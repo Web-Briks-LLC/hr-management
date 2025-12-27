@@ -11,7 +11,7 @@ async function createServiceInDB(data: {
 }
 
 async function getAllServicesFromDB(options: {
-    isActive?: boolean;
+    isActive?: boolean | undefined;
     page?: number;
     limit?: number;
 }): Promise<{ services: IService[]; total: number }> {

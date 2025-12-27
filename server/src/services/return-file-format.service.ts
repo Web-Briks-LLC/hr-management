@@ -12,7 +12,7 @@ async function createReturnFileFormatInDB(data: {
 }
 
 async function getAllReturnFileFormatsFromDB(options: {
-    isActive?: boolean;
+    isActive?: boolean | undefined;
     page?: number;
     limit?: number;
 }): Promise<{ formats: IReturnFileFormat[]; total: number }> {
