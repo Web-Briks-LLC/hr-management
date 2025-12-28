@@ -68,7 +68,8 @@ export default function AuthGuard({
     }
 
     // 🚫 Block rendering while redirecting
-    if (!session && !publicRoutes.has(pathname)) {
+    const isPublicRoute = publicRoutes.has(pathname) || pathname.startsWith('/sign-up');
+    if (!session && !isPublicRoute) {
         return null;
     }
 
