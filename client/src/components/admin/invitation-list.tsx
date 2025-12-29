@@ -33,6 +33,7 @@ import {
     XCircle,
     AlertTriangle,
     RefreshCw,
+    Copy,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, formatDistanceToNow } from 'date-fns';
@@ -199,6 +200,25 @@ export default function InvitationList() {
                                     <div className="flex justify-end gap-1">
                                         {!invitation.isUsed && (
                                             <>
+                                                <TooltipProvider>
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <Button
+                                                                size="icon"
+                                                                variant="ghost"
+                                                                onClick={() => {
+                                                                    const url = `${window.location.origin}/sign-up/${invitation.token}`;
+                                                                    navigator.clipboard.writeText(url);
+                                                                    toast.success('Link copied to clipboard');
+                                                                }}
+                                                                className="h-8 w-8"
+                                                            >
+                                                                <Copy className="h-4 w-4" />
+                                                            </Button>
+                                                        </TooltipTrigger>
+                                                        <TooltipContent>Copy link</TooltipContent>
+                                                    </Tooltip>
+                                                </TooltipProvider>
                                                 <TooltipProvider>
                                                     <Tooltip>
                                                         <TooltipTrigger asChild>
