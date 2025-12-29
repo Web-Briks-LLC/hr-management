@@ -210,8 +210,10 @@ async function getProfitSummaryFromDB(
     year: number,
     month?: number
 ): Promise<ProfitSummary> {
-    let earningsMatch: Record<string, unknown> = { year, status: 'completed' };
-    let expenseMatch: Record<string, unknown> = {};
+    const earningsMatch: Record<string, unknown> = {
+        year,
+        status: 'completed',
+    };
 
     if (periodType === 'month' && month) {
         earningsMatch.month = month;
@@ -332,7 +334,9 @@ async function distributeProfitInDB(
         notes: data.notes,
     }));
 
-    return ProfitDistributionModel.insertMany(distributions);
+    return ProfitDistributionModel.insertMany(
+        distributions
+    ) as unknown as Promise<IProfitDistribution[]>;
 }
 
 async function getDistributionsFromDB(
