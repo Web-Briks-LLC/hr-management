@@ -35,7 +35,12 @@ app.use(
             (req.method === 'POST' &&
                 /^\/invitations\/[^/]+\/accept$/.test(req.path));
 
-        if (isPublicInvitationRoute) {
+        // Allow public access to metadata type routes (for invite dialog dropdowns)
+        const isPublicMetadataRoute =
+            req.method === 'GET' &&
+            /^\/metadata\/type\/(department|designation)$/.test(req.path);
+
+        if (isPublicInvitationRoute || isPublicMetadataRoute) {
             return next();
         }
 

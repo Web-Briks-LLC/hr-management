@@ -23,6 +23,10 @@ export const apiSlice = createApi({
         'Service',
         'ReturnFileFormat',
         'Earning',
+        'Metadata',
+        'Shareholder',
+        'ProfitSummary',
+        'Distribution',
     ],
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     endpoints: (_builder) => ({}),

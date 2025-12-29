@@ -75,7 +75,6 @@ const notificationSchema = new Schema<INotification>(
         },
         expiresAt: {
             type: Date,
-            index: true,
         },
     },
     {
@@ -90,6 +89,9 @@ notificationSchema.index({ userId: 1, type: 1 });
 // Auto-delete expired notifications
 notificationSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
-const NotificationModel = model<INotification>('Notification', notificationSchema);
+const NotificationModel = model<INotification>(
+    'Notification',
+    notificationSchema
+);
 
 export default NotificationModel;

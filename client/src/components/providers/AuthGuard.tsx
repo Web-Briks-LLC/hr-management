@@ -2,7 +2,7 @@
 
 import { useSession } from '@/lib/auth-client';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { canAccess } from '@/utils/canAccess';
 import { Role } from '@/consonants/role';
 
@@ -12,6 +12,13 @@ const publicRoutes = new Set([
     '/reset-password',
 ]);
 
+// Loading spinner component
+const LoadingSpinner = () => (
+    <div className="flex h-screen items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
+    </div>
+);
+
 export default function AuthGuard({
     children,
 }: {
@@ -20,6 +27,7 @@ export default function AuthGuard({
     const { data: session, isPending } = useSession();
     const pathname = usePathname();
     const router = useRouter();
+    const [isRedirecting, setIsRedirecting] = useState(false);
 
     useEffect(() => {
         if (isPending) return;
@@ -41,12 +49,14 @@ export default function AuthGuard({
         // ❌ Not logged in
         if (!session) {
             if (isPublic) return;
+            setIsRedirecting(true);
             router.replace('/sign-in');
             return;
         }
 
         // ✅ Logged in user on public route → dashboard
         if (isPublic || pathname === '/') {
+            setIsRedirecting(true);
             router.replace('/dashboard');
             return;
         }
@@ -54,23 +64,24 @@ export default function AuthGuard({
         // 🔐 Role based access
         const role = session.user?.role as Role | undefined;
         if (role && !canAccess(role, pathname)) {
+            setIsRedirecting(true);
             router.replace('/dashboard');
+            return;
         }
+
+        // ✅ Access granted
+        setIsRedirecting(false);
     }, [session, isPending, pathname, router]);
 
-    // ⏳ Loading state
-    if (isPending) {
-        return (
-            <div className="flex h-screen items-center justify-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
-            </div>
-        );
+    // ⏳ Loading or redirecting state
+    if (isPending || isRedirecting) {
+        return <LoadingSpinner />;
     }
 
-    // 🚫 Block rendering while redirecting
+    // 🚫 Block rendering for unauthorized access (fallback)
     const isPublicRoute = publicRoutes.has(pathname) || pathname.startsWith('/sign-up');
     if (!session && !isPublicRoute) {
-        return null;
+        return <LoadingSpinner />;
     }
 
     return <>{children}</>;

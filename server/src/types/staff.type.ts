@@ -6,7 +6,7 @@ export default interface IStaff {
 
     phone: string;
 
-    branchId: Types.ObjectId;
+    branchId?: Types.ObjectId;
     department?: string;
     designation: string;
     joinDate: Date;

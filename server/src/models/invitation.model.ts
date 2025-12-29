@@ -6,15 +6,15 @@ export interface IInvitation {
     expiresAt: Date;
     isUsed: boolean;
     usedAt?: Date;
-    
+
     // Employee details set by admin
     salary: number;
-    role: 'staff' | 'team_leader';
+    role: 'staff' | 'team_leader' | 'admin' | 'super_admin' | 'hr_manager';
     department?: string;
     designation: string;
-    branchId: Schema.Types.ObjectId;
+    branchId?: Schema.Types.ObjectId;
     shiftId?: Schema.Types.ObjectId;
-    
+
     // Metadata
     createdBy: Schema.Types.ObjectId;
     createdAt: Date;
@@ -39,7 +39,6 @@ const invitationSchema = new Schema<IInvitation>(
         expiresAt: {
             type: Date,
             required: true,
-            index: true,
         },
         isUsed: {
             type: Boolean,
@@ -47,7 +46,7 @@ const invitationSchema = new Schema<IInvitation>(
             index: true,
         },
         usedAt: Date,
-        
+
         // Employee details
         salary: {
             type: Number,
@@ -56,7 +55,13 @@ const invitationSchema = new Schema<IInvitation>(
         },
         role: {
             type: String,
-            enum: ['staff', 'team_leader'],
+            enum: [
+                'staff',
+                'team_leader',
+                'admin',
+                'super_admin',
+                'hr_manager',
+            ],
             required: true,
         },
         department: String,
@@ -67,13 +72,13 @@ const invitationSchema = new Schema<IInvitation>(
         branchId: {
             type: Schema.Types.ObjectId,
             ref: 'Branch',
-            required: true,
+            required: false, // Optional for admin roles
         },
         shiftId: {
             type: Schema.Types.ObjectId,
             ref: 'Shift',
         },
-        
+
         // Metadata
         createdBy: {
             type: Schema.Types.ObjectId,

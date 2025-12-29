@@ -3,12 +3,13 @@ import type { Types } from 'mongoose';
 export interface IInvitationCreate {
     email: string;
     salary: number;
-    role: 'staff' | 'team_leader';
+    role: 'staff' | 'team_leader' | 'admin' | 'super_admin' | 'hr_manager';
     department?: string;
     designation: string;
-    branchId: string;
+    branchId?: string;
     shiftId?: string;
     createdBy: string;
+    currentUserRole: string;
     expiryHours?: number;
 }
 
@@ -23,7 +24,7 @@ export interface IInvitationResponse {
     role: string;
     department?: string;
     designation: string;
-    branchId: Types.ObjectId;
+    branchId?: Types.ObjectId;
     shiftId?: Types.ObjectId;
     createdBy: Types.ObjectId;
     createdAt: Date;

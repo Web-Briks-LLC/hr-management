@@ -16,6 +16,8 @@ import { orderRoute } from './order.route.js';
 import { serviceRoute } from './service.route.js';
 import { returnFileFormatRoute } from './return-file-format.route.js';
 import { earningRoute } from './earning.route.js';
+import { metadataRoute } from './metadata.route.js';
+import { profitShareRoute } from './profit-share.route.js';
 
 const router: Router = Router();
 
@@ -87,6 +89,14 @@ const moduleRoutes = [
     {
         path: '/earnings',
         route: earningRoute,
+    },
+    {
+        path: '/metadata',
+        route: metadataRoute,
+    },
+    {
+        path: '/profit-share',
+        route: profitShareRoute,
     },
 ];
 

@@ -1,10 +1,10 @@
 export interface IInvitationCreate {
     email: string;
     salary: number;
-    role: 'staff' | 'team_leader';
+    role: 'staff' | 'team_leader' | 'admin' | 'super_admin' | 'hr_manager';
     department?: string;
     designation: string;
-    branchId: string;
+    branchId?: string;
     shiftId?: string;
     expiryHours?: number;
 }

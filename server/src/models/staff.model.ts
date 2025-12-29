@@ -29,20 +29,13 @@ const StaffSchema = new Schema<IStaff>(
         branchId: {
             type: Schema.Types.ObjectId,
             ref: 'Branch',
-            required: true,
+            required: false, // Optional for admin roles
             index: true,
         },
 
         department: {
             type: String,
-            enum: [
-                'Graphic Design',
-                'Web Design & Development',
-                'Photo Editing',
-                'Marketing',
-                'Video Editing',
-                'Management',
-            ],
+            // Dynamic values from metadata, no enum restriction
             index: true,
         },
 

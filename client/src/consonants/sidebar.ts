@@ -11,6 +11,7 @@ import {
     IconUsers,
     IconPackage,
     IconChartBar,
+    IconPigMoney,
 } from '@tabler/icons-react';
 
 export const sidebarData = [
@@ -65,6 +66,12 @@ export const sidebarData = [
         title: 'Earnings',
         url: '/earnings',
         icon: IconReceipt,
+        access: [Role.SUPER_ADMIN, Role.ADMIN],
+    },
+    {
+        title: 'Profit Share',
+        url: '/profit-share',
+        icon: IconPigMoney,
         access: [Role.SUPER_ADMIN, Role.ADMIN],
     },
     {
