@@ -12,6 +12,7 @@ import {
     IconPackage,
     IconChartBar,
     IconPigMoney,
+    IconCreditCard,
 } from '@tabler/icons-react';
 
 export const sidebarData = [
@@ -26,6 +27,12 @@ export const sidebarData = [
             Role.TEAM_LEADER,
             Role.STAFF,
         ],
+    },
+    {
+        title: 'Debit',
+        url: '/debit',
+        icon: IconCreditCard,
+        access: [Role.SUPER_ADMIN, Role.ADMIN],
     },
     {
         title: 'Invitations',

@@ -18,6 +18,7 @@ import { returnFileFormatRoute } from './return-file-format.route.js';
 import { earningRoute } from './earning.route.js';
 import { metadataRoute } from './metadata.route.js';
 import { profitShareRoute } from './profit-share.route.js';
+import { debitRoute } from './debitRoutes.js';
 
 const router: Router = Router();
 
@@ -97,6 +98,10 @@ const moduleRoutes = [
     {
         path: '/profit-share',
         route: profitShareRoute,
+    },
+    {
+        path: '/debits',
+        route: debitRoute,
     },
 ];
 

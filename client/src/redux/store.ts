@@ -1,10 +1,12 @@
 import { configureStore } from '@reduxjs/toolkit';
 import { apiSlice } from './api/apiSlice';
+import debitReducer from './slices/debitSlice';
 
 export const store = () => {
     return configureStore({
         reducer: {
             [apiSlice.reducerPath]: apiSlice.reducer,
+            debit: debitReducer,
         },
         devTools: process.env.NODE_ENV !== 'production',
         middleware: (getDefault) => getDefault().concat(apiSlice.middleware),
