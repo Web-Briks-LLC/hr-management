@@ -237,7 +237,7 @@ export const deletePerson = async (req: Request, res: Response) => {
         const { id } = req.params;
 
         // Delete all transactions for this person first
-        await TransactionModel.deleteMany({ personId: id });
+        await TransactionModel.deleteMany({ personId: id } as any);
 
         const person = await PersonModel.findByIdAndDelete(id);
 
@@ -245,11 +245,9 @@ export const deletePerson = async (req: Request, res: Response) => {
             return res.status(404).json({ message: 'Person not found' });
         }
 
-        return res
-            .status(200)
-            .json({
-                message: 'Person and their transactions deleted successfully',
-            });
+        return res.status(200).json({
+            message: 'Person and their transactions deleted successfully',
+        });
     } catch (error) {
         console.error('Error deleting person:', error);
         return res

@@ -2,7 +2,7 @@ import express from 'express';
 import {
     getNextInvoiceNumber,
     getCurrentInvoiceNumber,
-} from '../controllers/invoice.controller';
+} from '../controllers/invoice.controller.js';
 
 const router = express.Router();
 

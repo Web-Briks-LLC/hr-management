@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express';
-import { InvoiceCounter } from '../models/invoice-counter.model';
+import { InvoiceCounter } from '../models/invoice-counter.model.js';
 
-export const getNextInvoiceNumber = async (req: Request, res: Response) => {
+export const getNextInvoiceNumber = async (_req: Request, res: Response) => {
     try {
         const counter = await InvoiceCounter.findByIdAndUpdate(
             { _id: 'invoice_id' },
@@ -26,7 +26,7 @@ export const getNextInvoiceNumber = async (req: Request, res: Response) => {
     }
 };
 
-export const getCurrentInvoiceNumber = async (req: Request, res: Response) => {
+export const getCurrentInvoiceNumber = async (_req: Request, res: Response) => {
     try {
         const counter = await InvoiceCounter.findById('invoice_id');
         const currentSeq = counter ? counter.seq : 0;

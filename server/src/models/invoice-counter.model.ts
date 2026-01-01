@@ -1,6 +1,6 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
-export interface IInvoiceCounter extends Document {
+export interface IInvoiceCounter extends Document<string> {
     _id: string;
     seq: number;
 }
