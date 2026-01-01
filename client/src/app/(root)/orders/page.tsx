@@ -81,9 +81,11 @@ import {
     Eye,
     Calendar,
     RotateCcw,
-    History,
     AlertTriangle,
+    FileText,
+    History,
 } from 'lucide-react';
+import Link from 'next/link';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { OrderForm, type OrderFormData } from '@/components/order/OrderForm';
@@ -503,35 +505,46 @@ export default function OrdersPage() {
                             Manage graphic design orders and track their status
                         </CardDescription>
                     </div>
-                    <Dialog
-                        open={isAddDialogOpen}
-                        onOpenChange={(open) => {
-                            setIsAddDialogOpen(open);
-                            if (!open) setServerErrors(undefined);
-                        }}
-                    >
-                        <DialogTrigger asChild>
-                            <Button>
-                                <Plus />
-                                Add Order
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-2xl! max-h-[90vh] overflow-y-auto">
-                            <DialogHeader>
-                                <DialogTitle>Create New Order</DialogTitle>
-                                <DialogDescription>
-                                    Fill in the order details
-                                </DialogDescription>
-                            </DialogHeader>
-                            <OrderForm
-                                onSubmit={handleCreateOrder}
-                                isSubmitting={isCreating}
-                                submitLabel="Create Order"
-                                onCancel={() => setIsAddDialogOpen(false)}
-                                serverErrors={serverErrors}
-                            />
-                        </DialogContent>
-                    </Dialog>
+                    <div className="flex gap-3">
+                        <Button
+                            variant="outline"
+                            asChild
+                        >
+                            <Link href="/orders/invoice">
+                                <FileText className="mr-2 h-4 w-4" />
+                                Generate Invoice
+                            </Link>
+                        </Button>
+                        <Dialog
+                            open={isAddDialogOpen}
+                            onOpenChange={(open) => {
+                                setIsAddDialogOpen(open);
+                                if (!open) setServerErrors(undefined);
+                            }}
+                        >
+                            <DialogTrigger asChild>
+                                <Button>
+                                    <Plus />
+                                    Add Order
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-2xl! max-h-[90vh] overflow-y-auto">
+                                <DialogHeader>
+                                    <DialogTitle>Create New Order</DialogTitle>
+                                    <DialogDescription>
+                                        Fill in the order details
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <OrderForm
+                                    onSubmit={handleCreateOrder}
+                                    isSubmitting={isCreating}
+                                    submitLabel="Create Order"
+                                    onCancel={() => setIsAddDialogOpen(false)}
+                                    serverErrors={serverErrors}
+                                />
+                            </DialogContent>
+                        </Dialog>
+                    </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     {/* Filters */}

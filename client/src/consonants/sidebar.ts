@@ -29,11 +29,18 @@ export const sidebarData = [
         ],
     },
     {
+        title: 'Staffs',
+        url: '/staffs',
+        icon: IconUsers,
+        access: [Role.SUPER_ADMIN, Role.ADMIN, Role.HR_MANAGER],
+    },
+    {
         title: 'Debit',
         url: '/debit',
         icon: IconCreditCard,
         access: [Role.SUPER_ADMIN, Role.ADMIN],
     },
+
     {
         title: 'Invitations',
         url: '/invitations',

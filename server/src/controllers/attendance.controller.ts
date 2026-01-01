@@ -60,7 +60,7 @@ async function checkOut(req: Request, res: Response) {
             });
         }
 
-        await AttendanceServices.checkOutInDB({
+        const result = await AttendanceServices.checkOutInDB({
             userId,
             ip,
             userAgent,
@@ -70,6 +70,7 @@ async function checkOut(req: Request, res: Response) {
         return res.status(200).json({
             success: true,
             message: 'Checked out successfully',
+            attendanceDay: result.attendanceDay,
         });
     } catch (error) {
         return res.status(500).json({
@@ -103,7 +104,7 @@ async function getTodayAttendance(req: Request, res: Response) {
             success: false,
             message:
                 error.message ||
-                'Failed to fetch today\'s attendance. Please try again.',
+                "Failed to fetch today's attendance. Please try again.",
         });
     }
 }
@@ -132,8 +133,11 @@ const getMyAttendanceHistory = async (req: Request, res: Response) => {
         if (!userId) throw new Error('Unauthorized');
 
         const days = parseInt(req.query.days as string) || 7;
-        const result = await AttendanceServices.getMyAttendanceHistoryInDB(userId, days);
-        
+        const result = await AttendanceServices.getMyAttendanceHistoryInDB(
+            userId,
+            days
+        );
+
         return res.status(200).json({
             success: true,
             data: result,
@@ -148,10 +152,26 @@ const getMyAttendanceHistory = async (req: Request, res: Response) => {
 
 const getAllAttendance = async (req: Request, res: Response) => {
     try {
-        const { startDate, endDate, staffId, status, branchId, page = '1', limit = '50' } = req.query;
-        
-        console.log('getAllAttendance called with params:', { startDate, endDate, staffId, status, branchId, page, limit });
-        
+        const {
+            startDate,
+            endDate,
+            staffId,
+            status,
+            branchId,
+            page = '1',
+            limit = '50',
+        } = req.query;
+
+        console.log('getAllAttendance called with params:', {
+            startDate,
+            endDate,
+            staffId,
+            status,
+            branchId,
+            page,
+            limit,
+        });
+
         const result = await AttendanceServices.getAllAttendanceFromDB({
             startDate: startDate as string,
             endDate: endDate as string,
@@ -161,7 +181,7 @@ const getAllAttendance = async (req: Request, res: Response) => {
             page: parseInt(page as string) || 1,
             limit: parseInt(limit as string) || 50,
         });
-        
+
         return res.status(200).json({
             success: true,
             data: result,
@@ -180,21 +200,21 @@ const updateAttendanceStatus = async (req: Request, res: Response) => {
         const { id } = req.params;
         const { status, notes } = req.body;
         const updatedBy = req.user?.id;
-        
+
         if (!updatedBy) {
             return res.status(401).json({
                 success: false,
                 message: 'Unauthorized',
             });
         }
-        
+
         const result = await AttendanceServices.updateAttendanceStatusInDB({
             attendanceId: id as string,
             status,
             notes,
             updatedBy,
         });
-        
+
         return res.status(200).json({
             success: true,
             message: 'Attendance status updated successfully',
@@ -208,10 +228,10 @@ const updateAttendanceStatus = async (req: Request, res: Response) => {
     }
 };
 
-const AttendanceController = { 
-    checkIn, 
-    checkOut, 
-    getTodayAttendance, 
+const AttendanceController = {
+    checkIn,
+    checkOut,
+    getTodayAttendance,
     getMonthlyStats,
     getMyAttendanceHistory,
     getAllAttendance,

@@ -1,4 +1,4 @@
-import { connection } from 'mongoose';
+import mongoose from 'mongoose';
 
-const UserModel = connection.collection('user');
+const UserModel = mongoose.connection.collection('user');
 export default UserModel;

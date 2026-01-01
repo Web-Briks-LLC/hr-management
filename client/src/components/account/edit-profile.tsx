@@ -74,29 +74,35 @@ export default function EditProfile() {
         form.setValue('name', session?.user.name as string);
         form.setValue('email', session?.user.email as string);
 
-        if (!data || !data.staff.profileCompleted) return;
+        // Check if staff exists and profile is completed
+        if (!data?.staff?.profileCompleted) return;
 
-        form.setValue('phone', data.staff.phone as string);
-        form.setValue('dateOfBirth', data.staff.dateOfBirth);
-        form.setValue('bloodGroup', data.staff.bloodGroup);
-        form.setValue('nationalId', data.staff.nationalId);
-        form.setValue('address', data.staff.address);
-        form.setValue(
-            'emergencyContact.name',
-            data.staff.emergencyContact.name
-        );
-        form.setValue(
-            'emergencyContact.phone',
-            data.staff.emergencyContact.phone
-        );
-        form.setValue(
-            'emergencyContact.relation',
-            data.staff.emergencyContact.relation
-        );
-        form.setValue('fathersName', data.staff.fathersName);
-        form.setValue('mothersName', data.staff.mothersName);
-        form.setValue('spouseName', data.staff.spouseName);
-        form.setValue('joinDate', data.staff.joinDate);
+        form.setValue('phone', data.staff.phone || '');
+
+        // Convert date strings to Date objects
+        if (data.staff.dateOfBirth) {
+            form.setValue('dateOfBirth', new Date(data.staff.dateOfBirth));
+        }
+
+        form.setValue('bloodGroup', data.staff.bloodGroup || '');
+        form.setValue('nationalId', data.staff.nationalId || '');
+        form.setValue('address', data.staff.address || '');
+
+        // Handle emergency contact - check if it exists and has values
+        if (data.staff.emergencyContact) {
+            form.setValue('emergencyContact.name', data.staff.emergencyContact.name || '');
+            form.setValue('emergencyContact.phone', data.staff.emergencyContact.phone || '');
+            form.setValue('emergencyContact.relation', data.staff.emergencyContact.relation || '');
+        }
+
+        form.setValue('fathersName', data.staff.fathersName || '');
+        form.setValue('mothersName', data.staff.mothersName || '');
+        form.setValue('spouseName', data.staff.spouseName || '');
+
+        // Convert joinDate string to Date object
+        if (data.staff.joinDate) {
+            form.setValue('joinDate', new Date(data.staff.joinDate));
+        }
     }, [session, form, isPending, isRefetching, data]);
 
     const isLoading =
@@ -128,7 +134,10 @@ export default function EditProfile() {
             }
 
             const staffPayload = {
-                dateOfBirth: values.dateOfBirth.toISOString(),
+                phone: values.phone,
+                dateOfBirth: values.dateOfBirth instanceof Date
+                    ? values.dateOfBirth.toISOString()
+                    : new Date(values.dateOfBirth).toISOString(),
                 nationalId: values.nationalId,
                 bloodGroup: values.bloodGroup,
                 address: values.address,
@@ -143,12 +152,30 @@ export default function EditProfile() {
                 mothersName: values.mothersName,
                 spouseName: values.spouseName || undefined,
 
-                joinDate: values.joinDate.toISOString(),
+                joinDate: values.joinDate instanceof Date
+                    ? values.joinDate.toISOString()
+                    : new Date(values.joinDate).toISOString(),
             };
 
-            data.staff.profileCompleted
-                ? await updateProfile(staffPayload).unwrap()
-                : await completeProfile(staffPayload).unwrap();
+
+            // Use updateProfile if profile is completed, otherwise completeProfile
+            // completeProfile will create a new staff record if needed
+            const isProfileCompleted = data?.staff?.profileCompleted;
+
+            try {
+                if (isProfileCompleted) {
+                    await updateProfile(staffPayload).unwrap();
+                } else {
+                    await completeProfile(staffPayload).unwrap();
+                }
+            } catch (apiError: unknown) {
+                const errorMessage = (apiError as { data?: { message?: string } })?.data?.message
+                    || (apiError as Error)?.message
+                    || 'Failed to update profile';
+                throw new Error(errorMessage);
+            }
+
+
 
             if (nameChanged && emailChanged) {
                 toast.success(

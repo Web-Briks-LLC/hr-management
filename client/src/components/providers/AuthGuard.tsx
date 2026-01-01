@@ -2,7 +2,7 @@
 
 import { useSession } from '@/lib/auth-client';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { canAccess } from '@/utils/canAccess';
 import { Role } from '@/consonants/role';
 
@@ -27,36 +27,43 @@ export default function AuthGuard({
     const { data: session, isPending } = useSession();
     const pathname = usePathname();
     const router = useRouter();
-    const [isRedirecting, setIsRedirecting] = useState(false);
+    const hasRedirected = useRef(false);
 
-    useEffect(() => {
-        if (isPending) return;
-
-        // Allow next static / assets automatically
-        if (
+    // Memoize route checks to avoid unnecessary recalculations
+    const isStaticRoute = useMemo(() => {
+        return (
             pathname.startsWith('/_next') ||
             pathname.startsWith('/api') ||
             pathname === '/favicon.ico' ||
             pathname === '/robots.txt' ||
             pathname.startsWith('/assets')
-        ) {
-            return;
-        }
+        );
+    }, [pathname]);
 
-        const isPublic =
-            publicRoutes.has(pathname) || pathname.startsWith('/sign-up');
+    const isPublicRoute = useMemo(() => {
+        return publicRoutes.has(pathname) || pathname.startsWith('/sign-up');
+    }, [pathname]);
+
+    useEffect(() => {
+        // Reset redirect flag when pathname changes
+        hasRedirected.current = false;
+    }, [pathname]);
+
+    useEffect(() => {
+        // Skip if still pending or already redirected
+        if (isPending || hasRedirected.current || isStaticRoute) return;
 
         // ❌ Not logged in
         if (!session) {
-            if (isPublic) return;
-            setIsRedirecting(true);
+            if (isPublicRoute) return;
+            hasRedirected.current = true;
             router.replace('/sign-in');
             return;
         }
 
         // ✅ Logged in user on public route → dashboard
-        if (isPublic || pathname === '/') {
-            setIsRedirecting(true);
+        if (isPublicRoute || pathname === '/') {
+            hasRedirected.current = true;
             router.replace('/dashboard');
             return;
         }
@@ -64,23 +71,29 @@ export default function AuthGuard({
         // 🔐 Role based access
         const role = session.user?.role as Role | undefined;
         if (role && !canAccess(role, pathname)) {
-            setIsRedirecting(true);
+            hasRedirected.current = true;
             router.replace('/dashboard');
             return;
         }
+    }, [session, isPending, pathname, router, isPublicRoute, isStaticRoute]);
 
-        // ✅ Access granted
-        setIsRedirecting(false);
-    }, [session, isPending, pathname, router]);
+    // Allow static routes immediately
+    if (isStaticRoute) {
+        return <>{children}</>;
+    }
 
-    // ⏳ Loading or redirecting state
-    if (isPending || isRedirecting) {
+    // ⏳ Only show loading while session is being fetched
+    if (isPending) {
         return <LoadingSpinner />;
     }
 
-    // 🚫 Block rendering for unauthorized access (fallback)
-    const isPublicRoute = publicRoutes.has(pathname) || pathname.startsWith('/sign-up');
+    // 🚫 Not logged in and not on public route - show loading while redirect happens
     if (!session && !isPublicRoute) {
+        return <LoadingSpinner />;
+    }
+
+    // ✅ Logged in on public route - show loading while redirect happens
+    if (session && (isPublicRoute || pathname === '/')) {
         return <LoadingSpinner />;
     }
 

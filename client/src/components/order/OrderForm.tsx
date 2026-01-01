@@ -135,13 +135,30 @@ export function OrderForm({
 
     const imageQuantity = watch('imageQuantity');
     const perImagePrice = watch('perImagePrice');
+    const totalPrice = watch('totalPrice');
 
-    // Auto-calculate total price
+    // Track which field the user is editing - 'perImage' or 'total'
+    const [priceMode, setPriceMode] = useState<'perImage' | 'total'>('perImage');
+
+    // Auto-calculate based on which field was last edited
     useEffect(() => {
         const qty = Number(imageQuantity) || 0;
-        const price = Number(perImagePrice) || 0;
-        setValue('totalPrice', qty * price);
-    }, [imageQuantity, perImagePrice, setValue]);
+
+        if (priceMode === 'perImage') {
+            // User entered per image price, calculate total
+            const price = Number(perImagePrice) || 0;
+            const calculatedTotal = Number((qty * price).toFixed(2));
+            setValue('totalPrice', calculatedTotal);
+        } else {
+            // User entered total price, calculate per image
+            const total = Number(totalPrice) || 0;
+            if (qty > 0) {
+                const calculatedPerImage = Number((total / qty).toFixed(2));
+                setValue('perImagePrice', calculatedPerImage);
+            }
+        }
+    }, [imageQuantity, perImagePrice, totalPrice, priceMode, setValue]);
+
 
     // Set server errors
     useEffect(() => {
@@ -332,7 +349,11 @@ export function OrderForm({
                         type="number"
                         step="0.01"
                         min="0"
-                        {...register('perImagePrice', { valueAsNumber: true })}
+                        value={perImagePrice || ''}
+                        onChange={(e) => {
+                            setPriceMode('perImage');
+                            setValue('perImagePrice', Number(e.target.value) || 0);
+                        }}
                     />
                     {errors.perImagePrice && (
                         <p className="text-sm text-destructive">
@@ -348,12 +369,18 @@ export function OrderForm({
                         id="totalPrice"
                         type="number"
                         step="0.01"
-                        {...register('totalPrice', { valueAsNumber: true })}
-                        readOnly
-                        className="bg-muted"
+                        min="0"
+                        value={totalPrice || ''}
+                        onChange={(e) => {
+                            setPriceMode('total');
+                            setValue('totalPrice', Number(e.target.value) || 0);
+                        }}
                     />
                 </div>
+
             </div>
+
+
 
             {/* Services */}
             <div className="space-y-2">

@@ -223,6 +223,25 @@ const checkClientId = async (req: Request, res: Response) => {
     }
 };
 
+const getClientStats = async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        if (!id) throw new Error('Client ID is required');
+
+        const result = await ClientServices.getClientStatsFromDB(id);
+        res.status(200).json({
+            success: true,
+            data: result,
+        });
+    } catch (error: unknown) {
+        const err = error as Error;
+        res.status(500).json({
+            success: false,
+            message: err.message || 'Failed to fetch client stats',
+        });
+    }
+};
+
 export default {
     getAllClients,
     getClientById,
@@ -230,4 +249,5 @@ export default {
     updateClient,
     deleteClient,
     checkClientId,
+    getClientStats,
 };

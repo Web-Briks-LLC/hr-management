@@ -151,11 +151,30 @@ const getAllClientsFromDB = async (params: ClientQueryParams) => {
 
 // Get client by ID
 const getClientByIdFromDB = async (id: string) => {
-    const result = await ClientModel.findById(id).populate(
-        'createdBy',
-        '-password'
-    );
-    return result;
+    const result = await ClientModel.aggregate([
+        { $match: { _id: new Types.ObjectId(id) } },
+        {
+            $lookup: {
+                from: 'user',
+                localField: 'createdBy',
+                foreignField: '_id',
+                as: 'createdBy',
+            },
+        },
+        {
+            $unwind: {
+                path: '$createdBy',
+                preserveNullAndEmptyArrays: true,
+            },
+        },
+        {
+            $project: {
+                'createdBy.password': 0,
+                'createdBy.passwordHistory': 0,
+            },
+        },
+    ]);
+    return result[0] || null;
 };
 
 // Custom error class for client ID conflicts
@@ -245,6 +264,51 @@ const deleteClientFromDB = async (id: string) => {
     return result;
 };
 
+// Get client financial stats
+const getClientStatsFromDB = async (clientId: string) => {
+    const { default: OrderModel } = await import('../models/order.model.js');
+    const { default: EarningModel } = await import(
+        '../models/earning.model.js'
+    );
+
+    const clientObjectId = new Types.ObjectId(clientId);
+
+    // Get total orders count and total amount from orders
+    const orderStats = await OrderModel.aggregate([
+        { $match: { clientId: clientObjectId } },
+        {
+            $group: {
+                _id: null,
+                totalOrders: { $sum: 1 },
+                totalAmount: { $sum: '$totalPrice' },
+            },
+        },
+    ]);
+
+    // Get total paid amount from earnings
+    const earningStats = await EarningModel.aggregate([
+        { $match: { clientId: clientObjectId } },
+        {
+            $group: {
+                _id: null,
+                paidAmount: { $sum: '$amount' },
+            },
+        },
+    ]);
+
+    const totalOrders = orderStats[0]?.totalOrders || 0;
+    const totalAmount = orderStats[0]?.totalAmount || 0;
+    const paidAmount = earningStats[0]?.paidAmount || 0;
+    const dueAmount = totalAmount - paidAmount;
+
+    return {
+        totalOrders,
+        totalAmount,
+        paidAmount,
+        dueAmount: Math.max(0, dueAmount), // Ensure due is not negative
+    };
+};
+
 export default {
     getAllClientsFromDB,
     getClientByIdFromDB,
@@ -252,6 +316,7 @@ export default {
     updateClientInDB,
     deleteClientFromDB,
     checkClientIdAvailability,
+    getClientStatsFromDB,
 };
 
 export { ClientIdExistsError };

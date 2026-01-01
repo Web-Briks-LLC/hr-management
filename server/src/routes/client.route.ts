@@ -17,6 +17,13 @@ router.get(
     ClientController.checkClientId
 );
 
+// Get client stats (must be before :id route)
+router.get(
+    '/:id/stats',
+    authorize(...allowedRoles),
+    ClientController.getClientStats
+);
+
 // Get client by ID
 router.get('/:id', authorize(...allowedRoles), ClientController.getClientById);
 

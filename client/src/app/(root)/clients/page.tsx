@@ -31,7 +31,8 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Loader2, ChevronLeft, ChevronRight, Plus, Trash2, Edit2, Users } from 'lucide-react';
+import { Loader2, ChevronLeft, ChevronRight, Plus, Trash2, Edit2, Users, Eye } from 'lucide-react';
+import Link from 'next/link';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { ClientForm, type ClientFormData } from '@/components/client/ClientForm';
@@ -335,6 +336,15 @@ export default function ClientsPage() {
                                                     </TableCell>
                                                     <TableCell className="text-right">
                                                         <div className="flex items-center justify-center gap-2">
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                asChild
+                                                            >
+                                                                <Link href={`/clients/${client._id}`}>
+                                                                    <Eye className="h-4 w-4" />
+                                                                </Link>
+                                                            </Button>
                                                             <Button
                                                                 variant="ghost"
                                                                 size="icon"

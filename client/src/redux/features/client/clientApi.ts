@@ -63,6 +63,29 @@ export const clientApi = apiSlice.injectEndpoints({
                 data: { available: boolean; suggestions?: string[] };
             }) => response.data,
         }),
+        getClientStats: builder.query<
+            {
+                totalOrders: number;
+                totalAmount: number;
+                paidAmount: number;
+                dueAmount: number;
+            },
+            string
+        >({
+            query: (clientId) => ({
+                url: `/clients/${clientId}/stats`,
+                method: 'GET',
+            }),
+            transformResponse: (response: {
+                data: {
+                    totalOrders: number;
+                    totalAmount: number;
+                    paidAmount: number;
+                    dueAmount: number;
+                };
+            }) => response.data,
+            providesTags: ['Client'],
+        }),
     }),
 });
 
@@ -73,4 +96,5 @@ export const {
     useUpdateClientMutation,
     useDeleteClientMutation,
     useLazyCheckClientIdQuery,
+    useGetClientStatsQuery,
 } = clientApi;

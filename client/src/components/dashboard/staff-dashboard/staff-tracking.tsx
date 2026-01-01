@@ -130,7 +130,14 @@ export default function StaffTracking() {
                 error?.error ||
                 'Failed to check in. Please try again.';
 
-            toast.error(apiMessage);
+            // Show warning for shift timing issues, error for other issues
+            if (apiMessage.includes('Shift has not started') ||
+                apiMessage.includes('not a working day') ||
+                apiMessage.includes('Shift time is over')) {
+                toast.warning(apiMessage);
+            } else {
+                toast.error(apiMessage);
+            }
         }
     };
 
@@ -145,13 +152,14 @@ export default function StaffTracking() {
                 return;
             }
 
-            if (res.attendanceDay.earlyExitMinutes > 0) {
+            if ((res.attendanceDay?.earlyExitMinutes ?? 0) > 0) {
                 toast.warning('Checked out early!', {
                     description: `You left ${res.attendanceDay.earlyExitMinutes} minutes early.`,
                 });
             } else {
                 toast.success('Checked out successfully!');
             }
+
         } catch (error: any) {
             console.log(error);
             const apiMessage =
