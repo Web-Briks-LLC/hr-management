@@ -84,6 +84,9 @@ import {
     AlertTriangle,
     FileText,
     History,
+    Search,
+    Filter,
+    X,
 } from 'lucide-react';
 import Link from 'next/link';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -92,6 +95,12 @@ import { OrderForm, type OrderFormData } from '@/components/order/OrderForm';
 import { DeadlineCountdown } from '@/components/order/DeadlineCountdown';
 import { OrderTimeline } from '@/components/order/OrderTimeline';
 import { Badge } from '@/components/ui/badge';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { format } from 'date-fns';
 import { DateTimePicker } from '@/components/shared/DateTimePicker';
 import { cn } from '@/lib/utils';
@@ -173,6 +182,28 @@ export default function OrdersPage() {
     const [revisionInstruction, setRevisionInstruction] = useState('');
     const [statusChangeNote, setStatusChangeNote] = useState('');
 
+    // Date filter state
+    const [selectedMonth, setSelectedMonth] = useState<string>('');
+    const [selectedYear, setSelectedYear] = useState<string>('');
+
+    // Generate year options (from 2020 to current year + 1)
+    const currentYear = new Date().getFullYear();
+    const years = Array.from({ length: currentYear - 2020 + 2 }, (_, i) => 2020 + i);
+    const months = [
+        { value: '1', label: 'January' },
+        { value: '2', label: 'February' },
+        { value: '3', label: 'March' },
+        { value: '4', label: 'April' },
+        { value: '5', label: 'May' },
+        { value: '6', label: 'June' },
+        { value: '7', label: 'July' },
+        { value: '8', label: 'August' },
+        { value: '9', label: 'September' },
+        { value: '10', label: 'October' },
+        { value: '11', label: 'November' },
+        { value: '12', label: 'December' },
+    ];
+
     // Queries
     const {
         data: orderData,
@@ -181,6 +212,8 @@ export default function OrdersPage() {
     } = useGetOrdersQuery({
         ...filters,
         page,
+        month: selectedMonth ? parseInt(selectedMonth) : undefined,
+        year: selectedYear ? parseInt(selectedYear) : undefined,
     });
     const { data: statsData } = useGetOrderStatsQuery();
     const { data: clientsData } = useGetClientsQuery({ limit: 100 });
@@ -388,110 +421,138 @@ export default function OrdersPage() {
 
     return (
         <div className="space-y-6">
-            {/* Stats Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">
-                            Total
-                        </CardTitle>
-                        <Package className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">
+            {/* Stats Cards - Row 1 */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {/* Total Orders Card */}
+                <div className="group relative overflow-hidden rounded-2xl border bg-gradient-to-br from-slate-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-slate-500/5 hover:border-slate-500/30">
+                    <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-slate-500/10 blur-2xl transition-all duration-300 group-hover:bg-slate-500/20" />
+                    <div className="relative">
+                        <div className="flex items-center justify-between mb-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-500/10 text-slate-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-slate-500/20">
+                                <Package className="h-5 w-5" />
+                            </div>
+                        </div>
+                        <h3 className="text-3xl font-bold tracking-tight text-slate-600 dark:text-slate-300">
                             {stats?.total || 0}
+                        </h3>
+                        <p className="text-xs text-muted-foreground mt-1">Total Orders</p>
+                    </div>
+                </div>
+
+                {/* Pending Card */}
+                <div className="group relative overflow-hidden rounded-2xl border bg-gradient-to-br from-yellow-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-yellow-500/5 hover:border-yellow-500/30">
+                    <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-yellow-500/10 blur-2xl transition-all duration-300 group-hover:bg-yellow-500/20" />
+                    <div className="relative">
+                        <div className="flex items-center justify-between mb-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-yellow-500/10 text-yellow-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-yellow-500/20">
+                                <Clock className="h-5 w-5" />
+                            </div>
                         </div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">
-                            Pending
-                        </CardTitle>
-                        <Clock className="h-4 w-4 text-yellow-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-yellow-600">
+                        <h3 className="text-3xl font-bold tracking-tight text-yellow-600 dark:text-yellow-400">
                             {stats?.pending || 0}
+                        </h3>
+                        <p className="text-xs text-muted-foreground mt-1">Pending</p>
+                    </div>
+                </div>
+
+                {/* In Progress Card */}
+                <div className="group relative overflow-hidden rounded-2xl border bg-gradient-to-br from-blue-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/5 hover:border-blue-500/30">
+                    <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-blue-500/10 blur-2xl transition-all duration-300 group-hover:bg-blue-500/20" />
+                    <div className="relative">
+                        <div className="flex items-center justify-between mb-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/10 text-blue-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-blue-500/20">
+                                <Loader2 className="h-5 w-5" />
+                            </div>
                         </div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">
-                            In Progress
-                        </CardTitle>
-                        <Loader2 className="h-4 w-4 text-blue-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-blue-600">
+                        <h3 className="text-3xl font-bold tracking-tight text-blue-600 dark:text-blue-400">
                             {stats?.inProgress || 0}
+                        </h3>
+                        <p className="text-xs text-muted-foreground mt-1">In Progress</p>
+                    </div>
+                </div>
+
+                {/* Quality Check Card */}
+                <div className="group relative overflow-hidden rounded-2xl border bg-gradient-to-br from-purple-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-purple-500/5 hover:border-purple-500/30">
+                    <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-purple-500/10 blur-2xl transition-all duration-300 group-hover:bg-purple-500/20" />
+                    <div className="relative">
+                        <div className="flex items-center justify-between mb-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-500/10 text-purple-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-purple-500/20">
+                                <AlertCircle className="h-5 w-5" />
+                            </div>
                         </div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">QC</CardTitle>
-                        <AlertCircle className="h-4 w-4 text-purple-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-purple-600">
+                        <h3 className="text-3xl font-bold tracking-tight text-purple-600 dark:text-purple-400">
                             {stats?.qualityCheck || 0}
+                        </h3>
+                        <p className="text-xs text-muted-foreground mt-1">Quality Check</p>
+                    </div>
+                </div>
+            </div>
+
+            {/* Stats Cards - Row 2 */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {/* Revision Card */}
+                <div className="group relative overflow-hidden rounded-2xl border bg-gradient-to-br from-orange-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-orange-500/5 hover:border-orange-500/30">
+                    <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-orange-500/10 blur-2xl transition-all duration-300 group-hover:bg-orange-500/20" />
+                    <div className="relative">
+                        <div className="flex items-center justify-between mb-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-500/10 text-orange-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-orange-500/20">
+                                <RotateCcw className="h-5 w-5" />
+                            </div>
                         </div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">
-                            Revision
-                        </CardTitle>
-                        <RotateCcw className="h-4 w-4 text-orange-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-orange-600">
+                        <h3 className="text-3xl font-bold tracking-tight text-orange-600 dark:text-orange-400">
                             {stats?.revision || 0}
+                        </h3>
+                        <p className="text-xs text-muted-foreground mt-1">Revision</p>
+                    </div>
+                </div>
+
+                {/* Completed Card */}
+                <div className="group relative overflow-hidden rounded-2xl border bg-gradient-to-br from-green-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-green-500/5 hover:border-green-500/30">
+                    <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-green-500/10 blur-2xl transition-all duration-300 group-hover:bg-green-500/20" />
+                    <div className="relative">
+                        <div className="flex items-center justify-between mb-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-500/10 text-green-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-green-500/20">
+                                <CheckCircle className="h-5 w-5" />
+                            </div>
                         </div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">
-                            Completed
-                        </CardTitle>
-                        <CheckCircle className="h-4 w-4 text-green-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-green-600">
+                        <h3 className="text-3xl font-bold tracking-tight text-green-600 dark:text-green-400">
                             {stats?.completed || 0}
+                        </h3>
+                        <p className="text-xs text-muted-foreground mt-1">Completed</p>
+                    </div>
+                </div>
+
+                {/* Delivered Card */}
+                <div className="group relative overflow-hidden rounded-2xl border bg-gradient-to-br from-emerald-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-emerald-500/5 hover:border-emerald-500/30">
+                    <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-emerald-500/10 blur-2xl transition-all duration-300 group-hover:bg-emerald-500/20" />
+                    <div className="relative">
+                        <div className="flex items-center justify-between mb-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-emerald-500/20">
+                                <CheckCircle className="h-5 w-5" />
+                            </div>
                         </div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">
-                            Delivered
-                        </CardTitle>
-                        <CheckCircle className="h-4 w-4 text-emerald-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-emerald-600">
+                        <h3 className="text-3xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400">
                             {stats?.delivered || 0}
+                        </h3>
+                        <p className="text-xs text-muted-foreground mt-1">Delivered</p>
+                    </div>
+                </div>
+
+                {/* Overdue Card */}
+                <div className="group relative overflow-hidden rounded-2xl border bg-gradient-to-br from-red-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-red-500/5 hover:border-red-500/30">
+                    <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-red-500/10 blur-2xl transition-all duration-300 group-hover:bg-red-500/20" />
+                    <div className="relative">
+                        <div className="flex items-center justify-between mb-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-500/10 text-red-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-red-500/20">
+                                <AlertTriangle className="h-5 w-5" />
+                            </div>
                         </div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">
-                            Overdue
-                        </CardTitle>
-                        <AlertTriangle className="h-4 w-4 text-red-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-red-600">
+                        <h3 className="text-3xl font-bold tracking-tight text-red-600 dark:text-red-400">
                             {stats?.overdue || 0}
-                        </div>
-                    </CardContent>
-                </Card>
+                        </h3>
+                        <p className="text-xs text-muted-foreground mt-1">Overdue</p>
+                    </div>
+                </div>
             </div>
 
             {/* Main Card */}
@@ -548,94 +609,159 @@ export default function OrdersPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                     {/* Filters */}
-                    <div className="grid grid-cols-1 md:grid-cols-5 gap-4 w-full">
-                        <Input
-                            placeholder="Search by name..."
-                            value={filters.search || ''}
-                            onChange={(e) =>
-                                handleFilterChange('search', e.target.value)
-                            }
-                            className="w-full"
-                        />
-                        <Select
-                            value={filters.status || ''}
-                            onValueChange={(value) =>
-                                handleFilterChange(
-                                    'status',
-                                    value as OrderStatus
-                                )
-                            }
-                        >
-                            <SelectTrigger className="w-full">
-                                <SelectValue placeholder="All statuses" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {Object.entries(ORDER_STATUS_LABELS).map(
-                                    ([value, label]) => (
-                                        <SelectItem key={value} value={value}>
-                                            {label}
-                                        </SelectItem>
-                                    )
-                                )}
-                            </SelectContent>
-                        </Select>
-                        <Select
-                            value={filters.priority || ''}
-                            onValueChange={(value) =>
-                                handleFilterChange(
-                                    'priority',
-                                    value as OrderPriority
-                                )
-                            }
-                        >
-                            <SelectTrigger className="w-full">
-                                <SelectValue placeholder="All priorities" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {Object.entries(ORDER_PRIORITY_LABELS).map(
-                                    ([value, label]) => (
-                                        <SelectItem key={value} value={value}>
-                                            {label}
-                                        </SelectItem>
-                                    )
-                                )}
-                            </SelectContent>
-                        </Select>
-                        <Select
-                            value={filters.clientId || ''}
-                            onValueChange={(value) =>
-                                handleFilterChange('clientId', value)
-                            }
-                        >
-                            <SelectTrigger className="w-full">
-                                <SelectValue placeholder="All clients" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {clients.map((client) => (
-                                    <SelectItem
-                                        key={client._id}
-                                        value={client._id}
-                                    >
-                                        {client.name}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                        <Button
-                            variant="outline"
-                            onClick={() => {
-                                setFilters({
-                                    search: '',
-                                    status: undefined,
-                                    priority: undefined,
-                                    clientId: undefined,
-                                    limit: 10,
-                                });
-                                setPage(1);
-                            }}
-                        >
-                            Clear Filters
-                        </Button>
+                    <div className="rounded-xl border bg-muted/30 p-4">
+                        <div className="flex items-center gap-2 mb-4">
+                            <Filter className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-sm font-medium">Filters</span>
+                        </div>
+                        <TooltipProvider>
+                            <div className="flex flex-wrap gap-4 items-center">
+                                {/* Search */}
+                                <div className="relative flex-1 min-w-[200px]">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                    <Input
+                                        placeholder="Search..."
+                                        value={filters.search || ''}
+                                        onChange={(e) =>
+                                            handleFilterChange('search', e.target.value)
+                                        }
+                                        className="pl-9 bg-background"
+                                    />
+                                </div>
+
+                                {/* Month Filter */}
+                                <Select
+                                    value={selectedMonth}
+                                    onValueChange={(value) => {
+                                        setSelectedMonth(value);
+                                        setPage(1);
+                                    }}
+                                >
+                                    <SelectTrigger className="bg-background w-[140px]">
+                                        <SelectValue placeholder="All Months" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {months.map((month) => (
+                                            <SelectItem key={month.value} value={month.value}>
+                                                {month.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+
+                                {/* Year Filter */}
+                                <Select
+                                    value={selectedYear}
+                                    onValueChange={(value) => {
+                                        setSelectedYear(value);
+                                        setPage(1);
+                                    }}
+                                >
+                                    <SelectTrigger className="bg-background w-[120px]">
+                                        <SelectValue placeholder="All Years" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {years.map((year) => (
+                                            <SelectItem key={year} value={year.toString()}>
+                                                {year}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+
+                                {/* Status Filter */}
+                                <Select
+                                    value={filters.status || ''}
+                                    onValueChange={(value) =>
+                                        handleFilterChange('status', value as OrderStatus)
+                                    }
+                                >
+                                    <SelectTrigger className="bg-background w-[140px]">
+                                        <SelectValue placeholder="All Statuses" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {Object.entries(ORDER_STATUS_LABELS).map(
+                                            ([value, label]) => (
+                                                <SelectItem key={value} value={value}>
+                                                    {label}
+                                                </SelectItem>
+                                            )
+                                        )}
+                                    </SelectContent>
+                                </Select>
+
+                                {/* Priority Filter */}
+                                <Select
+                                    value={filters.priority || ''}
+                                    onValueChange={(value) =>
+                                        handleFilterChange('priority', value as OrderPriority)
+                                    }
+                                >
+                                    <SelectTrigger className="bg-background w-[140px]">
+                                        <SelectValue placeholder="All Priorities" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {Object.entries(ORDER_PRIORITY_LABELS).map(
+                                            ([value, label]) => (
+                                                <SelectItem key={value} value={value}>
+                                                    {label}
+                                                </SelectItem>
+                                            )
+                                        )}
+                                    </SelectContent>
+                                </Select>
+
+                                {/* Client Filter */}
+                                <Select
+                                    value={filters.clientId || ''}
+                                    onValueChange={(value) =>
+                                        handleFilterChange('clientId', value)
+                                    }
+                                >
+                                    <SelectTrigger className="bg-background w-[140px]">
+                                        <SelectValue placeholder="All Clients" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {clients.map((client) => (
+                                            <SelectItem
+                                                key={client._id}
+                                                value={client._id}
+                                            >
+                                                {client.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+
+                                {/* Clear Filters Button */}
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button
+                                            variant="outline"
+                                            size="icon"
+                                            onClick={() => {
+                                                setFilters({
+                                                    search: '',
+                                                    status: undefined,
+                                                    priority: undefined,
+                                                    clientId: undefined,
+                                                    limit: 10,
+                                                });
+                                                setSelectedMonth('');
+                                                setSelectedYear('');
+                                                setPage(1);
+                                            }}
+                                            className="bg-background"
+                                        >
+                                            <X className="h-4 w-4" />
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        <p>Clear Filters</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                            </div>
+                        </TooltipProvider>
                     </div>
 
                     {/* Table */}
@@ -693,8 +819,8 @@ export default function OrdersPage() {
                             <Table>
                                 <TableHeader>
                                     <TableRow>
+                                        <TableHead className="border-r">Order Date</TableHead>
                                         <TableHead className="border-r">Name</TableHead>
-                                        <TableHead className="border-r">Client</TableHead>
                                         <TableHead className="border-r">Time Left</TableHead>
                                         <TableHead className="border-r text-center">Qty</TableHead>
                                         <TableHead className="border-r">Total</TableHead>
@@ -716,6 +842,9 @@ export default function OrdersPage() {
                                     ) : (
                                         orders.map((order: IOrder) => (
                                             <TableRow key={order._id}>
+                                                <TableCell className="border-r">
+                                                    {format(new Date(order.orderDate), 'PPP')}
+                                                </TableCell>
                                                 <TableCell className="border-r font-medium max-w-[200px] truncate">
                                                     {order.orderName}
                                                     {order.revisionCount > 0 && (
@@ -726,9 +855,6 @@ export default function OrdersPage() {
                                                             R{order.revisionCount}
                                                         </Badge>
                                                     )}
-                                                </TableCell>
-                                                <TableCell className="border-r">
-                                                    {order.clientId?.name || '-'}
                                                 </TableCell>
                                                 <TableCell className="border-r">
                                                     <DeadlineCountdown
@@ -781,69 +907,97 @@ export default function OrdersPage() {
                                                     </span>
                                                 </TableCell>
                                                 <TableCell className='w-auto'>
-                                                    <div className="flex items-center justify-center gap-1">
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            onClick={() =>
-                                                                openViewDialog(order)
-                                                            }
-                                                            title="View"
-                                                        >
-                                                            <Eye className="h-4 w-4" />
-                                                        </Button>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            onClick={() =>
-                                                                openEditDialog(order)
-                                                            }
-                                                            title="Edit"
-                                                        >
-                                                            <Edit2 className="h-4 w-4" />
-                                                        </Button>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            onClick={() =>
-                                                                openExtendDialog(order)
-                                                            }
-                                                            title="Extend Deadline"
-                                                        >
-                                                            <Calendar className="h-4 w-4" />
-                                                        </Button>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            onClick={() =>
-                                                                openRevisionDialog(order)
-                                                            }
-                                                            title="Add Revision"
-                                                        >
-                                                            <RotateCcw className="h-4 w-4" />
-                                                        </Button>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            onClick={() =>
-                                                                openTimelineDialog(order)
-                                                            }
-                                                            title="View Timeline"
-                                                        >
-                                                            <History className="h-4 w-4" />
-                                                        </Button>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            onClick={() => {
-                                                                setSelectedOrder(order);
-                                                                setIsDeleteDialogOpen(true);
-                                                            }}
-                                                            title="Delete"
-                                                        >
-                                                            <Trash2 className="h-4 w-4 text-destructive" />
-                                                        </Button>
-                                                    </div>
+                                                    <TooltipProvider>
+                                                        <div className="flex items-center justify-center gap-1">
+                                                            <Tooltip>
+                                                                <TooltipTrigger asChild>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        onClick={() => openViewDialog(order)}
+                                                                    >
+                                                                        <Eye className="h-4 w-4" />
+                                                                    </Button>
+                                                                </TooltipTrigger>
+                                                                <TooltipContent>
+                                                                    <p>View</p>
+                                                                </TooltipContent>
+                                                            </Tooltip>
+                                                            <Tooltip>
+                                                                <TooltipTrigger asChild>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        onClick={() => openEditDialog(order)}
+                                                                    >
+                                                                        <Edit2 className="h-4 w-4" />
+                                                                    </Button>
+                                                                </TooltipTrigger>
+                                                                <TooltipContent>
+                                                                    <p>Edit</p>
+                                                                </TooltipContent>
+                                                            </Tooltip>
+                                                            <Tooltip>
+                                                                <TooltipTrigger asChild>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        onClick={() => openExtendDialog(order)}
+                                                                    >
+                                                                        <Calendar className="h-4 w-4" />
+                                                                    </Button>
+                                                                </TooltipTrigger>
+                                                                <TooltipContent>
+                                                                    <p>Extend Deadline</p>
+                                                                </TooltipContent>
+                                                            </Tooltip>
+                                                            <Tooltip>
+                                                                <TooltipTrigger asChild>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        onClick={() => openRevisionDialog(order)}
+                                                                    >
+                                                                        <RotateCcw className="h-4 w-4" />
+                                                                    </Button>
+                                                                </TooltipTrigger>
+                                                                <TooltipContent>
+                                                                    <p>Add Revision</p>
+                                                                </TooltipContent>
+                                                            </Tooltip>
+                                                            <Tooltip>
+                                                                <TooltipTrigger asChild>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        onClick={() => openTimelineDialog(order)}
+                                                                    >
+                                                                        <History className="h-4 w-4" />
+                                                                    </Button>
+                                                                </TooltipTrigger>
+                                                                <TooltipContent>
+                                                                    <p>View Timeline</p>
+                                                                </TooltipContent>
+                                                            </Tooltip>
+                                                            <Tooltip>
+                                                                <TooltipTrigger asChild>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        onClick={() => {
+                                                                            setSelectedOrder(order);
+                                                                            setIsDeleteDialogOpen(true);
+                                                                        }}
+                                                                    >
+                                                                        <Trash2 className="h-4 w-4 text-destructive" />
+                                                                    </Button>
+                                                                </TooltipTrigger>
+                                                                <TooltipContent>
+                                                                    <p>Delete</p>
+                                                                </TooltipContent>
+                                                            </Tooltip>
+                                                        </div>
+                                                    </TooltipProvider>
                                                 </TableCell>
                                             </TableRow>
                                         ))
@@ -854,52 +1008,55 @@ export default function OrdersPage() {
                     </div>
 
                     {/* Pagination */}
-                    {meta && meta.totalPages > 1 && (
-                        <div className="flex items-center justify-between">
-                            <div className="text-sm text-muted-foreground">
-                                Page {meta.page} of {meta.totalPages} (
-                                {meta.total} total)
+                    {
+                        meta && meta.totalPages > 1 && (
+                            <div className="flex items-center justify-between">
+                                <div className="text-sm text-muted-foreground">
+                                    Page {meta.page} of {meta.totalPages} (
+                                    {meta.total} total)
+                                </div>
+                                <div className="flex gap-2">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() =>
+                                            setPage((p) => Math.max(1, p - 1))
+                                        }
+                                        disabled={page === 1 || isFetching}
+                                    >
+                                        <ChevronLeft />
+                                        Previous
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() =>
+                                            setPage((p) =>
+                                                Math.min(meta.totalPages, p + 1)
+                                            )
+                                        }
+                                        disabled={
+                                            page === meta.totalPages || isFetching
+                                        }
+                                    >
+                                        Next
+                                        <ChevronRight />
+                                    </Button>
+                                </div>
                             </div>
-                            <div className="flex gap-2">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() =>
-                                        setPage((p) => Math.max(1, p - 1))
-                                    }
-                                    disabled={page === 1 || isFetching}
-                                >
-                                    <ChevronLeft />
-                                    Previous
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() =>
-                                        setPage((p) =>
-                                            Math.min(meta.totalPages, p + 1)
-                                        )
-                                    }
-                                    disabled={
-                                        page === meta.totalPages || isFetching
-                                    }
-                                >
-                                    Next
-                                    <ChevronRight />
-                                </Button>
-                            </div>
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
+                        )
+                    }
+                </CardContent >
+            </Card >
 
             {/* Edit Dialog */}
-            <Dialog
+            < Dialog
                 open={isEditDialogOpen}
                 onOpenChange={(open) => {
                     setIsEditDialogOpen(open);
                     if (!open) setServerErrors(undefined);
-                }}
+                }
+                }
             >
                 <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
@@ -921,10 +1078,10 @@ export default function OrdersPage() {
                         />
                     )}
                 </DialogContent>
-            </Dialog>
+            </Dialog >
 
             {/* View Dialog */}
-            <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+            < Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen} >
                 <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle>Order Details</DialogTitle>
@@ -1080,10 +1237,10 @@ export default function OrdersPage() {
                         </div>
                     )}
                 </DialogContent>
-            </Dialog>
+            </Dialog >
 
             {/* Extend Deadline Dialog */}
-            <Dialog
+            < Dialog
                 open={isExtendDialogOpen}
                 onOpenChange={(open) => {
                     setIsExtendDialogOpen(open);
@@ -1135,10 +1292,10 @@ export default function OrdersPage() {
                         </Button>
                     </DialogFooter>
                 </DialogContent>
-            </Dialog>
+            </Dialog >
 
             {/* Add Revision Dialog */}
-            <Dialog
+            < Dialog
                 open={isRevisionDialogOpen}
                 onOpenChange={(open) => {
                     setIsRevisionDialogOpen(open);
@@ -1185,10 +1342,10 @@ export default function OrdersPage() {
                         </Button>
                     </DialogFooter>
                 </DialogContent>
-            </Dialog>
+            </Dialog >
 
             {/* Timeline Dialog */}
-            <Dialog
+            < Dialog
                 open={isTimelineDialogOpen}
                 onOpenChange={setIsTimelineDialogOpen}
             >
@@ -1203,10 +1360,10 @@ export default function OrdersPage() {
                         <OrderTimeline timeline={selectedOrder.timeline} />
                     )}
                 </DialogContent>
-            </Dialog>
+            </Dialog >
 
             {/* Status Change Dialog (for revision) */}
-            <Dialog
+            < Dialog
                 open={isStatusChangeDialogOpen}
                 onOpenChange={(open) => {
                     setIsStatusChangeDialogOpen(open);
@@ -1252,10 +1409,10 @@ export default function OrdersPage() {
                         </Button>
                     </DialogFooter>
                 </DialogContent>
-            </Dialog>
+            </Dialog >
 
             {/* Delete Confirmation */}
-            <AlertDialog
+            < AlertDialog
                 open={isDeleteDialogOpen}
                 onOpenChange={setIsDeleteDialogOpen}
             >
@@ -1282,7 +1439,7 @@ export default function OrdersPage() {
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
-            </AlertDialog>
-        </div>
+            </AlertDialog >
+        </div >
     );
 }

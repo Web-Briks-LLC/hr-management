@@ -48,6 +48,8 @@ interface GetOrdersFilters {
     assignedTo?: string;
     startDate?: string;
     endDate?: string;
+    month?: number;
+    year?: number;
     search?: string;
     page?: number;
     limit?: number;
@@ -86,6 +88,8 @@ async function getAllOrdersFromDB(filters: GetOrdersFilters): Promise<{
         assignedTo,
         startDate,
         endDate,
+        month,
+        year,
         search,
         page = 1,
         limit = 20,
@@ -120,6 +124,31 @@ async function getAllOrdersFromDB(filters: GetOrdersFilters): Promise<{
             (query.orderDate as Record<string, unknown>).$lte = new Date(
                 endDate
             );
+        }
+    }
+
+    // Month and Year filtering
+    if (month || year) {
+        const filterYear = year || new Date().getFullYear();
+
+        if (month) {
+            // Filter by specific month and year
+            const startOfMonth = new Date(filterYear, month - 1, 1);
+            const endOfMonth = new Date(filterYear, month, 0, 23, 59, 59, 999);
+            query.orderDate = {
+                ...((query.orderDate as Record<string, unknown>) || {}),
+                $gte: startOfMonth,
+                $lte: endOfMonth,
+            };
+        } else {
+            // Filter by year only
+            const startOfYear = new Date(filterYear, 0, 1);
+            const endOfYear = new Date(filterYear, 11, 31, 23, 59, 59, 999);
+            query.orderDate = {
+                ...((query.orderDate as Record<string, unknown>) || {}),
+                $gte: startOfYear,
+                $lte: endOfYear,
+            };
         }
     }
 

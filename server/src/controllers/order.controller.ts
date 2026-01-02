@@ -72,6 +72,8 @@ async function getAllOrders(req: Request, res: Response) {
             assignedTo,
             startDate,
             endDate,
+            month,
+            year,
             search,
             page,
             limit,
@@ -85,6 +87,8 @@ async function getAllOrders(req: Request, res: Response) {
             assignedTo?: string;
             startDate?: string;
             endDate?: string;
+            month?: number;
+            year?: number;
             search?: string;
             page: number;
             limit: number;
@@ -99,7 +103,9 @@ async function getAllOrders(req: Request, res: Response) {
         if (assignedTo) filters.assignedTo = assignedTo as string;
         if (startDate) filters.startDate = startDate as string;
         if (endDate) filters.endDate = endDate as string;
-        if (search) filters.search = search as string;
+        if (month) filters.month = parseInt(month as string);
+        if (year) filters.year = parseInt(year as string);
+        if (search) filters.search = (search as string).trim();
 
         const result = await orderService.getAllOrdersFromDB(filters);
 
