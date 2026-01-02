@@ -153,7 +153,7 @@ export default function NotificationBell() {
 
     const { data: notifications, isLoading, isFetching } = useGetNotificationsQuery(
         { limit: 20, skip: (page - 1) * 20 },
-        { skip: !open }
+        { skip: !open, refetchOnMountOrArgChange: true }
     );
 
     const [markAllAsRead] = useMarkAllAsReadMutation();
@@ -179,7 +179,6 @@ export default function NotificationBell() {
     useEffect(() => {
         if (open) {
             setPage(1);
-            setAllNotifications([]);
             setHasMore(true);
         }
     }, [open]);

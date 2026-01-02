@@ -21,6 +21,7 @@ import { profitShareRoute } from './profit-share.route.js';
 import { debitRoute } from './debitRoutes.js';
 import invoiceRoute from './invoice.route.js';
 import { leaveRoute } from './leave.route.js';
+import { noticeRoute } from './notice.route.js';
 
 const router: Router = Router();
 
@@ -112,6 +113,10 @@ const moduleRoutes = [
     {
         path: '/leave',
         route: leaveRoute,
+    },
+    {
+        path: '/notices',
+        route: noticeRoute,
     },
 ];
 

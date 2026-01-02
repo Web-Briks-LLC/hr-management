@@ -83,6 +83,7 @@ export interface ILeaveBalance {
 }
 
 export interface ApplyLeaveInput {
+    staffId?: string; // Optional: Admin can apply on behalf of a staff member
     leaveType: LeaveType;
     startDate: string;
     endDate: string;

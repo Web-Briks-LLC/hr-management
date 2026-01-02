@@ -2,11 +2,73 @@ import LeaveApplicationModel from '../models/leave_application.model.js';
 import LeaveBalanceModel from '../models/leave-balance.model.js';
 import ShiftAssignmentModel from '../models/shift-assignment.model.js';
 import ShiftModel from '../models/shift.model.js';
+import notificationService from './notification.service.js';
 import type {
     LeaveType,
     LeaveStatus,
 } from '../types/leave_application.type.js';
-import type { Types } from 'mongoose';
+import { Types } from 'mongoose';
+import { format } from 'date-fns';
+
+// Lookup stages for populating user data from 'user' collection
+const LOOKUP_STAGES = [
+    {
+        $lookup: {
+            from: 'staffs',
+            let: { staffId: '$staffId' },
+            pipeline: [
+                { $match: { $expr: { $eq: ['$_id', '$$staffId'] } } },
+                {
+                    $lookup: {
+                        from: 'user',
+                        localField: 'userId',
+                        foreignField: '_id',
+                        as: 'userId',
+                        pipeline: [{ $project: { name: 1, email: 1 } }],
+                    },
+                },
+                {
+                    $unwind: {
+                        path: '$userId',
+                        preserveNullAndEmptyArrays: true,
+                    },
+                },
+            ],
+            as: 'staffId',
+        },
+    },
+    { $unwind: { path: '$staffId', preserveNullAndEmptyArrays: true } },
+    {
+        $lookup: {
+            from: 'user',
+            localField: 'approvedBy',
+            foreignField: '_id',
+            as: 'approvedBy',
+            pipeline: [{ $project: { name: 1, email: 1 } }],
+        },
+    },
+    { $unwind: { path: '$approvedBy', preserveNullAndEmptyArrays: true } },
+    {
+        $lookup: {
+            from: 'user',
+            localField: 'appliedBy',
+            foreignField: '_id',
+            as: 'appliedBy',
+            pipeline: [{ $project: { name: 1, email: 1 } }],
+        },
+    },
+    { $unwind: { path: '$appliedBy', preserveNullAndEmptyArrays: true } },
+    {
+        $lookup: {
+            from: 'user',
+            localField: 'revokedBy',
+            foreignField: '_id',
+            as: 'revokedBy',
+            pipeline: [{ $project: { name: 1, email: 1 } }],
+        },
+    },
+    { $unwind: { path: '$revokedBy', preserveNullAndEmptyArrays: true } },
+];
 
 // Helper: Get end of day (11:59:59.999 PM)
 function getEndOfDay(date: Date): Date {
@@ -134,10 +196,32 @@ async function applyForLeave(input: ApplyLeaveInput) {
         status: 'pending',
     });
 
-    return application.populate([
-        { path: 'staffId', populate: { path: 'userId', select: 'name email' } },
-        { path: 'appliedBy', select: 'name email' },
-    ]);
+    // Notify admins about new leave request
+    try {
+        const populatedApp = await application.populate({
+            path: 'staffId',
+            populate: { path: 'userId', select: 'name' },
+        });
+        const staffName =
+            (populatedApp.staffId as any)?.userId?.name || 'Staff Member';
+        const staffUserId =
+            (populatedApp.staffId as any)?.userId?._id ||
+            (populatedApp.staffId as any)?.userId;
+
+        await notificationService.notifyAdminsLeaveRequest({
+            staffName,
+            staffUserId: staffUserId,
+            leaveId: application._id as Types.ObjectId,
+            leaveType,
+            startDate: format(new Date(startDate), 'MMM dd'),
+            endDate: format(new Date(endDate), 'MMM dd'),
+            days: requestedDates.length,
+        });
+    } catch (err) {
+        console.error('Failed to notify admins about leave request:', err);
+    }
+
+    return application.populate('staffId');
 }
 
 // Approve leave (full or partial)
@@ -243,10 +327,28 @@ async function approveLeave(input: ApproveLeaveInput) {
 
     await application.save();
 
-    return application.populate([
-        { path: 'staffId', populate: { path: 'userId', select: 'name email' } },
-        { path: 'approvedBy', select: 'name email' },
-    ]);
+    // Send notification to staff
+    try {
+        const populatedApp = await application.populate('staffId');
+        const staffUserId = (populatedApp.staffId as any)?.userId;
+        if (staffUserId) {
+            await notificationService.notifyLeaveStatus({
+                staffUserId: staffUserId,
+                leaveId: application._id as Types.ObjectId,
+                status: status,
+                leaveType: application.leaveType,
+                startDate: format(application.startDate, 'MMM dd'),
+                endDate: format(application.endDate, 'MMM dd'),
+                approvedDays: finalApprovedDates.length,
+                approvedBy: approvedBy as unknown as Types.ObjectId,
+                ...(comment && { comment }),
+            });
+        }
+    } catch (err) {
+        console.error('Failed to send leave approval notification:', err);
+    }
+
+    return application.populate('staffId');
 }
 
 // Reject leave
@@ -276,16 +378,35 @@ async function rejectLeave(
 
     await application.save();
 
-    return application.populate([
-        { path: 'staffId', populate: { path: 'userId', select: 'name email' } },
-    ]);
+    // Send notification to staff
+    try {
+        const populatedApp = await application.populate('staffId');
+        const staffUserId = (populatedApp.staffId as any)?.userId;
+        if (staffUserId) {
+            await notificationService.notifyLeaveStatus({
+                staffUserId: staffUserId,
+                leaveId: application._id as Types.ObjectId,
+                status: 'rejected',
+                leaveType: application.leaveType,
+                startDate: format(application.startDate, 'MMM dd'),
+                endDate: format(application.endDate, 'MMM dd'),
+                approvedBy: rejectedBy as unknown as Types.ObjectId,
+                ...(comment && { comment }),
+            });
+        }
+    } catch (err) {
+        console.error('Failed to send leave rejection notification:', err);
+    }
+
+    return application.populate('staffId');
 }
 
-// Revoke approved leave
+// Revoke approved leave (full or partial)
 async function revokeLeave(
     applicationId: string,
     revokedBy: string,
-    reason?: string
+    reason?: string,
+    datesToRevoke?: Date[] // Optional: if provided, partial revoke; if not, full revoke
 ) {
     const application = await LeaveApplicationModel.findById(applicationId);
     if (!application) {
@@ -305,27 +426,88 @@ async function revokeLeave(
         year
     );
 
-    const restoredDays = application.approvedDates.length;
+    let restoredDays: number;
 
-    if (application.leaveType === 'annual') {
-        balance.annualLeaveUsed -= restoredDays;
-        balance.annualLeaveRemaining += restoredDays;
-    } else if (application.leaveType === 'sick') {
-        balance.sickLeaveUsed -= restoredDays;
-        balance.sickLeaveRemaining += restoredDays;
+    if (datesToRevoke && datesToRevoke.length > 0) {
+        // Partial revoke - only revoke specified dates
+        const datesToRevokeStrings = datesToRevoke.map(
+            (d) => new Date(d).toISOString().split('T')[0]
+        );
+
+        // Filter approved dates to remove revoked ones
+        const remainingApprovedDates = application.approvedDates.filter((d) => {
+            const dateStr = new Date(d).toISOString().split('T')[0];
+            return !datesToRevokeStrings.includes(dateStr);
+        });
+
+        restoredDays =
+            application.approvedDates.length - remainingApprovedDates.length;
+
+        // Update approved dates
+        application.approvedDates = remainingApprovedDates;
+
+        // Add to rejected dates for record keeping (or create partialRevokedDates)
+        if (!application.rejectedDates) {
+            application.rejectedDates = [];
+        }
+        datesToRevoke.forEach((d) => {
+            application.rejectedDates.push(d);
+        });
+
+        // Update status
+        if (remainingApprovedDates.length === 0) {
+            application.status = 'revoked';
+            application.revokedAt = new Date();
+            application.revokedBy = revokedBy as unknown as Types.ObjectId;
+        } else {
+            application.status = 'partially_approved';
+        }
+    } else {
+        // Full revoke - revoke all approved dates
+        restoredDays = application.approvedDates.length;
+
+        application.status = 'revoked';
+        application.revokedAt = new Date();
+        application.revokedBy = revokedBy as unknown as Types.ObjectId;
     }
 
-    await balance.save();
+    // Restore balance
+    if (restoredDays > 0) {
+        if (application.leaveType === 'annual') {
+            balance.annualLeaveUsed -= restoredDays;
+            balance.annualLeaveRemaining += restoredDays;
+        } else if (application.leaveType === 'sick') {
+            balance.sickLeaveUsed -= restoredDays;
+            balance.sickLeaveRemaining += restoredDays;
+        }
+        await balance.save();
+    }
 
-    // Update application
-    application.status = 'revoked';
-    application.revokedAt = new Date();
-    application.revokedBy = revokedBy as unknown as Types.ObjectId;
     if (reason) {
         application.revokeReason = reason;
     }
 
     await application.save();
+
+    // Send notification to staff
+    try {
+        const populatedApp = await application.populate('staffId');
+        const staffUserId = (populatedApp.staffId as any)?.userId;
+        if (staffUserId) {
+            await notificationService.notifyLeaveStatus({
+                staffUserId: staffUserId,
+                leaveId: application._id as Types.ObjectId,
+                status: 'revoked',
+                leaveType: application.leaveType,
+                startDate: format(application.startDate, 'MMM dd'),
+                endDate: format(application.endDate, 'MMM dd'),
+                approvedBy: revokedBy as unknown as Types.ObjectId,
+                ...(reason && { comment: reason }),
+            });
+        }
+    } catch (err) {
+        console.error('Failed to send leave revoke notification:', err);
+    }
 
     return application;
 }
@@ -338,15 +520,16 @@ async function getLeaveBalance(staffId: string, year?: number) {
 
 // Get pending leaves for admin notification
 async function getPendingLeaves() {
-    return LeaveApplicationModel.find({
-        status: 'pending',
-        expiresAt: { $gte: new Date() },
-    })
-        .populate({
-            path: 'staffId',
-            populate: { path: 'userId', select: 'name email' },
-        })
-        .sort({ createdAt: -1 });
+    return LeaveApplicationModel.aggregate([
+        {
+            $match: {
+                status: 'pending',
+                expiresAt: { $gte: new Date() },
+            },
+        },
+        ...LOOKUP_STAGES,
+        { $sort: { createdAt: -1 } },
+    ]);
 }
 
 // Get all leave applications with filters
@@ -373,7 +556,7 @@ async function getLeaveApplications(filters: GetLeavesFilters) {
 
     const query: Record<string, unknown> = {};
 
-    if (staffId) query.staffId = staffId;
+    if (staffId) query.staffId = new Types.ObjectId(staffId);
     if (status) query.status = status;
     if (leaveType) query.leaveType = leaveType;
     if (startDate || endDate) {
@@ -389,16 +572,13 @@ async function getLeaveApplications(filters: GetLeavesFilters) {
     const skip = (page - 1) * limit;
 
     const [applications, total] = await Promise.all([
-        LeaveApplicationModel.find(query)
-            .populate({
-                path: 'staffId',
-                populate: { path: 'userId', select: 'name email' },
-            })
-            .populate('approvedBy', 'name email')
-            .populate('appliedBy', 'name email')
-            .sort({ createdAt: -1 })
-            .skip(skip)
-            .limit(limit),
+        LeaveApplicationModel.aggregate([
+            { $match: query },
+            ...LOOKUP_STAGES,
+            { $sort: { createdAt: -1 } },
+            { $skip: skip },
+            { $limit: limit },
+        ]),
         LeaveApplicationModel.countDocuments(query),
     ]);
 
@@ -412,14 +592,11 @@ async function getLeaveApplications(filters: GetLeavesFilters) {
 
 // Get single leave application by ID
 async function getLeaveApplicationById(id: string) {
-    return LeaveApplicationModel.findById(id)
-        .populate({
-            path: 'staffId',
-            populate: { path: 'userId', select: 'name email' },
-        })
-        .populate('approvedBy', 'name email')
-        .populate('appliedBy', 'name email')
-        .populate('revokedBy', 'name email');
+    const result = await LeaveApplicationModel.aggregate([
+        { $match: { _id: new Types.ObjectId(id) } },
+        ...LOOKUP_STAGES,
+    ]);
+    return result[0] || null;
 }
 
 // Expire stale applications (for cron job)
@@ -444,11 +621,13 @@ async function getMyLeaveApplications(staffId: string, page = 1, limit = 20) {
     const skip = (page - 1) * limit;
 
     const [applications, total] = await Promise.all([
-        LeaveApplicationModel.find({ staffId })
-            .populate('approvedBy', 'name email')
-            .sort({ createdAt: -1 })
-            .skip(skip)
-            .limit(limit),
+        LeaveApplicationModel.aggregate([
+            { $match: { staffId: new Types.ObjectId(staffId) } },
+            ...LOOKUP_STAGES,
+            { $sort: { createdAt: -1 } },
+            { $skip: skip },
+            { $limit: limit },
+        ]),
         LeaveApplicationModel.countDocuments({ staffId }),
     ]);
 

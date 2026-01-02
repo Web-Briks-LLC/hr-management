@@ -26,7 +26,8 @@ const createNotification = async (data: {
     };
 
     if (data.resourceType) payload.resourceType = data.resourceType;
-    if (data.resourceId) payload.resourceId = new Types.ObjectId(data.resourceId);
+    if (data.resourceId)
+        payload.resourceId = new Types.ObjectId(data.resourceId);
     if (data.actionUrl) payload.actionUrl = data.actionUrl;
     if (data.actionLabel) payload.actionLabel = data.actionLabel;
     if (data.createdBy) payload.createdBy = new Types.ObjectId(data.createdBy);
@@ -37,12 +38,15 @@ const createNotification = async (data: {
 };
 
 // Get all notifications for a user
-const getUserNotifications = async (userId: string, filters?: {
-    isRead?: boolean;
-    type?: string;
-    limit?: number;
-    skip?: number;
-}) => {
+const getUserNotifications = async (
+    userId: string,
+    filters?: {
+        isRead?: boolean;
+        type?: string;
+        limit?: number;
+        skip?: number;
+    }
+) => {
     const query: any = { userId: new Types.ObjectId(userId) };
 
     if (filters?.isRead !== undefined) {
@@ -137,13 +141,15 @@ const notifyOvertimeStatus = async (data: {
     date: string;
     approvedBy: Types.ObjectId | string;
 }) => {
-    const title = data.status === 'approved' 
-        ? '✅ Overtime Approved' 
-        : '❌ Overtime Rejected';
-    
-    const message = data.status === 'approved'
-        ? `Your overtime request for ${data.hours} hours on ${data.date} has been approved`
-        : `Your overtime request for ${data.hours} hours on ${data.date} has been rejected`;
+    const title =
+        data.status === 'approved'
+            ? '✅ Overtime Approved'
+            : '❌ Overtime Rejected';
+
+    const message =
+        data.status === 'approved'
+            ? `Your overtime request for ${data.hours} hours on ${data.date} has been approved`
+            : `Your overtime request for ${data.hours} hours on ${data.date} has been rejected`;
 
     await createNotification({
         userId: data.staffUserId,
@@ -210,12 +216,11 @@ const notifyAdminsOvertimeRequest = async (data: {
 }) => {
     // Get all users with admin roles
     const { default: UserModel } = await import('../models/user.model.js');
-    
-    // Note: Assuming you have a User model with role field
-    // Adjust based on your actual user model structure
-    const admins = await (UserModel.find({
-        role: { $in: ['super_admin', 'admin', 'hr_manager'] }
-    }) as any).lean();
+
+    // UserModel is a native MongoDB collection, not a Mongoose model
+    const admins = await UserModel.find({
+        role: { $in: ['super_admin', 'admin', 'hr_manager'] },
+    }).toArray();
 
     // Create notification for each admin
     const notifications = admins.map((admin: any) => ({
@@ -234,6 +239,104 @@ const notifyAdminsOvertimeRequest = async (data: {
     await NotificationModel.insertMany(notifications);
 };
 
+// ============================================
+// LEAVE NOTIFICATION HELPERS
+// ============================================
+
+// Notify staff about leave status change (approved/rejected/revoked)
+const notifyLeaveStatus = async (data: {
+    staffUserId: Types.ObjectId | string;
+    leaveId: Types.ObjectId | string;
+    status: 'approved' | 'partially_approved' | 'rejected' | 'revoked';
+    leaveType: string;
+    startDate: string;
+    endDate: string;
+    approvedDays?: number;
+    approvedBy: Types.ObjectId | string;
+    comment?: string;
+}) => {
+    let title: string;
+    let message: string;
+    let priority: 'low' | 'medium' | 'high' | 'urgent' = 'high';
+
+    switch (data.status) {
+        case 'approved':
+            title = '✅ Leave Approved';
+            message = `Your ${data.leaveType} leave from ${data.startDate} to ${data.endDate} has been approved`;
+            break;
+        case 'partially_approved':
+            title = '✅ Leave Partially Approved';
+            message = `Your ${
+                data.leaveType
+            } leave has been partially approved (${
+                data.approvedDays || 0
+            } days)`;
+            break;
+        case 'rejected':
+            title = '❌ Leave Rejected';
+            message = `Your ${data.leaveType} leave from ${data.startDate} to ${data.endDate} has been rejected`;
+            if (data.comment) message += `. Reason: ${data.comment}`;
+            break;
+        case 'revoked':
+            title = '⚠️ Leave Revoked';
+            message = `Your ${data.leaveType} leave from ${data.startDate} to ${data.endDate} has been revoked. Balance has been restored.`;
+            priority = 'urgent';
+            if (data.comment) message += ` Reason: ${data.comment}`;
+            break;
+        default:
+            title = '📋 Leave Update';
+            message = `Your ${data.leaveType} leave status has been updated`;
+    }
+
+    await createNotification({
+        userId: data.staffUserId,
+        title,
+        message,
+        type: 'leave',
+        priority,
+        resourceType: 'leave',
+        resourceId: data.leaveId,
+        actionUrl: '/leave/apply',
+        actionLabel: 'View Details',
+        createdBy: data.approvedBy,
+    });
+};
+
+// Notify admins about new leave request
+const notifyAdminsLeaveRequest = async (data: {
+    staffName: string;
+    staffUserId: Types.ObjectId | string;
+    leaveId: Types.ObjectId | string;
+    leaveType: string;
+    startDate: string;
+    endDate: string;
+    days: number;
+}) => {
+    const { default: UserModel } = await import('../models/user.model.js');
+
+    // UserModel is a native MongoDB collection, not a Mongoose model
+    const admins = await UserModel.find({
+        role: { $in: ['super_admin', 'admin', 'hr_manager'] },
+    }).toArray();
+
+    const notifications = admins.map((admin: any) => ({
+        userId: admin._id,
+        title: '📝 Leave Approval Needed',
+        message: `${data.staffName} requested ${data.days} days of ${data.leaveType} leave (${data.startDate} - ${data.endDate})`,
+        type: 'leave' as const,
+        priority: 'high' as const,
+        resourceType: 'leave' as const,
+        resourceId: data.leaveId,
+        actionUrl: '/leave/manage',
+        actionLabel: 'Review Request',
+        createdBy: data.staffUserId,
+    }));
+
+    if (notifications.length > 0) {
+        await NotificationModel.insertMany(notifications);
+    }
+};
+
 export default {
     createNotification,
     getUserNotifications,
@@ -247,4 +350,7 @@ export default {
     notifyShiftAssignment,
     notifyShiftChange,
     notifyAdminsOvertimeRequest,
+    // Leave helpers
+    notifyLeaveStatus,
+    notifyAdminsLeaveRequest,
 };

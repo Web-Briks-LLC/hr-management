@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import {
     Card,
     CardHeader,
@@ -197,8 +198,10 @@ export default function StaffTracking() {
         }
     };
 
+    const router = useRouter();
+
     const handleApplyLeave = () => {
-        toast.warning('Leave application page coming soon!');
+        router.push('/leave/apply');
     };
 
     const attendanceDay = todaysData?.attendance?.attendanceDay;

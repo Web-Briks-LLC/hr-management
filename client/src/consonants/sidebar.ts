@@ -14,6 +14,7 @@ import {
     IconPigMoney,
     IconCreditCard,
     IconUserCircle,
+    IconSpeakerphone,
 } from '@tabler/icons-react';
 
 export interface SidebarItem {
@@ -153,18 +154,6 @@ export const sidebarGroups: SidebarGroup[] = [
                     Role.STAFF,
                 ],
             },
-            {
-                title: 'Notices',
-                url: '/notices',
-                icon: IconNotes,
-                access: [
-                    Role.SUPER_ADMIN,
-                    Role.ADMIN,
-                    Role.HR_MANAGER,
-                    Role.TEAM_LEADER,
-                    Role.STAFF,
-                ],
-            },
         ],
     },
     {
@@ -181,6 +170,29 @@ export const sidebarGroups: SidebarGroup[] = [
                 url: '/debit',
                 icon: IconCreditCard,
                 access: [Role.SUPER_ADMIN, Role.ADMIN],
+            },
+        ],
+    },
+    {
+        groupLabel: 'Communication',
+        items: [
+            {
+                title: 'Notices',
+                url: '/notices',
+                icon: IconSpeakerphone,
+                access: [
+                    Role.SUPER_ADMIN,
+                    Role.ADMIN,
+                    Role.HR_MANAGER,
+                    Role.TEAM_LEADER,
+                    Role.STAFF,
+                ],
+            },
+            {
+                title: 'Notice Management',
+                url: '/notices/manage',
+                icon: IconSpeakerphone,
+                access: [Role.SUPER_ADMIN, Role.ADMIN, Role.HR_MANAGER],
             },
         ],
     },

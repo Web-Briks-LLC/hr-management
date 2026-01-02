@@ -9,21 +9,44 @@ import type {
 // Apply for leave
 async function applyForLeave(req: Request, res: Response) {
     try {
-        const { leaveType, startDate, endDate, reason } = req.body;
+        const {
+            leaveType,
+            startDate,
+            endDate,
+            reason,
+            staffId: targetStaffId,
+        } = req.body;
         const userId = req.user?.id;
 
         if (!userId) {
             return res.status(401).json({ message: 'Unauthorized' });
         }
 
-        // Get staff record for current user
-        const staff = await StaffModel.findOne({ userId });
-        if (!staff) {
-            return res.status(404).json({ message: 'Staff record not found' });
+        let staffIdToUse: string;
+
+        // If admin provides staffId, use that (applying on behalf of staff)
+        if (targetStaffId) {
+            // Verify the target staff exists
+            const targetStaff = await StaffModel.findById(targetStaffId);
+            if (!targetStaff) {
+                return res
+                    .status(404)
+                    .json({ message: 'Target staff not found' });
+            }
+            staffIdToUse = targetStaffId;
+        } else {
+            // Get staff record for current user (applying for self)
+            const staff = await StaffModel.findOne({ userId });
+            if (!staff) {
+                return res
+                    .status(404)
+                    .json({ message: 'Staff record not found' });
+            }
+            staffIdToUse = staff._id.toString();
         }
 
         const application = await leaveService.applyForLeave({
-            staffId: staff._id.toString(),
+            staffId: staffIdToUse,
             leaveType,
             startDate: new Date(startDate),
             endDate: new Date(endDate),
@@ -259,11 +282,11 @@ async function rejectLeave(req: Request, res: Response) {
     }
 }
 
-// Revoke approved leave
+// Revoke approved leave (full or partial)
 async function revokeLeave(req: Request, res: Response) {
     try {
         const { id } = req.params;
-        const { reason } = req.body;
+        const { reason, datesToRevoke } = req.body;
         const userId = req.user?.id;
 
         if (!userId) {
@@ -276,10 +299,20 @@ async function revokeLeave(req: Request, res: Response) {
                 .json({ message: 'Application ID is required' });
         }
 
-        const application = await leaveService.revokeLeave(id, userId, reason);
+        const application = await leaveService.revokeLeave(
+            id,
+            userId,
+            reason,
+            datesToRevoke
+        );
+
+        const message =
+            datesToRevoke && datesToRevoke.length > 0
+                ? `${datesToRevoke.length} day(s) have been revoked and balance restored`
+                : 'Leave has been revoked and balance restored';
 
         return res.status(200).json({
-            message: 'Leave has been revoked and balance restored',
+            message,
             data: application,
         });
     } catch (error) {

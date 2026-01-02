@@ -31,6 +31,7 @@ export const apiSlice = createApi({
         'DebitPerson',
         'Debit',
         'DebitStats',
+        'Notice',
     ],
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     endpoints: (_builder) => ({}),

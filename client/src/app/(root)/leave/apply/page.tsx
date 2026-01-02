@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
-import { format, addDays, differenceInDays } from 'date-fns';
+import { format } from 'date-fns';
 import { Calendar as CalendarIcon, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useSession } from '@/lib/auth-client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -16,7 +17,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
-import { useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import {
     useApplyForLeaveMutation,
@@ -26,6 +26,7 @@ import {
     useCancelLeaveApplicationMutation,
     useUploadMedicalDocumentMutation,
 } from '@/redux/features/leave/leaveApi';
+import { useGetStaffsQuery } from '@/redux/features/staff/staffApi';
 import type { LeaveType, ILeaveApplication } from '@/types/leave.type';
 import { LEAVE_TYPE_LABELS, LEAVE_STATUS_LABELS } from '@/types/leave.type';
 
@@ -34,12 +35,19 @@ interface FormData {
     reason: string;
 }
 
+const ADMIN_ROLES = ['admin', 'super_admin', 'hr_admin'];
+
 export default function LeaveApplyPage() {
+    const { data: session } = useSession();
+    const userRole = session?.user?.role as string | undefined;
+    const isAdmin = userRole && ADMIN_ROLES.includes(userRole);
+
     const [startDate, setStartDate] = useState<Date | undefined>();
     const [endDate, setEndDate] = useState<Date | undefined>();
     const [workingDaysCount, setWorkingDaysCount] = useState(0);
     const [workingDates, setWorkingDates] = useState<string[]>([]);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    const [selectedStaffId, setSelectedStaffId] = useState<string>('');
 
     const { register, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm<FormData>({
         defaultValues: {
@@ -49,6 +57,10 @@ export default function LeaveApplyPage() {
     });
 
     const leaveType = watch('leaveType');
+
+    // Fetch staff list for admin
+    const { data: staffsData } = useGetStaffsQuery({ limit: 200 }, { skip: !isAdmin });
+    const staffs = staffsData?.data || [];
 
     const { data: balanceData, isLoading: isLoadingBalance } = useGetLeaveBalanceQuery();
     const { data: myApplicationsData, isLoading: isLoadingApplications } = useGetMyLeaveApplicationsQuery({ limit: 10 });
@@ -123,24 +135,39 @@ export default function LeaveApplyPage() {
             return;
         }
 
-        // Check balance
-        if (data.leaveType === 'annual' && balance && workingDaysCount > balance.annualLeaveRemaining) {
-            toast.error(`Insufficient annual leave. Remaining: ${balance.annualLeaveRemaining}`);
+        // Admin must select a staff member
+        if (isAdmin && !selectedStaffId) {
+            toast.error('Please select a staff member');
             return;
         }
 
-        if (data.leaveType === 'sick' && balance && workingDaysCount > balance.sickLeaveRemaining) {
-            toast.error(`Insufficient sick leave. Remaining: ${balance.sickLeaveRemaining}`);
-            return;
+        // Check balance (only for non-admin applying for themselves)
+        if (!isAdmin) {
+            if (data.leaveType === 'annual' && balance && workingDaysCount > balance.annualLeaveRemaining) {
+                toast.error(`Insufficient annual leave. Remaining: ${balance.annualLeaveRemaining}`);
+                return;
+            }
+
+            if (data.leaveType === 'sick' && balance && workingDaysCount > balance.sickLeaveRemaining) {
+                toast.error(`Insufficient sick leave. Remaining: ${balance.sickLeaveRemaining}`);
+                return;
+            }
         }
 
         try {
-            const result = await applyForLeave({
+            const payload: any = {
                 leaveType: data.leaveType,
                 startDate: format(startDate, 'yyyy-MM-dd'),
                 endDate: format(endDate, 'yyyy-MM-dd'),
                 reason: data.reason,
-            }).unwrap();
+            };
+
+            // Add staffId if admin is applying on behalf of someone
+            if (isAdmin && selectedStaffId) {
+                payload.staffId = selectedStaffId;
+            }
+
+            const result = await applyForLeave(payload).unwrap();
 
             // If sick leave and file selected, upload document
             if (data.leaveType === 'sick' && selectedFile && result.data._id) {
@@ -161,6 +188,7 @@ export default function LeaveApplyPage() {
             setStartDate(undefined);
             setEndDate(undefined);
             setSelectedFile(null);
+            setSelectedStaffId('');
         } catch (error: any) {
             toast.error(error?.data?.message || 'Failed to submit application');
         }
@@ -196,63 +224,88 @@ export default function LeaveApplyPage() {
         <div className="p-6 space-y-6">
             <div>
                 <h1 className="text-2xl font-bold">Leave Application</h1>
-                <p className="text-muted-foreground">Apply for leave and track your applications</p>
+                <p className="text-muted-foreground">
+                    {isAdmin ? 'Apply for leave on behalf of staff members' : 'Apply for leave and track your applications'}
+                </p>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Leave Balance Cards */}
-                <div className="lg:col-span-1 space-y-4">
-                    <Card className="bg-gradient-to-br from-blue-500/10 to-blue-600/5 border-blue-200">
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-lg">Annual Leave</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            {isLoadingBalance ? (
-                                <Skeleton className="h-10 w-20" />
-                            ) : (
-                                <div className="flex items-baseline gap-2">
-                                    <span className="text-3xl font-bold text-blue-600">
-                                        {balance?.annualLeaveRemaining || 0}
-                                    </span>
-                                    <span className="text-muted-foreground">
-                                        / {balance?.annualLeaveTotal || 12} remaining
-                                    </span>
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
+                {/* Leave Balance Cards - Only show for non-admin */}
+                {!isAdmin && (
+                    <div className="lg:col-span-1 space-y-4">
+                        <Card className="bg-gradient-to-br from-blue-500/10 to-blue-600/5 border-blue-200">
+                            <CardHeader className="pb-2">
+                                <CardTitle className="text-lg">Annual Leave</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                {isLoadingBalance ? (
+                                    <Skeleton className="h-10 w-20" />
+                                ) : (
+                                    <div className="flex items-baseline gap-2">
+                                        <span className="text-3xl font-bold text-blue-600">
+                                            {balance?.annualLeaveRemaining || 0}
+                                        </span>
+                                        <span className="text-muted-foreground">
+                                            / {balance?.annualLeaveTotal || 12} remaining
+                                        </span>
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
 
-                    <Card className="bg-gradient-to-br from-orange-500/10 to-orange-600/5 border-orange-200">
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-lg">Sick Leave</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            {isLoadingBalance ? (
-                                <Skeleton className="h-10 w-20" />
-                            ) : (
-                                <div className="flex items-baseline gap-2">
-                                    <span className="text-3xl font-bold text-orange-600">
-                                        {balance?.sickLeaveRemaining || 0}
-                                    </span>
-                                    <span className="text-muted-foreground">
-                                        / {balance?.sickLeaveTotal || 18} remaining
-                                    </span>
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-                </div>
+                        <Card className="bg-gradient-to-br from-orange-500/10 to-orange-600/5 border-orange-200">
+                            <CardHeader className="pb-2">
+                                <CardTitle className="text-lg">Sick Leave</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                {isLoadingBalance ? (
+                                    <Skeleton className="h-10 w-20" />
+                                ) : (
+                                    <div className="flex items-baseline gap-2">
+                                        <span className="text-3xl font-bold text-orange-600">
+                                            {balance?.sickLeaveRemaining || 0}
+                                        </span>
+                                        <span className="text-muted-foreground">
+                                            / {balance?.sickLeaveTotal || 18} remaining
+                                        </span>
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </div>
+                )}
 
                 {/* Application Form */}
-                <Card className="lg:col-span-2">
+                <Card className={isAdmin ? 'lg:col-span-3' : 'lg:col-span-2'}>
                     <CardHeader>
                         <CardTitle>Apply for Leave</CardTitle>
                         <CardDescription>
-                            Submit your leave application. It must be approved by 11:59 PM today.
+                            {isAdmin
+                                ? 'Select a staff member and submit leave application on their behalf.'
+                                : 'Submit your leave application. It must be approved by 11:59 PM today.'}
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
                         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                            {/* Staff Selection - Only for Admin */}
+                            {isAdmin && (
+                                <div className="space-y-2">
+                                    <Label>Staff Member *</Label>
+                                    <Select value={selectedStaffId} onValueChange={setSelectedStaffId}>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select a staff member" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {staffs.map((staff: any) => (
+                                                <SelectItem key={staff._id} value={staff._id}>
+                                                    {staff.user?.name} ({staff.staffId})
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            )}
+
                             {/* Leave Type */}
                             <div className="space-y-2">
                                 <Label>Leave Type</Label>
@@ -456,66 +509,107 @@ export default function LeaveApplyPage() {
                 </Card>
             </div>
 
-            {/* My Applications */}
-            <Card>
-                <CardHeader>
-                    <CardTitle>My Leave Applications</CardTitle>
-                    <CardDescription>Recent leave applications and their status</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    {isLoadingApplications ? (
-                        <div className="space-y-2">
-                            <Skeleton className="h-12 w-full" />
-                            <Skeleton className="h-12 w-full" />
-                            <Skeleton className="h-12 w-full" />
-                        </div>
-                    ) : myApplications.length === 0 ? (
-                        <p className="text-center text-muted-foreground py-8">No leave applications found</p>
-                    ) : (
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Type</TableHead>
-                                    <TableHead>Dates</TableHead>
-                                    <TableHead>Days</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead>Applied On</TableHead>
-                                    <TableHead>Actions</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
+            {/* My Applications - Only show for non-admin */}
+            {!isAdmin && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                            </svg>
+                            My Leave Applications
+                        </CardTitle>
+                        <CardDescription>Track your leave requests and their current status</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        {isLoadingApplications ? (
+                            <div className="space-y-3">
+                                <Skeleton className="h-20 w-full" />
+                                <Skeleton className="h-20 w-full" />
+                                <Skeleton className="h-20 w-full" />
+                            </div>
+                        ) : myApplications.length === 0 ? (
+                            <div className="text-center py-12">
+                                <svg className="mx-auto h-12 w-12 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                                <p className="mt-2 text-muted-foreground">No leave applications yet</p>
+                                <p className="text-sm text-muted-foreground">Your leave requests will appear here</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-3">
                                 {myApplications.map((app: ILeaveApplication) => (
-                                    <TableRow key={app._id}>
-                                        <TableCell>{LEAVE_TYPE_LABELS[app.leaveType]}</TableCell>
-                                        <TableCell>
-                                            {format(new Date(app.startDate), 'MMM dd')} - {format(new Date(app.endDate), 'MMM dd, yyyy')}
-                                        </TableCell>
-                                        <TableCell>{app.requestedDates.length}</TableCell>
-                                        <TableCell>
-                                            <Badge variant={getStatusBadgeVariant(app.status)}>
-                                                {LEAVE_STATUS_LABELS[app.status]}
-                                            </Badge>
-                                        </TableCell>
-                                        <TableCell>{format(new Date(app.createdAt), 'MMM dd, yyyy')}</TableCell>
-                                        <TableCell>
-                                            {app.status === 'pending' && (
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={() => handleCancel(app._id)}
-                                                    disabled={isCancelling}
-                                                >
-                                                    Cancel
-                                                </Button>
-                                            )}
-                                        </TableCell>
-                                    </TableRow>
+                                    <div key={app._id} className="border rounded-lg p-4 hover:bg-muted/30 transition-colors">
+                                        <div className="flex items-start justify-between gap-4">
+                                            <div className="flex-1 space-y-2">
+                                                <div className="flex items-center gap-3">
+                                                    <Badge variant={getStatusBadgeVariant(app.status)} className="text-xs">
+                                                        {LEAVE_STATUS_LABELS[app.status]}
+                                                    </Badge>
+                                                    <span className="text-sm font-medium">{LEAVE_TYPE_LABELS[app.leaveType]}</span>
+                                                </div>
+                                                <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                                                    <span className="flex items-center gap-1">
+                                                        <CalendarIcon className="h-3.5 w-3.5" />
+                                                        {format(new Date(app.startDate), 'MMM dd')} - {format(new Date(app.endDate), 'MMM dd, yyyy')}
+                                                    </span>
+                                                    <span className="font-medium text-foreground">{app.requestedDates.length} day(s)</span>
+                                                </div>
+
+                                                {/* Status Details */}
+                                                {app.status === 'approved' && app.approvedDates && (
+                                                    <p className="text-xs text-green-600">✓ Approved: {app.approvedDates.length} day(s)</p>
+                                                )}
+                                                {app.status === 'partially_approved' && (
+                                                    <div className="flex gap-3 text-xs">
+                                                        {app.approvedDates?.length > 0 && <span className="text-green-600">✓ Approved: {app.approvedDates.length}</span>}
+                                                        {app.paidLeaveDates?.length > 0 && <span className="text-blue-600">💰 Paid: {app.paidLeaveDates.length}</span>}
+                                                        {app.rejectedDates?.length > 0 && <span className="text-red-600">✗ Rejected: {app.rejectedDates.length}</span>}
+                                                    </div>
+                                                )}
+                                                {app.status === 'rejected' && app.commentByApprover && (
+                                                    <p className="text-xs text-red-600">Reason: {app.commentByApprover}</p>
+                                                )}
+                                                {app.status === 'revoked' && (
+                                                    <p className="text-xs text-orange-600">⚠️ This leave was revoked. Balance restored.</p>
+                                                )}
+
+                                                <p className="text-xs text-muted-foreground">
+                                                    Applied on {format(new Date(app.createdAt), 'MMM dd, yyyy')}
+                                                    {app.approvedAt && ` • ${app.status === 'rejected' ? 'Rejected' : 'Approved'} on ${format(new Date(app.approvedAt), 'MMM dd')}`}
+                                                </p>
+                                            </div>
+
+                                            <div className="flex items-center gap-2">
+                                                {app.status === 'pending' && (
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => handleCancel(app._id)}
+                                                        disabled={isCancelling}
+                                                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                                    >
+                                                        Cancel
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Reason */}
+                                        {app.reason && (
+                                            <div className="mt-3 pt-3 border-t">
+                                                <p className="text-xs text-muted-foreground">
+                                                    <span className="font-medium">Your reason:</span> {app.reason}
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
                                 ))}
-                            </TableBody>
-                        </Table>
-                    )}
-                </CardContent>
-            </Card>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            )}
         </div>
     );
 }
