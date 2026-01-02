@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { format } from 'date-fns';
 import { createOrderSchema } from '@/validators/order.validator';
 import {
     useGetServicesQuery,
@@ -183,7 +184,7 @@ export function OrderForm({
     // Update dates in form
     useEffect(() => {
         if (orderDate) {
-            setValue('orderDate', orderDate.toISOString().split('T')[0]);
+            setValue('orderDate', format(orderDate, 'yyyy-MM-dd'));
         }
     }, [orderDate, setValue]);
 
