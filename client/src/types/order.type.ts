@@ -166,6 +166,8 @@ export interface OrderFilters {
     assignedTo?: string;
     startDate?: string;
     endDate?: string;
+    month?: number;
+    year?: number;
     search?: string;
     page?: number;
     limit?: number;

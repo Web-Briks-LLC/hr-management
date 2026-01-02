@@ -20,7 +20,6 @@ const runMigration = async () => {
         console.log('📌 Connected to hr-management DB.');
 
         const oldDb = mongoose.connection.useDb('hrManagement'); // Old database
-        const mainDb = mongoose.connection; // New database (hr-management)
 
         // Get a default user for createdBy field
         const users = await UserModel.find({}).toArray();
