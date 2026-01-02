@@ -10,6 +10,7 @@ import {
     addRevision,
     getOrderStats,
     getOrdersByClient,
+    getOrderYears,
 } from '../controllers/order.controller.js';
 
 const router = Router();
@@ -17,6 +18,7 @@ const router = Router();
 router.post('/', createOrder);
 router.get('/', getAllOrders);
 router.get('/stats', getOrderStats);
+router.get('/years', getOrderYears);
 router.get('/client/:clientId', getOrdersByClient);
 router.get('/:id', getOrderById);
 router.patch('/:id', updateOrder);

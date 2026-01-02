@@ -399,6 +399,20 @@ async function getOrdersByClient(req: Request, res: Response) {
     }
 }
 
+async function getOrderYears(_req: Request, res: Response) {
+    try {
+        const years = await orderService.getOrderYearsFromDB();
+
+        return res.status(200).json({
+            message: 'Order years retrieved successfully',
+            data: years,
+        });
+    } catch (error) {
+        console.error('Error getting order years:', error);
+        return res.status(500).json({ message: 'Internal server error' });
+    }
+}
+
 export {
     createOrder,
     getAllOrders,
@@ -410,4 +424,5 @@ export {
     addRevision,
     getOrderStats,
     getOrdersByClient,
+    getOrderYears,
 };

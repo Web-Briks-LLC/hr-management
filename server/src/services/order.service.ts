@@ -414,6 +414,21 @@ async function getOrdersByClientFromDB(
         .lean() as Promise<IOrder[]>;
 }
 
+// Get distinct years from orders
+async function getOrderYearsFromDB(): Promise<number[]> {
+    const result = await OrderModel.aggregate([
+        {
+            $group: {
+                _id: { $year: '$orderDate' },
+            },
+        },
+        {
+            $sort: { _id: -1 }, // Sort descending (newest first)
+        },
+    ]);
+    return result.map((r) => r._id);
+}
+
 export default {
     createOrderInDB,
     getAllOrdersFromDB,
@@ -425,4 +440,5 @@ export default {
     addRevision,
     getOrderStatsFromDB,
     getOrdersByClientFromDB,
+    getOrderYearsFromDB,
 };

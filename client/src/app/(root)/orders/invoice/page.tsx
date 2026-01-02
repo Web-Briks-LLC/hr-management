@@ -1,8 +1,7 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { useGetClientsQuery } from '@/redux/features/client/clientApi';
-import { useGetOrdersQuery } from '@/redux/features/order/orderApi';
+import { useState, useMemo, useRef, useEffect } from 'react';
+import { useGetOrdersQuery, useGetOrderYearsQuery } from '@/redux/features/order/orderApi';
 import { useLazyGetNextInvoiceNumberQuery } from '@/redux/features/invoice/invoiceApi';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, Download, FileText } from 'lucide-react';
+import { ArrowLeft, FileText } from 'lucide-react';
 import { format } from 'date-fns';
 import Link from 'next/link';
 import type { IOrder, OrderStatus } from '@/types/order.type';
@@ -51,40 +50,67 @@ const months = [
 
 export default function InvoicePage() {
     const currentDate = new Date();
-    const [selectedClientId, setSelectedClientId] = useState<string>('');
+    const [selectedYear, setSelectedYear] = useState<string>('');
     const [selectedMonth, setSelectedMonth] = useState<string>(String(currentDate.getMonth() + 1));
-    const [selectedYear, setSelectedYear] = useState<string>(String(currentDate.getFullYear()));
+    const [selectedClientId, setSelectedClientId] = useState<string>('');
     const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
     const [invoiceNumber, setInvoiceNumber] = useState<string>('');
     const [showPDF, setShowPDF] = useState(false);
 
+    // Ref for PDF section scroll
+    const pdfSectionRef = useRef<HTMLDivElement>(null);
+
     const [getNextInvoiceNumber, { isLoading: isGeneratingInvoice }] = useLazyGetNextInvoiceNumberQuery();
 
-    // Fetch clients
-    const { data: clientsData, isLoading: isLoadingClients } = useGetClientsQuery({
-        limit: 100,
-    });
+    // Fetch available years from database
+    const { data: yearsData, isLoading: isLoadingYears } = useGetOrderYearsQuery();
+    const years = yearsData?.data?.map(String) || [];
 
-    const clients = clientsData?.clients || [];
+    // Auto-select first year when years load
+    useEffect(() => {
+        if (years.length > 0 && !selectedYear) {
+            setSelectedYear(years[0]);
+        }
+    }, [years, selectedYear]);
 
-    // Fetch orders for selected client and month
-    const { data: ordersData, isLoading: isLoadingOrders } = useGetOrdersQuery(
-        selectedClientId
-            ? {
-                clientId: selectedClientId,
-                startDate: `${selectedYear}-${selectedMonth.padStart(2, '0')}-01`,
-                endDate: format(new Date(parseInt(selectedYear), parseInt(selectedMonth), 0), 'yyyy-MM-dd') + 'T23:59:59.999Z',
-            }
-            : undefined,
-        { skip: !selectedClientId }
+    // Fetch all orders for selected year/month (to get unique clients)
+    const { data: allOrdersData, isLoading: isLoadingAllOrders } = useGetOrdersQuery(
+        selectedYear ? {
+            month: parseInt(selectedMonth),
+            year: parseInt(selectedYear),
+            limit: 1000,
+        } : undefined,
+        { skip: !selectedYear }
     );
 
-    const orders = ordersData?.data || [];
+    const allOrders = allOrdersData?.data || [];
+
+    // Extract unique clients from orders
+    const availableClients = useMemo(() => {
+        const clientMap = new Map<string, { _id: string; name: string; clientId: string; currency?: string }>();
+        allOrders.forEach((order: IOrder) => {
+            if (order.clientId && !clientMap.has(order.clientId._id)) {
+                clientMap.set(order.clientId._id, {
+                    _id: order.clientId._id,
+                    name: order.clientId.name,
+                    clientId: order.clientId.clientId,
+                    currency: (order.clientId as any).currency,
+                });
+            }
+        });
+        return Array.from(clientMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+    }, [allOrders]);
+
+    // Filter orders for selected client
+    const orders = useMemo(() => {
+        if (!selectedClientId) return [];
+        return allOrders.filter((order: IOrder) => order.clientId?._id === selectedClientId);
+    }, [allOrders, selectedClientId]);
 
     // Get selected client details
     const selectedClient = useMemo(() => {
-        return clients.find((c: Client) => c._id === selectedClientId);
-    }, [clients, selectedClientId]);
+        return availableClients.find((c) => c._id === selectedClientId);
+    }, [availableClients, selectedClientId]);
 
     // Get selected order objects
     const selectedOrdersList = useMemo(() => {
@@ -126,28 +152,24 @@ export default function InvoicePage() {
         try {
             const result = await getNextInvoiceNumber().unwrap();
             if (result.success) {
-                setInvoiceNumber(result.formattedInvoiceNumber); // or result.invoiceNumber.toString()
+                setInvoiceNumber(result.formattedInvoiceNumber);
                 setShowPDF(true);
+                // Smooth scroll to PDF section
+                setTimeout(() => {
+                    pdfSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 100);
             }
         } catch (error) {
             console.error('Failed to generate invoice number:', error);
-            // Optionally show toast error here
         }
     };
 
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat('en-US', {
             style: 'currency',
-            currency: selectedClient?.currency || 'USD',
+            currency: (selectedClient as any)?.currency || 'USD',
         }).format(amount);
     };
-
-    // Generate years (current year and 2 previous years)
-    const years = [
-        String(currentDate.getFullYear()),
-        String(currentDate.getFullYear() - 1),
-        String(currentDate.getFullYear() - 2),
-    ];
 
     return (
         <div className="p-6 space-y-6">
@@ -161,7 +183,7 @@ export default function InvoicePage() {
                 <div>
                     <h1 className="text-2xl font-bold">Generate Invoice</h1>
                     <p className="text-muted-foreground">
-                        Select client and orders to generate an invoice
+                        Select year, month, and client to generate an invoice
                     </p>
                 </div>
             </div>
@@ -170,31 +192,36 @@ export default function InvoicePage() {
             <Card>
                 <CardHeader>
                     <CardTitle>Select Orders</CardTitle>
-                    <CardDescription>Choose a client and time period to view orders</CardDescription>
+                    <CardDescription>Choose a year, month, and client to view orders</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        {/* Client Select */}
+                        {/* Year Select */}
                         <div className="space-y-2">
-                            <label className="text-sm font-medium">Client</label>
-                            {isLoadingClients ? (
+                            <label className="text-sm font-medium">Year</label>
+                            {isLoadingYears ? (
                                 <Skeleton className="h-10 w-full" />
                             ) : (
                                 <Select
-                                    value={selectedClientId}
+                                    value={selectedYear}
                                     onValueChange={(value) => {
-                                        setSelectedClientId(value);
+                                        setSelectedYear(value);
+                                        setSelectedClientId('');
                                         setSelectedOrders(new Set());
                                         setShowPDF(false);
                                     }}
                                 >
                                     <SelectTrigger>
-                                        <SelectValue placeholder="Select a client" />
+                                        <SelectValue placeholder={
+                                            years.length === 0
+                                                ? "No orders found"
+                                                : "Select year"
+                                        } />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {clients.map((client: Client) => (
-                                            <SelectItem key={client._id} value={client._id}>
-                                                {client.name} ({client.clientId})
+                                        {years.map((year) => (
+                                            <SelectItem key={year} value={year}>
+                                                {year}
                                             </SelectItem>
                                         ))}
                                     </SelectContent>
@@ -209,6 +236,7 @@ export default function InvoicePage() {
                                 value={selectedMonth}
                                 onValueChange={(value) => {
                                     setSelectedMonth(value);
+                                    setSelectedClientId('');
                                     setSelectedOrders(new Set());
                                     setShowPDF(false);
                                 }}
@@ -226,28 +254,41 @@ export default function InvoicePage() {
                             </Select>
                         </div>
 
-                        {/* Year Select */}
+                        {/* Client Select - Dynamic based on Year/Month */}
                         <div className="space-y-2">
-                            <label className="text-sm font-medium">Year</label>
-                            <Select
-                                value={selectedYear}
-                                onValueChange={(value) => {
-                                    setSelectedYear(value);
-                                    setSelectedOrders(new Set());
-                                    setShowPDF(false);
-                                }}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {years.map((year) => (
-                                        <SelectItem key={year} value={year}>
-                                            {year}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                            <label className="text-sm font-medium">Client</label>
+                            {isLoadingAllOrders ? (
+                                <Skeleton className="h-10 w-full" />
+                            ) : (
+                                <Select
+                                    value={selectedClientId}
+                                    onValueChange={(value) => {
+                                        setSelectedClientId(value);
+                                        setSelectedOrders(new Set());
+                                        setShowPDF(false);
+                                    }}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder={
+                                            availableClients.length === 0
+                                                ? "No clients found"
+                                                : "Select a client"
+                                        } />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {availableClients.map((client) => (
+                                            <SelectItem key={client._id} value={client._id}>
+                                                {client.name} ({client.clientId})
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            )}
+                            {!isLoadingAllOrders && availableClients.length === 0 && (
+                                <p className="text-xs text-muted-foreground">
+                                    No orders found for this period
+                                </p>
+                            )}
                         </div>
 
                         {/* Generate Button */}
@@ -291,15 +332,9 @@ export default function InvoicePage() {
                     </CardHeader>
                     <CardContent>
                         <div className="border">
-                            {isLoadingOrders ? (
-                                <div className="p-8 text-center">
-                                    <Skeleton className="h-8 w-full mb-2" />
-                                    <Skeleton className="h-8 w-full mb-2" />
-                                    <Skeleton className="h-8 w-full" />
-                                </div>
-                            ) : orders.length === 0 ? (
+                            {orders.length === 0 ? (
                                 <div className="p-8 text-center text-muted-foreground">
-                                    No orders found for this period
+                                    No orders found for this client in this period
                                 </div>
                             ) : (
                                 <Table>
@@ -371,26 +406,18 @@ export default function InvoicePage() {
                 </Card>
             )}
 
-            {/* PDF Preview & Download */}
+            {/* PDF Preview */}
             {showPDF && selectedClient && selectedOrdersList.length > 0 && (
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Invoice Preview</CardTitle>
-                        <CardDescription>
-                            Review and download the invoice
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <InvoicePDF
-                            client={selectedClient}
-                            orders={selectedOrdersList}
-                            month={months.find((m) => m.value === selectedMonth)?.label || ''}
-                            year={selectedYear}
-                            invoiceNumber={invoiceNumber}
-                            totals={totals}
-                        />
-                    </CardContent>
-                </Card>
+                <div ref={pdfSectionRef}>
+                    <InvoicePDF
+                        client={selectedClient as Client}
+                        orders={selectedOrdersList}
+                        month={months.find((m) => m.value === selectedMonth)?.label || ''}
+                        year={selectedYear}
+                        invoiceNumber={invoiceNumber}
+                        totals={totals}
+                    />
+                </div>
             )}
         </div>
     );
