@@ -4,10 +4,10 @@ import {
     getPersons,
     updatePerson,
     deletePerson,
-    createTransaction,
-    getTransactions,
-    updateTransaction,
-    deleteTransaction,
+    createDebit,
+    getDebits,
+    updateDebit,
+    deleteDebit,
     getDebitStats,
 } from '../controllers/DebitController.js';
 
@@ -19,11 +19,11 @@ debitRoute.get('/persons', getPersons);
 debitRoute.put('/persons/:id', updatePerson);
 debitRoute.delete('/persons/:id', deletePerson);
 
-// Transactions
-debitRoute.post('/transactions', createTransaction);
-debitRoute.get('/transactions', getTransactions);
-debitRoute.put('/transactions/:id', updateTransaction);
-debitRoute.delete('/transactions/:id', deleteTransaction);
+// Debits
+debitRoute.post('/debits', createDebit);
+debitRoute.get('/debits', getDebits);
+debitRoute.put('/debits/:id', updateDebit);
+debitRoute.delete('/debits/:id', deleteDebit);
 
 // Stats
 debitRoute.get('/stats', getDebitStats);

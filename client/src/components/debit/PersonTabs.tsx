@@ -4,11 +4,11 @@ import { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '@/redux/store';
 import {
-    deleteTransaction,
+    deleteDebit,
     deletePerson,
     fetchDebitStats,
     fetchPersons,
-    fetchTransactions,
+    fetchDebits,
 } from '@/redux/slices/debitSlice';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -36,7 +36,7 @@ import { toast } from 'sonner';
 import { EditTransactionDialog } from './EditTransactionDialog';
 import { EditPersonDialog } from './EditPersonDialog';
 
-interface Transaction {
+interface Debit {
     _id: string;
     personId: {
         _id: string;
@@ -60,25 +60,25 @@ interface Person {
 
 export function PersonTabs() {
     const dispatch = useDispatch<AppDispatch>();
-    const { persons, transactions, stats } = useSelector(
+    const { persons = [], debits = [], stats = [] } = useSelector(
         (state: RootState) => state.debit
-    );
+    ) || {};
 
-    const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+    const [editingDebit, setEditingDebit] = useState<Debit | null>(null);
     const [editingPerson, setEditingPerson] = useState<Person | null>(null);
-    const [deleteTransactionId, setDeleteTransactionId] = useState<string | null>(null);
+    const [deleteDebitId, setDeleteDebitId] = useState<string | null>(null);
     const [deletePersonId, setDeletePersonId] = useState<string | null>(null);
 
-    const handleDeleteTransaction = () => {
-        if (!deleteTransactionId) return;
+    const handleDeleteDebit = () => {
+        if (!deleteDebitId) return;
 
-        dispatch(deleteTransaction(deleteTransactionId))
+        dispatch(deleteDebit(deleteDebitId))
             .unwrap()
             .then(() => {
-                toast.success('Transaction deleted');
+                toast.success('Debit deleted');
                 dispatch(fetchDebitStats());
-                dispatch(fetchTransactions(undefined));
-                setDeleteTransactionId(null);
+                dispatch(fetchDebits(undefined));
+                setDeleteDebitId(null);
             })
             .catch((err) => {
                 toast.error(`Failed to delete: ${err}`);
@@ -108,11 +108,11 @@ export function PersonTabs() {
 
     return (
         <>
-            <Tabs defaultValue="transactions" className="w-full">
+            <Tabs defaultValue="debits" className="w-full">
                 <TabsList className="grid w-full max-w-md grid-cols-2 mb-6">
-                    <TabsTrigger value="transactions" className="gap-2">
+                    <TabsTrigger value="debits" className="gap-2">
                         <ArrowLeftRight className="h-4 w-4" />
-                        Transactions
+                        Debits
                     </TabsTrigger>
                     <TabsTrigger value="persons" className="gap-2">
                         <Users className="h-4 w-4" />
@@ -120,14 +120,14 @@ export function PersonTabs() {
                     </TabsTrigger>
                 </TabsList>
 
-                {/* Transactions Tab */}
-                <TabsContent value="transactions" className="space-y-4">
-                    {transactions.length === 0 ? (
+                {/* Debits Tab */}
+                <TabsContent value="debits" className="space-y-4">
+                    {debits.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-16 text-center">
                             <ArrowLeftRight className="h-12 w-12 text-muted-foreground/50 mb-4" />
-                            <h3 className="text-lg font-medium">No transactions yet</h3>
+                            <h3 className="text-lg font-medium">No debits yet</h3>
                             <p className="text-muted-foreground text-sm mt-1">
-                                Add a transaction to get started
+                                Add a debit to get started
                             </p>
                         </div>
                     ) : (
@@ -144,30 +144,30 @@ export function PersonTabs() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {transactions.map((transaction) => (
-                                        <TableRow key={transaction._id} className="group border-b">
+                                    {debits.map((debit) => (
+                                        <TableRow key={debit._id} className="group border-b">
                                             <TableCell className="font-medium border-r">
-                                                {transaction.personId?.name || 'Unknown Person'}
+                                                {debit.personId?.name || 'Unknown Person'}
                                             </TableCell>
                                             <TableCell className="text-muted-foreground border-r">
-                                                {format(new Date(transaction.date), 'MMM d, yyyy')}
+                                                {format(new Date(debit.date), 'MMM d, yyyy')}
                                             </TableCell>
                                             <TableCell className="border-r">
-                                                <span className={`font-medium ${transaction.type === 'Borrow'
+                                                <span className={`font-medium ${debit.type === 'Borrow'
                                                     ? 'text-red-500'
                                                     : 'text-emerald-500'
                                                     }`}>
-                                                    {transaction.type}
+                                                    {debit.type}
                                                 </span>
                                             </TableCell>
                                             <TableCell className="text-right font-mono font-medium border-r">
-                                                {transaction.amount.toLocaleString('en-US', {
+                                                {debit.amount.toLocaleString('en-US', {
                                                     minimumFractionDigits: 2,
                                                     maximumFractionDigits: 2
                                                 })}
                                             </TableCell>
                                             <TableCell className="text-muted-foreground max-w-[200px] truncate border-r">
-                                                {transaction.description || '—'}
+                                                {debit.description || '—'}
                                             </TableCell>
                                             <TableCell className="text-right">
                                                 <div className="flex justify-end gap-1">
@@ -175,7 +175,7 @@ export function PersonTabs() {
                                                         variant="ghost"
                                                         size="icon"
                                                         className="h-8 w-8"
-                                                        onClick={() => setEditingTransaction(transaction)}
+                                                        onClick={() => setEditingDebit(debit)}
                                                     >
                                                         <Pencil className="h-4 w-4" />
                                                     </Button>
@@ -183,7 +183,7 @@ export function PersonTabs() {
                                                         variant="ghost"
                                                         size="icon"
                                                         className="h-8 w-8 text-destructive hover:text-destructive"
-                                                        onClick={() => setDeleteTransactionId(transaction._id)}
+                                                        onClick={() => setDeleteDebitId(debit._id)}
                                                     >
                                                         <Trash2 className="h-4 w-4" />
                                                     </Button>
@@ -285,12 +285,12 @@ export function PersonTabs() {
                 </TabsContent>
             </Tabs>
 
-            {/* Edit Transaction Dialog */}
-            {editingTransaction && (
+            {/* Edit Debit Dialog */}
+            {editingDebit && (
                 <EditTransactionDialog
-                    transaction={editingTransaction}
-                    open={!!editingTransaction}
-                    onOpenChange={(open) => !open && setEditingTransaction(null)}
+                    transaction={editingDebit}
+                    open={!!editingDebit}
+                    onOpenChange={(open) => !open && setEditingDebit(null)}
                 />
             )}
 
@@ -303,14 +303,14 @@ export function PersonTabs() {
                 />
             )}
 
-            {/* Delete Transaction Confirmation */}
+            {/* Delete Debit Confirmation */}
             <AlertDialog
-                open={!!deleteTransactionId}
-                onOpenChange={(open) => !open && setDeleteTransactionId(null)}
+                open={!!deleteDebitId}
+                onOpenChange={(open) => !open && setDeleteDebitId(null)}
             >
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>Delete transaction?</AlertDialogTitle>
+                        <AlertDialogTitle>Delete debit?</AlertDialogTitle>
                         <AlertDialogDescription>
                             This action cannot be undone.
                         </AlertDialogDescription>
@@ -318,7 +318,7 @@ export function PersonTabs() {
                     <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
                         <AlertDialogAction
-                            onClick={handleDeleteTransaction}
+                            onClick={handleDeleteDebit}
                             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         >
                             Delete
@@ -336,7 +336,7 @@ export function PersonTabs() {
                     <AlertDialogHeader>
                         <AlertDialogTitle>Delete person?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            This will also delete all their transactions. This action cannot be undone.
+                            This will also delete all their debits. This action cannot be undone.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

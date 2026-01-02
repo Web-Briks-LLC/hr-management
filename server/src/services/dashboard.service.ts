@@ -299,16 +299,16 @@ const getFinancialStats = async (): Promise<IFinancialStats> => {
             },
             { $group: { _id: null, total: { $sum: '$amount' } } },
         ]),
-        // Total revenue from ALL delivered orders (for display)
+        // Total revenue from ALL delivered/completed orders (for display)
         OrderModel.aggregate([
-            { $match: { status: 'delivered' } },
+            { $match: { status: { $in: ['delivered', 'completed'] } } },
             { $group: { _id: null, total: { $sum: '$totalPrice' } } },
         ]),
-        // Revenue from delivered orders NOT yet in earnings (unpaid)
+        // Unpaid = ALL orders NOT yet withdrawn (except cancelled)
         OrderModel.aggregate([
             {
                 $match: {
-                    status: 'delivered',
+                    status: { $ne: 'cancelled' },
                     _id: { $nin: paidOrderIds },
                 },
             },

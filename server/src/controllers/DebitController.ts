@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 import PersonModel from '../models/Person.js';
-import TransactionModel, { TransactionType } from '../models/Transaction.js';
+import DebitModel, { DebitType } from '../models/Debit.js';
 
 export const createPerson = async (req: Request, res: Response) => {
     try {
@@ -44,7 +44,7 @@ export const getPersons = async (_req: Request, res: Response) => {
     }
 };
 
-export const createTransaction = async (req: Request, res: Response) => {
+export const createDebit = async (req: Request, res: Response) => {
     try {
         const { personId, amount, date, type, description } = req.body;
         const userId = req.user?.id;
@@ -64,7 +64,7 @@ export const createTransaction = async (req: Request, res: Response) => {
             return res.status(404).json({ message: 'Person not found' });
         }
 
-        const transaction = await TransactionModel.create({
+        const debit = await DebitModel.create({
             personId,
             amount,
             date: date || new Date(),
@@ -73,43 +73,43 @@ export const createTransaction = async (req: Request, res: Response) => {
             createdBy: userId,
         });
 
-        return res.status(201).json(transaction);
+        return res.status(201).json(debit);
     } catch (error) {
-        console.error('Error creating transaction:', error);
+        console.error('Error creating debit:', error);
         return res
             .status(500)
-            .json({ message: 'Failed to create transaction', error });
+            .json({ message: 'Failed to create debit', error });
     }
 };
 
-export const getTransactions = async (req: Request, res: Response) => {
+export const getDebits = async (req: Request, res: Response) => {
     try {
         const { personId } = req.query as { personId?: string };
         const filter = personId ? { personId } : {};
 
-        const transactions = await TransactionModel.find(filter)
+        const debits = await DebitModel.find(filter)
             .populate('personId', 'name')
             .sort({ date: -1 });
 
-        return res.status(200).json(transactions);
+        return res.status(200).json(debits);
     } catch (error) {
-        console.error('Error fetching transactions:', error);
+        console.error('Error fetching debits:', error);
         return res
             .status(500)
-            .json({ message: 'Failed to fetch transactions', error });
+            .json({ message: 'Failed to fetch debits', error });
     }
 };
 
 export const getDebitStats = async (_req: Request, res: Response) => {
     try {
-        const stats = await TransactionModel.aggregate([
+        const stats = await DebitModel.aggregate([
             {
                 $group: {
                     _id: '$personId',
                     totalBorrowed: {
                         $sum: {
                             $cond: [
-                                { $eq: ['$type', TransactionType.BORROW] },
+                                { $eq: ['$type', DebitType.BORROW] },
                                 '$amount',
                                 0,
                             ],
@@ -118,7 +118,7 @@ export const getDebitStats = async (_req: Request, res: Response) => {
                     totalReturned: {
                         $sum: {
                             $cond: [
-                                { $eq: ['$type', TransactionType.RETURN] },
+                                { $eq: ['$type', DebitType.RETURN] },
                                 '$amount',
                                 0,
                             ],
@@ -128,7 +128,7 @@ export const getDebitStats = async (_req: Request, res: Response) => {
             },
             {
                 $lookup: {
-                    from: 'people', // Ensure collection name matches Mongoose default (pluralized 'Person' -> 'people')
+                    from: 'people',
                     localField: '_id',
                     foreignField: '_id',
                     as: 'person',
@@ -159,48 +159,46 @@ export const getDebitStats = async (_req: Request, res: Response) => {
     }
 };
 
-export const updateTransaction = async (req: Request, res: Response) => {
+export const updateDebit = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
         const { amount, date, type, description } = req.body;
 
-        const transaction = await TransactionModel.findByIdAndUpdate(
+        const debit = await DebitModel.findByIdAndUpdate(
             id,
             { amount, date, type, description },
             { new: true }
         ).populate('personId', 'name');
 
-        if (!transaction) {
-            return res.status(404).json({ message: 'Transaction not found' });
+        if (!debit) {
+            return res.status(404).json({ message: 'Debit not found' });
         }
 
-        return res.status(200).json(transaction);
+        return res.status(200).json(debit);
     } catch (error) {
-        console.error('Error updating transaction:', error);
+        console.error('Error updating debit:', error);
         return res
             .status(500)
-            .json({ message: 'Failed to update transaction', error });
+            .json({ message: 'Failed to update debit', error });
     }
 };
 
-export const deleteTransaction = async (req: Request, res: Response) => {
+export const deleteDebit = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
 
-        const transaction = await TransactionModel.findByIdAndDelete(id);
+        const debit = await DebitModel.findByIdAndDelete(id);
 
-        if (!transaction) {
-            return res.status(404).json({ message: 'Transaction not found' });
+        if (!debit) {
+            return res.status(404).json({ message: 'Debit not found' });
         }
 
-        return res
-            .status(200)
-            .json({ message: 'Transaction deleted successfully' });
+        return res.status(200).json({ message: 'Debit deleted successfully' });
     } catch (error) {
-        console.error('Error deleting transaction:', error);
+        console.error('Error deleting debit:', error);
         return res
             .status(500)
-            .json({ message: 'Failed to delete transaction', error });
+            .json({ message: 'Failed to delete debit', error });
     }
 };
 
@@ -236,8 +234,8 @@ export const deletePerson = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
 
-        // Delete all transactions for this person first
-        await TransactionModel.deleteMany({ personId: id } as any);
+        // Delete all debits for this person first
+        await DebitModel.deleteMany({ personId: id } as any);
 
         const person = await PersonModel.findByIdAndDelete(id);
 
@@ -246,7 +244,7 @@ export const deletePerson = async (req: Request, res: Response) => {
         }
 
         return res.status(200).json({
-            message: 'Person and their transactions deleted successfully',
+            message: 'Person and their debits deleted successfully',
         });
     } catch (error) {
         console.error('Error deleting person:', error);
@@ -255,3 +253,9 @@ export const deletePerson = async (req: Request, res: Response) => {
             .json({ message: 'Failed to delete person', error });
     }
 };
+
+// Legacy aliases for backward compatibility
+export const createTransaction = createDebit;
+export const getTransactions = getDebits;
+export const updateTransaction = updateDebit;
+export const deleteTransaction = deleteDebit;

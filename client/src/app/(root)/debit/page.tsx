@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { useDispatch } from 'react-redux';
 import { AppDispatch } from '@/redux/store';
-import { fetchPersons, fetchDebitStats, fetchTransactions } from '@/redux/slices/debitSlice';
+import { fetchPersons, fetchDebitStats, fetchDebits } from '@/redux/slices/debitSlice';
 import { AddPersonDialog } from '@/components/debit/AddPersonDialog';
 import { AddTransactionDialog } from '@/components/debit/AddTransactionDialog';
 import { PersonTabs } from '@/components/debit/PersonTabs';
@@ -15,7 +15,7 @@ export default function DebitPage() {
     useEffect(() => {
         dispatch(fetchPersons());
         dispatch(fetchDebitStats());
-        dispatch(fetchTransactions(undefined));
+        dispatch(fetchDebits(undefined));
     }, [dispatch]);
 
     return (

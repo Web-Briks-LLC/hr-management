@@ -9,7 +9,7 @@ interface Person {
     createdAt: string;
 }
 
-interface Transaction {
+interface Debit {
     _id: string;
     personId: {
         _id: string;
@@ -32,7 +32,7 @@ interface DebitStats {
 
 interface DebitState {
     persons: Person[];
-    transactions: Transaction[];
+    debits: Debit[];
     stats: DebitStats[];
     loading: boolean;
     error: string | null;
@@ -40,7 +40,7 @@ interface DebitState {
 
 const initialState: DebitState = {
     persons: [],
-    transactions: [],
+    debits: [],
     stats: [],
     loading: false,
     error: null,
@@ -137,17 +137,17 @@ export const deletePerson = createAsyncThunk(
     }
 );
 
-export const fetchTransactions = createAsyncThunk(
-    'debit/fetchTransactions',
+export const fetchDebits = createAsyncThunk(
+    'debit/fetchDebits',
     async (personId: string | undefined, { rejectWithValue }) => {
         try {
             const url = personId
-                ? `${BASE_URL}/debits/transactions?personId=${personId}`
-                : `${BASE_URL}/debits/transactions`;
+                ? `${BASE_URL}/debits/debits?personId=${personId}`
+                : `${BASE_URL}/debits/debits`;
             const response = await fetch(url, {
                 credentials: 'include',
             });
-            if (!response.ok) throw new Error('Failed to fetch transactions');
+            if (!response.ok) throw new Error('Failed to fetch debits');
             return await response.json();
         } catch (error: any) {
             return rejectWithValue(error.message);
@@ -155,8 +155,8 @@ export const fetchTransactions = createAsyncThunk(
     }
 );
 
-export const createTransaction = createAsyncThunk(
-    'debit/createTransaction',
+export const createDebit = createAsyncThunk(
+    'debit/createDebit',
     async (
         data: {
             personId: string;
@@ -168,7 +168,7 @@ export const createTransaction = createAsyncThunk(
         { rejectWithValue }
     ) => {
         try {
-            const response = await fetch(`${BASE_URL}/debits/transactions`, {
+            const response = await fetch(`${BASE_URL}/debits/debits`, {
                 method: 'POST',
                 credentials: 'include',
                 headers: {
@@ -176,7 +176,7 @@ export const createTransaction = createAsyncThunk(
                 },
                 body: JSON.stringify(data),
             });
-            if (!response.ok) throw new Error('Failed to create transaction');
+            if (!response.ok) throw new Error('Failed to create debit');
             return await response.json();
         } catch (error: any) {
             return rejectWithValue(error.message);
@@ -184,8 +184,8 @@ export const createTransaction = createAsyncThunk(
     }
 );
 
-export const updateTransaction = createAsyncThunk(
-    'debit/updateTransaction',
+export const updateDebit = createAsyncThunk(
+    'debit/updateDebit',
     async (
         data: {
             id: string;
@@ -198,18 +198,15 @@ export const updateTransaction = createAsyncThunk(
     ) => {
         try {
             const { id, ...rest } = data;
-            const response = await fetch(
-                `${BASE_URL}/debits/transactions/${id}`,
-                {
-                    method: 'PUT',
-                    credentials: 'include',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(rest),
-                }
-            );
-            if (!response.ok) throw new Error('Failed to update transaction');
+            const response = await fetch(`${BASE_URL}/debits/debits/${id}`, {
+                method: 'PUT',
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(rest),
+            });
+            if (!response.ok) throw new Error('Failed to update debit');
             return await response.json();
         } catch (error: any) {
             return rejectWithValue(error.message);
@@ -217,18 +214,15 @@ export const updateTransaction = createAsyncThunk(
     }
 );
 
-export const deleteTransaction = createAsyncThunk(
-    'debit/deleteTransaction',
+export const deleteDebit = createAsyncThunk(
+    'debit/deleteDebit',
     async (id: string, { rejectWithValue }) => {
         try {
-            const response = await fetch(
-                `${BASE_URL}/debits/transactions/${id}`,
-                {
-                    method: 'DELETE',
-                    credentials: 'include',
-                }
-            );
-            if (!response.ok) throw new Error('Failed to delete transaction');
+            const response = await fetch(`${BASE_URL}/debits/debits/${id}`, {
+                method: 'DELETE',
+                credentials: 'include',
+            });
+            if (!response.ok) throw new Error('Failed to delete debit');
             return id;
         } catch (error: any) {
             return rejectWithValue(error.message);
@@ -288,39 +282,39 @@ const debitSlice = createSlice({
                 state.persons = state.persons.filter(
                     (p) => p._id !== action.payload
                 );
-                state.transactions = state.transactions.filter(
+                state.debits = state.debits.filter(
                     (t) => t.personId._id !== action.payload
                 );
             })
-            // Fetch Transactions
-            .addCase(fetchTransactions.pending, (state) => {
+            // Fetch Debits
+            .addCase(fetchDebits.pending, (state) => {
                 state.loading = true;
                 state.error = null;
             })
-            .addCase(fetchTransactions.fulfilled, (state, action) => {
+            .addCase(fetchDebits.fulfilled, (state, action) => {
                 state.loading = false;
-                state.transactions = action.payload;
+                state.debits = action.payload;
             })
-            .addCase(fetchTransactions.rejected, (state, action) => {
+            .addCase(fetchDebits.rejected, (state, action) => {
                 state.loading = false;
                 state.error = action.payload as string;
             })
-            // Create Transaction
-            .addCase(createTransaction.fulfilled, (state, action) => {
-                state.transactions.unshift(action.payload);
+            // Create Debit
+            .addCase(createDebit.fulfilled, (state, action) => {
+                state.debits.unshift(action.payload);
             })
-            // Update Transaction
-            .addCase(updateTransaction.fulfilled, (state, action) => {
-                const index = state.transactions.findIndex(
+            // Update Debit
+            .addCase(updateDebit.fulfilled, (state, action) => {
+                const index = state.debits.findIndex(
                     (t) => t._id === action.payload._id
                 );
                 if (index !== -1) {
-                    state.transactions[index] = action.payload;
+                    state.debits[index] = action.payload;
                 }
             })
-            // Delete Transaction
-            .addCase(deleteTransaction.fulfilled, (state, action) => {
-                state.transactions = state.transactions.filter(
+            // Delete Debit
+            .addCase(deleteDebit.fulfilled, (state, action) => {
+                state.debits = state.debits.filter(
                     (t) => t._id !== action.payload
                 );
             })

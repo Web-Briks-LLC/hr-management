@@ -347,7 +347,7 @@ export function OrderForm({
                     <Input
                         id="perImagePrice"
                         type="number"
-                        step="0.01"
+                        step="any"
                         min="0"
                         value={perImagePrice || ''}
                         onChange={(e) => {

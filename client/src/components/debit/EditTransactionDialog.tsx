@@ -4,10 +4,10 @@ import { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '@/redux/store';
 import {
-    updateTransaction,
-    deleteTransaction,
+    updateDebit,
+    deleteDebit,
     fetchDebitStats,
-    fetchTransactions,
+    fetchDebits,
 } from '@/redux/slices/debitSlice';
 import {
     Dialog,
@@ -86,7 +86,7 @@ export function EditTransactionDialog({
         setErrors({});
 
         dispatch(
-            updateTransaction({
+            updateDebit({
                 id: transaction._id,
                 amount: amountNum,
                 date: date.toISOString(),
@@ -96,13 +96,13 @@ export function EditTransactionDialog({
         )
             .unwrap()
             .then(() => {
-                toast.success('Transaction updated successfully');
+                toast.success('Debit updated successfully');
                 dispatch(fetchDebitStats());
-                dispatch(fetchTransactions(undefined));
+                dispatch(fetchDebits(undefined));
                 onOpenChange(false);
             })
             .catch((err) => {
-                toast.error(`Failed to update transaction: ${err}`);
+                toast.error(`Failed to update debit: ${err}`);
             });
     };
 
@@ -110,9 +110,9 @@ export function EditTransactionDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-[425px]">
                 <DialogHeader>
-                    <DialogTitle>Edit Transaction</DialogTitle>
+                    <DialogTitle>Edit Debit</DialogTitle>
                     <DialogDescription>
-                        Update the transaction details.
+                        Update the debit details.
                     </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">

@@ -246,6 +246,15 @@ const styles = StyleSheet.create({
         color: colors.white,
         textAlign: 'center',
     },
+
+    // Page number
+    pageNumber: {
+        position: 'absolute',
+        bottom: 35,
+        right: 40,
+        fontSize: 8,
+        color: colors.gray,
+    },
 });
 
 interface InvoicePDFProps {
@@ -260,11 +269,55 @@ interface InvoicePDFProps {
     };
 }
 
-const InvoiceDocument = ({ client, orders, month, year, totals, invoiceNumber }: InvoicePDFProps) => {
-    // Generate Invoice Number (Mocking standard format)
-    // const invoiceNumber = `INV-${year}${month.slice(0, 3).toUpperCase()}-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`;
+// Table Header Component - fixed for multi-page
+const TableHeader = () => (
+    <View style={styles.tableHeader} fixed>
+        <Text style={[styles.tableHeaderText, styles.colNo]}>No.</Text>
+        <Text style={[styles.tableHeaderText, styles.colDate]}>Date</Text>
+        <Text style={[styles.tableHeaderText, styles.colName]}>Order Name</Text>
+        <Text style={[styles.tableHeaderText, styles.colQty]}>Image QTY</Text>
+        <Text style={[styles.tableHeaderText, styles.colRate]}>Per Image</Text>
+        <Text style={[styles.tableHeaderText, styles.colTotal]}>Sub Total</Text>
+    </View>
+);
+
+// Table Row Component - wrap={false} prevents row splitting across pages
+const TableRow = ({
+    order,
+    index,
+    formatCurrency,
+}: {
+    order: IOrder;
+    index: number;
+    formatCurrency: (n: number) => string;
+}) => (
+    <View style={[styles.tableRow, index % 2 !== 0 ? styles.tableRowEven : {}]} wrap={false}>
+        <Text style={[styles.tableCell, styles.colNo]}>{index + 1}</Text>
+        <Text style={[styles.tableCell, styles.colDate]}>
+            {format(new Date(order.orderDate), 'MMM do, yyyy')}
+        </Text>
+        <Text style={[styles.tableCell, styles.colName]}>{order.orderName}</Text>
+        <Text style={[styles.tableCell, styles.colQty]}>{order.imageQuantity}</Text>
+        <Text style={[styles.tableCell, styles.colRate]}>
+            {formatCurrency(order.perImagePrice)}
+        </Text>
+        <Text style={[styles.tableCell, styles.colTotal]}>
+            {formatCurrency(order.totalPrice)}
+        </Text>
+    </View>
+);
+
+const InvoiceDocument = ({
+    client,
+    orders,
+    month,
+    year,
+    totals,
+    invoiceNumber,
+}: InvoicePDFProps) => {
     const issueDate = format(new Date(), 'MMMM do, yyyy');
-    const logoUrl = 'https://res.cloudinary.com/dny7zfbg9/image/upload/v1755954483/mqontecf1xao7znsh6cx.png';
+    const logoUrl =
+        'https://res.cloudinary.com/dny7zfbg9/image/upload/v1755954483/mqontecf1xao7znsh6cx.png';
 
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat('en-US', {
@@ -277,7 +330,7 @@ const InvoiceDocument = ({ client, orders, month, year, totals, invoiceNumber }:
         <Document>
             <Page size="A4" style={styles.page}>
                 {/* Top Bar */}
-                <View style={styles.topBar} />
+                <View style={styles.topBar} fixed />
 
                 {/* Header */}
                 <View style={styles.headerContainer}>
@@ -288,7 +341,9 @@ const InvoiceDocument = ({ client, orders, month, year, totals, invoiceNumber }:
                     <View style={styles.invoiceDetailsContainer}>
                         <Text style={styles.invoiceTitle}>INVOICE</Text>
                         <View style={styles.titleUnderline} />
-                        <Text style={styles.invoiceDetailText}>Invoice No: {invoiceNumber}</Text>
+                        <Text style={styles.invoiceDetailText}>
+                            Invoice No: {invoiceNumber}
+                        </Text>
                         <Text style={styles.invoiceDetailText}>Date: {issueDate}</Text>
                     </View>
                 </View>
@@ -299,10 +354,18 @@ const InvoiceDocument = ({ client, orders, month, year, totals, invoiceNumber }:
                     <View style={styles.addressBox}>
                         <View style={[styles.accentBar, styles.billFromAccent]} />
                         <View style={[styles.addressContent, styles.billFromBox]}>
-                            <Text style={[styles.boxTitle, styles.billFromText]}>BILL FROM</Text>
-                            <Text style={[styles.boxText, styles.billFromText]}>Web Briks LLC</Text>
-                            <Text style={[styles.boxText, styles.billFromText]}>1209 Mountain Road PL NE,</Text>
-                            <Text style={[styles.boxText, styles.billFromText]}>STE R, Albuquerque, NM 87110, US</Text>
+                            <Text style={[styles.boxTitle, styles.billFromText]}>
+                                BILL FROM
+                            </Text>
+                            <Text style={[styles.boxText, styles.billFromText]}>
+                                Web Briks LLC
+                            </Text>
+                            <Text style={[styles.boxText, styles.billFromText]}>
+                                1209 Mountain Road PL NE,
+                            </Text>
+                            <Text style={[styles.boxText, styles.billFromText]}>
+                                STE R, Albuquerque, NM 87110, US
+                            </Text>
                         </View>
                     </View>
 
@@ -311,11 +374,17 @@ const InvoiceDocument = ({ client, orders, month, year, totals, invoiceNumber }:
                         <View style={[styles.accentBar, styles.billToAccent]} />
                         <View style={[styles.addressContent, styles.billToBox]}>
                             <Text style={[styles.boxTitle, styles.billToText]}>BILL TO</Text>
-                            <Text style={[styles.boxText, styles.billToText]}>{client.name}</Text>
+                            <Text style={[styles.boxText, styles.billToText]}>
+                                {client.name}
+                            </Text>
                             {client.officeAddress ? (
-                                <Text style={[styles.boxText, styles.billToText]}>{client.officeAddress}</Text>
+                                <Text style={[styles.boxText, styles.billToText]}>
+                                    {client.officeAddress}
+                                </Text>
                             ) : (
-                                <Text style={[styles.boxText, styles.billToText]}>{client.address || 'Address not provided'}</Text>
+                                <Text style={[styles.boxText, styles.billToText]}>
+                                    {client.address || 'Address not provided'}
+                                </Text>
                             )}
                         </View>
                     </View>
@@ -323,49 +392,50 @@ const InvoiceDocument = ({ client, orders, month, year, totals, invoiceNumber }:
 
                 {/* Table */}
                 <View style={styles.tableContainer}>
-                    <View style={styles.tableHeader}>
-                        <Text style={[styles.tableHeaderText, styles.colNo]}>No.</Text>
-                        <Text style={[styles.tableHeaderText, styles.colDate]}>Date</Text>
-                        <Text style={[styles.tableHeaderText, styles.colName]}>Order Name</Text>
-                        <Text style={[styles.tableHeaderText, styles.colQty]}>Image QTY</Text>
-                        <Text style={[styles.tableHeaderText, styles.colRate]}>Per Image</Text>
-                        <Text style={[styles.tableHeaderText, styles.colTotal]}>Sub Total</Text>
-                    </View>
-
+                    <TableHeader />
                     {orders.map((order, index) => (
-                        <View key={order._id} style={[styles.tableRow, index % 2 !== 0 ? styles.tableRowEven : {}]}>
-                            <Text style={[styles.tableCell, styles.colNo]}>{index + 1}</Text>
-                            <Text style={[styles.tableCell, styles.colDate]}>{format(new Date(order.orderDate), 'MMM do, yyyy')}</Text>
-                            <Text style={[styles.tableCell, styles.colName]}>{order.orderName}</Text>
-                            <Text style={[styles.tableCell, styles.colQty]}>{order.imageQuantity}</Text>
-                            <Text style={[styles.tableCell, styles.colRate]}>{formatCurrency(order.perImagePrice)}</Text>
-                            <Text style={[styles.tableCell, styles.colTotal]}>{formatCurrency(order.totalPrice)}</Text>
-                        </View>
+                        <TableRow
+                            key={order._id}
+                            order={order}
+                            index={index}
+                            formatCurrency={formatCurrency}
+                        />
                     ))}
                 </View>
 
                 {/* Total Block */}
-                <View style={styles.totalContainer}>
+                <View style={styles.totalContainer} wrap={false}>
                     <View style={styles.totalBox}>
                         <View style={styles.totalAccent} />
                         <View style={styles.totalContent}>
                             <Text style={styles.totalLabel}>TOTAL</Text>
-                            <Text style={styles.totalValue}>{formatCurrency(totals.totalAmount)}</Text>
+                            <Text style={styles.totalValue}>
+                                {formatCurrency(totals.totalAmount)}
+                            </Text>
                         </View>
                     </View>
                 </View>
 
                 {/* Footer */}
-                <View style={styles.footer}>
+                <View style={styles.footer} fixed>
                     <Text style={styles.footerText}>
-                        Web Briks LLC — Excellence in Editing and Design. For inquiry info@webbriks.com
+                        Web Briks LLC — Excellence in Editing and Design. For inquiry
+                        info@webbriks.com
                     </Text>
                 </View>
+
+                {/* Page Numbers */}
+                <Text
+                    style={styles.pageNumber}
+                    render={({ pageNumber, totalPages }) =>
+                        `Page ${pageNumber} of ${totalPages}`
+                    }
+                    fixed
+                />
             </Page>
         </Document>
     );
 };
-
 
 export default function InvoicePDF(props: InvoicePDFProps) {
     const fileName = `Invoice_${props.client.clientId}_${props.month}_${props.year}.pdf`;
@@ -378,7 +448,10 @@ export default function InvoicePDF(props: InvoicePDFProps) {
                     fileName={fileName}
                 >
                     {({ loading }) => (
-                        <Button className="bg-teal-500 hover:bg-teal-600" disabled={loading}>
+                        <Button
+                            className="bg-teal-500 hover:bg-teal-600"
+                            disabled={loading}
+                        >
                             <Download className="h-4 w-4 mr-2" />
                             {loading ? 'Generating PDF...' : 'Download PDF'}
                         </Button>
@@ -387,7 +460,7 @@ export default function InvoicePDF(props: InvoicePDFProps) {
             </div>
 
             <div className="h-[600px] w-full border rounded-lg overflow-hidden bg-gray-100">
-                <PDFViewer width="100%" height="100%" className='border-none'>
+                <PDFViewer width="100%" height="100%" className="border-none">
                     <InvoiceDocument {...props} />
                 </PDFViewer>
             </div>

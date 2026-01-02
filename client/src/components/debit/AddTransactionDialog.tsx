@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '@/redux/store';
-import { createTransaction, fetchDebitStats } from '@/redux/slices/debitSlice';
+import { createDebit, fetchDebitStats } from '@/redux/slices/debitSlice';
 import {
     Dialog,
     DialogContent,
@@ -69,7 +69,7 @@ export function AddTransactionDialog() {
         setErrors({});
 
         dispatch(
-            createTransaction({
+            createDebit({
                 personId,
                 amount: amountNum,
                 date: date.toISOString(),
@@ -79,7 +79,7 @@ export function AddTransactionDialog() {
         )
             .unwrap()
             .then(() => {
-                toast.success('Transaction added successfully');
+                toast.success('Debit added successfully');
                 dispatch(fetchDebitStats());
                 setOpen(false);
                 setPersonId('');
@@ -89,20 +89,20 @@ export function AddTransactionDialog() {
                 setDescription('');
             })
             .catch((err) => {
-                toast.error(`Failed to add transaction: ${err}`);
+                toast.error(`Failed to add debit: ${err}`);
             });
     };
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button variant="secondary">New Transaction</Button>
+                <Button variant="secondary">New Debit</Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[425px]">
                 <DialogHeader>
-                    <DialogTitle>Add New Transaction</DialogTitle>
+                    <DialogTitle>Add New Debit</DialogTitle>
                     <DialogDescription>
-                        Record a borrow or return transaction.
+                        Record a borrow or return debit.
                     </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
@@ -203,7 +203,7 @@ export function AddTransactionDialog() {
                             onChange={(e) => setDescription(e.target.value)}
                         />
                     </div>
-                    <Button type="submit">Save Transaction</Button>
+                    <Button type="submit">Save Debit</Button>
                 </form>
             </DialogContent>
         </Dialog>
