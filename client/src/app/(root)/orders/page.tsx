@@ -424,7 +424,7 @@ export default function OrdersPage() {
             {/* Stats Cards - Row 1 */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {/* Total Orders Card */}
-                <div className="group relative overflow-hidden rounded-2xl border bg-gradient-to-br from-slate-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-slate-500/5 hover:border-slate-500/30">
+                <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-slate-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-slate-500/5 hover:border-slate-500/30">
                     <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-slate-500/10 blur-2xl transition-all duration-300 group-hover:bg-slate-500/20" />
                     <div className="relative">
                         <div className="flex items-center justify-between mb-3">
@@ -440,7 +440,7 @@ export default function OrdersPage() {
                 </div>
 
                 {/* Pending Card */}
-                <div className="group relative overflow-hidden rounded-2xl border bg-gradient-to-br from-yellow-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-yellow-500/5 hover:border-yellow-500/30">
+                <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-yellow-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-yellow-500/5 hover:border-yellow-500/30">
                     <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-yellow-500/10 blur-2xl transition-all duration-300 group-hover:bg-yellow-500/20" />
                     <div className="relative">
                         <div className="flex items-center justify-between mb-3">
@@ -456,7 +456,7 @@ export default function OrdersPage() {
                 </div>
 
                 {/* In Progress Card */}
-                <div className="group relative overflow-hidden rounded-2xl border bg-gradient-to-br from-blue-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/5 hover:border-blue-500/30">
+                <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-blue-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/5 hover:border-blue-500/30">
                     <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-blue-500/10 blur-2xl transition-all duration-300 group-hover:bg-blue-500/20" />
                     <div className="relative">
                         <div className="flex items-center justify-between mb-3">
@@ -472,7 +472,7 @@ export default function OrdersPage() {
                 </div>
 
                 {/* Quality Check Card */}
-                <div className="group relative overflow-hidden rounded-2xl border bg-gradient-to-br from-purple-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-purple-500/5 hover:border-purple-500/30">
+                <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-purple-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-purple-500/5 hover:border-purple-500/30">
                     <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-purple-500/10 blur-2xl transition-all duration-300 group-hover:bg-purple-500/20" />
                     <div className="relative">
                         <div className="flex items-center justify-between mb-3">
@@ -491,7 +491,7 @@ export default function OrdersPage() {
             {/* Stats Cards - Row 2 */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {/* Revision Card */}
-                <div className="group relative overflow-hidden rounded-2xl border bg-gradient-to-br from-orange-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-orange-500/5 hover:border-orange-500/30">
+                <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-orange-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-orange-500/5 hover:border-orange-500/30">
                     <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-orange-500/10 blur-2xl transition-all duration-300 group-hover:bg-orange-500/20" />
                     <div className="relative">
                         <div className="flex items-center justify-between mb-3">
@@ -507,7 +507,7 @@ export default function OrdersPage() {
                 </div>
 
                 {/* Completed Card */}
-                <div className="group relative overflow-hidden rounded-2xl border bg-gradient-to-br from-green-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-green-500/5 hover:border-green-500/30">
+                <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-green-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-green-500/5 hover:border-green-500/30">
                     <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-green-500/10 blur-2xl transition-all duration-300 group-hover:bg-green-500/20" />
                     <div className="relative">
                         <div className="flex items-center justify-between mb-3">
@@ -523,7 +523,7 @@ export default function OrdersPage() {
                 </div>
 
                 {/* Delivered Card */}
-                <div className="group relative overflow-hidden rounded-2xl border bg-gradient-to-br from-emerald-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-emerald-500/5 hover:border-emerald-500/30">
+                <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-emerald-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-emerald-500/5 hover:border-emerald-500/30">
                     <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-emerald-500/10 blur-2xl transition-all duration-300 group-hover:bg-emerald-500/20" />
                     <div className="relative">
                         <div className="flex items-center justify-between mb-3">
@@ -539,7 +539,7 @@ export default function OrdersPage() {
                 </div>
 
                 {/* Overdue Card */}
-                <div className="group relative overflow-hidden rounded-2xl border bg-gradient-to-br from-red-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-red-500/5 hover:border-red-500/30">
+                <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-red-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-red-500/5 hover:border-red-500/30">
                     <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-red-500/10 blur-2xl transition-all duration-300 group-hover:bg-red-500/20" />
                     <div className="relative">
                         <div className="flex items-center justify-between mb-3">
@@ -820,6 +820,7 @@ export default function OrdersPage() {
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead className="border-r">Order Date</TableHead>
+                                        <TableHead className="border-r">Client</TableHead>
                                         <TableHead className="border-r">Name</TableHead>
                                         <TableHead className="border-r">Time Left</TableHead>
                                         <TableHead className="border-r text-center">Qty</TableHead>
@@ -833,7 +834,7 @@ export default function OrdersPage() {
                                     {orders.length === 0 ? (
                                         <TableRow>
                                             <TableCell
-                                                colSpan={8}
+                                                colSpan={9}
                                                 className="text-center py-8 text-muted-foreground"
                                             >
                                                 No orders found
@@ -844,6 +845,12 @@ export default function OrdersPage() {
                                             <TableRow key={order._id}>
                                                 <TableCell className="border-r">
                                                     {format(new Date(order.orderDate), 'PPP')}
+                                                </TableCell>
+                                                <TableCell className="border-r">
+                                                    <div className="flex flex-col">
+                                                        <span className="font-medium">{order.clientId?.name}</span>
+                                                        <span className="text-xs text-muted-foreground">{order.clientId?.clientId}</span>
+                                                    </div>
                                                 </TableCell>
                                                 <TableCell className="border-r font-medium max-w-[200px] truncate">
                                                     {order.orderName}

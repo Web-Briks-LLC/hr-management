@@ -2,6 +2,7 @@
 
 import {
     SidebarGroup,
+    SidebarGroupLabel,
     SidebarGroupContent,
     SidebarMenu,
     SidebarMenuButton,
@@ -9,7 +10,7 @@ import {
 } from '@/components/ui/sidebar';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { sidebarData } from '@/consonants/sidebar';
+import { sidebarGroups } from '@/consonants/sidebar';
 import { useSession } from '@/lib/auth-client';
 import { Skeleton } from '../ui/skeleton';
 import { Role } from '@/consonants/role';
@@ -35,42 +36,53 @@ export function NavMain() {
         );
     }
 
-    const userRole = session?.user?.role;
+    const userRole = session?.user?.role as Role | undefined;
 
-    const filteredData =
-        sidebarData.filter((item) =>
-            userRole ? item.access.includes(userRole as Role) : false
-        ) || [];
+    // Filter groups and items based on user role
+    const filteredGroups = sidebarGroups
+        .map((group) => ({
+            ...group,
+            items: group.items.filter((item) =>
+                userRole ? item.access.includes(userRole) : false
+            ),
+        }))
+        .filter((group) => group.items.length > 0);
 
     return (
-        <SidebarGroup>
-            <SidebarGroupContent>
-                <SidebarMenu className="space-y-2">
-                    {filteredData.map((item) => (
-                        <SidebarMenuItem key={item.title}>
-                            <SidebarMenuButton
-                                tooltip={item.title}
-                                className={cn(
-                                    pathname.startsWith(item.url) &&
-                                        'bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground',
-                                    ''
-                                )}
-                                asChild
-                            >
-                                <Link href={item.url}>
-                                    {item.icon && (
-                                        <item.icon
-                                            strokeWidth={2}
-                                            className="size-4 shrink-0"
-                                        />
-                                    )}
-                                    <span>{item.title}</span>
-                                </Link>
-                            </SidebarMenuButton>
-                        </SidebarMenuItem>
-                    ))}
-                </SidebarMenu>
-            </SidebarGroupContent>
-        </SidebarGroup>
+        <>
+            {filteredGroups.map((group) => (
+                <SidebarGroup key={group.groupLabel}>
+                    <SidebarGroupLabel className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 mb-1">
+                        {group.groupLabel}
+                    </SidebarGroupLabel>
+                    <SidebarGroupContent>
+                        <SidebarMenu className="space-y-0.5">
+                            {group.items.map((item) => (
+                                <SidebarMenuItem key={item.title}>
+                                    <SidebarMenuButton
+                                        tooltip={item.title}
+                                        className={cn(
+                                            pathname.startsWith(item.url) &&
+                                            'bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground'
+                                        )}
+                                        asChild
+                                    >
+                                        <Link href={item.url}>
+                                            {item.icon && (
+                                                <item.icon
+                                                    strokeWidth={2}
+                                                    className="size-4 shrink-0"
+                                                />
+                                            )}
+                                            <span>{item.title}</span>
+                                        </Link>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
+                            ))}
+                        </SidebarMenu>
+                    </SidebarGroupContent>
+                </SidebarGroup>
+            ))}
+        </>
     );
 }

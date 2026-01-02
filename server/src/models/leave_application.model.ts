@@ -44,6 +44,11 @@ const leaveApplicationSchema = new Schema<ILeaveApplication>(
             default: [],
         },
 
+        paidLeaveDates: {
+            type: [Date],
+            default: [],
+        },
+
         status: {
             type: String,
             enum: [
@@ -52,6 +57,8 @@ const leaveApplicationSchema = new Schema<ILeaveApplication>(
                 'partially_approved',
                 'rejected',
                 'cancelled',
+                'expired',
+                'revoked',
             ],
             default: 'pending',
             index: true,
@@ -82,12 +89,55 @@ const leaveApplicationSchema = new Schema<ILeaveApplication>(
             type: Boolean,
             default: false,
         },
+
+        // Expiry tracking - application expires at 11:59 PM on the same day
+        expiresAt: {
+            type: Date,
+            required: true,
+            index: true,
+        },
+
+        // Revocation tracking
+        revokedAt: {
+            type: Date,
+        },
+
+        revokedBy: {
+            type: Schema.Types.ObjectId,
+            ref: 'User',
+        },
+
+        revokeReason: {
+            type: String,
+        },
+
+        approvedAt: {
+            type: Date,
+        },
+
+        rejectedAt: {
+            type: Date,
+        },
+
+        // Medical documents for sick leave
+        medicalDocuments: {
+            type: [
+                {
+                    url: { type: String, required: true },
+                    publicId: { type: String },
+                    fileName: { type: String },
+                    uploadedAt: { type: Date, default: Date.now },
+                },
+            ],
+            default: [],
+        },
     },
     { timestamps: true }
 );
 
 leaveApplicationSchema.index({ staffId: 1, startDate: 1, endDate: 1 });
 leaveApplicationSchema.index({ staffId: 1, status: 1 });
+leaveApplicationSchema.index({ expiresAt: 1, status: 1 });
 
 const LeaveApplicationModel = model<ILeaveApplication>(
     'LeaveApplication',

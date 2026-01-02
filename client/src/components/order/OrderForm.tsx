@@ -13,6 +13,7 @@ import {
     useCreateReturnFileFormatMutation,
 } from '@/redux/features/returnFileFormat/returnFileFormatApi';
 import { useGetClientsQuery } from '@/redux/features/client/clientApi';
+import { useGetStaffsQuery } from '@/redux/features/staff/staffApi';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -123,6 +124,7 @@ export function OrderForm({
         useGetReturnFileFormatsQuery({ isActive: true });
     const { data: clientsData, isLoading: isLoadingClients } =
         useGetClientsQuery({ limit: 100 });
+    const { data: staffsData, isLoading: isLoadingStaffs } = useGetStaffsQuery(undefined);
 
     const [createService, { isLoading: isCreatingService }] =
         useCreateServiceMutation();
@@ -132,6 +134,7 @@ export function OrderForm({
     const services = servicesData?.data || [];
     const formats = formatsData?.data || [];
     const clients = clientsData?.clients || [];
+    const staffs = staffsData?.staffs || [];
 
     const imageQuantity = watch('imageQuantity');
     const perImagePrice = watch('perImagePrice');
@@ -609,6 +612,29 @@ export function OrderForm({
                         <SelectItem value="normal">Normal</SelectItem>
                         <SelectItem value="high">High</SelectItem>
                         <SelectItem value="urgent">Urgent</SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
+
+            {/* Assigned To */}
+            <div className="space-y-2">
+                <Label htmlFor="assignedTo">Assigned To</Label>
+                <Select
+                    value={watch('assignedTo') || '_unassigned'}
+                    onValueChange={(value) =>
+                        setValue('assignedTo', value === '_unassigned' ? '' : value)
+                    }
+                >
+                    <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select staff member" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="_unassigned">Unassigned</SelectItem>
+                        {staffs.map((staff: any) => (
+                            <SelectItem key={staff._id} value={staff._id}>
+                                {staff.user?.name || 'Unknown'} ({staff.ids?.staffId || staff.staffId})
+                            </SelectItem>
+                        ))}
                     </SelectContent>
                 </Select>
             </div>

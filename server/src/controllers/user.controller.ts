@@ -25,7 +25,7 @@ async function uploadImage(req: Request, res: Response) {
         const uploadResult = await new Promise<any>((resolve, reject) => {
             const uploadStream = cloudinary.uploader.upload_stream(
                 {
-                    folder: envConfig.cloudinary_upload_path,
+                    folder: `${envConfig.cloudinary_upload_path}/avatar`,
                     transformation: [
                         {
                             width: 500,

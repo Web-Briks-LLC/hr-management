@@ -1,4 +1,5 @@
 import OrderModel from '../models/order.model.js';
+import ClientModel from '../models/client.model.js';
 import type {
     IOrder,
     OrderStatus,
@@ -153,7 +154,20 @@ async function getAllOrdersFromDB(filters: GetOrdersFilters): Promise<{
     }
 
     if (search) {
-        query.$or = [{ orderName: { $regex: search, $options: 'i' } }];
+        // Find clients matching the search term
+        const matchingClients = await ClientModel.find({
+            $or: [
+                { name: { $regex: search, $options: 'i' } },
+                { clientId: { $regex: search, $options: 'i' } },
+            ],
+        }).select('_id');
+
+        const matchingClientIds = matchingClients.map((client) => client._id);
+
+        query.$or = [
+            { orderName: { $regex: search, $options: 'i' } },
+            { clientId: { $in: matchingClientIds } },
+        ];
     }
 
     const skip = (page - 1) * limit;

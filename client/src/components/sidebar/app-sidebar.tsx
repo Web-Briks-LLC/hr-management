@@ -27,10 +27,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                     <Image
                                         src="https://res.cloudinary.com/dny7zfbg9/image/upload/v1755954483/mqontecf1xao7znsh6cx.png"
                                         alt="Company logo"
-                                        width={200}
-                                        height={60}
+                                        width={150}
+                                        height={45}
                                         loading="eager"
-                                        style={{ width: 'auto', height: 'auto' }}
+                                        style={{ width: 'auto', height: 'auto', maxWidth: '150px' }}
                                     />
                                 </figure>
                             </Link>
