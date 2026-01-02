@@ -1,9 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useDispatch } from 'react-redux';
-import { AppDispatch } from '@/redux/store';
-import { createPerson } from '@/redux/slices/debitSlice';
+import { useCreatePersonMutation } from '@/redux/features/debit/debitApi';
 import {
     Dialog,
     DialogContent,
@@ -25,9 +23,10 @@ export function AddPersonDialog() {
     const [address, setAddress] = useState('');
     const [description, setDescription] = useState('');
     const [error, setError] = useState('');
-    const dispatch = useDispatch<AppDispatch>();
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const [createPerson, { isLoading }] = useCreatePersonMutation();
+
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
 
@@ -36,19 +35,17 @@ export function AddPersonDialog() {
             return;
         }
 
-        dispatch(createPerson({ name, phone, address, description }))
-            .unwrap()
-            .then(() => {
-                toast.success('Person added successfully');
-                setOpen(false);
-                setName('');
-                setPhone('');
-                setAddress('');
-                setDescription('');
-            })
-            .catch((err) => {
-                toast.error(`Failed to add person: ${err}`);
-            });
+        try {
+            await createPerson({ name, phone, address, description }).unwrap();
+            toast.success('Person added successfully');
+            setOpen(false);
+            setName('');
+            setPhone('');
+            setAddress('');
+            setDescription('');
+        } catch (err: any) {
+            toast.error(`Failed to add person: ${err?.data?.message || err.message}`);
+        }
     };
 
     return (
@@ -103,7 +100,9 @@ export function AddPersonDialog() {
                             onChange={(e) => setDescription(e.target.value)}
                         />
                     </div>
-                    <Button type="submit">Save</Button>
+                    <Button type="submit" disabled={isLoading}>
+                        {isLoading ? 'Saving...' : 'Save'}
+                    </Button>
                 </form>
             </DialogContent>
         </Dialog>

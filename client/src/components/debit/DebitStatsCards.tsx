@@ -1,7 +1,6 @@
 'use client';
 
-import { useSelector } from 'react-redux';
-import { RootState } from '@/redux/store';
+import { useGetDebitStatsQuery } from '@/redux/features/debit/debitApi';
 import {
     ArrowDownCircle,
     ArrowUpCircle,
@@ -11,7 +10,7 @@ import {
 } from 'lucide-react';
 
 export function DebitStatsCards() {
-    const { stats, loading } = useSelector((state: RootState) => state.debit);
+    const { data: stats = [], isLoading } = useGetDebitStatsQuery();
 
     // Calculate overall totals
     const totalBorrowed = stats.reduce((sum, s) => sum + s.totalBorrowed, 0);
@@ -25,7 +24,7 @@ export function DebitStatsCards() {
         });
     };
 
-    if (loading) {
+    if (isLoading) {
         return (
             <div className="grid gap-4 md:grid-cols-3">
                 {[1, 2, 3].map((i) => (
@@ -130,33 +129,33 @@ export function DebitStatsCards() {
 
             {/* Current Balance Card */}
             <div className={`group relative overflow-hidden rounded-2xl border p-6 transition-all duration-300 hover:shadow-xl ${currentBalance > 0
-                    ? 'bg-gradient-to-br from-amber-500/10 via-card to-card hover:shadow-amber-500/5 hover:border-amber-500/30'
-                    : currentBalance < 0
-                        ? 'bg-gradient-to-br from-blue-500/10 via-card to-card hover:shadow-blue-500/5 hover:border-blue-500/30'
-                        : 'bg-gradient-to-br from-slate-500/10 via-card to-card hover:shadow-slate-500/5 hover:border-slate-500/30'
+                ? 'bg-gradient-to-br from-amber-500/10 via-card to-card hover:shadow-amber-500/5 hover:border-amber-500/30'
+                : currentBalance < 0
+                    ? 'bg-gradient-to-br from-blue-500/10 via-card to-card hover:shadow-blue-500/5 hover:border-blue-500/30'
+                    : 'bg-gradient-to-br from-slate-500/10 via-card to-card hover:shadow-slate-500/5 hover:border-slate-500/30'
                 }`}>
                 {/* Decorative background elements */}
                 <div className={`absolute -right-4 -top-4 h-24 w-24 rounded-full blur-2xl transition-all duration-300 ${currentBalance > 0
-                        ? 'bg-amber-500/10 group-hover:bg-amber-500/20'
-                        : currentBalance < 0
-                            ? 'bg-blue-500/10 group-hover:bg-blue-500/20'
-                            : 'bg-slate-500/10 group-hover:bg-slate-500/20'
+                    ? 'bg-amber-500/10 group-hover:bg-amber-500/20'
+                    : currentBalance < 0
+                        ? 'bg-blue-500/10 group-hover:bg-blue-500/20'
+                        : 'bg-slate-500/10 group-hover:bg-slate-500/20'
                     }`} />
                 <div className={`absolute -right-2 -bottom-2 h-16 w-16 rounded-full blur-xl ${currentBalance > 0
-                        ? 'bg-amber-400/5'
-                        : currentBalance < 0
-                            ? 'bg-blue-400/5'
-                            : 'bg-slate-400/5'
+                    ? 'bg-amber-400/5'
+                    : currentBalance < 0
+                        ? 'bg-blue-400/5'
+                        : 'bg-slate-400/5'
                     }`} />
 
                 <div className="relative">
                     <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-2">
                             <div className={`flex h-10 w-10 items-center justify-center rounded-xl transition-all duration-300 group-hover:scale-110 ${currentBalance > 0
-                                    ? 'bg-amber-500/10 text-amber-500 group-hover:bg-amber-500/20'
-                                    : currentBalance < 0
-                                        ? 'bg-blue-500/10 text-blue-500 group-hover:bg-blue-500/20'
-                                        : 'bg-slate-500/10 text-slate-500 group-hover:bg-slate-500/20'
+                                ? 'bg-amber-500/10 text-amber-500 group-hover:bg-amber-500/20'
+                                : currentBalance < 0
+                                    ? 'bg-blue-500/10 text-blue-500 group-hover:bg-blue-500/20'
+                                    : 'bg-slate-500/10 text-slate-500 group-hover:bg-slate-500/20'
                                 }`}>
                                 <Wallet className="h-5 w-5" />
                             </div>
@@ -166,8 +165,8 @@ export function DebitStatsCards() {
                         </div>
                         {currentBalance !== 0 && (
                             <div className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${currentBalance > 0
-                                    ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
-                                    : 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
+                                ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                                : 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
                                 }`}>
                                 {currentBalance > 0 ? 'Receivable' : 'Settled'}
                             </div>
@@ -176,10 +175,10 @@ export function DebitStatsCards() {
 
                     <div className="space-y-1">
                         <h3 className={`text-3xl font-bold tracking-tight ${currentBalance > 0
-                                ? 'text-amber-600 dark:text-amber-400'
-                                : currentBalance < 0
-                                    ? 'text-blue-600 dark:text-blue-400'
-                                    : 'text-slate-600 dark:text-slate-400'
+                            ? 'text-amber-600 dark:text-amber-400'
+                            : currentBalance < 0
+                                ? 'text-blue-600 dark:text-blue-400'
+                                : 'text-slate-600 dark:text-slate-400'
                             }`}>
                             ৳{formatCurrency(Math.abs(currentBalance))}
                         </h3>
@@ -198,8 +197,8 @@ export function DebitStatsCards() {
                         <div className="h-1.5 flex-1 rounded-full bg-muted/50 overflow-hidden">
                             <div
                                 className={`h-full rounded-full transition-all duration-500 ${currentBalance > 0
-                                        ? 'bg-gradient-to-r from-amber-500 to-amber-400'
-                                        : 'bg-gradient-to-r from-blue-500 to-blue-400'
+                                    ? 'bg-gradient-to-r from-amber-500 to-amber-400'
+                                    : 'bg-gradient-to-r from-blue-500 to-blue-400'
                                     }`}
                                 style={{
                                     width: totalBorrowed > 0

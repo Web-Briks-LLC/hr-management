@@ -1,3 +1,6 @@
+'use client';
+
+import { useGetDebitStatsQuery } from '@/redux/features/debit/debitApi';
 import {
     Table,
     TableBody,
@@ -6,14 +9,12 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { useSelector } from 'react-redux';
-import { RootState } from '@/redux/store';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export function DebitTable() {
-    const { stats, loading } = useSelector((state: RootState) => state.debit);
+    const { data: stats = [], isLoading } = useGetDebitStatsQuery();
 
-    if (loading && stats.length === 0) {
+    if (isLoading && stats.length === 0) {
         return <div>Loading stats...</div>;
     }
 

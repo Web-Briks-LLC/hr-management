@@ -1,14 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { AppDispatch, RootState } from '@/redux/store';
-import {
-    updateDebit,
-    deleteDebit,
-    fetchDebitStats,
-    fetchDebits,
-} from '@/redux/slices/debitSlice';
+import { useUpdateDebitMutation } from '@/redux/features/debit/debitApi';
 import {
     Dialog,
     DialogContent,
@@ -67,9 +60,9 @@ export function EditTransactionDialog({
     const [description, setDescription] = useState(transaction.description || '');
     const [errors, setErrors] = useState<{ amount?: string }>({});
 
-    const dispatch = useDispatch<AppDispatch>();
+    const [updateDebit, { isLoading }] = useUpdateDebitMutation();
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         const newErrors: { amount?: string } = {};
 
@@ -85,25 +78,19 @@ export function EditTransactionDialog({
 
         setErrors({});
 
-        dispatch(
-            updateDebit({
+        try {
+            await updateDebit({
                 id: transaction._id,
                 amount: amountNum,
                 date: date.toISOString(),
                 type,
                 description,
-            })
-        )
-            .unwrap()
-            .then(() => {
-                toast.success('Debit updated successfully');
-                dispatch(fetchDebitStats());
-                dispatch(fetchDebits(undefined));
-                onOpenChange(false);
-            })
-            .catch((err) => {
-                toast.error(`Failed to update debit: ${err}`);
-            });
+            }).unwrap();
+            toast.success('Debit updated successfully');
+            onOpenChange(false);
+        } catch (err: any) {
+            toast.error(`Failed to update debit: ${err?.data?.message || err.message}`);
+        }
     };
 
     return (
@@ -191,7 +178,9 @@ export function EditTransactionDialog({
                         />
                     </div>
                     <div className="flex gap-2">
-                        <Button type="submit">Save Changes</Button>
+                        <Button type="submit" disabled={isLoading}>
+                            {isLoading ? 'Saving...' : 'Save Changes'}
+                        </Button>
                         <Button
                             type="button"
                             variant="outline"

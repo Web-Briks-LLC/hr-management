@@ -1,14 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useDispatch } from 'react-redux';
-import { AppDispatch } from '@/redux/store';
-import {
-    updatePerson,
-    deletePerson,
-    fetchDebitStats,
-    fetchPersons,
-} from '@/redux/slices/debitSlice';
+import { useUpdatePersonMutation } from '@/redux/features/debit/debitApi';
 import {
     Dialog,
     DialogContent,
@@ -47,9 +40,9 @@ export function EditPersonDialog({
     const [description, setDescription] = useState(person.description || '');
     const [error, setError] = useState('');
 
-    const dispatch = useDispatch<AppDispatch>();
+    const [updatePerson, { isLoading }] = useUpdatePersonMutation();
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
 
@@ -58,25 +51,19 @@ export function EditPersonDialog({
             return;
         }
 
-        dispatch(
-            updatePerson({
+        try {
+            await updatePerson({
                 id: person._id,
                 name,
                 phone,
                 address,
                 description,
-            })
-        )
-            .unwrap()
-            .then(() => {
-                toast.success('Person updated successfully');
-                dispatch(fetchDebitStats());
-                dispatch(fetchPersons());
-                onOpenChange(false);
-            })
-            .catch((err) => {
-                toast.error(`Failed to update person: ${err}`);
-            });
+            }).unwrap();
+            toast.success('Person updated successfully');
+            onOpenChange(false);
+        } catch (err: any) {
+            toast.error(`Failed to update person: ${err?.data?.message || err.message}`);
+        }
     };
 
     return (
@@ -129,7 +116,9 @@ export function EditPersonDialog({
                         />
                     </div>
                     <div className="flex gap-2">
-                        <Button type="submit">Save Changes</Button>
+                        <Button type="submit" disabled={isLoading}>
+                            {isLoading ? 'Saving...' : 'Save Changes'}
+                        </Button>
                         <Button
                             type="button"
                             variant="outline"

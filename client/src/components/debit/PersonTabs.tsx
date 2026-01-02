@@ -1,15 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { AppDispatch, RootState } from '@/redux/store';
 import {
-    deleteDebit,
-    deletePerson,
-    fetchDebitStats,
-    fetchPersons,
-    fetchDebits,
-} from '@/redux/slices/debitSlice';
+    useGetPersonsQuery,
+    useGetDebitsQuery,
+    useGetDebitStatsQuery,
+    useDeleteDebitMutation,
+    useDeletePersonMutation,
+} from '@/redux/features/debit/debitApi';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
     Table,
@@ -59,46 +57,40 @@ interface Person {
 }
 
 export function PersonTabs() {
-    const dispatch = useDispatch<AppDispatch>();
-    const { persons = [], debits = [], stats = [] } = useSelector(
-        (state: RootState) => state.debit
-    ) || {};
+    const { data: persons = [] } = useGetPersonsQuery();
+    const { data: debits = [] } = useGetDebitsQuery();
+    const { data: stats = [] } = useGetDebitStatsQuery();
+
+    const [deleteDebit] = useDeleteDebitMutation();
+    const [deletePerson] = useDeletePersonMutation();
 
     const [editingDebit, setEditingDebit] = useState<Debit | null>(null);
     const [editingPerson, setEditingPerson] = useState<Person | null>(null);
     const [deleteDebitId, setDeleteDebitId] = useState<string | null>(null);
     const [deletePersonId, setDeletePersonId] = useState<string | null>(null);
 
-    const handleDeleteDebit = () => {
+    const handleDeleteDebit = async () => {
         if (!deleteDebitId) return;
 
-        dispatch(deleteDebit(deleteDebitId))
-            .unwrap()
-            .then(() => {
-                toast.success('Debit deleted');
-                dispatch(fetchDebitStats());
-                dispatch(fetchDebits(undefined));
-                setDeleteDebitId(null);
-            })
-            .catch((err) => {
-                toast.error(`Failed to delete: ${err}`);
-            });
+        try {
+            await deleteDebit(deleteDebitId).unwrap();
+            toast.success('Debit deleted');
+            setDeleteDebitId(null);
+        } catch (err: any) {
+            toast.error(`Failed to delete: ${err?.data?.message || err.message}`);
+        }
     };
 
-    const handleDeletePerson = () => {
+    const handleDeletePerson = async () => {
         if (!deletePersonId) return;
 
-        dispatch(deletePerson(deletePersonId))
-            .unwrap()
-            .then(() => {
-                toast.success('Person deleted');
-                dispatch(fetchDebitStats());
-                dispatch(fetchPersons());
-                setDeletePersonId(null);
-            })
-            .catch((err) => {
-                toast.error(`Failed to delete: ${err}`);
-            });
+        try {
+            await deletePerson(deletePersonId).unwrap();
+            toast.success('Person deleted');
+            setDeletePersonId(null);
+        } catch (err: any) {
+            toast.error(`Failed to delete: ${err?.data?.message || err.message}`);
+        }
     };
 
     const getPersonBalance = (personId: string) => {
@@ -175,7 +167,7 @@ export function PersonTabs() {
                                                         variant="ghost"
                                                         size="icon"
                                                         className="h-8 w-8"
-                                                        onClick={() => setEditingDebit(debit)}
+                                                        onClick={() => setEditingDebit(debit as Debit)}
                                                     >
                                                         <Pencil className="h-4 w-4" />
                                                     </Button>
@@ -236,7 +228,7 @@ export function PersonTabs() {
                                                     variant="ghost"
                                                     size="icon"
                                                     className="h-8 w-8"
-                                                    onClick={() => setEditingPerson(person)}
+                                                    onClick={() => setEditingPerson(person as Person)}
                                                 >
                                                     <Pencil className="h-4 w-4" />
                                                 </Button>

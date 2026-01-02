@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { AppDispatch, RootState } from '@/redux/store';
-import { createDebit, fetchDebitStats } from '@/redux/slices/debitSlice';
+import {
+    useGetPersonsQuery,
+    useCreateDebitMutation,
+} from '@/redux/features/debit/debitApi';
 import {
     Dialog,
     DialogContent,
@@ -45,10 +46,10 @@ export function AddTransactionDialog() {
         {}
     );
 
-    const dispatch = useDispatch<AppDispatch>();
-    const { persons } = useSelector((state: RootState) => state.debit);
+    const { data: persons = [] } = useGetPersonsQuery();
+    const [createDebit, { isLoading }] = useCreateDebitMutation();
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         const newErrors: { personId?: string; amount?: string } = {};
 
@@ -68,29 +69,24 @@ export function AddTransactionDialog() {
 
         setErrors({});
 
-        dispatch(
-            createDebit({
+        try {
+            await createDebit({
                 personId,
                 amount: amountNum,
                 date: date.toISOString(),
                 type,
                 description,
-            })
-        )
-            .unwrap()
-            .then(() => {
-                toast.success('Debit added successfully');
-                dispatch(fetchDebitStats());
-                setOpen(false);
-                setPersonId('');
-                setAmount('');
-                setDate(new Date());
-                setType('Borrow');
-                setDescription('');
-            })
-            .catch((err) => {
-                toast.error(`Failed to add debit: ${err}`);
-            });
+            }).unwrap();
+            toast.success('Debit added successfully');
+            setOpen(false);
+            setPersonId('');
+            setAmount('');
+            setDate(new Date());
+            setType('Borrow');
+            setDescription('');
+        } catch (err: any) {
+            toast.error(`Failed to add debit: ${err?.data?.message || err.message}`);
+        }
     };
 
     return (
@@ -203,7 +199,9 @@ export function AddTransactionDialog() {
                             onChange={(e) => setDescription(e.target.value)}
                         />
                     </div>
-                    <Button type="submit">Save Debit</Button>
+                    <Button type="submit" disabled={isLoading}>
+                        {isLoading ? 'Saving...' : 'Save Debit'}
+                    </Button>
                 </form>
             </DialogContent>
         </Dialog>
