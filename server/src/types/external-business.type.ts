@@ -25,19 +25,19 @@ export interface IExternalBusinessPopulated
 
 export interface CreateExternalBusinessData {
     name: string;
-    description?: string;
-    contactPerson?: string;
-    phone?: string;
-    email?: string;
+    description?: string | undefined;
+    contactPerson?: string | undefined;
+    phone?: string | undefined;
+    email?: string | undefined;
 }
 
 export interface UpdateExternalBusinessData {
-    name?: string;
-    description?: string;
-    contactPerson?: string;
-    phone?: string;
-    email?: string;
-    isActive?: boolean;
+    name?: string | undefined;
+    description?: string | undefined;
+    contactPerson?: string | undefined;
+    phone?: string | undefined;
+    email?: string | undefined;
+    isActive?: boolean | undefined;
 }
 
 // ============ Profit Transfer Types ============
@@ -71,27 +71,27 @@ export interface IProfitTransferPopulated
 export interface CreateProfitTransferData {
     businessId: string;
     amount: number;
-    transferDate?: Date;
+    transferDate?: Date | undefined;
     periodType: 'month' | 'year';
-    month?: number;
+    month?: number | undefined;
     year: number;
-    notes?: string;
+    notes?: string | undefined;
 }
 
 // ============ Query Params ============
 export interface ExternalBusinessQueryParams {
-    page?: number;
-    limit?: number;
-    isActive?: boolean;
+    page?: number | undefined;
+    limit?: number | undefined;
+    isActive?: boolean | undefined;
 }
 
 export interface ProfitTransferQueryParams {
-    page?: number;
-    limit?: number;
-    businessId?: string;
-    periodType?: 'month' | 'year';
-    year?: number;
-    month?: number;
+    page?: number | undefined;
+    limit?: number | undefined;
+    businessId?: string | undefined;
+    periodType?: 'month' | 'year' | undefined;
+    year?: number | undefined;
+    month?: number | undefined;
 }
 
 // ============ Stats Types ============
