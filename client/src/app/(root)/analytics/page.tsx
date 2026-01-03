@@ -163,7 +163,7 @@ export default function FinanceAnalyticsPage() {
             </div>
 
             {/* Summary Stats */}
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">
@@ -176,7 +176,7 @@ export default function FinanceAnalyticsPage() {
                             {formatCurrency(summary.totalEarnings)}
                         </div>
                         <p className="text-xs text-muted-foreground">
-                            From {summary.deliveredOrders} delivered orders
+                            From {summary.deliveredOrders} orders
                         </p>
                     </CardContent>
                 </Card>
@@ -193,7 +193,7 @@ export default function FinanceAnalyticsPage() {
                             {formatCurrency(summary.totalExpenses)}
                         </div>
                         <p className="text-xs text-muted-foreground">
-                            Across all categories
+                            All categories
                         </p>
                     </CardContent>
                 </Card>
@@ -237,6 +237,40 @@ export default function FinanceAnalyticsPage() {
                         </div>
                         <p className="text-xs text-muted-foreground">
                             Not yet withdrawn
+                        </p>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">
+                            Shared Amount
+                        </CardTitle>
+                        <Package className="h-4 w-4 text-purple-600" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold text-purple-600">
+                            {formatCurrency(summary.totalShared || 0)}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                            Transferred to external
+                        </p>
+                    </CardContent>
+                </Card>
+
+                <Card className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 border-emerald-200 dark:border-emerald-800">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">
+                            Final Amount
+                        </CardTitle>
+                        <TrendingUp className="h-4 w-4 text-emerald-600" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className={`text-2xl font-bold ${(summary.finalAmount || 0) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                            {formatCurrency(summary.finalAmount || 0)}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                            Profit - Shared + Debit
                         </p>
                     </CardContent>
                 </Card>

@@ -2,6 +2,8 @@ import { subMonths } from 'date-fns';
 import EarningModel from '../models/earning.model.js';
 import ExpenseModel from '../models/expense.model.js';
 import OrderModel from '../models/order.model.js';
+import ProfitTransferModel from '../models/profit-transfer.model.js';
+import DebitModel, { DebitType } from '../models/Debit.js';
 import type {
     IFinanceAnalytics,
     IMonthlyFinance,
@@ -182,12 +184,38 @@ async function getFinanceAnalytics(
     const deliveredData = deliveredOrdersResult[0] || { count: 0, revenue: 0 };
     const unpaidRevenue = (unpaidOrdersResult[0]?.total || 0) * 120;
 
+    // Get total profit transfers (shared amount)
+    const profitTransferResult = await ProfitTransferModel.aggregate([
+        { $group: { _id: null, total: { $sum: '$amount' } } },
+    ]);
+    const totalShared = profitTransferResult[0]?.total || 0;
+
+    // Get debit balance (Borrow - Return = net amount owed to us)
+    const debitBorrowResult = await DebitModel.aggregate([
+        { $match: { type: DebitType.BORROW } },
+        { $group: { _id: null, total: { $sum: '$amount' } } },
+    ]);
+    const debitReturnResult = await DebitModel.aggregate([
+        { $match: { type: DebitType.RETURN } },
+        { $group: { _id: null, total: { $sum: '$amount' } } },
+    ]);
+    const totalBorrow = debitBorrowResult[0]?.total || 0;
+    const totalReturn = debitReturnResult[0]?.total || 0;
+    const totalDebit = totalBorrow - totalReturn; // Net amount owed to us
+
+    // Final Amount = Earnings - Expenses - Shared + Debit
+    const finalAmount =
+        totalEarnings - totalExpenses - totalShared + totalDebit;
+
     const summary = {
         totalEarnings,
         totalExpenses,
         totalProfit: totalEarnings - totalExpenses,
         totalRevenue: deliveredData.revenue * 120,
         unpaidRevenue,
+        totalShared,
+        totalDebit,
+        finalAmount,
         totalOrders: totalOrdersResult,
         deliveredOrders: deliveredData.count,
     };

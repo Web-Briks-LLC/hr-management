@@ -31,6 +31,9 @@ export interface IFinanceAnalytics {
         totalProfit: number;
         totalRevenue: number;
         unpaidRevenue: number;
+        totalShared: number;
+        totalDebit: number;
+        finalAmount: number;
         totalOrders: number;
         deliveredOrders: number;
     };
