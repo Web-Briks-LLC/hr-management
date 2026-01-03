@@ -78,7 +78,12 @@ async function getFinanceAnalytics(
         ]),
         // Unpaid orders revenue
         OrderModel.aggregate([
-            { $match: { status: 'delivered', _id: { $nin: paidOrderIds } } },
+            {
+                $match: {
+                    status: { $ne: 'cancelled' },
+                    _id: { $nin: paidOrderIds },
+                },
+            },
             { $group: { _id: null, total: { $sum: '$totalPrice' } } },
         ]),
         // Monthly earnings (last N months)
