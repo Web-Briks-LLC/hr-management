@@ -271,7 +271,8 @@ async function distributeProfitInDB(
         data.month
     );
 
-    if (summary.netProfit <= 0) {
+    // Only check for positive net profit if not using customAmount
+    if (!data.customAmount && summary.netProfit <= 0) {
         throw new Error(
             `Cannot distribute profit. Net profit is ৳${summary.netProfit.toLocaleString()}. There must be positive profit to distribute.`
         );
@@ -320,19 +321,29 @@ async function distributeProfitInDB(
     }
 
     // Create distribution records
-    const distributions = shareholders.map((shareholder) => ({
-        shareholderId: shareholder._id,
-        periodType: data.periodType,
-        month: data.month,
-        year: data.year,
-        totalProfit: summary.netProfit,
-        sharePercentage: shareholder.percentage,
-        shareAmount: (summary.netProfit * shareholder.percentage) / 100,
-        status: 'distributed' as const,
-        distributedAt: new Date(),
-        distributedBy: userId,
-        notes: data.notes,
-    }));
+    const distributions = shareholders.map((shareholder) => {
+        // If customAmount is provided, use it directly (for single shareholder share)
+        // Otherwise calculate based on percentage
+        const shareAmount = data.customAmount
+            ? data.customAmount
+            : (summary.netProfit * shareholder.percentage) / 100;
+
+        return {
+            shareholderId: shareholder._id,
+            periodType: data.periodType,
+            month: data.month,
+            year: data.year,
+            totalProfit: data.customAmount
+                ? data.customAmount
+                : summary.netProfit,
+            sharePercentage: data.customAmount ? 100 : shareholder.percentage, // 100% if direct amount
+            shareAmount,
+            status: 'distributed' as const,
+            distributedAt: new Date(),
+            distributedBy: userId,
+            notes: data.notes,
+        };
+    });
 
     return ProfitDistributionModel.insertMany(
         distributions

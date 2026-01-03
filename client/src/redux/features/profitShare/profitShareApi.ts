@@ -97,6 +97,7 @@ export interface DistributeProfitInput {
     month?: number;
     year: number;
     notes?: string;
+    customAmount?: number; // Direct amount to share (bypasses percentage calculation)
 }
 
 const profitShareApi = apiSlice.injectEndpoints({

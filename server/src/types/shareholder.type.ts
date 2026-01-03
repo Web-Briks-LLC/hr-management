@@ -72,6 +72,7 @@ export interface DistributeProfitData {
     month?: number | undefined;
     year: number;
     notes?: string | undefined;
+    customAmount?: number | undefined; // Direct amount to share (bypasses percentage calculation)
 }
 
 // ============ Profit Summary Types ============
