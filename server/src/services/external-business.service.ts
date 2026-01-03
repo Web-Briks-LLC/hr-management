@@ -35,30 +35,91 @@ async function getAllBusinessesFromDB(
     const { page = 1, limit = 50, isActive } = params;
     const skip = (page - 1) * limit;
 
-    const filter: Record<string, unknown> = {};
+    const matchStage: Record<string, unknown> = {};
     if (isActive !== undefined) {
-        filter.isActive = isActive;
+        matchStage.isActive = isActive;
     }
 
-    const [businesses, total] = await Promise.all([
-        ExternalBusinessModel.find(filter)
-            .populate('createdBy', 'name email')
-            .sort({ name: 1 })
-            .skip(skip)
-            .limit(limit)
-            .lean<IExternalBusinessPopulated[]>(),
-        ExternalBusinessModel.countDocuments(filter),
+    const [businesses, countResult] = await Promise.all([
+        ExternalBusinessModel.aggregate([
+            { $match: matchStage },
+            {
+                $lookup: {
+                    from: 'user',
+                    let: { createdById: '$createdBy' },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $eq: [
+                                        '$_id',
+                                        { $toObjectId: '$$createdById' },
+                                    ],
+                                },
+                            },
+                        },
+                        { $project: { _id: 1, name: 1, email: 1 } },
+                    ],
+                    as: 'createdByUser',
+                },
+            },
+            {
+                $unwind: {
+                    path: '$createdByUser',
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            { $addFields: { createdBy: '$createdByUser' } },
+            { $project: { createdByUser: 0 } },
+            { $sort: { name: 1 } },
+            { $skip: skip },
+            { $limit: limit },
+        ]),
+        ExternalBusinessModel.aggregate([
+            { $match: matchStage },
+            { $count: 'total' },
+        ]),
     ]);
 
-    return { businesses, total };
+    return {
+        businesses: businesses as unknown as IExternalBusinessPopulated[],
+        total: countResult[0]?.total || 0,
+    };
 }
 
 async function getBusinessByIdFromDB(
     id: string
 ): Promise<IExternalBusinessPopulated | null> {
-    return await ExternalBusinessModel.findById(id)
-        .populate('createdBy', 'name email')
-        .lean<IExternalBusinessPopulated>();
+    const mongoose = await import('mongoose');
+    const result = await ExternalBusinessModel.aggregate([
+        { $match: { _id: new mongoose.Types.ObjectId(id) } },
+        {
+            $lookup: {
+                from: 'user',
+                let: { createdById: '$createdBy' },
+                pipeline: [
+                    {
+                        $match: {
+                            $expr: {
+                                $eq: ['$_id', { $toObjectId: '$$createdById' }],
+                            },
+                        },
+                    },
+                    { $project: { _id: 1, name: 1, email: 1 } },
+                ],
+                as: 'createdByUser',
+            },
+        },
+        {
+            $unwind: {
+                path: '$createdByUser',
+                preserveNullAndEmptyArrays: true,
+            },
+        },
+        { $addFields: { createdBy: '$createdByUser' } },
+        { $project: { createdByUser: 0 } },
+    ]);
+    return (result[0] as IExternalBusinessPopulated) || null;
 }
 
 async function updateBusinessInDB(
@@ -97,6 +158,7 @@ async function getTransfersFromDB(params: ProfitTransferQueryParams): Promise<{
     page: number;
     totalPages: number;
 }> {
+    const mongoose = await import('mongoose');
     const {
         page = 1,
         limit = 20,
@@ -107,28 +169,68 @@ async function getTransfersFromDB(params: ProfitTransferQueryParams): Promise<{
     } = params;
     const skip = (page - 1) * limit;
 
-    const filter: Record<string, unknown> = {};
-    if (businessId) filter.businessId = businessId;
-    if (periodType) filter.periodType = periodType;
-    if (year) filter.year = year;
-    if (month) filter.month = month;
+    const matchStage: Record<string, unknown> = {};
+    if (businessId)
+        matchStage.businessId = new mongoose.Types.ObjectId(businessId);
+    if (periodType) matchStage.periodType = periodType;
+    if (year) matchStage.year = year;
+    if (month) matchStage.month = month;
 
-    const [transfers, total] = await Promise.all([
-        ProfitTransferModel.find(filter)
-            .populate('businessId', 'name')
-            .populate('transferredBy', 'name email')
-            .sort({ transferDate: -1 })
-            .skip(skip)
-            .limit(limit)
-            .lean<IProfitTransferPopulated[]>(),
-        ProfitTransferModel.countDocuments(filter),
+    const [transfers, countResult] = await Promise.all([
+        ProfitTransferModel.aggregate([
+            { $match: matchStage },
+            {
+                $lookup: {
+                    from: 'externalbusinesses',
+                    localField: 'businessId',
+                    foreignField: '_id',
+                    as: 'businessId',
+                },
+            },
+            {
+                $unwind: {
+                    path: '$businessId',
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
+                    from: 'user',
+                    let: { userId: '$transferredBy' },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $eq: ['$_id', { $toObjectId: '$$userId' }],
+                                },
+                            },
+                        },
+                        { $project: { _id: 1, name: 1, email: 1 } },
+                    ],
+                    as: 'transferredBy',
+                },
+            },
+            {
+                $unwind: {
+                    path: '$transferredBy',
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            { $sort: { transferDate: -1 } },
+            { $skip: skip },
+            { $limit: limit },
+        ]),
+        ProfitTransferModel.aggregate([
+            { $match: matchStage },
+            { $count: 'total' },
+        ]),
     ]);
 
     return {
-        transfers,
-        total,
+        transfers: transfers as unknown as IProfitTransferPopulated[],
+        total: countResult[0]?.total || 0,
         page,
-        totalPages: Math.ceil(total / limit),
+        totalPages: Math.ceil((countResult[0]?.total || 0) / limit),
     };
 }
 

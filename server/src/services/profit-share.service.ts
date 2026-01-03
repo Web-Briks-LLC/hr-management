@@ -369,30 +369,72 @@ async function getDistributionsFromDB(
     } = params;
     const skip = (page - 1) * limit;
 
-    const filter: Record<string, unknown> = {};
-    if (shareholderId) filter.shareholderId = shareholderId;
-    if (periodType) filter.periodType = periodType;
-    if (year) filter.year = year;
-    if (month) filter.month = month;
-    if (status) filter.status = status;
+    const mongoose = await import('mongoose');
 
-    const [distributions, total] = await Promise.all([
-        ProfitDistributionModel.find(filter)
-            .populate('shareholderId', 'name email percentage')
-            // Note: distributedBy references native 'user' collection, cannot populate
-            .sort({ distributedAt: -1 })
-            .skip(skip)
-            .limit(limit)
-            .lean(),
-        ProfitDistributionModel.countDocuments(filter),
+    const matchStage: Record<string, unknown> = {};
+    if (shareholderId)
+        matchStage.shareholderId = new mongoose.Types.ObjectId(shareholderId);
+    if (periodType) matchStage.periodType = periodType;
+    if (year) matchStage.year = year;
+    if (month) matchStage.month = month;
+    if (status) matchStage.status = status;
+
+    const [distributions, countResult] = await Promise.all([
+        ProfitDistributionModel.aggregate([
+            { $match: matchStage },
+            {
+                $lookup: {
+                    from: 'shareholders',
+                    localField: 'shareholderId',
+                    foreignField: '_id',
+                    as: 'shareholderId',
+                },
+            },
+            {
+                $unwind: {
+                    path: '$shareholderId',
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $lookup: {
+                    from: 'user',
+                    let: { userId: '$distributedBy' },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $eq: ['$_id', { $toObjectId: '$$userId' }],
+                                },
+                            },
+                        },
+                        { $project: { _id: 1, name: 1, email: 1 } },
+                    ],
+                    as: 'distributedBy',
+                },
+            },
+            {
+                $unwind: {
+                    path: '$distributedBy',
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            { $sort: { distributedAt: -1 } },
+            { $skip: skip },
+            { $limit: limit },
+        ]),
+        ProfitDistributionModel.aggregate([
+            { $match: matchStage },
+            { $count: 'total' },
+        ]),
     ]);
 
     return {
         distributions:
             distributions as unknown as IProfitDistributionPopulated[],
-        total,
+        total: countResult[0]?.total || 0,
         page,
-        totalPages: Math.ceil(total / limit),
+        totalPages: Math.ceil((countResult[0]?.total || 0) / limit),
     };
 }
 

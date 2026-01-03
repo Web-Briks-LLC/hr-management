@@ -5,6 +5,7 @@ import type {
     OrderStatus,
     OrderPriority,
 } from '../types/order.type.js';
+import mongoose from 'mongoose';
 
 interface CreateOrderData {
     orderName: string;
@@ -201,7 +202,7 @@ async function getAllOrdersFromDB(filters: GetOrdersFilters): Promise<{
 }
 
 async function getOrderByIdFromDB(id: string): Promise<IOrder | null> {
-    return OrderModel.findById(id)
+    const order = await OrderModel.findById(id)
         .populate('clientId', 'clientId name email phone')
         .populate('services', 'name description')
         .populate('returnFileFormat', 'name extension')
@@ -213,8 +214,21 @@ async function getOrderByIdFromDB(id: string): Promise<IOrder | null> {
                 select: 'name email',
             },
         })
-        .populate('createdBy', 'name email')
         .lean();
+
+    if (order && order.createdBy) {
+        // Manually fetch createdBy user since it's a native collection
+        const { default: UserModel } = await import('../models/user.model.js');
+        const user = await UserModel.findOne(
+            { _id: new mongoose.Types.ObjectId(order.createdBy.toString()) },
+            { projection: { name: 1, email: 1 } }
+        );
+        if (user) {
+            // @ts-ignore
+            order.createdBy = user;
+        }
+    }
+    return order;
 }
 
 async function updateOrderInDB(
