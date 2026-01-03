@@ -24,7 +24,7 @@ export default function ProfitSharePage() {
             </div>
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <TabsList className="grid w-full max-w-2xl grid-cols-5">
+                <TabsList className="grid w-full max-w-4xl grid-cols-5">
                     <TabsTrigger value="overview" className="gap-2">
                         <PieChart className="h-4 w-4" />
                         Overview

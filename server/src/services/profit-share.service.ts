@@ -379,7 +379,7 @@ async function getDistributionsFromDB(
     const [distributions, total] = await Promise.all([
         ProfitDistributionModel.find(filter)
             .populate('shareholderId', 'name email percentage')
-            .populate('distributedBy', 'name email')
+            // Note: distributedBy references native 'user' collection, cannot populate
             .sort({ distributedAt: -1 })
             .skip(skip)
             .limit(limit)
