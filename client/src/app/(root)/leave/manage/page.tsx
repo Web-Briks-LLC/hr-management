@@ -335,86 +335,197 @@ export default function LeaveManagePage() {
 
             {/* Enhanced Approve Dialog */}
             <Dialog open={showApproveDialog} onOpenChange={setShowApproveDialog}>
-                <DialogContent className="max-w-2xl">
-                    <DialogHeader>
-                        <DialogTitle>Approve Leave</DialogTitle>
-                        <DialogDescription>Approve leave application for {selectedApplication?.staffId?.userId?.name}</DialogDescription>
+                <DialogContent className="!max-w-[900px] w-[900px] max-h-[85vh] overflow-y-auto">
+                    <DialogHeader className="pb-4 border-b">
+                        <div className="flex items-center gap-3">
+                            <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-xl">
+                                <Check className="h-6 w-6 text-green-600" />
+                            </div>
+                            <div>
+                                <DialogTitle className="text-xl">Approve Leave Request</DialogTitle>
+                                <DialogDescription className="mt-1">
+                                    Review and approve leave application for <span className="font-semibold text-foreground">{selectedApplication?.staffId?.userId?.name}</span>
+                                </DialogDescription>
+                            </div>
+                        </div>
                     </DialogHeader>
-                    <div className="space-y-4">
-                        <div className="bg-muted p-4 rounded-lg">
-                            <p><strong>Type:</strong> {selectedApplication && LEAVE_TYPE_LABELS[selectedApplication.leaveType]}</p>
-                            <p><strong>Period:</strong> {selectedApplication && `${format(new Date(selectedApplication.startDate), 'PPP')} - ${format(new Date(selectedApplication.endDate), 'PPP')}`}</p>
-                            <p><strong>Total Days:</strong> {selectedApplication?.requestedDates.length}</p>
-                            <p><strong>Reason:</strong> {selectedApplication?.reason}</p>
+
+                    <div className="space-y-5 py-4">
+                        {/* Leave Info Card */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-900/20 dark:to-blue-800/10 rounded-xl border border-blue-200 dark:border-blue-800">
+                                <p className="text-xs text-blue-600 dark:text-blue-400 font-medium uppercase tracking-wide">Leave Type</p>
+                                <p className="text-lg font-bold mt-1">{selectedApplication && LEAVE_TYPE_LABELS[selectedApplication.leaveType]}</p>
+                            </div>
+                            <div className="p-4 bg-gradient-to-br from-purple-50 to-purple-100/50 dark:from-purple-900/20 dark:to-purple-800/10 rounded-xl border border-purple-200 dark:border-purple-800">
+                                <p className="text-xs text-purple-600 dark:text-purple-400 font-medium uppercase tracking-wide">Total Days</p>
+                                <p className="text-lg font-bold mt-1">{selectedApplication?.requestedDates.length} days</p>
+                            </div>
+                            <div className="p-4 bg-gradient-to-br from-emerald-50 to-emerald-100/50 dark:from-emerald-900/20 dark:to-emerald-800/10 rounded-xl border border-emerald-200 dark:border-emerald-800">
+                                <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium uppercase tracking-wide">From</p>
+                                <p className="text-lg font-bold mt-1">{selectedApplication && format(new Date(selectedApplication.startDate), 'MMM dd')}</p>
+                            </div>
+                            <div className="p-4 bg-gradient-to-br from-amber-50 to-amber-100/50 dark:from-amber-900/20 dark:to-amber-800/10 rounded-xl border border-amber-200 dark:border-amber-800">
+                                <p className="text-xs text-amber-600 dark:text-amber-400 font-medium uppercase tracking-wide">To</p>
+                                <p className="text-lg font-bold mt-1">{selectedApplication && format(new Date(selectedApplication.endDate), 'MMM dd')}</p>
+                            </div>
+                        </div>
+
+                        {/* Reason */}
+                        <div className="p-4 bg-muted/50 rounded-xl">
+                            <p className="text-sm font-medium text-muted-foreground mb-2">Reason for Leave</p>
+                            <p className="text-foreground">{selectedApplication?.reason}</p>
                         </div>
 
                         <Separator />
 
-                        <div className="space-y-3">
-                            <Label className="text-base font-semibold">Approval Mode</Label>
-                            <RadioGroup value={approvalMode} onValueChange={(v) => setApprovalMode(v as 'full' | 'partial')}>
-                                <div className="flex items-center space-x-2">
-                                    <RadioGroupItem value="full" id="full" />
-                                    <Label htmlFor="full" className="cursor-pointer">Approve All Dates</Label>
+                        {/* Approval Mode Selection */}
+                        <div className="space-y-4">
+                            <Label className="text-base font-semibold">How would you like to approve?</Label>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div
+                                    onClick={() => setApprovalMode('full')}
+                                    className={`p-5 rounded-xl border-2 cursor-pointer transition-all ${approvalMode === 'full'
+                                        ? 'border-green-500 bg-green-50 dark:bg-green-900/20 shadow-md'
+                                        : 'border-muted hover:border-green-300 hover:bg-muted/50'
+                                        }`}
+                                >
+                                    <div className="flex items-start gap-3">
+                                        <div className={`mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center ${approvalMode === 'full' ? 'border-green-500 bg-green-500' : 'border-muted-foreground'}`}>
+                                            {approvalMode === 'full' && <Check className="w-3 h-3 text-white" />}
+                                        </div>
+                                        <div>
+                                            <p className="font-semibold text-base">Approve All Dates</p>
+                                            <p className="text-sm text-muted-foreground mt-1">Approve the entire leave request</p>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div className="flex items-center space-x-2">
-                                    <RadioGroupItem value="partial" id="partial" />
-                                    <Label htmlFor="partial" className="cursor-pointer">Partial Approve (Select dates individually)</Label>
+                                <div
+                                    onClick={() => setApprovalMode('partial')}
+                                    className={`p-5 rounded-xl border-2 cursor-pointer transition-all ${approvalMode === 'partial'
+                                        ? 'border-green-500 bg-green-50 dark:bg-green-900/20 shadow-md'
+                                        : 'border-muted hover:border-green-300 hover:bg-muted/50'
+                                        }`}
+                                >
+                                    <div className="flex items-start gap-3">
+                                        <div className={`mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center ${approvalMode === 'partial' ? 'border-green-500 bg-green-500' : 'border-muted-foreground'}`}>
+                                            {approvalMode === 'partial' && <Check className="w-3 h-3 text-white" />}
+                                        </div>
+                                        <div>
+                                            <p className="font-semibold text-base">Partial Approval</p>
+                                            <p className="text-sm text-muted-foreground mt-1">Approve selected dates only</p>
+                                        </div>
+                                    </div>
                                 </div>
-                            </RadioGroup>
+                            </div>
                         </div>
 
+                        {/* Partial Approval Date Selection */}
                         {approvalMode === 'partial' && (
-                            <div className="space-y-3">
-                                <Label className="text-base font-semibold flex items-center gap-2">
-                                    <Calendar className="h-4 w-4" />
-                                    Date Decisions
-                                </Label>
-                                <ScrollArea className="h-[200px] border rounded-lg p-3">
-                                    <div className="space-y-2">
-                                        {dateSelections.map((ds) => (
-                                            <div key={ds.date} className="flex items-center justify-between p-2 bg-muted/50 rounded">
-                                                <span className="font-medium">{format(new Date(ds.date), 'EEE, MMM dd, yyyy')}</span>
-                                                <div className="flex items-center gap-4">
-                                                    <label className="flex items-center gap-1.5 cursor-pointer">
-                                                        <Checkbox checked={ds.decision === 'approve'} onCheckedChange={() => handleDateDecisionChange(ds.date, 'approve')} />
-                                                        <span className="text-sm text-green-600">Approve</span>
-                                                    </label>
-                                                    <label className="flex items-center gap-1.5 cursor-pointer">
-                                                        <Checkbox checked={ds.decision === 'paid'} onCheckedChange={() => handleDateDecisionChange(ds.date, 'paid')} />
-                                                        <span className="text-sm text-blue-600">Paid Leave</span>
-                                                    </label>
-                                                    <label className="flex items-center gap-1.5 cursor-pointer">
-                                                        <Checkbox checked={ds.decision === 'reject'} onCheckedChange={() => handleDateDecisionChange(ds.date, 'reject')} />
-                                                        <span className="text-sm text-red-600">Reject</span>
-                                                    </label>
+                            <div className="space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <Label className="text-base font-semibold flex items-center gap-2">
+                                        <Calendar className="h-5 w-5" />
+                                        Select Decision for Each Date
+                                    </Label>
+                                </div>
+                                <div className="border rounded-xl overflow-hidden">
+                                    <ScrollArea className="h-[240px]">
+                                        <div className="divide-y">
+                                            {dateSelections.map((ds, index) => (
+                                                <div key={ds.date} className={`flex items-center justify-between p-4 ${index % 2 === 0 ? 'bg-muted/30' : ''}`}>
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                                                            <span className="font-bold text-sm text-primary">{format(new Date(ds.date), 'dd')}</span>
+                                                        </div>
+                                                        <div>
+                                                            <p className="font-medium">{format(new Date(ds.date), 'EEEE')}</p>
+                                                            <p className="text-sm text-muted-foreground">{format(new Date(ds.date), 'MMMM dd, yyyy')}</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <Button
+                                                            type="button"
+                                                            variant={ds.decision === 'approve' ? 'default' : 'outline'}
+                                                            size="sm"
+                                                            className={ds.decision === 'approve' ? 'bg-green-600 hover:bg-green-700' : ''}
+                                                            onClick={() => handleDateDecisionChange(ds.date, 'approve')}
+                                                        >
+                                                            <Check className="h-4 w-4 mr-1" />
+                                                            Approve
+                                                        </Button>
+                                                        <Button
+                                                            type="button"
+                                                            variant={ds.decision === 'paid' ? 'default' : 'outline'}
+                                                            size="sm"
+                                                            className={ds.decision === 'paid' ? 'bg-blue-600 hover:bg-blue-700' : ''}
+                                                            onClick={() => handleDateDecisionChange(ds.date, 'paid')}
+                                                        >
+                                                            💰 Paid
+                                                        </Button>
+                                                        <Button
+                                                            type="button"
+                                                            variant={ds.decision === 'reject' ? 'destructive' : 'outline'}
+                                                            size="sm"
+                                                            onClick={() => handleDateDecisionChange(ds.date, 'reject')}
+                                                        >
+                                                            <X className="h-4 w-4 mr-1" />
+                                                            Reject
+                                                        </Button>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        ))}
+                                            ))}
+                                        </div>
+                                    </ScrollArea>
+                                </div>
+                                {/* Summary */}
+                                <div className="flex items-center justify-center gap-6 p-4 bg-muted/50 rounded-xl">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-3 h-3 rounded-full bg-green-500" />
+                                        <span className="font-medium">{approvedDates.length} Approved</span>
                                     </div>
-                                </ScrollArea>
-                                <div className="flex gap-4 text-sm">
-                                    <span className="text-green-600">✓ Approved: {approvedDates.length}</span>
-                                    <span className="text-blue-600">💰 Paid: {paidLeaveDates.length}</span>
-                                    <span className="text-red-600">✕ Rejected: {dateSelections.filter(ds => ds.decision === 'reject').length}</span>
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-3 h-3 rounded-full bg-blue-500" />
+                                        <span className="font-medium">{paidLeaveDates.length} Paid Leave</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-3 h-3 rounded-full bg-red-500" />
+                                        <span className="font-medium">{dateSelections.filter(ds => ds.decision === 'reject').length} Rejected</span>
+                                    </div>
                                 </div>
                             </div>
                         )}
 
+                        {/* Comment */}
                         <div className="space-y-2">
-                            <Label>Comment (Optional)</Label>
-                            <Textarea value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Add a comment..." />
+                            <Label className="text-base">Add a Comment (Optional)</Label>
+                            <Textarea
+                                value={comment}
+                                onChange={(e) => setComment(e.target.value)}
+                                placeholder="Add any notes or comments for this approval..."
+                                className="min-h-[100px] resize-none"
+                            />
                         </div>
                     </div>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setShowApproveDialog(false)}>Cancel</Button>
-                        <Button onClick={handleApprove} disabled={isApproving || (approvalMode === 'partial' && approvedDates.length === 0 && paidLeaveDates.length === 0)} className="bg-green-600 hover:bg-green-700">
+
+                    <DialogFooter className="pt-4 border-t gap-3">
+                        <Button variant="outline" onClick={() => setShowApproveDialog(false)} className="px-6">
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={handleApprove}
+                            disabled={isApproving || (approvalMode === 'partial' && approvedDates.length === 0 && paidLeaveDates.length === 0)}
+                            className="bg-green-600 hover:bg-green-700 px-8"
+                            size="lg"
+                        >
                             {isApproving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            {approvalMode === 'full' ? 'Approve All' : 'Approve Selected'}
+                            <Check className="mr-2 h-4 w-4" />
+                            {approvalMode === 'full' ? 'Approve All Days' : `Approve ${approvedDates.length + paidLeaveDates.length} Day(s)`}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
 
             {/* Reject Dialog */}
             <Dialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>

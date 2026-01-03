@@ -22,6 +22,7 @@ import { debitRoute } from './debitRoutes.js';
 import invoiceRoute from './invoice.route.js';
 import { leaveRoute } from './leave.route.js';
 import { noticeRoute } from './notice.route.js';
+import externalBusinessRoute from './external-business.routes.js';
 
 const router: Router = Router();
 
@@ -117,6 +118,10 @@ const moduleRoutes = [
     {
         path: '/notices',
         route: noticeRoute,
+    },
+    {
+        path: '/external-business',
+        route: externalBusinessRoute,
     },
 ];
 

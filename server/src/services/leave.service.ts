@@ -126,9 +126,9 @@ async function getOrCreateLeaveBalance(staffId: string, year: number) {
             annualLeaveTotal: 12,
             annualLeaveUsed: 0,
             annualLeaveRemaining: 12,
-            sickLeaveTotal: 18,
+            sickLeaveTotal: 14,
             sickLeaveUsed: 0,
-            sickLeaveRemaining: 18,
+            sickLeaveRemaining: 14,
         });
     }
 
@@ -198,15 +198,24 @@ async function applyForLeave(input: ApplyLeaveInput) {
 
     // Notify admins about new leave request
     try {
-        const populatedApp = await application.populate({
-            path: 'staffId',
-            populate: { path: 'userId', select: 'name' },
-        });
-        const staffName =
-            (populatedApp.staffId as any)?.userId?.name || 'Staff Member';
-        const staffUserId =
-            (populatedApp.staffId as any)?.userId?._id ||
-            (populatedApp.staffId as any)?.userId;
+        // Get staff info
+        const staff = await LeaveApplicationModel.findById(application._id)
+            .populate('staffId')
+            .lean();
+
+        // Get user info from native MongoDB collection (better-auth manages User)
+        const UserModel = (await import('../models/user.model.js')).default;
+        const staffRecord = staff?.staffId as any;
+        let staffName = 'Staff Member';
+        let staffUserId = staffRecord?.userId;
+
+        if (staffRecord?.userId) {
+            const user = await UserModel.findOne({ _id: staffRecord.userId });
+            if (user) {
+                staffName = user.name || 'Staff Member';
+                staffUserId = user._id;
+            }
+        }
 
         await notificationService.notifyAdminsLeaveRequest({
             staffName,
