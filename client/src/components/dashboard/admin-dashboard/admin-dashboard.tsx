@@ -45,47 +45,6 @@ export default function AdminDashboard() {
 
     return (
         <div className="space-y-6">
-            {/* Financial Overview */}
-            {financialStats && (
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-lg">Financial Overview</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                            <StatCard
-                                title="Total Earnings"
-                                value={formatCurrency(financialStats.totalEarnings)}
-                                icon={DollarSign}
-                                description={`This month: ${formatCurrency(financialStats.thisMonthEarnings)}`}
-                                variant="success"
-                            />
-                            <StatCard
-                                title="Total Expenses"
-                                value={formatCurrency(financialStats.totalExpenses)}
-                                icon={Receipt}
-                                description={`This month: ${formatCurrency(financialStats.thisMonthExpenses)}`}
-                                variant="warning"
-                            />
-                            <StatCard
-                                title="Profit"
-                                value={formatCurrency(financialStats.profit)}
-                                icon={TrendingUp}
-                                description="Earnings - Expenses"
-                                variant={financialStats.profit >= 0 ? 'primary' : 'warning'}
-                            />
-                            <StatCard
-                                title="Unpaid Revenue"
-                                value={formatCurrency(financialStats.unpaidRevenue)}
-                                icon={Wallet}
-                                description="Not yet withdrawn"
-                                variant="default"
-                            />
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
-
             {/* Stats Cards */}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 <StatCard

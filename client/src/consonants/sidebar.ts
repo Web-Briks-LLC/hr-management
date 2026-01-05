@@ -49,7 +49,7 @@ export const sidebarGroups: SidebarGroup[] = [
                 title: 'Analytics',
                 url: '/analytics',
                 icon: IconChartBar,
-                access: [Role.SUPER_ADMIN, Role.ADMIN, Role.HR_MANAGER],
+                access: [Role.SUPER_ADMIN, Role.ADMIN],
             },
         ],
     },
@@ -60,7 +60,7 @@ export const sidebarGroups: SidebarGroup[] = [
                 title: 'Clients',
                 url: '/clients',
                 icon: IconUserCircle,
-                access: [Role.SUPER_ADMIN, Role.ADMIN, Role.HR_MANAGER],
+                access: [Role.SUPER_ADMIN, Role.ADMIN],
             },
             {
                 title: 'Orders',
@@ -69,7 +69,6 @@ export const sidebarGroups: SidebarGroup[] = [
                 access: [
                     Role.SUPER_ADMIN,
                     Role.ADMIN,
-                    Role.HR_MANAGER,
                     Role.TEAM_LEADER,
                 ],
             },
