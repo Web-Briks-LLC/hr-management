@@ -175,7 +175,10 @@ async function getAllOrdersFromDB(filters: GetOrdersFilters): Promise<{
 
     const [orders, total] = await Promise.all([
         OrderModel.find(query)
-            .populate('clientId', 'clientId name email')
+            .populate(
+                'clientId',
+                'clientId name email currency officeAddress address'
+            )
             .populate('services', 'name')
             .populate('returnFileFormat', 'name extension')
             .populate({
@@ -203,7 +206,10 @@ async function getAllOrdersFromDB(filters: GetOrdersFilters): Promise<{
 
 async function getOrderByIdFromDB(id: string): Promise<IOrder | null> {
     const order = await OrderModel.findById(id)
-        .populate('clientId', 'clientId name email phone')
+        .populate(
+            'clientId',
+            'clientId name email phone currency officeAddress address'
+        )
         .populate('services', 'name description')
         .populate('returnFileFormat', 'name extension')
         .populate({
@@ -247,7 +253,10 @@ async function updateOrderInDB(
         new: true,
         runValidators: true,
     })
-        .populate('clientId', 'clientId name email')
+        .populate(
+            'clientId',
+            'clientId name email currency officeAddress address'
+        )
         .populate('services', 'name')
         .populate('returnFileFormat', 'name extension')
         .populate({
@@ -298,7 +307,10 @@ async function updateOrderStatusWithTimeline(
         new: true,
         runValidators: true,
     })
-        .populate('clientId', 'clientId name email')
+        .populate(
+            'clientId',
+            'clientId name email currency officeAddress address'
+        )
         .populate('services', 'name')
         .populate('returnFileFormat', 'name extension')
         .populate({
@@ -344,7 +356,10 @@ async function extendDeadline(
         new: true,
         runValidators: true,
     })
-        .populate('clientId', 'clientId name email')
+        .populate(
+            'clientId',
+            'clientId name email currency officeAddress address'
+        )
         .populate('services', 'name')
         .populate('returnFileFormat', 'name extension')
         .lean();
@@ -378,7 +393,10 @@ async function addRevision(
         new: true,
         runValidators: true,
     })
-        .populate('clientId', 'clientId name email')
+        .populate(
+            'clientId',
+            'clientId name email currency officeAddress address'
+        )
         .populate('services', 'name')
         .populate('returnFileFormat', 'name extension')
         .lean();

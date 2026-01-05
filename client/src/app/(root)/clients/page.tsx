@@ -155,6 +155,7 @@ export default function ClientsPage() {
             address: client.address || '',
             officeAddress: client.officeAddress || '',
             description: client.description || '',
+            currency: client.currency || '',
             status: client.status,
         });
         setIsEditDialogOpen(true);
