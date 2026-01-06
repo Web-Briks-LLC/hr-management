@@ -377,15 +377,13 @@ const InvoiceDocument = ({
                             <Text style={[styles.boxText, styles.billToText]}>
                                 {client.name}
                             </Text>
-                            {client.officeAddress ? (
-                                <Text style={[styles.boxText, styles.billToText]}>
-                                    {client.officeAddress}
-                                </Text>
-                            ) : (
-                                <Text style={[styles.boxText, styles.billToText]}>
-                                    {client.address || 'Address not provided'}
-                                </Text>
-                            )}
+                            <Text style={[styles.boxText, styles.billToText]}>
+                                {(client.address && client.address !== 'N/A')
+                                    ? client.address
+                                    : (client.officeAddress && client.officeAddress !== 'N/A')
+                                        ? client.officeAddress
+                                        : 'Address not provided'}
+                            </Text>
                         </View>
                     </View>
                 </View>
