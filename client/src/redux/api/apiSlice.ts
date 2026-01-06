@@ -35,6 +35,8 @@ export const apiSlice = createApi({
         'ExternalBusiness',
         'ProfitTransfer',
         'TransferStats',
+        'JobPosition',
+        'JobApplication',
     ],
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     endpoints: (_builder) => ({}),
