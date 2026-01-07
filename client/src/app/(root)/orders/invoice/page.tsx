@@ -87,7 +87,7 @@ export default function InvoicePage() {
 
     // Extract unique clients from orders
     const availableClients = useMemo(() => {
-        const clientMap = new Map<string, { _id: string; name: string; clientId: string; currency?: string }>();
+        const clientMap = new Map<string, { _id: string; name: string; clientId: string; currency?: string; address?: string; officeAddress?: string }>();
         allOrders.forEach((order: IOrder) => {
             if (order.clientId && !clientMap.has(order.clientId._id)) {
                 clientMap.set(order.clientId._id, {
@@ -95,6 +95,8 @@ export default function InvoicePage() {
                     name: order.clientId.name,
                     clientId: order.clientId.clientId,
                     currency: (order.clientId as any).currency,
+                    address: (order.clientId as any).address,
+                    officeAddress: (order.clientId as any).officeAddress,
                 });
             }
         });

@@ -40,7 +40,12 @@ app.use(
             req.method === 'GET' &&
             /^\/metadata\/type\/(department|designation)$/.test(req.path);
 
-        if (isPublicInvitationRoute || isPublicMetadataRoute) {
+        // Allow public access to career routes
+        const isPublicCareerRoute =
+            (req.method === 'GET' && /^\/careers\/positions\/public/.test(req.path)) ||
+            (req.method === 'POST' && req.path === '/careers/applications/public');
+
+        if (isPublicInvitationRoute || isPublicMetadataRoute || isPublicCareerRoute) {
             return next();
         }
 
