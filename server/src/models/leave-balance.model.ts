@@ -40,7 +40,7 @@ const leaveBalanceSchema = new Schema<ILeaveBalance>(
         },
         sickLeaveTotal: {
             type: Number,
-            default: 18,
+            default: 14,
         },
         sickLeaveUsed: {
             type: Number,
@@ -48,7 +48,7 @@ const leaveBalanceSchema = new Schema<ILeaveBalance>(
         },
         sickLeaveRemaining: {
             type: Number,
-            default: 18,
+            default: 14,
         },
     },
     { timestamps: true }

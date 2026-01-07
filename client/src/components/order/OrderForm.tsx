@@ -1,6 +1,6 @@
-'use client';
+ 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { format } from 'date-fns';
@@ -91,6 +91,10 @@ export function OrderForm({
     const [newServiceDescription, setNewServiceDescription] = useState('');
     const [newFormatName, setNewFormatName] = useState('');
     const [newFormatExtension, setNewFormatExtension] = useState('');
+    
+    // Service search with debounce
+    const [serviceSearchInput, setServiceSearchInput] = useState('');
+    const [debouncedServiceSearch, setDebouncedServiceSearch] = useState('');
 
     const {
         register,
@@ -136,6 +140,23 @@ export function OrderForm({
     const formats = formatsData?.data || [];
     const clients = clientsData?.clients || [];
     const staffs = staffsData?.staffs || [];
+    
+    // Debounce service search (300ms delay)
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedServiceSearch(serviceSearchInput);
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [serviceSearchInput]);
+    
+    // Filter services based on debounced search
+    const filteredServices = useMemo(() => {
+        if (!debouncedServiceSearch.trim()) return services;
+        const searchLower = debouncedServiceSearch.toLowerCase();
+        return services.filter((service: { name: string }) => 
+            service.name.toLowerCase().includes(searchLower)
+        );
+    }, [services, debouncedServiceSearch]);
 
     const imageQuantity = watch('imageQuantity');
     const perImagePrice = watch('perImagePrice');
@@ -459,34 +480,49 @@ export function OrderForm({
                         </DialogContent>
                     </Dialog>
                 </div>
+                
+                {/* Service Search Input */}
+                <Input
+                    placeholder="Search services..."
+                    value={serviceSearchInput}
+                    onChange={(e) => setServiceSearchInput(e.target.value)}
+                    className="h-9"
+                />
+                
                 {isLoadingServices ? (
                     <p className="text-sm text-muted-foreground">
                         Loading services...
                     </p>
                 ) : (
                     <div className="grid grid-cols-2 gap-2 p-3 border rounded-md max-h-40 overflow-y-auto">
-                        {services.map((service) => (
-                            <div
-                                key={service._id}
-                                className="flex items-center space-x-2"
-                            >
-                                <Checkbox
-                                    id={`service-${service._id}`}
-                                    checked={selectedServices.includes(
-                                        service._id
-                                    )}
-                                    onCheckedChange={() =>
-                                        handleServiceToggle(service._id)
-                                    }
-                                />
-                                <Label
-                                    htmlFor={`service-${service._id}`}
-                                    className="text-sm cursor-pointer"
+                        {filteredServices.length === 0 ? (
+                            <p className="text-sm text-muted-foreground col-span-2">
+                                No services found
+                            </p>
+                        ) : (
+                            filteredServices.map((service) => (
+                                <div
+                                    key={service._id}
+                                    className="flex items-center space-x-2"
                                 >
-                                    {service.name}
-                                </Label>
-                            </div>
-                        ))}
+                                    <Checkbox
+                                        id={`service-${service._id}`}
+                                        checked={selectedServices.includes(
+                                            service._id
+                                        )}
+                                        onCheckedChange={() =>
+                                            handleServiceToggle(service._id)
+                                        }
+                                    />
+                                    <Label
+                                        htmlFor={`service-${service._id}`}
+                                        className="text-sm cursor-pointer"
+                                    >
+                                        {service.name}
+                                    </Label>
+                                </div>
+                            ))
+                        )}
                     </div>
                 )}
                 {errors.services && (
