@@ -104,6 +104,7 @@ import {
 import { format } from 'date-fns';
 import { DateTimePicker } from '@/components/shared/DateTimePicker';
 import { cn } from '@/lib/utils';
+import { useSession } from '@/lib/auth-client';
 
 const statusColors: Record<OrderStatus, string> = {
     pending: 'bg-yellow-500/20 text-yellow-700 dark:text-yellow-400',
@@ -148,6 +149,7 @@ interface ApiErrorResponse {
 }
 
 export default function OrdersPage() {
+    const { data: session } = useSession();
     const [page, setPage] = useState(1);
     const [filters, setFilters] = useState<OrderFilters>({
         search: '',
@@ -566,46 +568,48 @@ export default function OrdersPage() {
                             Manage graphic design orders and track their status
                         </CardDescription>
                     </div>
-                    <div className="flex gap-3">
-                        <Button
-                            variant="outline"
-                            asChild
-                        >
-                            <Link href="/orders/invoice">
-                                <FileText className="mr-2 h-4 w-4" />
-                                Generate Invoice
-                            </Link>
-                        </Button>
-                        <Dialog
-                            open={isAddDialogOpen}
-                            onOpenChange={(open) => {
-                                setIsAddDialogOpen(open);
-                                if (!open) setServerErrors(undefined);
-                            }}
-                        >
-                            <DialogTrigger asChild>
-                                <Button>
-                                    <Plus />
-                                    Add Order
-                                </Button>
-                            </DialogTrigger>
-                            <DialogContent className="max-w-2xl! max-h-[90vh] overflow-y-auto">
-                                <DialogHeader>
-                                    <DialogTitle>Create New Order</DialogTitle>
-                                    <DialogDescription>
-                                        Fill in the order details
-                                    </DialogDescription>
-                                </DialogHeader>
-                                <OrderForm
-                                    onSubmit={handleCreateOrder}
-                                    isSubmitting={isCreating}
-                                    submitLabel="Create Order"
-                                    onCancel={() => setIsAddDialogOpen(false)}
-                                    serverErrors={serverErrors}
-                                />
-                            </DialogContent>
-                        </Dialog>
-                    </div>
+                    {session?.user?.role !== 'team_leader' && (
+                        <div className="flex gap-3">
+                            <Button
+                                variant="outline"
+                                asChild
+                            >
+                                <Link href="/orders/invoice">
+                                    <FileText className="mr-2 h-4 w-4" />
+                                    Generate Invoice
+                                </Link>
+                            </Button>
+                            <Dialog
+                                open={isAddDialogOpen}
+                                onOpenChange={(open) => {
+                                    setIsAddDialogOpen(open);
+                                    if (!open) setServerErrors(undefined);
+                                }}
+                            >
+                                <DialogTrigger asChild>
+                                    <Button>
+                                        <Plus />
+                                        Add Order
+                                    </Button>
+                                </DialogTrigger>
+                                <DialogContent className="max-w-2xl! max-h-[90vh] overflow-y-auto">
+                                    <DialogHeader>
+                                        <DialogTitle>Create New Order</DialogTitle>
+                                        <DialogDescription>
+                                            Fill in the order details
+                                        </DialogDescription>
+                                    </DialogHeader>
+                                    <OrderForm
+                                        onSubmit={handleCreateOrder}
+                                        isSubmitting={isCreating}
+                                        submitLabel="Create Order"
+                                        onCancel={() => setIsAddDialogOpen(false)}
+                                        serverErrors={serverErrors}
+                                    />
+                                </DialogContent>
+                            </Dialog>
+                        </div>
+                    )}
                 </CardHeader>
                 <CardContent className="space-y-4">
                     {/* Filters */}
