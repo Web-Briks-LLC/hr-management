@@ -211,6 +211,30 @@ async function deleteEarning(req: Request, res: Response) {
     }
 }
 
+async function getMonthlySummary(req: Request, res: Response) {
+    try {
+        const month = parseInt(req.query.month as string || '');
+        const year = parseInt(req.query.year as string || '');
+
+        if (!month || !year || month < 1 || month > 12) {
+            return res.status(400).json({
+                message: 'Valid month (1-12) and year are required',
+            });
+        }
+
+        const result = await earningService.getMonthlySummaryByClient(month, year);
+
+        return res.status(200).json({
+            message: 'Monthly summary fetched successfully',
+            data: result.clients,
+            currencies: result.currencies,
+        });
+    } catch (error) {
+        console.error('Error fetching monthly summary:', error);
+        return res.status(500).json({ message: 'Internal server error' });
+    }
+}
+
 export {
     createEarning,
     getAllEarnings,
@@ -219,4 +243,5 @@ export {
     getEarningStats,
     updateEarning,
     deleteEarning,
+    getMonthlySummary,
 };

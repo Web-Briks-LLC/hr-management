@@ -24,6 +24,7 @@ import { leaveRoute } from './leave.route.js';
 import { noticeRoute } from './notice.route.js';
 import externalBusinessRoute from './external-business.routes.js';
 import { careerRoute } from './career.route.js';
+import { currencyRateRoute } from './currency-rate.route.js';
 
 const router: Router = Router();
 
@@ -127,6 +128,10 @@ const moduleRoutes = [
     {
         path: '/careers',
         route: careerRoute,
+    },
+    {
+        path: '/currency-rates',
+        route: currencyRateRoute,
     },
 ];
 

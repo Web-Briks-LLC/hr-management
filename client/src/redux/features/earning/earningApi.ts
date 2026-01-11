@@ -8,6 +8,7 @@ import type {
     UpdateEarningInput,
     EarningFilters,
 } from '@/types/earning.type';
+import type { MonthlySummaryResponse } from '@/types/currency-rate.type';
 
 const earningApi = apiSlice.injectEndpoints({
     endpoints: (builder) => ({
@@ -45,6 +46,16 @@ const earningApi = apiSlice.injectEndpoints({
             query: ({ clientId, month, year }) => ({
                 url: '/earnings/orders',
                 params: { clientId, month, year },
+            }),
+        }),
+
+        getMonthlySummary: builder.query<
+            MonthlySummaryResponse,
+            { month: number; year: number }
+        >({
+            query: ({ month, year }) => ({
+                url: '/earnings/monthly-summary',
+                params: { month, year },
             }),
         }),
 
@@ -96,7 +107,9 @@ export const {
     useGetEarningStatsQuery,
     useGetOrdersForWithdrawalQuery,
     useLazyGetOrdersForWithdrawalQuery,
+    useGetMonthlySummaryQuery,
     useCreateEarningMutation,
     useUpdateEarningMutation,
     useDeleteEarningMutation,
 } = earningApi;
+

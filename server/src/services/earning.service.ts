@@ -208,6 +208,99 @@ async function deleteEarningFromDB(id: string): Promise<IEarning | null> {
     return EarningModel.findByIdAndDelete(id).lean();
 }
 
+// Get monthly summary grouped by client for withdrawal page
+interface ClientMonthlySummary {
+    clientId: string;
+    clientName: string;
+    clientCode: string;
+    currency: string;
+    orderCount: number;
+    totalAmount: number;
+    orders: {
+        _id: string;
+        orderName: string;
+        totalPrice: number;
+        deliveredAt: Date;
+    }[];
+}
+
+async function getMonthlySummaryByClient(
+    month: number,
+    year: number
+): Promise<{
+    clients: ClientMonthlySummary[];
+    currencies: string[];
+}> {
+    // Get start and end of the month
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0, 23, 59, 59, 999);
+
+    // Get all order IDs that have already been withdrawn (in any earning)
+    const withdrawnOrderIds = await EarningModel.distinct('orderIds');
+
+    // Aggregate delivered orders by client for this month, excluding withdrawn orders
+    const summary = await OrderModel.aggregate([
+        {
+            $match: {
+                status: 'delivered',
+                deliveredAt: { $gte: startDate, $lte: endDate },
+                _id: { $nin: withdrawnOrderIds },
+            },
+        },
+        {
+            $lookup: {
+                from: 'clients',
+                localField: 'clientId',
+                foreignField: '_id',
+                as: 'client',
+            },
+        },
+        { $unwind: '$client' },
+        {
+            $group: {
+                _id: {
+                    clientId: '$clientId',
+                    currency: '$client.currency',
+                },
+                clientName: { $first: '$client.name' },
+                clientCode: { $first: '$client.clientId' },
+                currency: { $first: '$client.currency' },
+                orderCount: { $sum: 1 },
+                totalAmount: { $sum: '$totalPrice' },
+                orders: {
+                    $push: {
+                        _id: '$_id',
+                        orderName: '$orderName',
+                        totalPrice: '$totalPrice',
+                        deliveredAt: '$deliveredAt',
+                    },
+                },
+            },
+        },
+        {
+            $project: {
+                _id: 0,
+                clientId: '$_id.clientId',
+                clientName: 1,
+                clientCode: 1,
+                currency: 1,
+                orderCount: 1,
+                totalAmount: 1,
+                orders: 1,
+            },
+        },
+        { $sort: { totalAmount: -1 } },
+    ]);
+
+    // Get unique currencies from this month's data
+    const currencies = [...new Set(summary.map((s) => s.currency || 'USD'))];
+
+    return {
+        clients: summary as ClientMonthlySummary[],
+        currencies,
+    };
+}
+
 export default {
     createEarningInDB,
     getAllEarningsFromDB,
@@ -216,4 +309,5 @@ export default {
     getEarningStatsFromDB,
     updateEarningInDB,
     deleteEarningFromDB,
+    getMonthlySummaryByClient,
 };

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
     Card,
     CardContent,
@@ -59,6 +60,7 @@ import {
     ChevronRight,
     Eye,
     Pencil,
+    CalendarDays,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -93,6 +95,7 @@ const currentYear = new Date().getFullYear();
 const YEARS = Array.from({ length: 5 }, (_, i) => currentYear - i);
 
 export default function EarningsPage() {
+    const router = useRouter();
     const [page, setPage] = useState(1);
     const [filters, setFilters] = useState<EarningFilters>({
         limit: 10,
@@ -344,19 +347,27 @@ export default function EarningsPage() {
                             Track your earnings from order payments
                         </CardDescription>
                     </div>
-                    <Dialog
-                        open={isAddDialogOpen}
-                        onOpenChange={(open) => {
-                            setIsAddDialogOpen(open);
-                            if (!open) resetForm();
-                        }}
-                    >
-                        <DialogTrigger asChild>
-                            <Button>
-                                <Plus />
-                                Add Withdrawal
-                            </Button>
-                        </DialogTrigger>
+                    <div className="flex gap-2">
+                        <Button
+                            variant="outline"
+                            onClick={() => router.push('/earnings/monthly-summary')}
+                        >
+                            <CalendarDays />
+                            Monthly Summary
+                        </Button>
+                        <Dialog
+                            open={isAddDialogOpen}
+                            onOpenChange={(open) => {
+                                setIsAddDialogOpen(open);
+                                if (!open) resetForm();
+                            }}
+                        >
+                            <DialogTrigger asChild>
+                                <Button>
+                                    <Plus />
+                                    Add Withdrawal
+                                </Button>
+                            </DialogTrigger>
                         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                             <DialogHeader>
                                 <DialogTitle>Record Withdrawal</DialogTitle>
@@ -585,6 +596,7 @@ export default function EarningsPage() {
                             </DialogFooter>
                         </DialogContent>
                     </Dialog>
+                    </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     {/* Table */}
