@@ -25,16 +25,20 @@ async function submitApplication(req: Request, res: Response) {
         // Validate required fields
         if (!position || !firstName || !lastName || !email || !phone) {
             return res.status(400).json({
-                message: 'Position info, first name, last name, email, and phone are required',
+                message:
+                    'Position info, first name, last name, email, and phone are required',
             });
         }
 
         // Parse position if it's a string
         let positionData;
         try {
-            positionData = typeof position === 'string' ? JSON.parse(position) : position;
+            positionData =
+                typeof position === 'string' ? JSON.parse(position) : position;
         } catch {
-            return res.status(400).json({ message: 'Invalid position data format' });
+            return res
+                .status(400)
+                .json({ message: 'Invalid position data format' });
         }
 
         // Validate position has required fields
@@ -51,8 +55,10 @@ async function submitApplication(req: Request, res: Response) {
         }
 
         // Find or create position
-        let jobPosition = await jobPositionService.getPositionBySlugAdmin(positionData.slug);
-        
+        let jobPosition = await jobPositionService.getPositionBySlugAdmin(
+            positionData.slug
+        );
+
         if (!jobPosition) {
             // Create new position from WebBriks data
             jobPosition = await jobPositionService.createPositionFromExternal({
@@ -64,7 +70,9 @@ async function submitApplication(req: Request, res: Response) {
                 officeTime: positionData.officeTime,
                 jobType: positionData.jobType || 'Full-time',
                 salary: positionData.salary || 'Negotiable',
-                deadline: positionData.deadline ? new Date(positionData.deadline) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+                deadline: positionData.deadline
+                    ? new Date(positionData.deadline)
+                    : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
                 companyHistory: positionData.companyHistory,
                 description: positionData.description || '',
                 responsibilities: positionData.responsibilities || [],
@@ -81,9 +89,10 @@ async function submitApplication(req: Request, res: Response) {
         let parsedExperiences;
         if (experiences) {
             try {
-                parsedExperiences = typeof experiences === 'string' 
-                    ? JSON.parse(experiences) 
-                    : experiences;
+                parsedExperiences =
+                    typeof experiences === 'string'
+                        ? JSON.parse(experiences)
+                        : experiences;
             } catch {
                 parsedExperiences = [];
             }
@@ -99,7 +108,8 @@ async function submitApplication(req: Request, res: Response) {
                 facebook,
                 linkedin,
                 portfolio,
-                hasExperience: hasExperience === 'true' || hasExperience === true,
+                hasExperience:
+                    hasExperience === 'true' || hasExperience === true,
                 experiences: parsedExperiences,
                 coverLetter,
             },
@@ -130,12 +140,16 @@ async function getAllApplications(req: Request, res: Response) {
             return res.status(401).json({ message: 'Unauthorized' });
         }
 
-        const { jobPosition, status, hasExperience, page, limit } = req.query;
+        const { jobPosition, status, hasExperience, search, page, limit } =
+            req.query;
 
         const result = await jobApplicationService.getAllApplications({
             jobPosition: jobPosition as string,
             status: status as ApplicationStatus,
-            ...(hasExperience !== undefined && { hasExperience: hasExperience === 'true' }),
+            ...(hasExperience !== undefined && {
+                hasExperience: hasExperience === 'true',
+            }),
+            search: search as string,
             page: page ? parseInt(page as string) : 1,
             limit: limit ? parseInt(limit as string) : 20,
         });
@@ -165,7 +179,9 @@ async function getApplicationById(req: Request, res: Response) {
 
         const { id } = req.params;
         if (!id) {
-            return res.status(400).json({ message: 'Application ID is required' });
+            return res
+                .status(400)
+                .json({ message: 'Application ID is required' });
         }
 
         const application = await jobApplicationService.getApplicationById(id);
@@ -196,14 +212,22 @@ async function updateApplicationStatus(req: Request, res: Response) {
         const { status, notes } = req.body;
 
         if (!id) {
-            return res.status(400).json({ message: 'Application ID is required' });
+            return res
+                .status(400)
+                .json({ message: 'Application ID is required' });
         }
 
         if (!status) {
             return res.status(400).json({ message: 'Status is required' });
         }
 
-        const validStatuses: ApplicationStatus[] = ['pending', 'reviewed', 'shortlisted', 'rejected', 'hired'];
+        const validStatuses: ApplicationStatus[] = [
+            'pending',
+            'reviewed',
+            'shortlisted',
+            'rejected',
+            'hired',
+        ];
         if (!validStatuses.includes(status)) {
             return res.status(400).json({ message: 'Invalid status' });
         }
@@ -239,7 +263,9 @@ async function deleteApplication(req: Request, res: Response) {
 
         const { id } = req.params;
         if (!id) {
-            return res.status(400).json({ message: 'Application ID is required' });
+            return res
+                .status(400)
+                .json({ message: 'Application ID is required' });
         }
 
         const result = await jobApplicationService.deleteApplication(id);

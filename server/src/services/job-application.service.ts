@@ -1,4 +1,6 @@
-import JobApplicationModel, { type ApplicationStatus } from '../models/job-application.model.js';
+import JobApplicationModel, {
+    type ApplicationStatus,
+} from '../models/job-application.model.js';
 import cloudinary from '../lib/cloudinary.js';
 import envConfig from '../config/env.config.js';
 import { Types } from 'mongoose';
@@ -28,18 +30,23 @@ interface GetAllFilters {
     jobPosition?: string;
     status?: ApplicationStatus;
     hasExperience?: boolean;
+    search?: string;
     page?: number;
     limit?: number;
 }
 
 // Upload CV to Cloudinary
-async function uploadCV(file: Express.Multer.File): Promise<{ url: string; publicId: string; fileName: string }> {
+async function uploadCV(
+    file: Express.Multer.File
+): Promise<{ url: string; publicId: string; fileName: string }> {
     return new Promise((resolve, reject) => {
         // Sanitize filename and create unique public_id with extension
         const originalName = file.originalname;
         const ext = originalName.split('.').pop();
-        const nameWithoutExt = originalName.replace(/\.[^/.]+$/, "").replace(/[^a-zA-Z0-9.-]/g, '_');
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        const nameWithoutExt = originalName
+            .replace(/\.[^/.]+$/, '')
+            .replace(/[^a-zA-Z0-9.-]/g, '_');
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
         const publicId = `${nameWithoutExt}-${uniqueSuffix}.${ext}`;
 
         const uploadStream = cloudinary.uploader.upload_stream(
@@ -76,25 +83,35 @@ async function deleteCV(publicId: string): Promise<void> {
 }
 
 // Create a new application (public)
-async function createApplication(data: CreateApplicationInput, cvFile: Express.Multer.File) {
+async function createApplication(
+    data: CreateApplicationInput,
+    cvFile: Express.Multer.File
+) {
     // Upload CV to Cloudinary
     const cvData = await uploadCV(cvFile);
-    
+
     const application = new JobApplicationModel({
         ...data,
         jobPosition: new Types.ObjectId(data.jobPosition),
         cvFile: cvData,
     });
-    
+
     return application.save();
 }
 
 // Get all applications (admin)
 async function getAllApplications(filters: GetAllFilters) {
-    const { jobPosition, status, hasExperience, page = 1, limit = 20 } = filters;
-    
+    const {
+        jobPosition,
+        status,
+        hasExperience,
+        search,
+        page = 1,
+        limit = 20,
+    } = filters;
+
     const query: Record<string, unknown> = {};
-    
+
     if (jobPosition) {
         query.jobPosition = new Types.ObjectId(jobPosition);
     }
@@ -104,9 +121,18 @@ async function getAllApplications(filters: GetAllFilters) {
     if (hasExperience !== undefined) {
         query.hasExperience = hasExperience;
     }
-    
+    if (search) {
+        const searchRegex = { $regex: search, $options: 'i' };
+        query.$or = [
+            { firstName: searchRegex },
+            { lastName: searchRegex },
+            { email: searchRegex },
+            { phone: searchRegex },
+        ];
+    }
+
     const skip = (page - 1) * limit;
-    
+
     const [applications, total] = await Promise.all([
         JobApplicationModel.find(query)
             .populate('jobPosition', 'title company slug')
@@ -116,7 +142,7 @@ async function getAllApplications(filters: GetAllFilters) {
             .lean(),
         JobApplicationModel.countDocuments(query),
     ]);
-    
+
     return {
         applications,
         total,
@@ -161,12 +187,15 @@ async function updateApplicationStatus(
 // Email templates for different statuses
 async function sendStatusEmail(application: any, status: ApplicationStatus) {
     const { sendMail } = await import('../lib/nodemailer.js');
-    
+
     const applicantName = `${application.firstName} ${application.lastName}`;
     const positionTitle = application.jobPosition?.title || 'the position';
     const companyName = application.jobPosition?.company || 'Web Briks LLC';
 
-    const emailTemplates: Record<ApplicationStatus, { subject: string; body: string }> = {
+    const emailTemplates: Record<
+        ApplicationStatus,
+        { subject: string; body: string }
+    > = {
         pending: {
             subject: `Application Received - ${positionTitle}`,
             body: `
@@ -244,14 +273,16 @@ async function sendStatusEmail(application: any, status: ApplicationStatus) {
     };
 
     const template = emailTemplates[status];
-    
+
     try {
         await sendMail({
             to: application.email,
             subject: template.subject,
             body: template.body,
         });
-        console.log(`Status email sent to ${application.email} for status: ${status}`);
+        console.log(
+            `Status email sent to ${application.email} for status: ${status}`
+        );
     } catch (error) {
         console.error('Error sending status email:', error);
         // Don't throw - we don't want email failure to break the status update
@@ -262,7 +293,7 @@ async function sendStatusEmail(application: any, status: ApplicationStatus) {
 async function deleteApplication(id: string) {
     const application = await JobApplicationModel.findById(id);
     if (!application) return null;
-    
+
     // Delete CV from Cloudinary
     if (application.cvFile?.publicId) {
         try {
@@ -271,13 +302,15 @@ async function deleteApplication(id: string) {
             console.error('Error deleting CV from Cloudinary:', error);
         }
     }
-    
+
     return JobApplicationModel.findByIdAndDelete(id);
 }
 
 // Get applications count by position
 async function getApplicationsCountByPosition(positionId: string) {
-    return JobApplicationModel.countDocuments({ jobPosition: new Types.ObjectId(positionId) });
+    return JobApplicationModel.countDocuments({
+        jobPosition: new Types.ObjectId(positionId),
+    });
 }
 
 // Get applications stats
@@ -290,7 +323,7 @@ async function getApplicationsStats() {
             },
         },
     ]);
-    
+
     const experienceStats = await JobApplicationModel.aggregate([
         {
             $group: {
@@ -299,15 +332,16 @@ async function getApplicationsStats() {
             },
         },
     ]);
-    
+
     return {
         byStatus: stats.reduce((acc, curr) => {
             acc[curr._id] = curr.count;
             return acc;
         }, {} as Record<string, number>),
         byExperience: {
-            experienced: experienceStats.find(s => s._id === true)?.count || 0,
-            fresher: experienceStats.find(s => s._id === false)?.count || 0,
+            experienced:
+                experienceStats.find((s) => s._id === true)?.count || 0,
+            fresher: experienceStats.find((s) => s._id === false)?.count || 0,
         },
     };
 }

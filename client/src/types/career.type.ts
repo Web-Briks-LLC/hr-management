@@ -46,10 +46,16 @@ export interface CreateJobPositionInput {
     isOpened?: boolean;
 }
 
-export interface UpdateJobPositionInput extends Partial<CreateJobPositionInput> {}
+export interface UpdateJobPositionInput
+    extends Partial<CreateJobPositionInput> {}
 
 // Job Application Types
-export type ApplicationStatus = 'pending' | 'reviewed' | 'shortlisted' | 'rejected' | 'hired';
+export type ApplicationStatus =
+    | 'pending'
+    | 'reviewed'
+    | 'shortlisted'
+    | 'rejected'
+    | 'hired';
 
 export interface IWorkExperience {
     company: string;
@@ -105,6 +111,7 @@ export interface JobApplicationFilters {
     jobPosition?: string;
     status?: ApplicationStatus;
     hasExperience?: boolean;
+    search?: string;
     page?: number;
     limit?: number;
 }

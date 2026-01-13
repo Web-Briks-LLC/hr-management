@@ -58,13 +58,17 @@ export const careerApi = apiSlice.injectEndpoints({
         // ============================================
 
         // Get all positions (admin)
-        getAllPositions: builder.query<PositionsResponse, JobPositionFilters | void>({
+        getAllPositions: builder.query<
+            PositionsResponse,
+            JobPositionFilters | void
+        >({
             query: (filters) => {
                 const params = new URLSearchParams();
                 if (filters?.isOpened !== undefined)
                     params.append('isOpened', String(filters.isOpened));
                 if (filters?.page) params.append('page', String(filters.page));
-                if (filters?.limit) params.append('limit', String(filters.limit));
+                if (filters?.limit)
+                    params.append('limit', String(filters.limit));
                 return `/careers/positions?${params.toString()}`;
             },
             providesTags: ['JobPosition'],
@@ -73,11 +77,16 @@ export const careerApi = apiSlice.injectEndpoints({
         // Get position by ID
         getPositionById: builder.query<PositionResponse, string>({
             query: (id) => `/careers/positions/${id}`,
-            providesTags: (_result, _error, id) => [{ type: 'JobPosition', id }],
+            providesTags: (_result, _error, id) => [
+                { type: 'JobPosition', id },
+            ],
         }),
 
         // Create position
-        createPosition: builder.mutation<PositionResponse, CreateJobPositionInput>({
+        createPosition: builder.mutation<
+            PositionResponse,
+            CreateJobPositionInput
+        >({
             query: (data) => ({
                 url: '/careers/positions',
                 method: 'POST',
@@ -87,7 +96,10 @@ export const careerApi = apiSlice.injectEndpoints({
         }),
 
         // Update position
-        updatePosition: builder.mutation<PositionResponse, { id: string } & UpdateJobPositionInput>({
+        updatePosition: builder.mutation<
+            PositionResponse,
+            { id: string } & UpdateJobPositionInput
+        >({
             query: ({ id, ...data }) => ({
                 url: `/careers/positions/${id}`,
                 method: 'PUT',
@@ -122,16 +134,24 @@ export const careerApi = apiSlice.injectEndpoints({
         // ============================================
 
         // Get all applications (admin)
-        getAllApplications: builder.query<ApplicationsResponse, JobApplicationFilters | void>({
+        getAllApplications: builder.query<
+            ApplicationsResponse,
+            JobApplicationFilters | void
+        >({
             query: (filters) => {
                 const params = new URLSearchParams();
                 if (filters?.jobPosition)
                     params.append('jobPosition', filters.jobPosition);
                 if (filters?.status) params.append('status', filters.status);
                 if (filters?.hasExperience !== undefined)
-                    params.append('hasExperience', String(filters.hasExperience));
+                    params.append(
+                        'hasExperience',
+                        String(filters.hasExperience)
+                    );
+                if (filters?.search) params.append('search', filters.search);
                 if (filters?.page) params.append('page', String(filters.page));
-                if (filters?.limit) params.append('limit', String(filters.limit));
+                if (filters?.limit)
+                    params.append('limit', String(filters.limit));
                 return `/careers/applications?${params.toString()}`;
             },
             providesTags: ['JobApplication'],
@@ -140,7 +160,9 @@ export const careerApi = apiSlice.injectEndpoints({
         // Get application by ID
         getApplicationById: builder.query<ApplicationResponse, string>({
             query: (id) => `/careers/applications/${id}`,
-            providesTags: (_result, _error, id) => [{ type: 'JobApplication', id }],
+            providesTags: (_result, _error, id) => [
+                { type: 'JobApplication', id },
+            ],
         }),
 
         // Update application status
