@@ -1,81 +1,36 @@
 import type { Request, Response } from 'express';
 import earningService from '../services/earning.service.js';
-import type { EarningQueryParams } from '../types/earning.type.js';
+import type {
+    EarningQueryParams,
+    WithdrawEarningData,
+    BulkWithdrawData,
+} from '../types/earning.type.js';
 
-async function createEarning(req: Request, res: Response) {
-    try {
-        const userId = req.user?.id;
-        if (!userId) {
-            return res.status(401).json({ message: 'Unauthorized' });
-        }
-
-        const {
-            clientId,
-            orderIds,
-            month,
-            year,
-            totalOrderAmount,
-            fees,
-            tax,
-            currency,
-            conversionRate,
-            notes,
-        } = req.body;
-
-        if (!clientId || !month || !year || !currency || !conversionRate) {
-            return res.status(400).json({
-                message:
-                    'Client ID, month, year, currency, and conversion rate are required',
-            });
-        }
-
-        const earning = await earningService.createEarningInDB(
-            {
-                clientId,
-                orderIds: orderIds || [],
-                month,
-                year,
-                totalOrderAmount: totalOrderAmount || 0,
-                fees: fees || 0,
-                tax: tax || 0,
-                currency,
-                conversionRate,
-                notes,
-            },
-            userId
-        );
-
-        return res.status(201).json({
-            message: 'Earning created successfully',
-            data: earning,
-        });
-    } catch (error) {
-        console.error('Error creating earning:', error);
-        return res.status(500).json({ message: 'Internal server error' });
-    }
-}
-
+// Get all earnings with date filter
 async function getAllEarnings(req: Request, res: Response) {
     try {
         const params: EarningQueryParams = {
             page: parseInt(req.query.page as string) || 1,
-            limit: parseInt(req.query.limit as string) || 10,
+            limit: parseInt(req.query.limit as string) || 20,
         };
 
-        if (req.query.clientId) {
-            params.clientId = req.query.clientId as string;
-        }
-        if (req.query.month) {
-            params.month = parseInt(req.query.month as string);
-        }
-        if (req.query.year) {
-            params.year = parseInt(req.query.year as string);
-        }
-        if (req.query.status) {
-            params.status = req.query.status as 'pending' | 'completed';
-        }
+        if (req.query.clientId) params.clientId = req.query.clientId as string;
+        if (req.query.status)
+            params.status = req.query.status as 'unpaid' | 'paid';
+        if (req.query.filterType)
+            params.filterType = req.query.filterType as
+                | 'today'
+                | 'week'
+                | 'month'
+                | 'year'
+                | 'range';
+        if (req.query.startDate)
+            params.startDate = req.query.startDate as string;
+        if (req.query.endDate) params.endDate = req.query.endDate as string;
+        if (req.query.month) params.month = parseInt(req.query.month as string);
+        if (req.query.year) params.year = parseInt(req.query.year as string);
 
-        const result = await earningService.getAllEarningsFromDB(params);
+        const result = await earningService.getEarningsWithDateFilter(params);
 
         return res.status(200).json({
             message: 'Earnings fetched successfully',
@@ -92,6 +47,7 @@ async function getAllEarnings(req: Request, res: Response) {
     }
 }
 
+// Get earning by ID
 async function getEarningById(req: Request, res: Response) {
     try {
         const id = req.params.id;
@@ -115,36 +71,25 @@ async function getEarningById(req: Request, res: Response) {
     }
 }
 
-async function getOrdersForWithdrawal(req: Request, res: Response) {
+// Get earning stats with optional date filter
+async function getEarningStats(req: Request, res: Response) {
     try {
-        const { clientId, month, year } = req.query;
+        const params: EarningQueryParams = {};
 
-        if (!clientId || !month || !year) {
-            return res.status(400).json({
-                message: 'Client ID, month, and year are required',
-            });
-        }
+        if (req.query.filterType)
+            params.filterType = req.query.filterType as
+                | 'today'
+                | 'week'
+                | 'month'
+                | 'year'
+                | 'range';
+        if (req.query.startDate)
+            params.startDate = req.query.startDate as string;
+        if (req.query.endDate) params.endDate = req.query.endDate as string;
+        if (req.query.month) params.month = parseInt(req.query.month as string);
+        if (req.query.year) params.year = parseInt(req.query.year as string);
 
-        const result = await earningService.getOrdersForWithdrawal(
-            clientId as string,
-            parseInt(month as string),
-            parseInt(year as string)
-        );
-
-        return res.status(200).json({
-            message: 'Orders fetched successfully',
-            data: result.orders,
-            totalAmount: result.totalAmount,
-        });
-    } catch (error) {
-        console.error('Error fetching orders for withdrawal:', error);
-        return res.status(500).json({ message: 'Internal server error' });
-    }
-}
-
-async function getEarningStats(_req: Request, res: Response) {
-    try {
-        const stats = await earningService.getEarningStatsFromDB();
+        const stats = await earningService.getEarningStatsWithFilter(params);
 
         return res.status(200).json({
             message: 'Earning stats fetched successfully',
@@ -156,39 +101,192 @@ async function getEarningStats(_req: Request, res: Response) {
     }
 }
 
-async function updateEarning(req: Request, res: Response) {
+// Withdraw single earning (mark as paid)
+async function withdrawEarning(req: Request, res: Response) {
     try {
+        const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({ message: 'Unauthorized' });
+        }
+
         const id = req.params.id;
         if (!id) {
             return res.status(400).json({ message: 'Earning ID is required' });
         }
 
-        const { totalOrderAmount, fees, tax, currency, conversionRate, notes } =
-            req.body;
+        const { fees, tax, conversionRate, notes } = req.body;
 
-        const earning = await earningService.updateEarningInDB(id, {
-            totalOrderAmount,
-            fees,
-            tax,
-            currency,
+        if (conversionRate === undefined || conversionRate <= 0) {
+            return res
+                .status(400)
+                .json({ message: 'Valid conversion rate is required' });
+        }
+
+        const data: WithdrawEarningData = {
+            fees: fees ?? 0,
+            tax: tax ?? 0,
             conversionRate,
             notes,
-        });
+            paidBy: userId,
+        };
+
+        const earning = await earningService.withdrawSingleEarning(id, data);
 
         if (!earning) {
             return res.status(404).json({ message: 'Earning not found' });
         }
 
         return res.status(200).json({
-            message: 'Earning updated successfully',
+            message: 'Earning withdrawn successfully',
             data: earning,
         });
     } catch (error) {
-        console.error('Error updating earning:', error);
+        console.error('Error withdrawing earning:', error);
         return res.status(500).json({ message: 'Internal server error' });
     }
 }
 
+// Toggle earning status (paid <-> unpaid)
+async function toggleEarningStatus(req: Request, res: Response) {
+    try {
+        const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({ message: 'Unauthorized' });
+        }
+
+        const id = req.params.id;
+        if (!id) {
+            return res.status(400).json({ message: 'Earning ID is required' });
+        }
+
+        const { status, fees, tax, conversionRate, notes } = req.body;
+
+        if (!status || !['paid', 'unpaid'].includes(status)) {
+            return res
+                .status(400)
+                .json({ message: 'Valid status (paid/unpaid) is required' });
+        }
+
+        let withdrawData: WithdrawEarningData | undefined;
+        if (status === 'paid') {
+            if (conversionRate === undefined || conversionRate <= 0) {
+                return res.status(400).json({
+                    message:
+                        'Valid conversion rate is required for paid status',
+                });
+            }
+            withdrawData = {
+                fees: fees ?? 0,
+                tax: tax ?? 0,
+                conversionRate,
+                notes,
+                paidBy: userId,
+            };
+        }
+
+        const earning = await earningService.toggleEarningStatus(
+            id,
+            status,
+            withdrawData
+        );
+
+        if (!earning) {
+            return res.status(404).json({ message: 'Earning not found' });
+        }
+
+        return res.status(200).json({
+            message: `Earning marked as ${status} successfully`,
+            data: earning,
+        });
+    } catch (error) {
+        console.error('Error toggling earning status:', error);
+        return res.status(500).json({ message: 'Internal server error' });
+    }
+}
+
+// Bulk withdraw earnings
+async function bulkWithdrawEarnings(req: Request, res: Response) {
+    try {
+        const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({ message: 'Unauthorized' });
+        }
+
+        const { earningIds, totalFees, totalTax, conversionRate, notes } =
+            req.body;
+
+        if (
+            !earningIds ||
+            !Array.isArray(earningIds) ||
+            earningIds.length === 0
+        ) {
+            return res
+                .status(400)
+                .json({ message: 'Earning IDs array is required' });
+        }
+
+        if (conversionRate === undefined || conversionRate <= 0) {
+            return res
+                .status(400)
+                .json({ message: 'Valid conversion rate is required' });
+        }
+
+        const data: BulkWithdrawData = {
+            earningIds,
+            totalFees: totalFees ?? 0,
+            totalTax: totalTax ?? 0,
+            conversionRate,
+            notes,
+            paidBy: userId,
+        };
+
+        const result = await earningService.withdrawBulkEarnings(data);
+
+        return res.status(200).json({
+            message: `${result.updatedCount} earnings withdrawn successfully`,
+            data: result,
+        });
+    } catch (error) {
+        console.error('Error bulk withdrawing earnings:', error);
+        return res.status(500).json({ message: 'Internal server error' });
+    }
+}
+
+// Get client orders for bulk withdraw
+async function getClientOrdersForWithdraw(req: Request, res: Response) {
+    try {
+        const { clientId, month, year } = req.query;
+
+        if (!clientId || !month || !year) {
+            return res.status(400).json({
+                message: 'Client ID, month, and year are required',
+            });
+        }
+
+        const result = await earningService.getClientOrdersForBulkWithdraw(
+            clientId as string,
+            parseInt(month as string),
+            parseInt(year as string)
+        );
+
+        if (!result) {
+            return res.status(200).json({
+                message: 'No unpaid orders found for this client',
+                data: null,
+            });
+        }
+
+        return res.status(200).json({
+            message: 'Client orders fetched successfully',
+            data: result,
+        });
+    } catch (error) {
+        console.error('Error fetching client orders:', error);
+        return res.status(500).json({ message: 'Internal server error' });
+    }
+}
+
+// Delete earning
 async function deleteEarning(req: Request, res: Response) {
     try {
         const id = req.params.id;
@@ -211,37 +309,55 @@ async function deleteEarning(req: Request, res: Response) {
     }
 }
 
-async function getMonthlySummary(req: Request, res: Response) {
+// Get earning years
+async function getEarningYears(_req: Request, res: Response) {
     try {
-        const month = parseInt(req.query.month as string || '');
-        const year = parseInt(req.query.year as string || '');
+        const years = await earningService.getEarningYearsFromDB();
+        return res.status(200).json({
+            message: 'Years fetched successfully',
+            data: years,
+        });
+    } catch (error) {
+        console.error('Error fetching years:', error);
+        return res.status(500).json({ message: 'Internal server error' });
+    }
+}
 
-        if (!month || !year || month < 1 || month > 12) {
+// Get clients with unpaid earnings for filter
+async function getClientsWithEarnings(req: Request, res: Response) {
+    try {
+        const { month, year } = req.query;
+
+        if (!month || !year) {
             return res.status(400).json({
-                message: 'Valid month (1-12) and year are required',
+                message: 'Month and year are required',
             });
         }
 
-        const result = await earningService.getMonthlySummaryByClient(month, year);
+        const clients = await earningService.getClientsWithUnpaidEarnings(
+            parseInt(month as string),
+            parseInt(year as string)
+        );
 
         return res.status(200).json({
-            message: 'Monthly summary fetched successfully',
-            data: result.clients,
-            currencies: result.currencies,
+            message: 'Clients fetched successfully',
+            data: clients,
         });
     } catch (error) {
-        console.error('Error fetching monthly summary:', error);
+        console.error('Error fetching clients with earnings:', error);
         return res.status(500).json({ message: 'Internal server error' });
     }
 }
 
 export {
-    createEarning,
     getAllEarnings,
     getEarningById,
-    getOrdersForWithdrawal,
     getEarningStats,
-    updateEarning,
+    withdrawEarning,
+    toggleEarningStatus,
+    bulkWithdrawEarnings,
+    getClientOrdersForWithdraw,
     deleteEarning,
-    getMonthlySummary,
+    getEarningYears,
+    getClientsWithEarnings,
 };

@@ -1,60 +1,58 @@
-export type EarningStatus = 'pending' | 'completed';
+export type EarningStatus = 'unpaid' | 'paid';
 
 export interface IEarning {
     _id: string;
+    orderId: {
+        _id: string;
+        orderName: string;
+        totalPrice: number;
+        status: string;
+    };
     clientId: {
         _id: string;
         clientId: string;
         name: string;
         email: string;
+        currency?: string;
     };
-    orderIds: {
-        _id: string;
-        orderName: string;
-        totalPrice: number;
-    }[];
-    month: number;
-    year: number;
-    totalOrderAmount: number;
+    orderName: string;
+    orderDate: string;
+    orderAmount: number;
+    currency: string;
     fees: number;
     tax: number;
-    netAmount: number;
-    currency: string;
     conversionRate: number;
+    netAmount: number;
     amountInBDT: number;
-    notes?: string;
     status: EarningStatus;
+    paidAt?: string;
+    paidBy?: string;
+    notes?: string;
     createdBy: string;
     createdAt: string;
     updatedAt: string;
 }
 
-export interface IOrderForWithdrawal {
-    _id: string;
-    orderName: string;
-    totalPrice: number;
-    deliveredAt: string;
-}
-
-export interface CreateEarningInput {
-    clientId: string;
-    orderIds: string[];
-    month: number;
-    year: number;
-    totalOrderAmount: number;
-    fees: number;
-    tax: number;
-    currency: string;
+export interface WithdrawEarningInput {
+    fees?: number;
+    tax?: number;
     conversionRate: number;
     notes?: string;
 }
 
-export interface UpdateEarningInput {
-    totalOrderAmount?: number;
+export interface ToggleStatusInput {
+    status: 'paid' | 'unpaid';
     fees?: number;
     tax?: number;
-    currency?: string;
     conversionRate?: number;
+    notes?: string;
+}
+
+export interface BulkWithdrawInput {
+    earningIds: string[];
+    totalFees: number;
+    totalTax: number;
+    conversionRate: number;
     notes?: string;
 }
 
@@ -62,9 +60,12 @@ export interface EarningFilters {
     page?: number;
     limit?: number;
     clientId?: string;
+    status?: EarningStatus;
+    filterType?: 'today' | 'week' | 'month' | 'year' | 'range';
+    startDate?: string;
+    endDate?: string;
     month?: number;
     year?: number;
-    status?: EarningStatus;
 }
 
 export interface EarningsResponse {
@@ -82,22 +83,57 @@ export interface EarningResponse {
     data: IEarning;
 }
 
-export interface OrdersForWithdrawalResponse {
-    message: string;
-    data: IOrderForWithdrawal[];
-    totalAmount: number;
-}
-
 export interface EarningStats {
-    totalEarnings: number;
-    thisMonthEarnings: number;
-    totalWithdrawals: number;
-    thisMonthWithdrawals: number;
+    totalUnpaidCount: number;
+    totalUnpaidAmount: number;
+    totalPaidCount: number;
+    totalPaidAmount: number;
+    totalPaidBDT: number;
+    filteredUnpaidCount: number;
+    filteredUnpaidAmount: number;
+    filteredPaidCount: number;
+    filteredPaidAmount: number;
+    filteredPaidBDT: number;
 }
 
 export interface EarningStatsResponse {
     message: string;
     data: EarningStats;
+}
+
+export interface ClientOrdersForWithdraw {
+    clientId: string;
+    clientName: string;
+    clientCode: string;
+    currency: string;
+    orders: {
+        earningId: string;
+        orderId: string;
+        orderName: string;
+        orderDate: string;
+        orderAmount: number;
+    }[];
+    totalAmount: number;
+    orderCount: number;
+}
+
+export interface ClientOrdersResponse {
+    message: string;
+    data: ClientOrdersForWithdraw | null;
+}
+
+export interface BulkWithdrawResponse {
+    message: string;
+    data: {
+        updatedCount: number;
+        totalAmount: number;
+        totalBDT: number;
+    };
+}
+
+export interface YearsResponse {
+    message: string;
+    data: number[];
 }
 
 // Currency options

@@ -1,24 +1,33 @@
 import { Router } from 'express';
 import {
-    createEarning,
     getAllEarnings,
     getEarningById,
-    getOrdersForWithdrawal,
     getEarningStats,
-    updateEarning,
+    withdrawEarning,
+    toggleEarningStatus,
+    bulkWithdrawEarnings,
+    getClientOrdersForWithdraw,
     deleteEarning,
-    getMonthlySummary,
+    getEarningYears,
+    getClientsWithEarnings,
 } from '../controllers/earning.controller.js';
 
 const router = Router();
 
-router.post('/', createEarning);
+// Get routes
 router.get('/', getAllEarnings);
 router.get('/stats', getEarningStats);
-router.get('/orders', getOrdersForWithdrawal);
-router.get('/monthly-summary', getMonthlySummary);
+router.get('/years', getEarningYears);
+router.get('/clients', getClientsWithEarnings);
+router.get('/client-orders', getClientOrdersForWithdraw);
 router.get('/:id', getEarningById);
-router.put('/:id', updateEarning);
+
+// Action routes
+router.put('/:id/withdraw', withdrawEarning);
+router.put('/:id/toggle-status', toggleEarningStatus);
+router.post('/bulk-withdraw', bulkWithdrawEarnings);
+
+// Delete route
 router.delete('/:id', deleteEarning);
 
 export { router as earningRoute };

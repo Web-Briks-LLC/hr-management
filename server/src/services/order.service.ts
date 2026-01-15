@@ -6,6 +6,7 @@ import type {
     OrderPriority,
 } from '../types/order.type.js';
 import mongoose from 'mongoose';
+import earningService from './earning.service.js';
 
 interface CreateOrderData {
     orderName: string;
@@ -74,6 +75,28 @@ async function createOrderInDB(data: CreateOrderData): Promise<IOrder> {
     };
 
     const order = await OrderModel.create(orderData as unknown as IOrder);
+
+    // Auto-create earning for this order
+    try {
+        // Get client to fetch currency
+        const client = await ClientModel.findById(data.clientId).lean();
+        const currency =
+            (client as { currency?: string } | null)?.currency || 'USD';
+
+        await earningService.createEarningForOrder({
+            orderId: (order._id as mongoose.Types.ObjectId).toString(),
+            clientId: data.clientId,
+            orderName: data.orderName,
+            orderDate: data.orderDate,
+            orderAmount: data.totalPrice,
+            currency,
+            createdBy: data.createdBy,
+        });
+    } catch (err) {
+        console.error('Error auto-creating earning for order:', err);
+        // Don't fail order creation if earning creation fails
+    }
+
     return order;
 }
 
@@ -249,7 +272,7 @@ async function updateOrderInDB(
         data.deliveredAt = new Date();
     }
 
-    return OrderModel.findByIdAndUpdate(id, data, {
+    const order = await OrderModel.findByIdAndUpdate(id, data, {
         new: true,
         runValidators: true,
     })
@@ -268,9 +291,36 @@ async function updateOrderInDB(
             },
         })
         .lean();
+
+    // Update earning if order name, amount, or date changes
+    if (order && (data.orderName || data.totalPrice || data.orderDate)) {
+        try {
+            const earningUpdate: {
+                orderName?: string;
+                orderAmount?: number;
+                orderDate?: Date;
+            } = {};
+            if (data.orderName) earningUpdate.orderName = data.orderName;
+            if (data.totalPrice) earningUpdate.orderAmount = data.totalPrice;
+            if (data.orderDate) earningUpdate.orderDate = data.orderDate;
+
+            await earningService.updateEarningForOrder(id, earningUpdate);
+        } catch (err) {
+            console.error('Error updating earning for order:', err);
+        }
+    }
+
+    return order;
 }
 
 async function deleteOrderFromDB(id: string): Promise<IOrder | null> {
+    // Delete associated earning first
+    try {
+        await earningService.deleteEarningForOrder(id);
+    } catch (err) {
+        console.error('Error deleting earning for order:', err);
+    }
+
     return OrderModel.findByIdAndDelete(id).lean();
 }
 

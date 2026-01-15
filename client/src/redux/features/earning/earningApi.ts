@@ -3,15 +3,18 @@ import type {
     EarningsResponse,
     EarningResponse,
     EarningStatsResponse,
-    OrdersForWithdrawalResponse,
-    CreateEarningInput,
-    UpdateEarningInput,
     EarningFilters,
+    WithdrawEarningInput,
+    ToggleStatusInput,
+    BulkWithdrawInput,
+    BulkWithdrawResponse,
+    ClientOrdersResponse,
+    YearsResponse,
 } from '@/types/earning.type';
-import type { MonthlySummaryResponse } from '@/types/currency-rate.type';
 
 const earningApi = apiSlice.injectEndpoints({
     endpoints: (builder) => ({
+        // Get all earnings with filters
         getEarnings: builder.query<EarningsResponse, EarningFilters>({
             query: (params) => ({
                 url: '/earnings',
@@ -29,54 +32,66 @@ const earningApi = apiSlice.injectEndpoints({
                     : [{ type: 'Earning', id: 'LIST' }],
         }),
 
+        // Get earning by ID
         getEarningById: builder.query<EarningResponse, string>({
             query: (id) => `/earnings/${id}`,
             providesTags: (_result, _error, id) => [{ type: 'Earning', id }],
         }),
 
-        getEarningStats: builder.query<EarningStatsResponse, void>({
-            query: () => '/earnings/stats',
+        // Get earning stats (with optional filter)
+        getEarningStats: builder.query<
+            EarningStatsResponse,
+            EarningFilters | void
+        >({
+            query: (params) => ({
+                url: '/earnings/stats',
+                params: params || {},
+            }),
             providesTags: [{ type: 'Earning', id: 'STATS' }],
         }),
 
-        getOrdersForWithdrawal: builder.query<
-            OrdersForWithdrawalResponse,
+        // Get available years
+        getEarningYears: builder.query<YearsResponse, void>({
+            query: () => '/earnings/years',
+        }),
+
+        // Get client orders for bulk withdraw
+        getClientOrdersForWithdraw: builder.query<
+            ClientOrdersResponse,
             { clientId: string; month: number; year: number }
         >({
             query: ({ clientId, month, year }) => ({
-                url: '/earnings/orders',
+                url: '/earnings/client-orders',
                 params: { clientId, month, year },
             }),
         }),
 
-        getMonthlySummary: builder.query<
-            MonthlySummaryResponse,
+        // Get clients with earnings for filter
+        getClientsWithEarnings: builder.query<
+            {
+                message: string;
+                data: {
+                    _id: string;
+                    name: string;
+                    clientId: string;
+                    currency?: string;
+                }[];
+            },
             { month: number; year: number }
         >({
             query: ({ month, year }) => ({
-                url: '/earnings/monthly-summary',
+                url: '/earnings/clients',
                 params: { month, year },
             }),
         }),
 
-        createEarning: builder.mutation<EarningResponse, CreateEarningInput>({
-            query: (data) => ({
-                url: '/earnings',
-                method: 'POST',
-                body: data,
-            }),
-            invalidatesTags: [
-                { type: 'Earning', id: 'LIST' },
-                { type: 'Earning', id: 'STATS' },
-            ],
-        }),
-
-        updateEarning: builder.mutation<
+        // Withdraw single earning (mark as paid)
+        withdrawEarning: builder.mutation<
             EarningResponse,
-            { id: string; data: UpdateEarningInput }
+            { id: string; data: WithdrawEarningInput }
         >({
             query: ({ id, data }) => ({
-                url: `/earnings/${id}`,
+                url: `/earnings/${id}/withdraw`,
                 method: 'PUT',
                 body: data,
             }),
@@ -87,6 +102,40 @@ const earningApi = apiSlice.injectEndpoints({
             ],
         }),
 
+        // Toggle earning status
+        toggleEarningStatus: builder.mutation<
+            EarningResponse,
+            { id: string; data: ToggleStatusInput }
+        >({
+            query: ({ id, data }) => ({
+                url: `/earnings/${id}/toggle-status`,
+                method: 'PUT',
+                body: data,
+            }),
+            invalidatesTags: (_result, _error, { id }) => [
+                { type: 'Earning', id },
+                { type: 'Earning', id: 'LIST' },
+                { type: 'Earning', id: 'STATS' },
+            ],
+        }),
+
+        // Bulk withdraw earnings
+        bulkWithdrawEarnings: builder.mutation<
+            BulkWithdrawResponse,
+            BulkWithdrawInput
+        >({
+            query: (data) => ({
+                url: '/earnings/bulk-withdraw',
+                method: 'POST',
+                body: data,
+            }),
+            invalidatesTags: [
+                { type: 'Earning', id: 'LIST' },
+                { type: 'Earning', id: 'STATS' },
+            ],
+        }),
+
+        // Delete earning
         deleteEarning: builder.mutation<{ message: string }, string>({
             query: (id) => ({
                 url: `/earnings/${id}`,
@@ -105,11 +154,13 @@ export const {
     useGetEarningsQuery,
     useGetEarningByIdQuery,
     useGetEarningStatsQuery,
-    useGetOrdersForWithdrawalQuery,
-    useLazyGetOrdersForWithdrawalQuery,
-    useGetMonthlySummaryQuery,
-    useCreateEarningMutation,
-    useUpdateEarningMutation,
-    useDeleteEarningMutation,
-} = earningApi;
+    useGetEarningYearsQuery,
+    useGetClientOrdersForWithdrawQuery,
+    useLazyGetClientOrdersForWithdrawQuery,
+    useWithdrawEarningMutation,
+    useToggleEarningStatusMutation,
+    useBulkWithdrawEarningsMutation,
 
+    useDeleteEarningMutation,
+    useLazyGetClientsWithEarningsQuery,
+} = earningApi;

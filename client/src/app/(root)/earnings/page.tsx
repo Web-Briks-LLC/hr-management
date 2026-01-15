@@ -1,14 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from '@/components/ui/card';
+import { useState, useMemo, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -17,7 +10,6 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-    DialogTrigger,
 } from '@/components/ui/dialog';
 import {
     Table,
@@ -38,6 +30,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -49,32 +42,63 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import {
-    Plus,
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import {
     Trash2,
     DollarSign,
     TrendingUp,
     Wallet,
-    Calendar,
+    Calendar as CalendarIcon,
     Loader2,
     ChevronLeft,
     ChevronRight,
     Eye,
-    Pencil,
-    CalendarDays,
+    Clock,
+    CheckCircle2,
+    XCircle,
+    Filter,
+    Download,
+    Search,
+    FileText,
+    CreditCard,
+    Settings2,
+    Info,
+    Receipt,
+    ArrowRight,
 } from 'lucide-react';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import {
     useGetEarningsQuery,
     useGetEarningStatsQuery,
-    useLazyGetOrdersForWithdrawalQuery,
-    useCreateEarningMutation,
-    useUpdateEarningMutation,
+    useWithdrawEarningMutation,
+    useToggleEarningStatusMutation,
+    useBulkWithdrawEarningsMutation,
+    useLazyGetClientOrdersForWithdrawQuery,
     useDeleteEarningMutation,
+    useLazyGetClientsWithEarningsQuery,
 } from '@/redux/features/earning/earningApi';
 import { useGetClientsQuery } from '@/redux/features/client/clientApi';
-import type { IEarning, EarningFilters, CreateEarningInput, UpdateEarningInput } from '@/types/earning.type';
-import { CURRENCIES, CURRENCY_SYMBOLS } from '@/types/earning.type';
+import { useGetCurrencyRatesQuery } from '@/redux/features/currencyRate/currencyRateApi';
+import type {
+    IEarning,
+    EarningFilters,
+    EarningStatus,
+} from '@/types/earning.type';
+import { CURRENCY_SYMBOLS } from '@/types/earning.type';
+import { cn } from '@/lib/utils';
+
+type FilterType = 'all' | 'today' | 'week' | 'month' | 'year' | 'range';
 
 const MONTHS = [
     { value: 1, label: 'January' },
@@ -95,160 +119,289 @@ const currentYear = new Date().getFullYear();
 const YEARS = Array.from({ length: 5 }, (_, i) => currentYear - i);
 
 export default function EarningsPage() {
-    const router = useRouter();
     const [page, setPage] = useState(1);
-    const [filters, setFilters] = useState<EarningFilters>({
-        limit: 10,
-    });
-    const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-    const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
-    const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-    const [selectedEarning, setSelectedEarning] = useState<IEarning | null>(null);
-
-    // Withdrawal form state
-    const [selectedClientId, setSelectedClientId] = useState('');
-    const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
+    const [filterType, setFilterType] = useState<FilterType>('all');
+    const [statusFilter, setStatusFilter] = useState<EarningStatus | 'all'>(
+        'all'
+    );
+    const [clientFilter, setClientFilter] = useState<string>('all');
+    const [selectedMonth, setSelectedMonth] = useState(
+        new Date().getMonth() + 1
+    );
     const [selectedYear, setSelectedYear] = useState(currentYear);
-    const [currency, setCurrency] = useState('USD');
-    const [fees, setFees] = useState('0');
-    const [tax, setTax] = useState('0');
-    const [conversionRate, setConversionRate] = useState('120');
-    const [notes, setNotes] = useState('');
+    const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>({});
 
-    // Edit form state
-    const [editFees, setEditFees] = useState('0');
-    const [editTax, setEditTax] = useState('0');
-    const [editConversionRate, setEditConversionRate] = useState('120');
-    const [editCurrency, setEditCurrency] = useState('USD');
-    const [editNotes, setEditNotes] = useState('');
+    // Dialog states
+    const [isWithdrawDialogOpen, setIsWithdrawDialogOpen] = useState(false);
+    const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+    const [isBulkWithdrawDialogOpen, setIsBulkWithdrawDialogOpen] =
+        useState(false);
+    const [selectedEarning, setSelectedEarning] = useState<IEarning | null>(
+        null
+    );
+
+    // Withdraw form state
+    const [withdrawFees, setWithdrawFees] = useState('0');
+    const [withdrawTax, setWithdrawTax] = useState('0');
+    const [withdrawRate, setWithdrawRate] = useState('120');
+    const [withdrawNotes, setWithdrawNotes] = useState('');
+
+    // Bulk withdraw state
+    const [bulkClientId, setBulkClientId] = useState('');
+    const [bulkMonth, setBulkMonth] = useState(new Date().getMonth() + 1);
+    const [bulkYear, setBulkYear] = useState(currentYear);
+    const [bulkFees, setBulkFees] = useState('0');
+    const [bulkTax, setBulkTax] = useState('0');
+    const [bulkRate, setBulkRate] = useState('120');
+    const [bulkNotes, setBulkNotes] = useState('');
+
+    // Build filters
+    const filters = useMemo<EarningFilters>(() => {
+        const f: EarningFilters = { page, limit: 20 };
+
+        if (statusFilter !== 'all') f.status = statusFilter;
+
+        switch (filterType) {
+            case 'today':
+                f.filterType = 'today';
+                break;
+            case 'week':
+                f.filterType = 'week';
+                break;
+            case 'month':
+                f.filterType = 'month';
+                f.month = selectedMonth;
+                f.year = selectedYear;
+                break;
+            case 'year':
+                f.filterType = 'year';
+                f.year = selectedYear;
+                break;
+            case 'range':
+                if (dateRange.from) {
+                    f.filterType = 'range';
+                    f.startDate = format(dateRange.from, 'yyyy-MM-dd');
+                    if (dateRange.to) {
+                        f.endDate = format(dateRange.to, 'yyyy-MM-dd');
+                    }
+                }
+                break;
+        }
+
+        if (clientFilter !== 'all') f.clientId = clientFilter;
+        return f;
+    }, [
+        page,
+        filterType,
+        statusFilter,
+        clientFilter,
+        selectedMonth,
+        selectedYear,
+        dateRange,
+    ]);
 
     // Queries
-    const { data: earningsData, isLoading, isFetching } = useGetEarningsQuery({
-        ...filters,
-        page,
-    });
-    const { data: statsData } = useGetEarningStatsQuery();
+    const {
+        data: earningsData,
+        isLoading,
+        isFetching,
+    } = useGetEarningsQuery(filters);
+    const { data: statsData, isLoading: isLoadingStats } =
+        useGetEarningStatsQuery(filterType !== 'all' ? filters : undefined);
     const { data: clientsData } = useGetClientsQuery({ limit: 100 });
+    const { data: ratesData } = useGetCurrencyRatesQuery({
+        month: bulkMonth,
+        year: bulkYear,
+    });
 
-    // Lazy query for orders
-    const [getOrders, { data: ordersData, isLoading: isLoadingOrders }] =
-        useLazyGetOrdersForWithdrawalQuery();
+    // Lazy query for bulk withdraw
+    const [
+        getClientOrders,
+        { data: clientOrdersData, isLoading: isLoadingClientOrders },
+    ] = useLazyGetClientOrdersForWithdrawQuery();
+    const [
+        getClients,
+        { data: clientsWithEarningsData, isFetching: isFetchingClients },
+    ] = useLazyGetClientsWithEarningsQuery();
+    const clientsWithEarnings = clientsWithEarningsData?.data || [];
+
+    useEffect(() => {
+        if (isBulkWithdrawDialogOpen) {
+            getClients({ month: bulkMonth, year: bulkYear });
+            setBulkClientId('');
+        }
+    }, [bulkMonth, bulkYear, isBulkWithdrawDialogOpen, getClients]);
+
+    // Auto-fetch orders when client is selected for bulk withdraw
+    useEffect(() => {
+        if (bulkClientId && isBulkWithdrawDialogOpen) {
+            getClientOrders({
+                clientId: bulkClientId,
+                month: bulkMonth,
+                year: bulkYear,
+            });
+        }
+    }, [
+        bulkClientId,
+        bulkMonth,
+        bulkYear,
+        isBulkWithdrawDialogOpen,
+        getClientOrders,
+    ]);
 
     // Mutations
-    const [createEarning, { isLoading: isCreating }] = useCreateEarningMutation();
-    const [updateEarning, { isLoading: isUpdating }] = useUpdateEarningMutation();
-    const [deleteEarning, { isLoading: isDeleting }] = useDeleteEarningMutation();
+    const [withdrawEarning, { isLoading: isWithdrawing }] =
+        useWithdrawEarningMutation();
+    const [toggleStatus, { isLoading: isToggling }] =
+        useToggleEarningStatusMutation();
+    const [bulkWithdraw, { isLoading: isBulkWithdrawing }] =
+        useBulkWithdrawEarningsMutation();
+    const [deleteEarning, { isLoading: isDeleting }] =
+        useDeleteEarningMutation();
 
     const earnings = earningsData?.data || [];
     const meta = earningsData?.meta;
     const stats = statsData?.data;
     const clients = clientsData?.clients || [];
 
-    // Calculate amounts for create form
-    const totalOrderAmount = ordersData?.totalAmount || 0;
-    const feesNum = parseFloat(fees) || 0;
-    const taxNum = parseFloat(tax) || 0;
-    const rateNum = parseFloat(conversionRate) || 1;
-    const netAmount = totalOrderAmount - feesNum - taxNum;
-    const amountInBDT = netAmount * rateNum;
+    // Get rate from currency rates or default
+    const getRateForCurrency = (currency: string): number => {
+        const rate = ratesData?.data?.rates?.find(
+            (r) => r.currency === currency
+        );
+        return rate?.rate || 120;
+    };
 
-    // Calculate amounts for edit form
-    const editFeesNum = parseFloat(editFees) || 0;
-    const editTaxNum = parseFloat(editTax) || 0;
-    const editRateNum = parseFloat(editConversionRate) || 1;
-    const editTotalAmount = selectedEarning?.totalOrderAmount || 0;
-    const editNetAmount = editTotalAmount - editFeesNum - editTaxNum;
-    const editAmountInBDT = editNetAmount * editRateNum;
+    // Withdraw calculations
+    const withdrawFeesNum = parseFloat(withdrawFees) || 0;
+    const withdrawTaxNum = parseFloat(withdrawTax) || 0;
+    const withdrawRateNum = parseFloat(withdrawRate) || 1;
+    const withdrawNetAmount =
+        (selectedEarning?.orderAmount || 0) - withdrawFeesNum - withdrawTaxNum;
+    const withdrawBDT = withdrawNetAmount * withdrawRateNum;
 
-    const handleClientChange = (clientId: string) => {
-        setSelectedClientId(clientId);
-        const client = clients.find((c) => c._id === clientId);
-        if (client?.currency) {
-            setCurrency(client.currency);
+    // Bulk withdraw calculations
+    const bulkOrdersData = clientOrdersData?.data;
+    const bulkFeesNum = parseFloat(bulkFees) || 0;
+    const bulkTaxNum = parseFloat(bulkTax) || 0;
+    const bulkRateNum = parseFloat(bulkRate) || 1;
+    const bulkNetAmount =
+        (bulkOrdersData?.totalAmount || 0) - bulkFeesNum - bulkTaxNum;
+    const bulkBDT = bulkNetAmount * bulkRateNum;
+
+    const formatCurrency = (amount: number, curr: string = 'BDT') => {
+        if (curr === 'BDT') {
+            return `৳${amount.toLocaleString('en-BD', {
+                minimumFractionDigits: 2,
+            })}`;
+        }
+        const symbol = CURRENCY_SYMBOLS[curr] || '$';
+        return `${symbol}${amount.toFixed(2)}`;
+    };
+
+    // Handlers
+    const handleWithdraw = (earning: IEarning) => {
+        setSelectedEarning(earning);
+        setWithdrawFees('0');
+        setWithdrawTax('0');
+        setWithdrawRate(getRateForCurrency(earning.currency).toString());
+        setWithdrawNotes('');
+        setIsWithdrawDialogOpen(true);
+    };
+
+    const handleConfirmWithdraw = async () => {
+        if (!selectedEarning) return;
+
+        try {
+            await withdrawEarning({
+                id: selectedEarning._id,
+                data: {
+                    fees: withdrawFeesNum,
+                    tax: withdrawTaxNum,
+                    conversionRate: withdrawRateNum,
+                    notes: withdrawNotes || undefined,
+                },
+            }).unwrap();
+
+            toast.success('Earning withdrawn successfully');
+            setIsWithdrawDialogOpen(false);
+            setSelectedEarning(null);
+        } catch (error) {
+            console.error('Error withdrawing:', error);
+            toast.error('Failed to withdraw earning');
         }
     };
 
-    const handleFetchOrders = async () => {
-        if (!selectedClientId) {
+    const handleStatusChange = async (
+        earning: IEarning,
+        newStatus: EarningStatus
+    ) => {
+        if (newStatus === 'paid' && earning.status === 'unpaid') {
+            handleWithdraw(earning);
+        } else if (newStatus === 'unpaid' && earning.status === 'paid') {
+            try {
+                await toggleStatus({
+                    id: earning._id,
+                    data: { status: 'unpaid' },
+                }).unwrap();
+                toast.success('Earning marked as unpaid');
+            } catch (error) {
+                console.error('Error toggling status:', error);
+                toast.error('Failed to update status');
+            }
+        }
+    };
+
+    const handleFetchBulkOrders = async () => {
+        if (!bulkClientId) {
             toast.error('Please select a client');
             return;
         }
-        await getOrders({
-            clientId: selectedClientId,
-            month: selectedMonth,
-            year: selectedYear,
+        await getClientOrders({
+            clientId: bulkClientId,
+            month: bulkMonth,
+            year: bulkYear,
         });
     };
 
-    const handleCreateEarning = async () => {
-        if (!selectedClientId) {
-            toast.error('Please select a client');
+    const handleBulkClientChange = (clientId: string) => {
+        setBulkClientId(clientId);
+        const client =
+            clients.find((c) => c._id === clientId) ||
+            clientsWithEarnings.find((c) => c._id === clientId);
+        if (client?.currency) {
+            setBulkRate(getRateForCurrency(client.currency).toString());
+        }
+    };
+
+    const handleConfirmBulkWithdraw = async () => {
+        if (!bulkOrdersData || bulkOrdersData.orders.length === 0) {
+            toast.error('No orders to withdraw');
             return;
         }
 
-        const data: CreateEarningInput = {
-            clientId: selectedClientId,
-            orderIds: ordersData?.data.map((o) => o._id) || [],
-            month: selectedMonth,
-            year: selectedYear,
-            totalOrderAmount,
-            fees: feesNum,
-            tax: taxNum,
-            currency,
-            conversionRate: rateNum,
-            notes: notes || undefined,
-        };
-
         try {
-            await createEarning(data).unwrap();
-            toast.success('Earning recorded successfully');
-            setIsAddDialogOpen(false);
-            resetForm();
+            await bulkWithdraw({
+                earningIds: bulkOrdersData.orders.map((o) => o.earningId),
+                totalFees: bulkFeesNum,
+                totalTax: bulkTaxNum,
+                conversionRate: bulkRateNum,
+                notes: bulkNotes || undefined,
+            }).unwrap();
+
+            toast.success(
+                `${bulkOrdersData.orders.length} earnings withdrawn successfully`
+            );
+            setIsBulkWithdrawDialogOpen(false);
+            setBulkClientId('');
         } catch (error) {
-            console.error('Error creating earning:', error);
-            toast.error('Failed to create earning');
+            console.error('Error bulk withdrawing:', error);
+            toast.error('Failed to bulk withdraw');
         }
     };
 
-    const openViewDialog = (earning: IEarning) => {
-        setSelectedEarning(earning);
-        setIsViewDialogOpen(true);
-    };
-
-    const openEditDialog = (earning: IEarning) => {
-        setSelectedEarning(earning);
-        setEditFees(earning.fees.toString());
-        setEditTax(earning.tax.toString());
-        setEditConversionRate(earning.conversionRate.toString());
-        setEditCurrency(earning.currency);
-        setEditNotes(earning.notes || '');
-        setIsEditDialogOpen(true);
-    };
-
-    const handleUpdateEarning = async () => {
-        if (!selectedEarning) return;
-
-        const data: UpdateEarningInput = {
-            fees: editFeesNum,
-            tax: editTaxNum,
-            currency: editCurrency,
-            conversionRate: editRateNum,
-            notes: editNotes || undefined,
-        };
-
-        try {
-            await updateEarning({ id: selectedEarning._id, data }).unwrap();
-            toast.success('Earning updated successfully');
-            setIsEditDialogOpen(false);
-            setSelectedEarning(null);
-        } catch (error) {
-            console.error('Error updating earning:', error);
-            toast.error('Failed to update earning');
-        }
-    };
-
-    const handleDeleteEarning = async () => {
+    const handleDelete = async () => {
         if (!selectedEarning) return;
         try {
             await deleteEarning(selectedEarning._id).unwrap();
@@ -256,517 +409,539 @@ export default function EarningsPage() {
             setIsDeleteDialogOpen(false);
             setSelectedEarning(null);
         } catch (error) {
-            console.error('Error deleting earning:', error);
+            console.error('Error deleting:', error);
             toast.error('Failed to delete earning');
         }
     };
 
-    const resetForm = () => {
-        setSelectedClientId('');
-        setSelectedMonth(new Date().getMonth() + 1);
-        setSelectedYear(currentYear);
-        setCurrency('USD');
-        setFees('0');
-        setTax('0');
-        setConversionRate('120');
-        setNotes('');
-    };
-
-    const formatCurrency = (amount: number, curr: string = 'BDT') => {
-        if (curr === 'BDT') {
-            return `৳${amount.toLocaleString('en-BD', { minimumFractionDigits: 2 })}`;
-        }
-        const symbol = CURRENCY_SYMBOLS[curr] || '$';
-        return `${symbol}${amount.toFixed(2)}`;
-    };
-
     return (
-        <div className="space-y-6">
-            {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">
-                            Total Earnings
-                        </CardTitle>
-                        <DollarSign className="h-4 w-4 text-green-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-green-600">
-                            {formatCurrency(stats?.totalEarnings || 0)}
-                        </div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">
-                            This Month
-                        </CardTitle>
-                        <TrendingUp className="h-4 w-4 text-blue-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-blue-600">
-                            {formatCurrency(stats?.thisMonthEarnings || 0)}
-                        </div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">
-                            Total Withdrawals
-                        </CardTitle>
-                        <Wallet className="h-4 w-4 text-purple-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-purple-600">
-                            {stats?.totalWithdrawals || 0}
-                        </div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">
-                            This Month Withdrawals
-                        </CardTitle>
-                        <Calendar className="h-4 w-4 text-orange-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-orange-600">
-                            {stats?.thisMonthWithdrawals || 0}
-                        </div>
-                    </CardContent>
-                </Card>
+        <div className="space-y-8 p-1">
+            {/* Header & Stats Overview */}
+            <div className="flex flex-col gap-6">
+                <div>
+                    <h2 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">
+                        Earnings Overview
+                    </h2>
+                    <p className="text-muted-foreground mt-1">
+                        Track payments, manage withdrawals, and view financial
+                        stats.
+                    </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+                    <StatsCard
+                        title="Unpaid Earnings"
+                        value={stats?.filteredUnpaidCount || 0}
+                        amount={formatCurrency(
+                            stats?.filteredUnpaidAmount || 0,
+                            'USD'
+                        )}
+                        icon={Clock}
+                        color="text-orange-500"
+                        bg="bg-orange-500/10"
+                        isLoading={isLoadingStats}
+                    />
+                    <StatsCard
+                        title="Paid Earnings"
+                        value={stats?.filteredPaidCount || 0}
+                        amount={formatCurrency(
+                            stats?.filteredPaidAmount || 0,
+                            'USD'
+                        )}
+                        icon={CheckCircle2}
+                        color="text-green-500"
+                        bg="bg-green-500/10"
+                        isLoading={isLoadingStats}
+                    />
+                    <StatsCard
+                        title="Paid (BDT)"
+                        amount={formatCurrency(stats?.filteredPaidBDT || 0)}
+                        icon={TrendingUp}
+                        color="text-blue-500"
+                        bg="bg-blue-500/10"
+                        isLoading={isLoadingStats}
+                    />
+                    <StatsCard
+                        title="Total Paid (Lifetime)"
+                        amount={formatCurrency(stats?.totalPaidBDT || 0)}
+                        subtext={`${stats?.totalPaidCount || 0} transactions`}
+                        icon={Wallet}
+                        color="text-purple-500"
+                        bg="bg-purple-500/10"
+                        isLoading={isLoadingStats}
+                    />
+                </div>
             </div>
 
-            {/* Main Card */}
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                    <div>
-                        <CardTitle className="text-2xl">Earnings</CardTitle>
-                        <CardDescription>
-                            Track your earnings from order payments
-                        </CardDescription>
-                    </div>
-                    <div className="flex gap-2">
+            {/* Main Content Area */}
+            <Card className="border-border/60 shadow-md">
+                <CardHeader className="pb-3">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <CardTitle className="flex items-center gap-2 text-xl">
+                            <DollarSign className="h-5 w-5 text-primary" />
+                            Recent Earnings
+                        </CardTitle>
                         <Button
-                            variant="outline"
-                            onClick={() => router.push('/earnings/monthly-summary')}
+                            className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
+                            onClick={() => setIsBulkWithdrawDialogOpen(true)}
                         >
-                            <CalendarDays />
-                            Monthly Summary
+                            <Download className="mr-2 h-4 w-4" />
+                            Monthly Withdraw
                         </Button>
-                        <Dialog
-                            open={isAddDialogOpen}
-                            onOpenChange={(open) => {
-                                setIsAddDialogOpen(open);
-                                if (!open) resetForm();
-                            }}
-                        >
-                            <DialogTrigger asChild>
-                                <Button>
-                                    <Plus />
-                                    Add Withdrawal
-                                </Button>
-                            </DialogTrigger>
-                        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                            <DialogHeader>
-                                <DialogTitle>Record Withdrawal</DialogTitle>
-                                <DialogDescription>
-                                    Record earnings from client order payments
-                                </DialogDescription>
-                            </DialogHeader>
-                            <div className="space-y-4">
-                                {/* Client & Period Selection */}
-                                <div className="grid grid-cols-3 gap-4">
-                                    <div className="space-y-2">
-                                        <Label>Client *</Label>
-                                        <Select
-                                            value={selectedClientId}
-                                            onValueChange={handleClientChange}
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select client" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {clients.map((client) => (
-                                                    <SelectItem
-                                                        key={client._id}
-                                                        value={client._id}
-                                                    >
-                                                        {client.name}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label>Month *</Label>
-                                        <Select
-                                            value={selectedMonth.toString()}
-                                            onValueChange={(v) =>
-                                                setSelectedMonth(parseInt(v))
-                                            }
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {MONTHS.map((m) => (
-                                                    <SelectItem
-                                                        key={m.value}
-                                                        value={m.value.toString()}
-                                                    >
-                                                        {m.label}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label>Year *</Label>
-                                        <Select
-                                            value={selectedYear.toString()}
-                                            onValueChange={(v) =>
-                                                setSelectedYear(parseInt(v))
-                                            }
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {YEARS.map((y) => (
-                                                    <SelectItem
-                                                        key={y}
-                                                        value={y.toString()}
-                                                    >
-                                                        {y}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                </div>
-
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={handleFetchOrders}
-                                    disabled={!selectedClientId || isLoadingOrders}
-                                >
-                                    {isLoadingOrders && (
-                                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                    )}
-                                    Fetch Orders
-                                </Button>
-
-                                {/* Orders Summary */}
-                                {ordersData && (
-                                    <div className="bg-muted p-4 rounded-md space-y-2">
-                                        <p className="font-medium">
-                                            Found {ordersData.data.length} delivered
-                                            order(s)
-                                        </p>
-                                        <p className="text-lg font-bold">
-                                            Total: {formatCurrency(totalOrderAmount, currency)}
-                                        </p>
-                                        {ordersData.data.length > 0 && (
-                                            <div className="text-sm text-muted-foreground max-h-32 overflow-y-auto">
-                                                {ordersData.data.map((order) => (
-                                                    <div
-                                                        key={order._id}
-                                                        className="flex justify-between"
-                                                    >
-                                                        <span>{order.orderName}</span>
-                                                        <span>
-                                                            {formatCurrency(
-                                                                order.totalPrice,
-                                                                currency
-                                                            )}
-                                                        </span>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-
-                                {/* Currency & Deductions */}
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label>Currency *</Label>
-                                        <Select value={currency} onValueChange={setCurrency}>
-                                            <SelectTrigger>
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {CURRENCIES.map((c) => (
-                                                    <SelectItem key={c.value} value={c.value}>
-                                                        {c.label}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label>Conversion Rate (to BDT) *</Label>
-                                        <Input
-                                            type="number"
-                                            value={conversionRate}
-                                            onChange={(e) => setConversionRate(e.target.value)}
-                                            min="0"
-                                            step="0.01"
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label>Fees</Label>
-                                        <Input
-                                            type="number"
-                                            value={fees}
-                                            onChange={(e) => setFees(e.target.value)}
-                                            min="0"
-                                            step="0.01"
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label>Tax</Label>
-                                        <Input
-                                            type="number"
-                                            value={tax}
-                                            onChange={(e) => setTax(e.target.value)}
-                                            min="0"
-                                            step="0.01"
-                                        />
-                                    </div>
-                                </div>
-
-                                {/* Calculation Summary */}
-                                <div className="bg-green-500/10 border border-green-500/30 p-4 rounded-md space-y-1">
-                                    <div className="flex justify-between">
-                                        <span>Total Order Amount:</span>
-                                        <span>{formatCurrency(totalOrderAmount, currency)}</span>
-                                    </div>
-                                    <div className="flex justify-between text-red-600">
-                                        <span>- Fees:</span>
-                                        <span>{formatCurrency(feesNum, currency)}</span>
-                                    </div>
-                                    <div className="flex justify-between text-red-600">
-                                        <span>- Tax:</span>
-                                        <span>{formatCurrency(taxNum, currency)}</span>
-                                    </div>
-                                    <hr className="my-2" />
-                                    <div className="flex justify-between font-medium">
-                                        <span>Net Amount:</span>
-                                        <span>{formatCurrency(netAmount, currency)}</span>
-                                    </div>
-                                    <div className="flex justify-between text-lg font-bold text-green-600">
-                                        <span>Amount in BDT:</span>
-                                        <span>{formatCurrency(amountInBDT)}</span>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label>Notes (optional)</Label>
-                                    <Textarea
-                                        value={notes}
-                                        onChange={(e) => setNotes(e.target.value)}
-                                        placeholder="Any additional notes..."
-                                        rows={2}
-                                    />
-                                </div>
-                            </div>
-                            <DialogFooter>
-                                <Button
-                                    variant="outline"
-                                    onClick={() => setIsAddDialogOpen(false)}
-                                >
-                                    Cancel
-                                </Button>
-                                <Button
-                                    onClick={handleCreateEarning}
-                                    disabled={!selectedClientId || isCreating}
-                                >
-                                    {isCreating && (
-                                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                    )}
-                                    Record Earning
-                                </Button>
-                            </DialogFooter>
-                        </DialogContent>
-                    </Dialog>
                     </div>
                 </CardHeader>
-                <CardContent className="space-y-4">
+
+                <CardContent className="space-y-6">
+                    {/* Filters Toolbar */}
+                    <div className="flex flex-wrap items-center gap-3 p-4 bg-muted/30 rounded-lg border border-border/50">
+                        <div className="flex items-center gap-2 mr-2">
+                            <div className="bg-primary/10 p-2 rounded-full">
+                                <Filter className="h-4 w-4 text-primary" />
+                            </div>
+                            <span className="text-sm font-medium">
+                                Filters:
+                            </span>
+                        </div>
+
+                        {/* Date Filter Type */}
+                        <Select
+                            value={filterType}
+                            onValueChange={(v) => {
+                                setFilterType(v as FilterType);
+                                setPage(1);
+                            }}
+                        >
+                            <SelectTrigger className="w-[140px] h-9 bg-background/60">
+                                <SelectValue placeholder="Date Range" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Time</SelectItem>
+                                <SelectItem value="today">Today</SelectItem>
+                                <SelectItem value="week">This Week</SelectItem>
+                                <SelectItem value="month">Monthly</SelectItem>
+                                <SelectItem value="year">Yearly</SelectItem>
+                                <SelectItem value="range">Range</SelectItem>
+                            </SelectContent>
+                        </Select>
+
+                        {/* Contextual Date Filters */}
+                        {filterType === 'month' && (
+                            <div className="flex gap-2 animate-in fade-in slide-in-from-left-2 duration-300">
+                                <Select
+                                    value={selectedMonth.toString()}
+                                    onValueChange={(v) =>
+                                        setSelectedMonth(parseInt(v))
+                                    }
+                                >
+                                    <SelectTrigger className="w-[120px] h-9 bg-background/60">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {MONTHS.map((m) => (
+                                            <SelectItem
+                                                key={m.value}
+                                                value={m.value.toString()}
+                                            >
+                                                {m.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <Select
+                                    value={selectedYear.toString()}
+                                    onValueChange={(v) =>
+                                        setSelectedYear(parseInt(v))
+                                    }
+                                >
+                                    <SelectTrigger className="w-[90px] h-9 bg-background/60">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {YEARS.map((y) => (
+                                            <SelectItem
+                                                key={y}
+                                                value={y.toString()}
+                                            >
+                                                {y}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
+
+                        {filterType === 'year' && (
+                            <Select
+                                value={selectedYear.toString()}
+                                onValueChange={(v) =>
+                                    setSelectedYear(parseInt(v))
+                                }
+                            >
+                                <SelectTrigger className="w-[100px] h-9 bg-background/60 animate-in fade-in slide-in-from-left-2">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {YEARS.map((y) => (
+                                        <SelectItem
+                                            key={y}
+                                            value={y.toString()}
+                                        >
+                                            {y}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        )}
+
+                        {filterType === 'range' && (
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button
+                                        variant="outline"
+                                        className="w-[240px] h-9 bg-background/60 justify-start text-left font-normal animate-in fade-in slide-in-from-left-2"
+                                    >
+                                        <CalendarIcon className="mr-2 h-4 w-4" />
+                                        {dateRange.from ? (
+                                            dateRange.to ? (
+                                                <>
+                                                    {format(
+                                                        dateRange.from,
+                                                        'MMM dd'
+                                                    )}{' '}
+                                                    -{' '}
+                                                    {format(
+                                                        dateRange.to,
+                                                        'MMM dd'
+                                                    )}
+                                                </>
+                                            ) : (
+                                                format(dateRange.from, 'PPP')
+                                            )
+                                        ) : (
+                                            'Pick a date range'
+                                        )}
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent
+                                    className="w-auto p-0"
+                                    align="start"
+                                >
+                                    <Calendar
+                                        mode="range"
+                                        selected={{
+                                            from: dateRange.from,
+                                            to: dateRange.to,
+                                        }}
+                                        onSelect={(range) =>
+                                            setDateRange({
+                                                from: range?.from,
+                                                to: range?.to,
+                                            })
+                                        }
+                                        numberOfMonths={2}
+                                    />
+                                </PopoverContent>
+                            </Popover>
+                        )}
+
+                        <div className="w-[1px] h-6 bg-border mx-1" />
+
+                        {/* Status Filter */}
+                        <Select
+                            value={statusFilter}
+                            onValueChange={(v) => {
+                                setStatusFilter(v as EarningStatus | 'all');
+                                setPage(1);
+                            }}
+                        >
+                            <SelectTrigger className="w-[130px] h-9 bg-background/60">
+                                <SelectValue placeholder="Status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Status</SelectItem>
+                                <SelectItem value="unpaid">Unpaid</SelectItem>
+                                <SelectItem value="paid">Paid</SelectItem>
+                            </SelectContent>
+                        </Select>
+
+                        {/* Client Filter */}
+                        <Select
+                            value={clientFilter}
+                            onValueChange={(v) => {
+                                setClientFilter(v);
+                                setPage(1);
+                            }}
+                        >
+                            <SelectTrigger className="w-[180px] h-9 bg-background/60">
+                                <SelectValue placeholder="Filter by Client" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Clients</SelectItem>
+                                {clients.map((client) => (
+                                    <SelectItem
+                                        key={client._id}
+                                        value={client._id}
+                                    >
+                                        {client.name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+
                     {/* Table */}
-                    <div className="border">
-                        {isLoading ? (
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead className="border-r">Client</TableHead>
-                                        <TableHead className="border-r">Period</TableHead>
-                                        <TableHead className="border-r">Amount</TableHead>
-                                        <TableHead className="border-r">Net</TableHead>
-                                        <TableHead className="border-r">BDT</TableHead>
-                                        <TableHead className="border-r">Date</TableHead>
-                                        <TableHead className="text-center">Actions</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {[...Array(5)].map((_, i) => (
+                    <div className="rounded-md border border-border/60 overflow-hidden">
+                        <Table>
+                            <TableHeader className="bg-muted/40">
+                                <TableRow className="hover:bg-muted/40 border-b-border/60">
+                                    <TableHead className="font-semibold">
+                                        Date
+                                    </TableHead>
+                                    <TableHead className="font-semibold">
+                                        Order
+                                    </TableHead>
+                                    <TableHead className="font-semibold">
+                                        Client
+                                    </TableHead>
+                                    <TableHead className="font-semibold text-right">
+                                        Amount
+                                    </TableHead>
+                                    <TableHead className="font-semibold">
+                                        Status
+                                    </TableHead>
+                                    <TableHead className="font-semibold text-right">
+                                        BDT
+                                    </TableHead>
+                                    <TableHead className="text-center font-semibold text-right">
+                                        Actions
+                                    </TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {isLoading ? (
+                                    [...Array(5)].map((_, i) => (
                                         <TableRow key={i}>
-                                            <TableCell className="border-r">
+                                            <TableCell>
                                                 <Skeleton className="h-4 w-24" />
                                             </TableCell>
-                                            <TableCell className="border-r">
-                                                <Skeleton className="h-4 w-20" />
+                                            <TableCell>
+                                                <Skeleton className="h-4 w-32" />
                                             </TableCell>
-                                            <TableCell className="border-r">
-                                                <Skeleton className="h-4 w-16" />
-                                            </TableCell>
-                                            <TableCell className="border-r">
-                                                <Skeleton className="h-4 w-16" />
-                                            </TableCell>
-                                            <TableCell className="border-r">
-                                                <Skeleton className="h-4 w-20" />
-                                            </TableCell>
-                                            <TableCell className="border-r">
+                                            <TableCell>
                                                 <Skeleton className="h-4 w-20" />
                                             </TableCell>
                                             <TableCell>
-                                                <div className="flex gap-1 justify-center">
-                                                    <Skeleton className="h-8 w-8" />
-                                                    <Skeleton className="h-8 w-8" />
-                                                    <Skeleton className="h-8 w-8" />
+                                                <Skeleton className="h-4 w-16 ml-auto" />
+                                            </TableCell>
+                                            <TableCell>
+                                                <Skeleton className="h-6 w-20 rounded-full" />
+                                            </TableCell>
+                                            <TableCell>
+                                                <Skeleton className="h-4 w-16 ml-auto" />
+                                            </TableCell>
+                                            <TableCell>
+                                                <Skeleton className="h-8 w-20 mx-auto" />
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
+                                ) : earnings.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell
+                                            colSpan={7}
+                                            className="h-48 text-center"
+                                        >
+                                            <div className="flex flex-col items-center justify-center text-muted-foreground gap-2">
+                                                <div className="bg-muted/50 p-3 rounded-full">
+                                                    <DollarSign className="h-6 w-6 opacity-30" />
+                                                </div>
+                                                <p className="text-lg font-medium">
+                                                    No earnings found
+                                                </p>
+                                                <p className="text-sm">
+                                                    Try adjusting your filters
+                                                    or create a new order.
+                                                </p>
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                ) : (
+                                    earnings.map((earning) => (
+                                        <TableRow
+                                            key={earning._id}
+                                            className="hover:bg-muted/20 transition-colors"
+                                        >
+                                            <TableCell className="whitespace-nowrap text-muted-foreground">
+                                                {format(
+                                                    new Date(earning.orderDate),
+                                                    'MMM dd, yyyy'
+                                                )}
+                                            </TableCell>
+                                            <TableCell
+                                                className="font-medium max-w-[200px] truncate"
+                                                title={earning.orderName}
+                                            >
+                                                {earning.orderName}
+                                            </TableCell>
+                                            <TableCell className="max-w-[150px] truncate text-muted-foreground">
+                                                {earning.clientId?.name || '-'}
+                                            </TableCell>
+                                            <TableCell className="text-right font-medium">
+                                                {formatCurrency(
+                                                    earning.orderAmount,
+                                                    earning.currency
+                                                )}
+                                            </TableCell>
+                                            <TableCell>
+                                                <Select
+                                                    value={earning.status}
+                                                    onValueChange={(v) =>
+                                                        handleStatusChange(
+                                                            earning,
+                                                            v as EarningStatus
+                                                        )
+                                                    }
+                                                    disabled={isToggling}
+                                                >
+                                                    <SelectTrigger
+                                                        className={cn(
+                                                            'w-[110px] h-8 border-none focus:ring-0 focus:ring-offset-0',
+                                                            earning.status ===
+                                                                'paid'
+                                                                ? 'text-green-600 font-medium hover:text-green-700'
+                                                                : 'text-orange-600 font-medium hover:text-orange-700'
+                                                        )}
+                                                    >
+                                                        <div className="flex items-center gap-1.5">
+                                                            {earning.status ===
+                                                            'paid' ? (
+                                                                <CheckCircle2 className="h-4 w-4" />
+                                                            ) : (
+                                                                <Clock className="h-4 w-4" />
+                                                            )}
+                                                            <span className="capitalize">
+                                                                {earning.status}
+                                                            </span>
+                                                        </div>
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="unpaid">
+                                                            <span className="flex items-center gap-2 text-orange-600">
+                                                                <XCircle className="h-4 w-4" />{' '}
+                                                                Unpaid
+                                                            </span>
+                                                        </SelectItem>
+                                                        <SelectItem value="paid">
+                                                            <span className="flex items-center gap-2 text-green-600">
+                                                                <CheckCircle2 className="h-4 w-4" />{' '}
+                                                                Paid
+                                                            </span>
+                                                        </SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                                {earning.status === 'paid' ? (
+                                                    <span className="font-mono text-green-600/90 font-medium">
+                                                        {formatCurrency(
+                                                            earning.amountInBDT
+                                                        )}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-muted-foreground/30">
+                                                        -
+                                                    </span>
+                                                )}
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="flex items-center justify-end gap-1">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-8 w-8 text-foreground/70 hover:text-primary"
+                                                        onClick={() => {
+                                                            setSelectedEarning(
+                                                                earning
+                                                            );
+                                                            setIsViewDialogOpen(
+                                                                true
+                                                            );
+                                                        }}
+                                                    >
+                                                        <Eye className="h-4 w-4" />
+                                                    </Button>
+                                                    {earning.status ===
+                                                        'unpaid' && (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-8 w-8 text-foreground/70 hover:text-green-600"
+                                                            onClick={() =>
+                                                                handleWithdraw(
+                                                                    earning
+                                                                )
+                                                            }
+                                                        >
+                                                            <Wallet className="h-4 w-4" />
+                                                        </Button>
+                                                    )}
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-8 w-8 text-foreground/70 hover:text-destructive"
+                                                        onClick={() => {
+                                                            setSelectedEarning(
+                                                                earning
+                                                            );
+                                                            setIsDeleteDialogOpen(
+                                                                true
+                                                            );
+                                                        }}
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
                                                 </div>
                                             </TableCell>
                                         </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        ) : (
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead className="border-r">Client</TableHead>
-                                        <TableHead className="border-r">Period</TableHead>
-                                        <TableHead className="border-r">Amount</TableHead>
-                                        <TableHead className="border-r">Net</TableHead>
-                                        <TableHead className="border-r">BDT</TableHead>
-                                        <TableHead className="border-r">Date</TableHead>
-                                        <TableHead className="text-center">Actions</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {earnings.length === 0 ? (
-                                        <TableRow>
-                                            <TableCell
-                                                colSpan={7}
-                                                className="text-center py-8 text-muted-foreground"
-                                            >
-                                                No earnings recorded yet
-                                            </TableCell>
-                                        </TableRow>
-                                    ) : (
-                                        earnings.map((earning: IEarning) => (
-                                            <TableRow key={earning._id}>
-                                                <TableCell className="border-r font-medium max-w-[200px] truncate">
-                                                    {earning.clientId?.name || '-'}
-                                                </TableCell>
-                                                <TableCell className="border-r">
-                                                    {MONTHS.find(
-                                                        (m) => m.value === earning.month
-                                                    )?.label || ''}{' '}
-                                                    {earning.year}
-                                                </TableCell>
-                                                <TableCell className="border-r">
-                                                    {formatCurrency(
-                                                        earning.totalOrderAmount,
-                                                        earning.currency
-                                                    )}
-                                                </TableCell>
-                                                <TableCell className="border-r">
-                                                    {formatCurrency(
-                                                        earning.netAmount,
-                                                        earning.currency
-                                                    )}
-                                                </TableCell>
-                                                <TableCell className="border-r font-medium text-green-600">
-                                                    {formatCurrency(earning.amountInBDT)}
-                                                </TableCell>
-                                                <TableCell className="border-r">
-                                                    {format(
-                                                        new Date(earning.createdAt),
-                                                        'MMM dd, yyyy'
-                                                    )}
-                                                </TableCell>
-                                                <TableCell className="w-auto">
-                                                    <div className="flex items-center justify-center gap-1">
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            onClick={() => openViewDialog(earning)}
-                                                            title="View"
-                                                        >
-                                                            <Eye className="h-4 w-4" />
-                                                        </Button>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            onClick={() => openEditDialog(earning)}
-                                                            title="Edit"
-                                                        >
-                                                            <Pencil className="h-4 w-4" />
-                                                        </Button>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            onClick={() => {
-                                                                setSelectedEarning(earning);
-                                                                setIsDeleteDialogOpen(true);
-                                                            }}
-                                                            title="Delete"
-                                                        >
-                                                            <Trash2 className="h-4 w-4 text-destructive" />
-                                                        </Button>
-                                                    </div>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))
-                                    )}
-                                </TableBody>
-                            </Table>
-                        )}
+                                    ))
+                                )}
+                            </TableBody>
+                        </Table>
                     </div>
 
                     {/* Pagination */}
                     {meta && meta.totalPages > 1 && (
-                        <div className="flex items-center justify-between">
-                            <div className="text-sm text-muted-foreground">
-                                Page {meta.page} of {meta.totalPages} ({meta.total} total)
-                            </div>
+                        <div className="flex items-center justify-between pt-2">
+                            <p className="text-sm text-muted-foreground">
+                                Showing {(page - 1) * 20 + 1} to{' '}
+                                {Math.min(page * 20, meta.total)} of{' '}
+                                {meta.total} entries
+                            </p>
                             <div className="flex gap-2">
                                 <Button
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                                    onClick={() =>
+                                        setPage((p) => Math.max(1, p - 1))
+                                    }
                                     disabled={page === 1 || isFetching}
                                 >
-                                    <ChevronLeft />
+                                    <ChevronLeft className="h-4 w-4 mr-1" />{' '}
                                     Previous
                                 </Button>
                                 <Button
                                     variant="outline"
                                     size="sm"
                                     onClick={() =>
-                                        setPage((p) => Math.min(meta.totalPages, p + 1))
+                                        setPage((p) =>
+                                            Math.min(meta.totalPages, p + 1)
+                                        )
                                     }
-                                    disabled={page === meta.totalPages || isFetching}
+                                    disabled={
+                                        page === meta.totalPages || isFetching
+                                    }
                                 >
-                                    Next
-                                    <ChevronRight />
+                                    Next{' '}
+                                    <ChevronRight className="h-4 w-4 ml-1" />
                                 </Button>
                             </div>
                         </div>
@@ -774,242 +949,767 @@ export default function EarningsPage() {
                 </CardContent>
             </Card>
 
-            {/* View Dialog */}
-            <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-                <DialogContent className="max-w-lg">
+            {/* Withdraw Dialog */}
+            <Dialog
+                open={isWithdrawDialogOpen}
+                onOpenChange={setIsWithdrawDialogOpen}
+            >
+                <DialogContent className="max-w-md">
                     <DialogHeader>
-                        <DialogTitle>Earning Details</DialogTitle>
+                        <DialogTitle>Withdraw Earning</DialogTitle>
                         <DialogDescription>
-                            View earning record details
+                            Complete this transaction
                         </DialogDescription>
                     </DialogHeader>
                     {selectedEarning && (
-                        <div className="space-y-4">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <Label className="text-muted-foreground">Client</Label>
-                                    <p className="font-medium">{selectedEarning.clientId?.name || '-'}</p>
-                                </div>
-                                <div>
-                                    <Label className="text-muted-foreground">Period</Label>
-                                    <p className="font-medium">
-                                        {MONTHS.find((m) => m.value === selectedEarning.month)?.label} {selectedEarning.year}
-                                    </p>
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <Label className="text-muted-foreground">Currency</Label>
-                                    <p className="font-medium">{selectedEarning.currency}</p>
-                                </div>
-                                <div>
-                                    <Label className="text-muted-foreground">Conversion Rate</Label>
-                                    <p className="font-medium">{selectedEarning.conversionRate}</p>
-                                </div>
-                            </div>
-
-                            <div className="bg-muted p-4 rounded-md space-y-2">
-                                <div className="flex justify-between">
-                                    <span>Total Order Amount:</span>
-                                    <span className="font-medium">
-                                        {formatCurrency(selectedEarning.totalOrderAmount, selectedEarning.currency)}
+                        <div className="space-y-4 pt-2">
+                            <div className="p-4 bg-muted/40 rounded-lg space-y-3">
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-muted-foreground">
+                                        Order Amount
+                                    </span>
+                                    <span className="font-semibold">
+                                        {formatCurrency(
+                                            selectedEarning.orderAmount,
+                                            selectedEarning.currency
+                                        )}
                                     </span>
                                 </div>
-                                <div className="flex justify-between text-red-600">
-                                    <span>Fees:</span>
-                                    <span>-{formatCurrency(selectedEarning.fees, selectedEarning.currency)}</span>
-                                </div>
-                                <div className="flex justify-between text-red-600">
-                                    <span>Tax:</span>
-                                    <span>-{formatCurrency(selectedEarning.tax, selectedEarning.currency)}</span>
-                                </div>
-                                <hr />
-                                <div className="flex justify-between font-medium">
-                                    <span>Net Amount:</span>
-                                    <span>{formatCurrency(selectedEarning.netAmount, selectedEarning.currency)}</span>
-                                </div>
-                                <div className="flex justify-between text-lg font-bold text-green-600">
-                                    <span>Amount in BDT:</span>
-                                    <span>{formatCurrency(selectedEarning.amountInBDT)}</span>
+                                <div className="border-t border-border/50 pt-3 flex items-center justify-between">
+                                    <span className="text-muted-foreground text-sm">
+                                        Net Rate (BDT)
+                                    </span>
+                                    <Input
+                                        type="number"
+                                        value={withdrawRate}
+                                        onChange={(e) =>
+                                            setWithdrawRate(e.target.value)
+                                        }
+                                        className="w-24 h-8 text-right font-mono"
+                                    />
                                 </div>
                             </div>
 
-                            {selectedEarning.notes && (
-                                <div>
-                                    <Label className="text-muted-foreground">Notes</Label>
-                                    <p className="mt-1">{selectedEarning.notes}</p>
-                                </div>
-                            )}
-
-                            {selectedEarning.orderIds && selectedEarning.orderIds.length > 0 && (
-                                <div>
-                                    <Label className="text-muted-foreground">Orders ({selectedEarning.orderIds.length})</Label>
-                                    <div className="mt-1 max-h-32 overflow-y-auto text-sm">
-                                        {selectedEarning.orderIds.map((order) => (
-                                            <div key={order._id} className="flex justify-between py-1">
-                                                <span>{order.orderName}</span>
-                                                <span>{formatCurrency(order.totalPrice, selectedEarning.currency)}</span>
-                                            </div>
-                                        ))}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                    <Label>Fees</Label>
+                                    <div className="relative">
+                                        <Input
+                                            type="number"
+                                            value={withdrawFees}
+                                            onChange={(e) =>
+                                                setWithdrawFees(e.target.value)
+                                            }
+                                            className="pl-6"
+                                        />
+                                        <span className="absolute left-2.5 top-2.5 text-muted-foreground text-xs">
+                                            $
+                                        </span>
                                     </div>
                                 </div>
-                            )}
+                                <div className="space-y-1.5">
+                                    <Label>Tax</Label>
+                                    <div className="relative">
+                                        <Input
+                                            type="number"
+                                            value={withdrawTax}
+                                            onChange={(e) =>
+                                                setWithdrawTax(e.target.value)
+                                            }
+                                            className="pl-6"
+                                        />
+                                        <span className="absolute left-2.5 top-2.5 text-muted-foreground text-xs">
+                                            $
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
 
-                            <div className="text-sm text-muted-foreground">
-                                Created: {format(new Date(selectedEarning.createdAt), 'PPpp')}
+                            <div className="bg-green-500/5 border border-green-500/20 rounded-lg p-4">
+                                <div className="flex justify-between items-center mb-1">
+                                    <span className="text-sm font-medium text-green-700 dark:text-green-400">
+                                        Final Payout
+                                    </span>
+                                    <span className="text-xl font-bold text-green-700 dark:text-green-400">
+                                        {formatCurrency(withdrawBDT)}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between text-xs text-muted-foreground">
+                                    <span>
+                                        Net:{' '}
+                                        {formatCurrency(
+                                            withdrawNetAmount,
+                                            selectedEarning.currency
+                                        )}
+                                    </span>
+                                    <span>Rate: {withdrawRateNum}</span>
+                                </div>
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <Label>Notes</Label>
+                                <Textarea
+                                    value={withdrawNotes}
+                                    onChange={(e) =>
+                                        setWithdrawNotes(e.target.value)
+                                    }
+                                    placeholder="Add any transaction details..."
+                                    rows={2}
+                                    className="resize-none"
+                                />
                             </div>
                         </div>
                     )}
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsViewDialogOpen(false)}>
-                            Close
+                    <DialogFooter className="gap-2 sm:gap-0">
+                        <Button
+                            variant="ghost"
+                            onClick={() => setIsWithdrawDialogOpen(false)}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={handleConfirmWithdraw}
+                            disabled={isWithdrawing}
+                            className="bg-green-600 hover:bg-green-700 text-white"
+                        >
+                            {isWithdrawing && (
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            )}
+                            Confirm Withdrawal
                         </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
 
-            {/* Edit Dialog */}
-            <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-                <DialogContent className="max-w-lg">
+            {/* View Details Dialog */}
+            <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+                <DialogContent className="max-w-md">
                     <DialogHeader>
-                        <DialogTitle>Edit Earning</DialogTitle>
-                        <DialogDescription>
-                            Update fees, tax, and conversion rate
-                        </DialogDescription>
+                        <DialogTitle>Earning Details</DialogTitle>
                     </DialogHeader>
                     {selectedEarning && (
-                        <div className="space-y-4">
-                            <div className="bg-muted p-3 rounded-md">
-                                <p className="font-medium">{selectedEarning.clientId?.name || '-'}</p>
-                                <p className="text-sm text-muted-foreground">
-                                    {MONTHS.find((m) => m.value === selectedEarning.month)?.label} {selectedEarning.year}
-                                </p>
+                        <div className="pt-2 space-y-5">
+                            <div className="flex items-center justify-between p-4 bg-muted/40 rounded-lg">
+                                <span className="text-sm font-medium text-muted-foreground">
+                                    Status
+                                </span>
+                                <Badge
+                                    variant={
+                                        selectedEarning.status === 'paid'
+                                            ? 'default'
+                                            : 'secondary'
+                                    }
+                                    className={
+                                        selectedEarning.status === 'paid'
+                                            ? 'bg-green-500/15 text-green-600 hover:bg-green-500/25'
+                                            : 'bg-orange-500/15 text-orange-600 hover:bg-orange-500/25'
+                                    }
+                                >
+                                    {selectedEarning.status.toUpperCase()}
+                                </Badge>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label>Currency</Label>
-                                    <Select value={editCurrency} onValueChange={setEditCurrency}>
-                                        <SelectTrigger>
+                            <div className="space-y-3">
+                                <div className="grid grid-cols-2 gap-4 text-sm">
+                                    <div>
+                                        <div className="text-muted-foreground text-xs mb-1">
+                                            Order
+                                        </div>
+                                        <div
+                                            className="font-medium truncate"
+                                            title={selectedEarning.orderName}
+                                        >
+                                            {selectedEarning.orderName}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div className="text-muted-foreground text-xs mb-1">
+                                            Client
+                                        </div>
+                                        <div className="font-medium truncate">
+                                            {selectedEarning.clientId?.name ||
+                                                'N/A'}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div className="text-muted-foreground text-xs mb-1">
+                                            Date
+                                        </div>
+                                        <div className="font-medium">
+                                            {format(
+                                                new Date(
+                                                    selectedEarning.orderDate
+                                                ),
+                                                'MMM dd, yyyy'
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div className="text-muted-foreground text-xs mb-1">
+                                            Amount
+                                        </div>
+                                        <div className="font-medium">
+                                            {formatCurrency(
+                                                selectedEarning.orderAmount,
+                                                selectedEarning.currency
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {selectedEarning.status === 'paid' && (
+                                    <>
+                                        <div className="h-px bg-border/50 my-2" />
+                                        <div className="grid grid-cols-2 gap-4 text-sm">
+                                            <div>
+                                                <div className="text-muted-foreground text-xs mb-1">
+                                                    Fees & Tax
+                                                </div>
+                                                <div className="font-medium text-destructive">
+                                                    -
+                                                    {formatCurrency(
+                                                        selectedEarning.fees +
+                                                            selectedEarning.tax,
+                                                        selectedEarning.currency
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <div className="text-muted-foreground text-xs mb-1">
+                                                    Net Amount
+                                                </div>
+                                                <div className="font-medium">
+                                                    {formatCurrency(
+                                                        selectedEarning.netAmount,
+                                                        selectedEarning.currency
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <div className="text-muted-foreground text-xs mb-1">
+                                                    Conversion Rate
+                                                </div>
+                                                <div className="font-medium">
+                                                    {
+                                                        selectedEarning.conversionRate
+                                                    }{' '}
+                                                    BDT
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <div className="text-muted-foreground text-xs mb-1">
+                                                    Paid At
+                                                </div>
+                                                <div className="font-medium">
+                                                    {selectedEarning.paidAt
+                                                        ? format(
+                                                              new Date(
+                                                                  selectedEarning.paidAt
+                                                              ),
+                                                              'P'
+                                                          )
+                                                        : '-'}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="p-3 bg-green-500/5 rounded border border-green-500/10 flex justify-between items-center mt-2">
+                                            <span className="text-xs font-medium text-green-700 dark:text-green-500">
+                                                Total Payout
+                                            </span>
+                                            <span className="text-lg font-bold text-green-700 dark:text-green-500">
+                                                {formatCurrency(
+                                                    selectedEarning.amountInBDT
+                                                )}
+                                            </span>
+                                        </div>
+                                    </>
+                                )}
+
+                                {selectedEarning.notes && (
+                                    <div className="text-sm bg-muted/20 p-3 rounded italic text-muted-foreground border border-border/50">
+                                        "{selectedEarning.notes}"
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
+
+            {/* Same Bulk Withdraw & Delete Dialogs (Keeping logic, updating style if needed) */}
+            <Dialog
+                open={isBulkWithdrawDialogOpen}
+                onOpenChange={(open) => {
+                    setIsBulkWithdrawDialogOpen(open);
+                    if (!open) {
+                        setBulkClientId('');
+                        setBulkFees('0');
+                        setBulkTax('0');
+                        setBulkNotes('');
+                    }
+                }}
+            >
+                <DialogContent className="!max-w-4xl max-h-[85vh] w-full overflow-hidden flex flex-col p-0">
+                    <DialogHeader className="px-6 py-4 border-b">
+                        <DialogTitle className="flex items-center gap-2">
+                            <Wallet className="h-5 w-5 text-primary" />
+                            Monthly Payout Statement
+                        </DialogTitle>
+                        <DialogDescription>
+                            Generate and process withdrawal for{' '}
+                            {format(
+                                new Date(bulkYear, bulkMonth - 1),
+                                'MMMM yyyy'
+                            )}
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="flex-1 overflow-y-auto p-6 space-y-8">
+                        {/* Selection Bar */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-muted/40 rounded-xl border border-border/50">
+                            <div className="space-y-1.5">
+                                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                                    Period
+                                </Label>
+                                <div className="flex gap-2">
+                                    <Select
+                                        value={bulkYear.toString()}
+                                        onValueChange={(v) =>
+                                            setBulkYear(parseInt(v))
+                                        }
+                                    >
+                                        <SelectTrigger className="bg-background">
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            {CURRENCIES.map((c) => (
-                                                <SelectItem key={c.value} value={c.value}>
-                                                    {c.label}
+                                            {YEARS.map((y) => (
+                                                <SelectItem
+                                                    key={y}
+                                                    value={y.toString()}
+                                                >
+                                                    {y}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    <Select
+                                        value={bulkMonth.toString()}
+                                        onValueChange={(v) =>
+                                            setBulkMonth(parseInt(v))
+                                        }
+                                    >
+                                        <SelectTrigger className="bg-background">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {MONTHS.map((m) => (
+                                                <SelectItem
+                                                    key={m.value}
+                                                    value={m.value.toString()}
+                                                >
+                                                    {m.label}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
                                 </div>
-                                <div className="space-y-2">
-                                    <Label>Conversion Rate</Label>
-                                    <Input
-                                        type="number"
-                                        value={editConversionRate}
-                                        onChange={(e) => setEditConversionRate(e.target.value)}
-                                        min="0"
-                                        step="0.01"
-                                    />
-                                </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label>Fees</Label>
-                                    <Input
-                                        type="number"
-                                        value={editFees}
-                                        onChange={(e) => setEditFees(e.target.value)}
-                                        min="0"
-                                        step="0.01"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>Tax</Label>
-                                    <Input
-                                        type="number"
-                                        value={editTax}
-                                        onChange={(e) => setEditTax(e.target.value)}
-                                        min="0"
-                                        step="0.01"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label>Notes</Label>
-                                <Textarea
-                                    value={editNotes}
-                                    onChange={(e) => setEditNotes(e.target.value)}
-                                    placeholder="Any additional notes..."
-                                    rows={2}
-                                />
-                            </div>
-
-                            {/* Calculation Preview */}
-                            <div className="bg-green-500/10 border border-green-500/30 p-4 rounded-md space-y-1">
-                                <div className="flex justify-between">
-                                    <span>Total Order Amount:</span>
-                                    <span>{formatCurrency(editTotalAmount, editCurrency)}</span>
-                                </div>
-                                <div className="flex justify-between text-red-600">
-                                    <span>- Fees:</span>
-                                    <span>{formatCurrency(editFeesNum, editCurrency)}</span>
-                                </div>
-                                <div className="flex justify-between text-red-600">
-                                    <span>- Tax:</span>
-                                    <span>{formatCurrency(editTaxNum, editCurrency)}</span>
-                                </div>
-                                <hr className="my-2" />
-                                <div className="flex justify-between font-medium">
-                                    <span>Net Amount:</span>
-                                    <span>{formatCurrency(editNetAmount, editCurrency)}</span>
-                                </div>
-                                <div className="flex justify-between text-lg font-bold text-green-600">
-                                    <span>Amount in BDT:</span>
-                                    <span>{formatCurrency(editAmountInBDT)}</span>
-                                </div>
+                            <div className="space-y-1.5 md:col-span-2">
+                                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                                    Client Account
+                                </Label>
+                                <Select
+                                    value={bulkClientId}
+                                    onValueChange={handleBulkClientChange}
+                                    disabled={isFetchingClients}
+                                >
+                                    <SelectTrigger
+                                        className={cn(
+                                            'bg-background transition-colors',
+                                            !bulkClientId && 'border-dashed'
+                                        )}
+                                    >
+                                        <SelectValue
+                                            placeholder={
+                                                isFetchingClients
+                                                    ? 'Loading clients...'
+                                                    : 'Select client to generate statement...'
+                                            }
+                                        />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {clientsWithEarnings.length === 0 ? (
+                                            <div className="p-4 text-center space-y-2">
+                                                <div className="mx-auto bg-muted rounded-full w-10 h-10 flex items-center justify-center">
+                                                    <Search className="h-5 w-5 text-muted-foreground" />
+                                                </div>
+                                                <div className="text-sm font-medium">
+                                                    No results found
+                                                </div>
+                                                <p className="text-xs text-muted-foreground">
+                                                    No unpaid earnings found for{' '}
+                                                    {format(
+                                                        new Date(
+                                                            bulkYear,
+                                                            bulkMonth - 1
+                                                        ),
+                                                        'MMMM yyyy'
+                                                    )}
+                                                </p>
+                                            </div>
+                                        ) : (
+                                            clientsWithEarnings.map(
+                                                (client) => (
+                                                    <SelectItem
+                                                        key={client._id}
+                                                        value={client._id}
+                                                        className="cursor-pointer"
+                                                    >
+                                                        <div className="flex items-center justify-between w-full gap-2">
+                                                            <span className="font-medium">
+                                                                {client.name}
+                                                            </span>
+                                                            <Badge
+                                                                variant="outline"
+                                                                className="text-[10px] h-5"
+                                                            >
+                                                                {client.currency ||
+                                                                    'USD'}
+                                                            </Badge>
+                                                        </div>
+                                                    </SelectItem>
+                                                )
+                                            )
+                                        )}
+                                    </SelectContent>
+                                </Select>
                             </div>
                         </div>
-                    )}
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-                            Cancel
-                        </Button>
-                        <Button onClick={handleUpdateEarning} disabled={isUpdating}>
-                            {isUpdating && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                            Update
-                        </Button>
+
+                        {/* Statement Content */}
+                        {isLoadingClientOrders ? (
+                            <div className="py-12 flex flex-col items-center justify-center space-y-3 opacity-80">
+                                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                                <span className="text-sm font-medium">
+                                    Fetching orders...
+                                </span>
+                            </div>
+                        ) : bulkClientId && bulkOrdersData ? (
+                            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+                                {/* Summary Cards */}
+                                <div className="grid grid-cols-2 gap-4">
+                                    <Card className="bg-primary/5 border-primary/20 shadow-sm">
+                                        <CardContent className="p-4">
+                                            <p className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
+                                                <FileText className="h-3.5 w-3.5" />{' '}
+                                                Total Orders
+                                            </p>
+                                            <p className="text-2xl font-bold mt-1 text-foreground">
+                                                {bulkOrdersData.orderCount}
+                                            </p>
+                                        </CardContent>
+                                    </Card>
+                                    <Card className="bg-primary/5 border-primary/20 shadow-sm">
+                                        <CardContent className="p-4">
+                                            <div className="flex justify-between items-start">
+                                                <div>
+                                                    <p className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
+                                                        <CreditCard className="h-3.5 w-3.5" />{' '}
+                                                        Gross Revenue
+                                                    </p>
+                                                    <p className="text-2xl font-bold mt-1 text-primary">
+                                                        {formatCurrency(
+                                                            bulkOrdersData.totalAmount,
+                                                            bulkOrdersData.currency
+                                                        )}
+                                                    </p>
+                                                </div>
+                                                <Badge className="bg-primary/20 text-primary hover:bg-primary/20">
+                                                    {bulkOrdersData.currency}
+                                                </Badge>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                </div>
+
+                                {/* Deductions Form */}
+                                <div className="bg-card rounded-xl border shadow-sm p-5 space-y-4">
+                                    <div className="flex items-center gap-2 pb-2 border-b">
+                                        <Settings2 className="h-4 w-4 text-muted-foreground" />
+                                        <h4 className="text-sm font-semibold">
+                                            Payout Adjustments
+                                        </h4>
+                                    </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+                                        <div className="space-y-2">
+                                            <Label className="text-xs text-muted-foreground">
+                                                Marketplace Fees
+                                            </Label>
+                                            <div className="relative">
+                                                <span className="absolute left-3 top-2.5 text-muted-foreground text-sm font-medium">
+                                                    {CURRENCY_SYMBOLS[
+                                                        bulkOrdersData?.currency ||
+                                                            'USD'
+                                                    ] || '$'}
+                                                </span>
+                                                <Input
+                                                    type="number"
+                                                    value={bulkFees}
+                                                    onChange={(e) =>
+                                                        setBulkFees(
+                                                            e.target.value
+                                                        )
+                                                    }
+                                                    className="pl-7 bg-muted/40"
+                                                    min={0}
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label className="text-xs text-muted-foreground">
+                                                Withholding Tax
+                                            </Label>
+                                            <div className="relative">
+                                                <span className="absolute left-3 top-2.5 text-muted-foreground text-sm font-medium">
+                                                    {CURRENCY_SYMBOLS[
+                                                        bulkOrdersData?.currency ||
+                                                            'USD'
+                                                    ] || '$'}
+                                                </span>
+                                                <Input
+                                                    type="number"
+                                                    value={bulkTax}
+                                                    onChange={(e) =>
+                                                        setBulkTax(
+                                                            e.target.value
+                                                        )
+                                                    }
+                                                    className="pl-7 bg-muted/40"
+                                                    min={0}
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                                                Exchange Rate
+                                                <TooltipProvider>
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <Info className="h-3 w-3 text-muted-foreground/50 cursor-pointer" />
+                                                        </TooltipTrigger>
+                                                        <TooltipContent>
+                                                            1{' '}
+                                                            {
+                                                                bulkOrdersData?.currency
+                                                            }{' '}
+                                                            = ? BDT
+                                                        </TooltipContent>
+                                                    </Tooltip>
+                                                </TooltipProvider>
+                                            </Label>
+                                            <div className="relative">
+                                                <span className="absolute left-3 top-2.5 text-muted-foreground text-sm font-medium">
+                                                    ৳
+                                                </span>
+                                                <Input
+                                                    type="number"
+                                                    value={bulkRate}
+                                                    onChange={(e) =>
+                                                        setBulkRate(
+                                                            e.target.value
+                                                        )
+                                                    }
+                                                    className="pl-7 bg-muted/40"
+                                                    min={0}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Net Payout */}
+                                <div className="bg-gradient-to-br from-green-500/10 to-emerald-500/5 rounded-xl border border-green-500/20 p-5">
+                                    <div className="flex flex-col sm:flex-row justify-between items-end gap-4">
+                                        <div className="space-y-1">
+                                            <p className="text-sm font-medium text-green-700 dark:text-green-400">
+                                                Net Payout Amount
+                                            </p>
+                                            <div className="text-3xl font-bold text-green-700 dark:text-green-400 tracking-tight">
+                                                {formatCurrency(bulkBDT)}
+                                            </div>
+                                            <p className="text-xs text-muted-foreground">
+                                                * Includes deductions for fees (
+                                                {formatCurrency(
+                                                    bulkFeesNum,
+                                                    bulkOrdersData.currency
+                                                )}
+                                                ) and tax (
+                                                {formatCurrency(
+                                                    bulkTaxNum,
+                                                    bulkOrdersData.currency
+                                                )}
+                                                )
+                                            </p>
+                                        </div>
+                                        <div className="w-full sm:w-auto">
+                                            <div className="text-right text-xs text-muted-foreground mb-1">
+                                                Net:{' '}
+                                                {formatCurrency(
+                                                    bulkNetAmount,
+                                                    bulkOrdersData.currency
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label className="text-xs">
+                                        Transaction Notes
+                                    </Label>
+                                    <Textarea
+                                        value={bulkNotes}
+                                        onChange={(e) =>
+                                            setBulkNotes(e.target.value)
+                                        }
+                                        placeholder="Add invoice number, transaction ID, or references..."
+                                        className="h-20 resize-none bg-muted/40"
+                                    />
+                                </div>
+                            </div>
+                        ) : (
+                            // Empty State Initial
+                            <div className="py-12 flex flex-col items-center justify-center text-center space-y-3 opacity-50">
+                                <div className="bg-muted p-4 rounded-full">
+                                    <Receipt className="h-8 w-8" />
+                                </div>
+                                <div>
+                                    <p className="text-lg font-medium">
+                                        Payout Statement
+                                    </p>
+                                    <p className="text-sm">
+                                        Select a client above to auto-generate
+                                        the statement
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    <DialogFooter className="p-4 border-t bg-muted/10">
+                        <div className="flex items-center justify-between w-full">
+                            <Button
+                                variant="ghost"
+                                onClick={() =>
+                                    setIsBulkWithdrawDialogOpen(false)
+                                }
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                onClick={handleConfirmBulkWithdraw}
+                                disabled={!bulkOrdersData || isBulkWithdrawing}
+                                className="bg-green-600 hover:bg-green-700 text-white min-w-[140px]"
+                            >
+                                {isBulkWithdrawing ? (
+                                    <>
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />{' '}
+                                        Processing...
+                                    </>
+                                ) : (
+                                    <>
+                                        Process Payout{' '}
+                                        <ArrowRight className="ml-2 h-4 w-4" />
+                                    </>
+                                )}
+                            </Button>
+                        </div>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
 
-            {/* Delete Confirmation */}
-            <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+            <AlertDialog
+                open={isDeleteDialogOpen}
+                onOpenChange={setIsDeleteDialogOpen}
+            >
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>Delete Earning</AlertDialogTitle>
+                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            Are you sure you want to delete this earning record? This
-                            action cannot be undone.
+                            This action cannot be undone. This will permanently
+                            delete the earning record. The associated order will
+                            remain unchanged.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
                         <AlertDialogAction
-                            onClick={handleDeleteEarning}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            onClick={handleDelete}
                             disabled={isDeleting}
+                            className="bg-destructive hover:bg-destructive/90"
                         >
                             {isDeleting && (
                                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                             )}
-                            Delete
+                            Delete Record
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
         </div>
+    );
+}
+
+// Stats Card Component
+function StatsCard({
+    title,
+    value,
+    amount,
+    subtext,
+    icon: Icon,
+    color,
+    bg,
+    isLoading,
+}: any) {
+    return (
+        <Card className="border-border/50 shadow-sm hover:shadow-md transition-shadow">
+            <CardContent className="p-6">
+                <div className="flex items-center justify-between space-x-4">
+                    <div className="flex items-center space-x-4">
+                        <div className={cn('p-3 rounded-full', bg)}>
+                            <Icon className={cn('h-6 w-6', color)} />
+                        </div>
+                        <div>
+                            <p className="text-sm font-medium text-muted-foreground">
+                                {title}
+                            </p>
+                            {isLoading ? (
+                                <Skeleton className="h-7 w-24 mt-1" />
+                            ) : (
+                                <div className="flex items-baseline gap-2">
+                                    <h3 className="text-2xl font-bold tracking-tight">
+                                        {amount}
+                                    </h3>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+                {value !== undefined && !isLoading && (
+                    <div className="mt-4 flex items-center text-xs text-muted-foreground">
+                        <span className={cn('font-medium', color)}>
+                            {value}
+                        </span>
+                        <span className="ml-1">pending transactions</span>
+                    </div>
+                )}
+                {subtext && !isLoading && (
+                    <div className="mt-4 flex items-center text-xs text-muted-foreground">
+                        {subtext}
+                    </div>
+                )}
+            </CardContent>
+        </Card>
     );
 }

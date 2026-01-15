@@ -1,21 +1,30 @@
 import { Document, Types } from 'mongoose';
 
-export type EarningStatus = 'pending' | 'completed';
+export type EarningStatus = 'unpaid' | 'paid';
 
 export interface IEarning extends Document {
+    orderId: Types.ObjectId;
     clientId: Types.ObjectId;
-    orderIds: Types.ObjectId[];
-    month: number; // 1-12
-    year: number;
-    totalOrderAmount: number; // Sum of order totals
-    fees: number; // Platform fees
-    tax: number; // Tax amount
-    netAmount: number; // After fees/tax
-    currency: string; // Original currency (USD, EUR, etc.)
-    conversionRate: number; // Rate to BDT
-    amountInBDT: number; // Final amount in BDT
-    notes?: string;
+
+    // Order info (denormalized for performance)
+    orderName: string;
+    orderDate: Date;
+    orderAmount: number;
+    currency: string;
+
+    // Withdrawal info (filled when status = paid)
+    fees: number;
+    tax: number;
+    conversionRate: number;
+    netAmount: number;
+    amountInBDT: number;
+
+    // Status
     status: EarningStatus;
+    paidAt?: Date;
+    paidBy?: Types.ObjectId;
+
+    notes?: string;
     createdBy: Types.ObjectId;
     createdAt: Date;
     updatedAt: Date;
@@ -23,51 +32,102 @@ export interface IEarning extends Document {
 
 export interface IEarningPopulated {
     _id: string;
+    orderId: {
+        _id: string;
+        orderName: string;
+        totalPrice: number;
+        status: string;
+    };
     clientId: {
         _id: string;
         clientId: string;
         name: string;
         email: string;
+        currency?: string;
     };
-    orderIds: {
-        _id: string;
-        orderName: string;
-        totalPrice: number;
-    }[];
-    month: number;
-    year: number;
-    totalOrderAmount: number;
+    orderName: string;
+    orderDate: string;
+    orderAmount: number;
+    currency: string;
     fees: number;
     tax: number;
-    netAmount: number;
-    currency: string;
     conversionRate: number;
+    netAmount: number;
     amountInBDT: number;
-    notes?: string;
     status: EarningStatus;
+    paidAt?: string;
+    paidBy?: string;
+    notes?: string;
     createdBy: string;
     createdAt: string;
     updatedAt: string;
 }
 
-export interface CreateEarningData {
+export interface CreateEarningForOrderData {
+    orderId: string;
     clientId: string;
-    orderIds: string[];
-    month: number;
-    year: number;
-    totalOrderAmount: number;
-    fees: number;
-    tax: number;
+    orderName: string;
+    orderDate: Date;
+    orderAmount: number;
     currency: string;
+    createdBy: string;
+}
+
+export interface WithdrawEarningData {
+    fees?: number;
+    tax?: number;
     conversionRate: number;
     notes?: string;
+    paidBy: string;
+}
+
+export interface BulkWithdrawData {
+    earningIds: string[];
+    totalFees: number;
+    totalTax: number;
+    conversionRate: number;
+    notes?: string;
+    paidBy: string;
 }
 
 export interface EarningQueryParams {
     page?: number;
     limit?: number;
     clientId?: string;
+    status?: EarningStatus;
+    // Date filters
+    filterType?: 'today' | 'week' | 'month' | 'year' | 'range';
+    startDate?: string;
+    endDate?: string;
     month?: number;
     year?: number;
-    status?: EarningStatus;
+}
+
+export interface EarningStatsResult {
+    totalUnpaidCount: number;
+    totalUnpaidAmount: number;
+    totalPaidCount: number;
+    totalPaidAmount: number;
+    totalPaidBDT: number;
+    filteredUnpaidCount: number;
+    filteredUnpaidAmount: number;
+    filteredPaidCount: number;
+    filteredPaidAmount: number;
+    filteredPaidBDT: number;
+}
+
+export interface ClientOrdersForWithdraw {
+    clientId: string;
+    clientName: string;
+    clientCode: string;
+    currency: string;
+    orders: {
+        earningId: string;
+        orderId: string;
+        orderName: string;
+        orderDate: Date;
+        orderAmount: number;
+    }[];
+    totalAmount: number;
+    orderCount: number;
 }
