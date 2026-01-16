@@ -142,6 +142,11 @@ const orderSchema = new Schema<IOrder>(
             type: Number,
             default: 0,
         },
+        isLegacy: {
+            type: Boolean,
+            default: false,
+            index: true,
+        },
         revisionInstructions: [revisionInstructionSchema],
         timeline: [timelineEntrySchema],
         completedAt: {
@@ -156,8 +161,20 @@ const orderSchema = new Schema<IOrder>(
             required: true,
         },
     },
-    { timestamps: true }
+    {
+        timestamps: true,
+        toJSON: { virtuals: true },
+        toObject: { virtuals: true },
+    }
 );
+
+// Virtual for Earning
+orderSchema.virtual('earning', {
+    ref: 'Earning',
+    localField: '_id',
+    foreignField: 'orderId',
+    justOne: true,
+});
 
 // Compound indexes for common queries
 orderSchema.index({ clientId: 1, orderDate: -1 });

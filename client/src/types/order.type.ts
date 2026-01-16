@@ -81,6 +81,10 @@ export interface IOrder {
     };
     notes?: string;
     revisionCount: number;
+    isLegacy?: boolean; // Flag for migrated orders
+    earning?: {
+        status: 'paid' | 'unpaid';
+    };
     revisionInstructions: IRevisionInstruction[];
     timeline: ITimelineEntry[];
     completedAt?: string;

@@ -44,6 +44,7 @@ export interface IOrder extends Document {
     assignedTo?: Types.ObjectId;
     notes?: string;
     revisionCount: number;
+    isLegacy?: boolean; // Flag for migrated orders
     revisionInstructions: IRevisionInstruction[];
     timeline: ITimelineEntry[];
     completedAt?: Date;

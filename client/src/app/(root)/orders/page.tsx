@@ -18,10 +18,7 @@ import type {
     OrderPriority,
     OrderFilters,
 } from '@/types/order.type';
-import {
-    ORDER_STATUS_LABELS,
-    ORDER_PRIORITY_LABELS,
-} from '@/types/order.type';
+import { ORDER_STATUS_LABELS, ORDER_PRIORITY_LABELS } from '@/types/order.type';
 import {
     Card,
     CardContent,
@@ -105,6 +102,8 @@ import { format } from 'date-fns';
 import { DateTimePicker } from '@/components/shared/DateTimePicker';
 import { cn } from '@/lib/utils';
 import { useSession } from '@/lib/auth-client';
+import { QuickWithdrawDialog } from '@/components/earning/QuickWithdrawDialog';
+import { DollarSign } from 'lucide-react';
 
 const statusColors: Record<OrderStatus, string> = {
     pending: 'bg-yellow-500/20 text-yellow-700 dark:text-yellow-400',
@@ -136,7 +135,10 @@ const statusWorkflow: Record<OrderStatus, OrderStatus[]> = {
 };
 
 // Helper function to check if a status transition is allowed
-const canTransitionTo = (currentStatus: OrderStatus, targetStatus: OrderStatus): boolean => {
+const canTransitionTo = (
+    currentStatus: OrderStatus,
+    targetStatus: OrderStatus
+): boolean => {
     if (currentStatus === targetStatus) return false; // Can't transition to same status
     return statusWorkflow[currentStatus]?.includes(targetStatus) || false;
 };
@@ -165,8 +167,14 @@ export default function OrdersPage() {
     const [isExtendDialogOpen, setIsExtendDialogOpen] = useState(false);
     const [isRevisionDialogOpen, setIsRevisionDialogOpen] = useState(false);
     const [isTimelineDialogOpen, setIsTimelineDialogOpen] = useState(false);
-    const [isStatusChangeDialogOpen, setIsStatusChangeDialogOpen] = useState(false);
-    const [pendingStatusChange, setPendingStatusChange] = useState<{ orderId: string; status: OrderStatus } | null>(null);
+    const [isStatusChangeDialogOpen, setIsStatusChangeDialogOpen] =
+        useState(false);
+    const [isQuickWithdrawDialogOpen, setIsQuickWithdrawDialogOpen] =
+        useState(false);
+    const [pendingStatusChange, setPendingStatusChange] = useState<{
+        orderId: string;
+        status: OrderStatus;
+    } | null>(null);
     const [selectedOrder, setSelectedOrder] = useState<IOrder | null>(null);
 
     const [serverErrors, setServerErrors] = useState<
@@ -190,7 +198,10 @@ export default function OrdersPage() {
 
     // Generate year options (from 2020 to current year + 1)
     const currentYear = new Date().getFullYear();
-    const years = Array.from({ length: currentYear - 2020 + 2 }, (_, i) => 2020 + i);
+    const years = Array.from(
+        { length: currentYear - 2020 + 2 },
+        (_, i) => 2020 + i
+    );
     const months = [
         { value: '1', label: 'January' },
         { value: '2', label: 'February' },
@@ -294,7 +305,10 @@ export default function OrdersPage() {
         }
     };
 
-    const handleStatusChange = async (orderId: string, newStatus: OrderStatus) => {
+    const handleStatusChange = async (
+        orderId: string,
+        newStatus: OrderStatus
+    ) => {
         // Guard against empty/undefined values
         if (!newStatus) {
             console.log('handleStatusChange - empty status, skipping');
@@ -314,7 +328,9 @@ export default function OrdersPage() {
                 id: orderId,
                 data: { status: newStatus },
             }).unwrap();
-            toast.success(`Status updated to ${ORDER_STATUS_LABELS[newStatus]}`);
+            toast.success(
+                `Status updated to ${ORDER_STATUS_LABELS[newStatus]}`
+            );
         } catch (error: unknown) {
             const err = error as ApiErrorResponse;
             toast.error(err?.data?.message || 'Failed to update status');
@@ -331,7 +347,11 @@ export default function OrdersPage() {
                     note: statusChangeNote || undefined,
                 },
             }).unwrap();
-            toast.success(`Status updated to ${ORDER_STATUS_LABELS[pendingStatusChange.status]}`);
+            toast.success(
+                `Status updated to ${
+                    ORDER_STATUS_LABELS[pendingStatusChange.status]
+                }`
+            );
             setIsStatusChangeDialogOpen(false);
             setPendingStatusChange(null);
             setStatusChangeNote('');
@@ -421,6 +441,11 @@ export default function OrdersPage() {
         setIsTimelineDialogOpen(true);
     };
 
+    const openQuickWithdrawDialog = (order: IOrder) => {
+        setSelectedOrder(order);
+        setIsQuickWithdrawDialogOpen(true);
+    };
+
     return (
         <div className="space-y-6">
             {/* Stats Cards - Row 1 */}
@@ -437,7 +462,9 @@ export default function OrdersPage() {
                         <h3 className="text-3xl font-bold tracking-tight text-slate-600 dark:text-slate-300">
                             {stats?.total || 0}
                         </h3>
-                        <p className="text-xs text-muted-foreground mt-1">Total Orders</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                            Total Orders
+                        </p>
                     </div>
                 </div>
 
@@ -453,7 +480,9 @@ export default function OrdersPage() {
                         <h3 className="text-3xl font-bold tracking-tight text-yellow-600 dark:text-yellow-400">
                             {stats?.pending || 0}
                         </h3>
-                        <p className="text-xs text-muted-foreground mt-1">Pending</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                            Pending
+                        </p>
                     </div>
                 </div>
 
@@ -469,7 +498,9 @@ export default function OrdersPage() {
                         <h3 className="text-3xl font-bold tracking-tight text-blue-600 dark:text-blue-400">
                             {stats?.inProgress || 0}
                         </h3>
-                        <p className="text-xs text-muted-foreground mt-1">In Progress</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                            In Progress
+                        </p>
                     </div>
                 </div>
 
@@ -485,7 +516,9 @@ export default function OrdersPage() {
                         <h3 className="text-3xl font-bold tracking-tight text-purple-600 dark:text-purple-400">
                             {stats?.qualityCheck || 0}
                         </h3>
-                        <p className="text-xs text-muted-foreground mt-1">Quality Check</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                            Quality Check
+                        </p>
                     </div>
                 </div>
             </div>
@@ -504,7 +537,9 @@ export default function OrdersPage() {
                         <h3 className="text-3xl font-bold tracking-tight text-orange-600 dark:text-orange-400">
                             {stats?.revision || 0}
                         </h3>
-                        <p className="text-xs text-muted-foreground mt-1">Revision</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                            Revision
+                        </p>
                     </div>
                 </div>
 
@@ -520,7 +555,9 @@ export default function OrdersPage() {
                         <h3 className="text-3xl font-bold tracking-tight text-green-600 dark:text-green-400">
                             {stats?.completed || 0}
                         </h3>
-                        <p className="text-xs text-muted-foreground mt-1">Completed</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                            Completed
+                        </p>
                     </div>
                 </div>
 
@@ -536,7 +573,9 @@ export default function OrdersPage() {
                         <h3 className="text-3xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400">
                             {stats?.delivered || 0}
                         </h3>
-                        <p className="text-xs text-muted-foreground mt-1">Delivered</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                            Delivered
+                        </p>
                     </div>
                 </div>
 
@@ -552,7 +591,9 @@ export default function OrdersPage() {
                         <h3 className="text-3xl font-bold tracking-tight text-red-600 dark:text-red-400">
                             {stats?.overdue || 0}
                         </h3>
-                        <p className="text-xs text-muted-foreground mt-1">Overdue</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                            Overdue
+                        </p>
                     </div>
                 </div>
             </div>
@@ -570,10 +611,7 @@ export default function OrdersPage() {
                     </div>
                     {session?.user?.role !== 'team_leader' && (
                         <div className="flex gap-3">
-                            <Button
-                                variant="outline"
-                                asChild
-                            >
+                            <Button variant="outline" asChild>
                                 <Link href="/orders/invoice">
                                     <FileText className="mr-2 h-4 w-4" />
                                     Generate Invoice
@@ -594,7 +632,9 @@ export default function OrdersPage() {
                                 </DialogTrigger>
                                 <DialogContent className="max-w-2xl! max-h-[90vh] overflow-y-auto">
                                     <DialogHeader>
-                                        <DialogTitle>Create New Order</DialogTitle>
+                                        <DialogTitle>
+                                            Create New Order
+                                        </DialogTitle>
                                         <DialogDescription>
                                             Fill in the order details
                                         </DialogDescription>
@@ -603,7 +643,9 @@ export default function OrdersPage() {
                                         onSubmit={handleCreateOrder}
                                         isSubmitting={isCreating}
                                         submitLabel="Create Order"
-                                        onCancel={() => setIsAddDialogOpen(false)}
+                                        onCancel={() =>
+                                            setIsAddDialogOpen(false)
+                                        }
                                         serverErrors={serverErrors}
                                     />
                                 </DialogContent>
@@ -627,7 +669,10 @@ export default function OrdersPage() {
                                         placeholder="Search..."
                                         value={filters.search || ''}
                                         onChange={(e) =>
-                                            handleFilterChange('search', e.target.value)
+                                            handleFilterChange(
+                                                'search',
+                                                e.target.value
+                                            )
                                         }
                                         className="pl-9 bg-background"
                                     />
@@ -646,7 +691,10 @@ export default function OrdersPage() {
                                     </SelectTrigger>
                                     <SelectContent>
                                         {months.map((month) => (
-                                            <SelectItem key={month.value} value={month.value}>
+                                            <SelectItem
+                                                key={month.value}
+                                                value={month.value}
+                                            >
                                                 {month.label}
                                             </SelectItem>
                                         ))}
@@ -666,7 +714,10 @@ export default function OrdersPage() {
                                     </SelectTrigger>
                                     <SelectContent>
                                         {years.map((year) => (
-                                            <SelectItem key={year} value={year.toString()}>
+                                            <SelectItem
+                                                key={year}
+                                                value={year.toString()}
+                                            >
                                                 {year}
                                             </SelectItem>
                                         ))}
@@ -677,20 +728,26 @@ export default function OrdersPage() {
                                 <Select
                                     value={filters.status || ''}
                                     onValueChange={(value) =>
-                                        handleFilterChange('status', value as OrderStatus)
+                                        handleFilterChange(
+                                            'status',
+                                            value as OrderStatus
+                                        )
                                     }
                                 >
                                     <SelectTrigger className="bg-background w-[140px]">
                                         <SelectValue placeholder="All Statuses" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {Object.entries(ORDER_STATUS_LABELS).map(
-                                            ([value, label]) => (
-                                                <SelectItem key={value} value={value}>
-                                                    {label}
-                                                </SelectItem>
-                                            )
-                                        )}
+                                        {Object.entries(
+                                            ORDER_STATUS_LABELS
+                                        ).map(([value, label]) => (
+                                            <SelectItem
+                                                key={value}
+                                                value={value}
+                                            >
+                                                {label}
+                                            </SelectItem>
+                                        ))}
                                     </SelectContent>
                                 </Select>
 
@@ -698,20 +755,26 @@ export default function OrdersPage() {
                                 <Select
                                     value={filters.priority || ''}
                                     onValueChange={(value) =>
-                                        handleFilterChange('priority', value as OrderPriority)
+                                        handleFilterChange(
+                                            'priority',
+                                            value as OrderPriority
+                                        )
                                     }
                                 >
                                     <SelectTrigger className="bg-background w-[140px]">
                                         <SelectValue placeholder="All Priorities" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {Object.entries(ORDER_PRIORITY_LABELS).map(
-                                            ([value, label]) => (
-                                                <SelectItem key={value} value={value}>
-                                                    {label}
-                                                </SelectItem>
-                                            )
-                                        )}
+                                        {Object.entries(
+                                            ORDER_PRIORITY_LABELS
+                                        ).map(([value, label]) => (
+                                            <SelectItem
+                                                key={value}
+                                                value={value}
+                                            >
+                                                {label}
+                                            </SelectItem>
+                                        ))}
                                     </SelectContent>
                                 </Select>
 
@@ -774,13 +837,27 @@ export default function OrdersPage() {
                             <Table>
                                 <TableHeader>
                                     <TableRow>
-                                        <TableHead className="border-r">Name</TableHead>
-                                        <TableHead className="border-r">Client</TableHead>
-                                        <TableHead className="border-r">Time Left</TableHead>
-                                        <TableHead className="border-r">Qty</TableHead>
-                                        <TableHead className="border-r">Total</TableHead>
-                                        <TableHead className="border-r">Status</TableHead>
-                                        <TableHead className="border-r">Priority</TableHead>
+                                        <TableHead className="border-r">
+                                            Name
+                                        </TableHead>
+                                        <TableHead className="border-r">
+                                            Client
+                                        </TableHead>
+                                        <TableHead className="border-r">
+                                            Time Left
+                                        </TableHead>
+                                        <TableHead className="border-r">
+                                            Qty
+                                        </TableHead>
+                                        <TableHead className="border-r">
+                                            Total
+                                        </TableHead>
+                                        <TableHead className="border-r">
+                                            Status
+                                        </TableHead>
+                                        <TableHead className="border-r">
+                                            Priority
+                                        </TableHead>
                                         <TableHead>Actions</TableHead>
                                     </TableRow>
                                 </TableHeader>
@@ -823,15 +900,33 @@ export default function OrdersPage() {
                             <Table>
                                 <TableHeader>
                                     <TableRow>
-                                        <TableHead className="border-r">Order Date</TableHead>
-                                        <TableHead className="border-r">Client</TableHead>
-                                        <TableHead className="border-r">Name</TableHead>
-                                        <TableHead className="border-r">Time Left</TableHead>
-                                        <TableHead className="border-r text-center">Qty</TableHead>
-                                        <TableHead className="border-r">Total</TableHead>
-                                        <TableHead className="border-r text-center">Status</TableHead>
-                                        <TableHead className="border-r">Priority</TableHead>
-                                        <TableHead className='text-center'>Actions</TableHead>
+                                        <TableHead className="border-r">
+                                            Order Date
+                                        </TableHead>
+                                        <TableHead className="border-r">
+                                            Client
+                                        </TableHead>
+                                        <TableHead className="border-r">
+                                            Name
+                                        </TableHead>
+                                        <TableHead className="border-r">
+                                            Time Left
+                                        </TableHead>
+                                        <TableHead className="border-r text-center">
+                                            Qty
+                                        </TableHead>
+                                        <TableHead className="border-r">
+                                            Total
+                                        </TableHead>
+                                        <TableHead className="border-r text-center">
+                                            Status
+                                        </TableHead>
+                                        <TableHead className="border-r">
+                                            Priority
+                                        </TableHead>
+                                        <TableHead className="text-center">
+                                            Actions
+                                        </TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -848,28 +943,49 @@ export default function OrdersPage() {
                                         orders.map((order: IOrder) => (
                                             <TableRow key={order._id}>
                                                 <TableCell className="border-r">
-                                                    {format(new Date(order.orderDate), 'PPP')}
+                                                    {format(
+                                                        new Date(
+                                                            order.orderDate
+                                                        ),
+                                                        'PPP'
+                                                    )}
                                                 </TableCell>
                                                 <TableCell className="border-r">
                                                     <div className="flex flex-col">
-                                                        <span className="font-medium">{order.clientId?.name}</span>
-                                                        <span className="text-xs text-muted-foreground">{order.clientId?.clientId}</span>
+                                                        <span className="font-medium">
+                                                            {
+                                                                order.clientId
+                                                                    ?.name
+                                                            }
+                                                        </span>
+                                                        <span className="text-xs text-muted-foreground">
+                                                            {
+                                                                order.clientId
+                                                                    ?.clientId
+                                                            }
+                                                        </span>
                                                     </div>
                                                 </TableCell>
                                                 <TableCell className="border-r font-medium max-w-[200px] truncate">
                                                     {order.orderName}
-                                                    {order.revisionCount > 0 && (
+                                                    {order.revisionCount >
+                                                        0 && (
                                                         <Badge
                                                             variant="outline"
                                                             className="ml-2 text-xs"
                                                         >
-                                                            R{order.revisionCount}
+                                                            R
+                                                            {
+                                                                order.revisionCount
+                                                            }
                                                         </Badge>
                                                     )}
                                                 </TableCell>
                                                 <TableCell className="border-r">
                                                     <DeadlineCountdown
-                                                        deadline={order.deadline}
+                                                        deadline={
+                                                            order.deadline
+                                                        }
                                                         status={order.status}
                                                     />
                                                 </TableCell>
@@ -877,55 +993,97 @@ export default function OrdersPage() {
                                                     {order.imageQuantity}
                                                 </TableCell>
                                                 <TableCell className="border-r">
-                                                    ${order.totalPrice.toFixed(2)}
+                                                    $
+                                                    {order.totalPrice.toFixed(
+                                                        2
+                                                    )}
                                                 </TableCell>
                                                 <TableCell className="border-r flex items-center justify-center w-auto">
                                                     <Select
                                                         value={order.status}
-                                                        onValueChange={(value) =>
+                                                        onValueChange={(
+                                                            value
+                                                        ) =>
                                                             handleStatusChange(
                                                                 order._id,
                                                                 value as OrderStatus
                                                             )
                                                         }
-                                                        disabled={isUpdatingStatus || statusWorkflow[order.status].length === 0}
+                                                        disabled={
+                                                            isUpdatingStatus ||
+                                                            statusWorkflow[
+                                                                order.status
+                                                            ].length === 0
+                                                        }
                                                     >
                                                         <SelectTrigger
-                                                            className={cn(statusColors[order.status])}
+                                                            className={cn(
+                                                                statusColors[
+                                                                    order.status
+                                                                ]
+                                                            )}
                                                         >
                                                             <SelectValue />
                                                         </SelectTrigger>
                                                         <SelectContent>
                                                             {Object.entries(
                                                                 ORDER_STATUS_LABELS
-                                                            ).map(([value, label]) => (
-                                                                <SelectItem
-                                                                    key={value}
-                                                                    value={value}
-                                                                    disabled={!canTransitionTo(order.status, value as OrderStatus)}
-                                                                >
-                                                                    {label}
-                                                                </SelectItem>
-                                                            ))}
+                                                            ).map(
+                                                                ([
+                                                                    value,
+                                                                    label,
+                                                                ]) => (
+                                                                    <SelectItem
+                                                                        key={
+                                                                            value
+                                                                        }
+                                                                        value={
+                                                                            value
+                                                                        }
+                                                                        disabled={
+                                                                            !canTransitionTo(
+                                                                                order.status,
+                                                                                value as OrderStatus
+                                                                            )
+                                                                        }
+                                                                    >
+                                                                        {label}
+                                                                    </SelectItem>
+                                                                )
+                                                            )}
                                                         </SelectContent>
                                                     </Select>
                                                 </TableCell>
                                                 <TableCell className="border-r">
                                                     <span
-                                                        className={`px-2 py-1 rounded-full text-xs font-medium ${priorityColors[order.priority]}`}
+                                                        className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                                            priorityColors[
+                                                                order.priority
+                                                            ]
+                                                        }`}
                                                     >
-                                                        {ORDER_PRIORITY_LABELS[order.priority]}
+                                                        {
+                                                            ORDER_PRIORITY_LABELS[
+                                                                order.priority
+                                                            ]
+                                                        }
                                                     </span>
                                                 </TableCell>
-                                                <TableCell className='w-auto'>
+                                                <TableCell className="w-auto">
                                                     <TooltipProvider>
                                                         <div className="flex items-center justify-center gap-1">
                                                             <Tooltip>
-                                                                <TooltipTrigger asChild>
+                                                                <TooltipTrigger
+                                                                    asChild
+                                                                >
                                                                     <Button
                                                                         variant="ghost"
                                                                         size="icon"
-                                                                        onClick={() => openViewDialog(order)}
+                                                                        onClick={() =>
+                                                                            openViewDialog(
+                                                                                order
+                                                                            )
+                                                                        }
                                                                     >
                                                                         <Eye className="h-4 w-4" />
                                                                     </Button>
@@ -935,11 +1093,17 @@ export default function OrdersPage() {
                                                                 </TooltipContent>
                                                             </Tooltip>
                                                             <Tooltip>
-                                                                <TooltipTrigger asChild>
+                                                                <TooltipTrigger
+                                                                    asChild
+                                                                >
                                                                     <Button
                                                                         variant="ghost"
                                                                         size="icon"
-                                                                        onClick={() => openEditDialog(order)}
+                                                                        onClick={() =>
+                                                                            openEditDialog(
+                                                                                order
+                                                                            )
+                                                                        }
                                                                     >
                                                                         <Edit2 className="h-4 w-4" />
                                                                     </Button>
@@ -949,62 +1113,142 @@ export default function OrdersPage() {
                                                                 </TooltipContent>
                                                             </Tooltip>
                                                             <Tooltip>
-                                                                <TooltipTrigger asChild>
+                                                                <TooltipTrigger
+                                                                    asChild
+                                                                >
                                                                     <Button
                                                                         variant="ghost"
                                                                         size="icon"
-                                                                        onClick={() => openExtendDialog(order)}
+                                                                        onClick={() =>
+                                                                            openExtendDialog(
+                                                                                order
+                                                                            )
+                                                                        }
                                                                     >
                                                                         <Calendar className="h-4 w-4" />
                                                                     </Button>
                                                                 </TooltipTrigger>
                                                                 <TooltipContent>
-                                                                    <p>Extend Deadline</p>
+                                                                    <p>
+                                                                        Extend
+                                                                        Deadline
+                                                                    </p>
                                                                 </TooltipContent>
                                                             </Tooltip>
                                                             <Tooltip>
-                                                                <TooltipTrigger asChild>
+                                                                <TooltipTrigger
+                                                                    asChild
+                                                                >
                                                                     <Button
                                                                         variant="ghost"
                                                                         size="icon"
-                                                                        onClick={() => openRevisionDialog(order)}
+                                                                        onClick={() =>
+                                                                            openRevisionDialog(
+                                                                                order
+                                                                            )
+                                                                        }
                                                                     >
                                                                         <RotateCcw className="h-4 w-4" />
                                                                     </Button>
                                                                 </TooltipTrigger>
                                                                 <TooltipContent>
-                                                                    <p>Add Revision</p>
+                                                                    <p>
+                                                                        Add
+                                                                        Revision
+                                                                    </p>
                                                                 </TooltipContent>
                                                             </Tooltip>
                                                             <Tooltip>
-                                                                <TooltipTrigger asChild>
+                                                                <TooltipTrigger
+                                                                    asChild
+                                                                >
                                                                     <Button
                                                                         variant="ghost"
                                                                         size="icon"
-                                                                        onClick={() => openTimelineDialog(order)}
+                                                                        onClick={() =>
+                                                                            openTimelineDialog(
+                                                                                order
+                                                                            )
+                                                                        }
                                                                     >
                                                                         <History className="h-4 w-4" />
                                                                     </Button>
                                                                 </TooltipTrigger>
                                                                 <TooltipContent>
-                                                                    <p>View Timeline</p>
+                                                                    <p>
+                                                                        View
+                                                                        Timeline
+                                                                    </p>
                                                                 </TooltipContent>
                                                             </Tooltip>
                                                             <Tooltip>
-                                                                <TooltipTrigger asChild>
+                                                                <TooltipTrigger
+                                                                    asChild
+                                                                >
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        onClick={() =>
+                                                                            order
+                                                                                .earning
+                                                                                ?.status !==
+                                                                                'paid' &&
+                                                                            openQuickWithdrawDialog(
+                                                                                order
+                                                                            )
+                                                                        }
+                                                                        disabled={
+                                                                            order
+                                                                                .earning
+                                                                                ?.status ===
+                                                                            'paid'
+                                                                        }
+                                                                        className={cn(
+                                                                            'text-green-600 dark:text-green-400',
+                                                                            order
+                                                                                .earning
+                                                                                ?.status ===
+                                                                                'paid' &&
+                                                                                'opacity-50 cursor-not-allowed text-muted-foreground'
+                                                                        )}
+                                                                    >
+                                                                        <DollarSign className="h-4 w-4" />
+                                                                    </Button>
+                                                                </TooltipTrigger>
+                                                                <TooltipContent>
+                                                                    <p>
+                                                                        {order
+                                                                            .earning
+                                                                            ?.status ===
+                                                                        'paid'
+                                                                            ? 'Already Paid'
+                                                                            : 'Quick Withdraw'}
+                                                                    </p>
+                                                                </TooltipContent>
+                                                            </Tooltip>
+                                                            <Tooltip>
+                                                                <TooltipTrigger
+                                                                    asChild
+                                                                >
                                                                     <Button
                                                                         variant="ghost"
                                                                         size="icon"
                                                                         onClick={() => {
-                                                                            setSelectedOrder(order);
-                                                                            setIsDeleteDialogOpen(true);
+                                                                            setSelectedOrder(
+                                                                                order
+                                                                            );
+                                                                            setIsDeleteDialogOpen(
+                                                                                true
+                                                                            );
                                                                         }}
                                                                     >
                                                                         <Trash2 className="h-4 w-4 text-destructive" />
                                                                     </Button>
                                                                 </TooltipTrigger>
                                                                 <TooltipContent>
-                                                                    <p>Delete</p>
+                                                                    <p>
+                                                                        Delete
+                                                                    </p>
                                                                 </TooltipContent>
                                                             </Tooltip>
                                                         </div>
@@ -1019,55 +1263,52 @@ export default function OrdersPage() {
                     </div>
 
                     {/* Pagination */}
-                    {
-                        meta && meta.totalPages > 1 && (
-                            <div className="flex items-center justify-between">
-                                <div className="text-sm text-muted-foreground">
-                                    Page {meta.page} of {meta.totalPages} (
-                                    {meta.total} total)
-                                </div>
-                                <div className="flex gap-2">
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() =>
-                                            setPage((p) => Math.max(1, p - 1))
-                                        }
-                                        disabled={page === 1 || isFetching}
-                                    >
-                                        <ChevronLeft />
-                                        Previous
-                                    </Button>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() =>
-                                            setPage((p) =>
-                                                Math.min(meta.totalPages, p + 1)
-                                            )
-                                        }
-                                        disabled={
-                                            page === meta.totalPages || isFetching
-                                        }
-                                    >
-                                        Next
-                                        <ChevronRight />
-                                    </Button>
-                                </div>
+                    {meta && meta.totalPages > 1 && (
+                        <div className="flex items-center justify-between">
+                            <div className="text-sm text-muted-foreground">
+                                Page {meta.page} of {meta.totalPages} (
+                                {meta.total} total)
                             </div>
-                        )
-                    }
-                </CardContent >
-            </Card >
+                            <div className="flex gap-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() =>
+                                        setPage((p) => Math.max(1, p - 1))
+                                    }
+                                    disabled={page === 1 || isFetching}
+                                >
+                                    <ChevronLeft />
+                                    Previous
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() =>
+                                        setPage((p) =>
+                                            Math.min(meta.totalPages, p + 1)
+                                        )
+                                    }
+                                    disabled={
+                                        page === meta.totalPages || isFetching
+                                    }
+                                >
+                                    Next
+                                    <ChevronRight />
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
 
             {/* Edit Dialog */}
-            < Dialog
+            <Dialog
                 open={isEditDialogOpen}
                 onOpenChange={(open) => {
                     setIsEditDialogOpen(open);
                     if (!open) setServerErrors(undefined);
-                }
-                }
+                }}
             >
                 <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
@@ -1089,10 +1330,10 @@ export default function OrdersPage() {
                         />
                     )}
                 </DialogContent>
-            </Dialog >
+            </Dialog>
 
             {/* View Dialog */}
-            < Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen} >
+            <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
                 <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle>Order Details</DialogTitle>
@@ -1120,7 +1361,11 @@ export default function OrdersPage() {
                                             statusColors[selectedOrder.status]
                                         }
                                     >
-                                        {ORDER_STATUS_LABELS[selectedOrder.status]}
+                                        {
+                                            ORDER_STATUS_LABELS[
+                                                selectedOrder.status
+                                            ]
+                                        }
                                     </Badge>
                                 </div>
                                 <div>
@@ -1186,10 +1431,16 @@ export default function OrdersPage() {
                                     </p>
                                     <Badge
                                         className={
-                                            priorityColors[selectedOrder.priority]
+                                            priorityColors[
+                                                selectedOrder.priority
+                                            ]
                                         }
                                     >
-                                        {ORDER_PRIORITY_LABELS[selectedOrder.priority]}
+                                        {
+                                            ORDER_PRIORITY_LABELS[
+                                                selectedOrder.priority
+                                            ]
+                                        }
                                     </Badge>
                                 </div>
                             </div>
@@ -1219,7 +1470,8 @@ export default function OrdersPage() {
                                 </div>
                             )}
                             {selectedOrder.revisionInstructions &&
-                                selectedOrder.revisionInstructions.length > 0 && (
+                                selectedOrder.revisionInstructions.length >
+                                    0 && (
                                     <div>
                                         <p className="text-sm text-muted-foreground mb-2">
                                             Revision Instructions
@@ -1234,7 +1486,9 @@ export default function OrdersPage() {
                                                         <p>{rev.instruction}</p>
                                                         <p className="text-xs text-muted-foreground mt-1">
                                                             {format(
-                                                                new Date(rev.createdAt),
+                                                                new Date(
+                                                                    rev.createdAt
+                                                                ),
                                                                 'MMM dd, yyyy h:mm a'
                                                             )}{' '}
                                                             by Admin
@@ -1248,10 +1502,10 @@ export default function OrdersPage() {
                         </div>
                     )}
                 </DialogContent>
-            </Dialog >
+            </Dialog>
 
             {/* Extend Deadline Dialog */}
-            < Dialog
+            <Dialog
                 open={isExtendDialogOpen}
                 onOpenChange={(open) => {
                     setIsExtendDialogOpen(open);
@@ -1279,7 +1533,9 @@ export default function OrdersPage() {
                             <Label>Reason (optional)</Label>
                             <Textarea
                                 value={extendReason}
-                                onChange={(e) => setExtendReason(e.target.value)}
+                                onChange={(e) =>
+                                    setExtendReason(e.target.value)
+                                }
                                 placeholder="Why is the deadline being extended?"
                                 rows={3}
                             />
@@ -1303,10 +1559,10 @@ export default function OrdersPage() {
                         </Button>
                     </DialogFooter>
                 </DialogContent>
-            </Dialog >
+            </Dialog>
 
             {/* Add Revision Dialog */}
-            < Dialog
+            <Dialog
                 open={isRevisionDialogOpen}
                 onOpenChange={(open) => {
                     setIsRevisionDialogOpen(open);
@@ -1353,10 +1609,10 @@ export default function OrdersPage() {
                         </Button>
                     </DialogFooter>
                 </DialogContent>
-            </Dialog >
+            </Dialog>
 
             {/* Timeline Dialog */}
-            < Dialog
+            <Dialog
                 open={isTimelineDialogOpen}
                 onOpenChange={setIsTimelineDialogOpen}
             >
@@ -1371,10 +1627,10 @@ export default function OrdersPage() {
                         <OrderTimeline timeline={selectedOrder.timeline} />
                     )}
                 </DialogContent>
-            </Dialog >
+            </Dialog>
 
             {/* Status Change Dialog (for revision) */}
-            < Dialog
+            <Dialog
                 open={isStatusChangeDialogOpen}
                 onOpenChange={(open) => {
                     setIsStatusChangeDialogOpen(open);
@@ -1396,7 +1652,9 @@ export default function OrdersPage() {
                             <Label>Revision Instructions (optional)</Label>
                             <Textarea
                                 value={statusChangeNote}
-                                onChange={(e) => setStatusChangeNote(e.target.value)}
+                                onChange={(e) =>
+                                    setStatusChangeNote(e.target.value)
+                                }
                                 placeholder="What needs to be revised..."
                                 rows={4}
                             />
@@ -1420,10 +1678,19 @@ export default function OrdersPage() {
                         </Button>
                     </DialogFooter>
                 </DialogContent>
-            </Dialog >
+            </Dialog>
+
+            {/* Quick Withdraw Dialog */}
+            {selectedOrder && (
+                <QuickWithdrawDialog
+                    isOpen={isQuickWithdrawDialogOpen}
+                    onClose={() => setIsQuickWithdrawDialogOpen(false)}
+                    order={selectedOrder}
+                />
+            )}
 
             {/* Delete Confirmation */}
-            < AlertDialog
+            <AlertDialog
                 open={isDeleteDialogOpen}
                 onOpenChange={setIsDeleteDialogOpen}
             >
@@ -1450,7 +1717,7 @@ export default function OrdersPage() {
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
-            </AlertDialog >
-        </div >
+            </AlertDialog>
+        </div>
     );
 }

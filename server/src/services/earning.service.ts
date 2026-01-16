@@ -1,5 +1,7 @@
+import type { HydratedDocument } from 'mongoose';
 import EarningModel from '../models/earning.model.js';
 import ClientModel from '../models/client.model.js';
+import OrderModel from '../models/order.model.js';
 import type {
     IEarning,
     IEarningPopulated,
@@ -24,7 +26,7 @@ import {
 // Create earning when order is created
 async function createEarningForOrder(
     data: CreateEarningForOrderData
-): Promise<IEarning> {
+): Promise<HydratedDocument<IEarning>> {
     const earning = new EarningModel({
         orderId: data.orderId,
         clientId: data.clientId,
@@ -89,7 +91,35 @@ async function withdrawSingleEarning(
     earningId: string,
     data: WithdrawEarningData
 ): Promise<IEarning | null> {
-    const earning = await EarningModel.findById(earningId);
+    // Try to find by Earning ID first
+    let earning = await EarningModel.findById(earningId);
+
+    // If not found, try to find by Order ID
+    if (!earning) {
+        earning = await EarningModel.findOne({ orderId: earningId });
+    }
+
+    // If still not found, check if it's a valid Order ID and create the earning
+    if (!earning) {
+        const order = await OrderModel.findById(earningId).populate('clientId');
+
+        if (order) {
+            // Auto-create earning for this order
+            // @ts-ignore
+            const currency = order.clientId?.currency || 'USD';
+
+            earning = await createEarningForOrder({
+                orderId: order._id.toString(),
+                clientId: order.clientId._id.toString(),
+                orderName: order.orderName,
+                orderDate: order.orderDate,
+                orderAmount: order.totalPrice,
+                currency,
+                createdBy: data.paidBy,
+            });
+        }
+    }
+
     if (!earning) return null;
 
     const fees = data.fees ?? 0;
@@ -98,7 +128,7 @@ async function withdrawSingleEarning(
     const amountInBDT = netAmount * data.conversionRate;
 
     return EarningModel.findByIdAndUpdate(
-        earningId,
+        earning._id,
         {
             $set: {
                 fees,
@@ -119,7 +149,7 @@ async function withdrawSingleEarning(
         .lean() as Promise<IEarning | null>;
 }
 
-// Bulk withdraw earnings (mark multiple as paid, split fee/tax equally)
+// Bulk withdraw earnings (mark multiple as paid, distribute fee/tax proportionally)
 async function withdrawBulkEarnings(data: BulkWithdrawData): Promise<{
     updatedCount: number;
     totalAmount: number;
@@ -134,16 +164,26 @@ async function withdrawBulkEarnings(data: BulkWithdrawData): Promise<{
         return { updatedCount: 0, totalAmount: 0, totalBDT: 0 };
     }
 
-    // Split fee and tax equally among all earnings
-    const feePerEarning = data.totalFees / earnings.length;
-    const taxPerEarning = data.totalTax / earnings.length;
+    // Calculate total order amount for proportional distribution
+    const totalOrderAmount = earnings.reduce(
+        (sum, e) => sum + e.orderAmount,
+        0
+    );
 
     let totalAmount = 0;
     let totalBDT = 0;
 
-    // Update each earning
+    // Update each earning with proportional fee/tax
     const updatePromises = earnings.map(async (earning) => {
-        const netAmount = earning.orderAmount - feePerEarning - taxPerEarning;
+        // Calculate proportion of this earning relative to total
+        const proportion =
+            totalOrderAmount > 0 ? earning.orderAmount / totalOrderAmount : 0;
+
+        // Distribute fee and tax proportionally based on order amount
+        const feeForEarning = data.totalFees * proportion;
+        const taxForEarning = data.totalTax * proportion;
+
+        const netAmount = earning.orderAmount - feeForEarning - taxForEarning;
         const amountInBDT = netAmount * data.conversionRate;
 
         totalAmount += netAmount;
@@ -151,8 +191,8 @@ async function withdrawBulkEarnings(data: BulkWithdrawData): Promise<{
 
         return EarningModel.findByIdAndUpdate(earning._id, {
             $set: {
-                fees: feePerEarning,
-                tax: taxPerEarning,
+                fees: feeForEarning,
+                tax: taxForEarning,
                 conversionRate: data.conversionRate,
                 netAmount,
                 amountInBDT,

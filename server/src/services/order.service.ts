@@ -212,6 +212,7 @@ async function getAllOrdersFromDB(filters: GetOrdersFilters): Promise<{
                     select: 'name',
                 },
             })
+            .populate('earning', 'status')
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(limit)
@@ -243,6 +244,7 @@ async function getOrderByIdFromDB(id: string): Promise<IOrder | null> {
                 select: 'name email',
             },
         })
+        .populate('earning', 'status')
         .lean();
 
     if (order && order.createdBy) {
