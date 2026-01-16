@@ -482,13 +482,15 @@ async function getClientOrdersForBulkWithdraw(
 
     const client = clientData;
 
-    const orders = earnings.map((e) => ({
-        earningId: (e._id as unknown as { toString(): string }).toString(),
-        orderId: e.orderId.toString(),
-        orderName: e.orderName,
-        orderDate: e.orderDate,
-        orderAmount: e.orderAmount,
-    }));
+    const orders = earnings
+        .filter((e) => e && e._id) // Filter out any invalid earnings
+        .map((e) => ({
+            earningId: e._id.toString(),
+            orderId: e.orderId ? e.orderId.toString() : '',
+            orderName: e.orderName || '',
+            orderDate: e.orderDate,
+            orderAmount: e.orderAmount || 0,
+        }));
 
     const totalAmount = orders.reduce((sum, o) => sum + o.orderAmount, 0);
 

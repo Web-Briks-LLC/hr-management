@@ -1,4 +1,5 @@
 import type { Request, Response } from 'express';
+import { Types } from 'mongoose';
 import earningService from '../services/earning.service.js';
 import type {
     EarningQueryParams,
@@ -263,10 +264,25 @@ async function getClientOrdersForWithdraw(req: Request, res: Response) {
             });
         }
 
+        if (!Types.ObjectId.isValid(clientId as string)) {
+            return res.status(400).json({
+                message: 'Invalid Client ID format',
+            });
+        }
+
+        const monthNum = parseInt(month as string);
+        const yearNum = parseInt(year as string);
+
+        if (isNaN(monthNum) || isNaN(yearNum)) {
+            return res.status(400).json({
+                message: 'Month and year must be valid numbers',
+            });
+        }
+
         const result = await earningService.getClientOrdersForBulkWithdraw(
             clientId as string,
-            parseInt(month as string),
-            parseInt(year as string)
+            monthNum,
+            yearNum
         );
 
         if (!result) {
