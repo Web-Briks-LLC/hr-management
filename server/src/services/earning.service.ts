@@ -25,7 +25,7 @@ import {
 
 // Create earning when order is created
 async function createEarningForOrder(
-    data: CreateEarningForOrderData
+    data: CreateEarningForOrderData,
 ): Promise<HydratedDocument<IEarning>> {
     const earning = new EarningModel({
         orderId: data.orderId,
@@ -54,7 +54,7 @@ async function updateEarningForOrder(
         orderAmount?: number;
         orderDate?: Date;
         currency?: string;
-    }
+    },
 ): Promise<IEarning | null> {
     const updateData: Record<string, unknown> = {};
 
@@ -75,13 +75,13 @@ async function updateEarningForOrder(
     return EarningModel.findOneAndUpdate(
         { orderId },
         { $set: updateData },
-        { new: true }
+        { new: true },
     ).lean();
 }
 
 // Delete earning when order is deleted
 async function deleteEarningForOrder(
-    orderId: string
+    orderId: string,
 ): Promise<IEarning | null> {
     return EarningModel.findOneAndDelete({ orderId }).lean();
 }
@@ -89,7 +89,7 @@ async function deleteEarningForOrder(
 // Withdraw single earning (mark as paid)
 async function withdrawSingleEarning(
     earningId: string,
-    data: WithdrawEarningData
+    data: WithdrawEarningData,
 ): Promise<IEarning | null> {
     // Try to find by Earning ID first
     let earning = await EarningModel.findById(earningId);
@@ -142,7 +142,7 @@ async function withdrawSingleEarning(
                 notes: data.notes,
             },
         },
-        { new: true }
+        { new: true },
     )
         .populate('clientId', 'clientId name email currency')
         .populate('orderId', 'orderName totalPrice status')
@@ -150,15 +150,66 @@ async function withdrawSingleEarning(
 }
 
 // Bulk withdraw earnings (mark multiple as paid, distribute fee/tax proportionally)
+// Supports both earning IDs and order IDs - will auto-create earnings from orders if needed
 async function withdrawBulkEarnings(data: BulkWithdrawData): Promise<{
     updatedCount: number;
     totalAmount: number;
     totalBDT: number;
 }> {
-    const earnings = await EarningModel.find({
+    // First try to find by earning IDs
+    let earnings = await EarningModel.find({
         _id: { $in: data.earningIds },
         status: 'unpaid',
     });
+
+    // If no earnings found, try finding by order IDs
+    if (earnings.length === 0) {
+        earnings = await EarningModel.find({
+            orderId: { $in: data.earningIds },
+            status: 'unpaid',
+        });
+    }
+
+    // If still no earnings, try to create them from orders
+    if (earnings.length === 0) {
+        const orders = await OrderModel.find({
+            _id: { $in: data.earningIds },
+        }).populate('clientId');
+
+        if (orders.length > 0) {
+            // Create earnings for orders that don't have them
+            const createPromises = orders.map(async (order) => {
+                // Check if earning exists for this order
+                const existingEarning = await EarningModel.findOne({
+                    orderId: order._id,
+                });
+                if (existingEarning && existingEarning.status === 'unpaid') {
+                    return existingEarning;
+                }
+                if (existingEarning) {
+                    return null; // Already paid
+                }
+
+                // @ts-ignore
+                const currency = order.clientId?.currency || 'USD';
+
+                return createEarningForOrder({
+                    orderId: order._id.toString(),
+                    clientId: order.clientId._id.toString(),
+                    orderName: order.orderName,
+                    orderDate: order.orderDate,
+                    orderAmount: order.totalPrice,
+                    currency,
+                    createdBy: data.paidBy,
+                });
+            });
+
+            const createdEarnings = await Promise.all(createPromises);
+            earnings = createdEarnings.filter(
+                (e) => e !== null && e.status === 'unpaid',
+            ) as typeof earnings;
+        }
+    }
 
     if (earnings.length === 0) {
         return { updatedCount: 0, totalAmount: 0, totalBDT: 0 };
@@ -167,7 +218,7 @@ async function withdrawBulkEarnings(data: BulkWithdrawData): Promise<{
     // Calculate total order amount for proportional distribution
     const totalOrderAmount = earnings.reduce(
         (sum, e) => sum + e.orderAmount,
-        0
+        0,
     );
 
     let totalAmount = 0;
@@ -217,7 +268,7 @@ async function withdrawBulkEarnings(data: BulkWithdrawData): Promise<{
 async function toggleEarningStatus(
     earningId: string,
     newStatus: 'paid' | 'unpaid',
-    data?: WithdrawEarningData
+    data?: WithdrawEarningData,
 ): Promise<IEarning | null> {
     const earning = await EarningModel.findById(earningId);
     if (!earning) return null;
@@ -243,7 +294,7 @@ async function toggleEarningStatus(
                     paidBy: 1,
                 },
             },
-            { new: true }
+            { new: true },
         )
             .populate('clientId', 'clientId name email currency')
             .populate('orderId', 'orderName totalPrice status')
@@ -357,7 +408,7 @@ async function getEarningsWithDateFilter(params: EarningQueryParams): Promise<{
 
 // Get earning by ID
 async function getEarningByIdFromDB(
-    id: string
+    id: string,
 ): Promise<IEarningPopulated | null> {
     return EarningModel.findById(id)
         .populate('clientId', 'clientId name email currency')
@@ -367,7 +418,7 @@ async function getEarningByIdFromDB(
 
 // Get stats with optional date filter
 async function getEarningStatsWithFilter(
-    params: EarningQueryParams
+    params: EarningQueryParams,
 ): Promise<EarningStatsResult> {
     // Get total stats (all time)
     const [totalStats, filteredStats] = await Promise.all([
@@ -452,7 +503,7 @@ async function getEarningStatsWithFilter(
 async function getClientOrdersForBulkWithdraw(
     clientId: string,
     month: number,
-    year: number
+    year: number,
 ): Promise<ClientOrdersForWithdraw | null> {
     const monthStart = new Date(year, month - 1, 1);
     const monthEnd = endOfMonth(monthStart);
@@ -529,7 +580,7 @@ async function getEarningYearsFromDB(): Promise<number[]> {
 // Get clients who have unpaid earnings for a specific month/year
 async function getClientsWithUnpaidEarnings(
     month: number,
-    year: number
+    year: number,
 ): Promise<any[]> {
     const monthStart = new Date(year, month - 1, 1);
     const monthEnd = endOfMonth(monthStart);

@@ -17,12 +17,15 @@ const checkInInDB = async ({
     source?: 'web' | 'mobile' | 'manual';
 }) => {
     const now = new Date();
+    // Debug log
+    console.log(`[CheckIn] Attempt for user ${userId} at ${now.toISOString()}`);
 
     const dayStart = startOfDay(now);
     const dayEnd = endOfDay(now);
 
     const staff = await StaffModel.findOne({ userId }).lean();
     if (!staff) {
+        console.error(`[CheckIn] Staff not found for user ${userId}`);
         throw new Error('Staff not found for the user.');
     }
 
@@ -49,13 +52,20 @@ const checkInInDB = async ({
         .lean();
 
     if (!shiftAssignment || !shiftAssignment.shiftId) {
+        console.error(`[CheckIn] No active shift for staff ${staffId}`);
         throw new Error('No active shift assignment found.');
     }
 
     const shift = shiftAssignment.shiftId as unknown as IShift;
+    console.log(
+        `[CheckIn] Found shift: ${shift.name} (${shift.startTime} - ${shift.endTime})`,
+    );
 
     const todayDay = now.getDay();
     if (!shift.workDays.includes(todayDay as any)) {
+        console.error(
+            `[CheckIn] Not a working day. Today: ${todayDay}, WorkDays: ${shift.workDays}`,
+        );
         throw new Error('Today is not a working day for your shift.');
     }
 
@@ -67,9 +77,19 @@ const checkInInDB = async ({
     const [eh, em] = shift.endTime.split(':');
     shiftEnd.setHours(Number(eh), Number(em), 0, 0);
 
-    if (now < shiftStart) {
+    // Allow 15 minutes buffer before shift start
+    const EARLY_BUFFER_MINUTES = 15;
+    const earliestCheckIn = new Date(
+        shiftStart.getTime() - EARLY_BUFFER_MINUTES * 60000,
+    );
+
+    console.log(
+        `[CheckIn] Time check: Now=${now.toLocaleTimeString()}, Start=${shiftStart.toLocaleTimeString()}, Window=${earliestCheckIn.toLocaleTimeString()}`,
+    );
+
+    if (now < earliestCheckIn) {
         throw new Error(
-            'Shift has not started yet. Early check-in is not allowed.'
+            `Shift has not started yet. You can check in from ${earliestCheckIn.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
         );
     }
 
@@ -89,6 +109,15 @@ const checkInInDB = async ({
         remarks: null,
     });
 
+    // Logic: If checking in early OR within strict grace period (5 mins), snap to Shift Start.
+    // This handles Time Sync issues (Client vs Server) and ensures "Check In Now" counts from start.
+    const TOLERANCE_MINUTES = 5;
+    const diffFromStartMinutes = (now.getTime() - shiftStart.getTime()) / 60000;
+
+    // Snap if early (< 0) OR within tolerance (<= 5)
+    const officialCheckInTime =
+        diffFromStartMinutes <= TOLERANCE_MINUTES ? shiftStart : now;
+
     let attendanceDay = await AttendanceDayModel.findOne({
         staffId,
         date: dayStart,
@@ -100,7 +129,7 @@ const checkInInDB = async ({
             shiftId: shift._id,
             date: dayStart,
             status: 'present',
-            checkInAt: now,
+            checkInAt: officialCheckInTime,
             totalMinutes: 0,
             lateMinutes: 0,
             earlyExitMinutes: 0,
@@ -113,12 +142,14 @@ const checkInInDB = async ({
         attendanceDay.status = 'present';
         attendanceDay.shiftId = shift._id;
         if (!attendanceDay.checkInAt) {
-            attendanceDay.checkInAt = now;
+            attendanceDay.checkInAt = officialCheckInTime;
         }
     }
 
+    // Calculate late minutes based on actual shift start vs official check-in
+    // Since we snap to shiftStart if early, diff will be 0.
     const diffMinutes = Math.round(
-        (now.getTime() - shiftStart.getTime()) / 60000
+        (officialCheckInTime.getTime() - shiftStart.getTime()) / 60000,
     );
 
     if (diffMinutes > 0) {
@@ -132,9 +163,17 @@ const checkInInDB = async ({
             attendanceDay.status = 'present';
             attendanceDay.lateMinutes = 0;
         }
+    } else {
+        // Early check-in or on time
+        attendanceDay.lateMinutes = 0;
+        attendanceDay.status = 'present';
     }
 
     await attendanceDay.save();
+
+    console.log(
+        `[CheckIn] Success for user ${userId}. Time snapped to ${officialCheckInTime.toLocaleTimeString()}`,
+    );
 
     return {
         event,
@@ -177,10 +216,22 @@ async function checkOutInDB({
         throw new Error('You must check in before checking out.');
     }
 
-    const attendanceDay = await AttendanceDayModel.findOne({
+    let attendanceDay = await AttendanceDayModel.findOne({
         staffId,
         date: dayStart,
     });
+
+    // Handle Overnight Shift: If checking out in the morning (e.g. 7:30 AM) for a shift started yesterday (e.g. 10 PM)
+    if (!attendanceDay) {
+        const yesterdayStart = new Date(dayStart);
+        yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+
+        attendanceDay = await AttendanceDayModel.findOne({
+            staffId,
+            date: yesterdayStart,
+            checkOutAt: null, // Look for open session
+        });
+    }
 
     if (!attendanceDay) {
         throw new Error('No check-in record found.');
@@ -222,33 +273,36 @@ async function checkOutInDB({
 
         if (now > shiftEnd) {
             const otMinutes = Math.round(
-                (now.getTime() - shiftEnd.getTime()) / 60000
+                (now.getTime() - shiftEnd.getTime()) / 60000,
             );
             attendanceDay.otMinutes = otMinutes;
         } else {
             const earlyExitMinutes = Math.round(
-                (shiftEnd.getTime() - now.getTime()) / 60000
+                (shiftEnd.getTime() - now.getTime()) / 60000,
             );
             attendanceDay.earlyExitMinutes = earlyExitMinutes;
 
             if (earlyExitMinutes >= shiftData.halfDayAfterMinutes) {
                 attendanceDay.status = 'half_day';
             } else if (earlyExitMinutes > 0) {
-                 // Only set to early_exit if it was previously present/late, 
-                 // otherwise keep as half_day if check-in already triggered it.
-                 // However, usually we might want to flag it.
-                 // For now, let's stick to the requested consistency: if early exit > 0, status could be 'early_exit' 
-                 // OR we can leave it as 'present' with earlyExitMinutes > 0. 
-                 // But typically 'early_exit' is a status.
-                 if (attendanceDay.status === 'present' || attendanceDay.status === 'late') {
-                     attendanceDay.status = 'early_exit';
-                 }
+                // Only set to early_exit if it was previously present/late,
+                // otherwise keep as half_day if check-in already triggered it.
+                // However, usually we might want to flag it.
+                // For now, let's stick to the requested consistency: if early exit > 0, status could be 'early_exit'
+                // OR we can leave it as 'present' with earlyExitMinutes > 0.
+                // But typically 'early_exit' is a status.
+                if (
+                    attendanceDay.status === 'present' ||
+                    attendanceDay.status === 'late'
+                ) {
+                    attendanceDay.status = 'early_exit';
+                }
             }
         }
     }
 
     const totalMinutes = Math.round(
-        (now.getTime() - attendanceDay.checkInAt.getTime()) / 60000
+        (now.getTime() - attendanceDay.checkInAt.getTime()) / 60000,
     );
     attendanceDay.totalMinutes = totalMinutes;
 
@@ -297,7 +351,15 @@ async function getTodayAttendanceFromDB(userId: string) {
 async function getMonthlyStatsInDB(userId: string) {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+    const endOfMonth = new Date(
+        now.getFullYear(),
+        now.getMonth() + 1,
+        0,
+        23,
+        59,
+        59,
+        999,
+    );
 
     const staff = await StaffModel.findOne({ userId }).lean();
     if (!staff) {
@@ -326,7 +388,8 @@ async function getMonthlyStatsInDB(userId: string) {
         },
     ]);
 
-    const { default: OvertimeModel } = await import('../models/overtime.model.js');
+    const { default: OvertimeModel } =
+        await import('../models/overtime.model.js');
 
     // Get Overtime Stats
     const overtimeStats = await OvertimeModel.aggregate([
@@ -353,8 +416,18 @@ async function getMonthlyStatsInDB(userId: string) {
     const totalOvertimeMinutes = overtimeStats[0]?.totalMinutes || 0;
 
     const monthNames = [
-        'January', 'February', 'March', 'April', 'May', 'June',
-        'July', 'August', 'September', 'October', 'November', 'December'
+        'January',
+        'February',
+        'March',
+        'April',
+        'May',
+        'June',
+        'July',
+        'August',
+        'September',
+        'October',
+        'November',
+        'December',
     ];
     const month = monthNames[now.getMonth()];
 
@@ -415,26 +488,26 @@ async function getAllAttendanceFromDB({
     limit?: number;
 }) {
     const query: any = {};
-    
+
     // Date filter
     if (startDate || endDate) {
         query.date = {};
         if (startDate) query.date.$gte = new Date(startDate);
         if (endDate) query.date.$lte = new Date(endDate);
     }
-    
+
     // Status filter
     if (status) {
         query.status = status;
     }
-    
+
     // Staff filter
     if (staffId) {
         query.staffId = staffId;
     }
-    
+
     const skip = (page - 1) * limit;
-    
+
     // Get attendance records with populated staff and shift details
     const attendanceRecords = await AttendanceDayModel.find(query)
         .populate({
@@ -446,17 +519,17 @@ async function getAllAttendanceFromDB({
         .skip(skip)
         .limit(limit)
         .lean();
-    
+
     // Apply branch filter if needed (after population)
     let filteredRecords = attendanceRecords;
     if (branchId) {
-        filteredRecords = attendanceRecords.filter((record: any) => 
-            record.staffId?.branchId?.toString() === branchId
+        filteredRecords = attendanceRecords.filter(
+            (record: any) => record.staffId?.branchId?.toString() === branchId,
         );
     }
-    
+
     const total = await AttendanceDayModel.countDocuments(query);
-    
+
     return {
         records: filteredRecords,
         pagination: {
@@ -478,27 +551,38 @@ async function updateAttendanceStatusInDB({
     notes?: string;
     updatedBy: string;
 }) {
-    const validStatuses = ['present', 'absent', 'on_leave', 'weekend', 'holiday', 'half_day', 'late', 'early_exit'];
-    
+    const validStatuses = [
+        'present',
+        'absent',
+        'on_leave',
+        'weekend',
+        'holiday',
+        'half_day',
+        'late',
+        'early_exit',
+    ];
+
     if (!validStatuses.includes(status)) {
-        throw new Error(`Invalid status. Must be one of: ${validStatuses.join(', ')}`);
+        throw new Error(
+            `Invalid status. Must be one of: ${validStatuses.join(', ')}`,
+        );
     }
-    
+
     const attendanceDay = await AttendanceDayModel.findById(attendanceId);
-    
+
     if (!attendanceDay) {
         throw new Error('Attendance record not found');
     }
-    
+
     // Update attendance
     attendanceDay.status = status as any;
     attendanceDay.isManual = true;
     if (notes) {
         attendanceDay.notes = notes;
     }
-    
+
     await attendanceDay.save();
-    
+
     // Log audit trail (optional - import AuditLog model if you have it)
     // await AuditLogModel.create({
     //     action: 'UPDATE_ATTENDANCE_STATUS',
@@ -507,7 +591,7 @@ async function updateAttendanceStatusInDB({
     //     changes: { from: oldStatus, to: status },
     //     notes,
     // });
-    
+
     return attendanceDay;
 }
 

@@ -19,14 +19,30 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSession } from '@/lib/auth-client';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
@@ -62,7 +78,14 @@ export default function LeaveApplyPage() {
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [selectedStaffId, setSelectedStaffId] = useState<string>('');
 
-    const { register, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm<FormData>({
+    const {
+        register,
+        handleSubmit,
+        reset,
+        watch,
+        setValue,
+        formState: { errors },
+    } = useForm<FormData>({
         defaultValues: {
             leaveType: 'annual',
             reason: '',
@@ -72,15 +95,23 @@ export default function LeaveApplyPage() {
     const leaveType = watch('leaveType');
 
     // Fetch staff list for admin
-    const { data: staffsData } = useGetStaffsQuery({ limit: 200 }, { skip: !isAdmin });
+    const { data: staffsData } = useGetStaffsQuery(
+        { limit: 200 },
+        { skip: !isAdmin },
+    );
     const staffs = staffsData?.data || [];
 
-    const { data: balanceData, isLoading: isLoadingBalance } = useGetLeaveBalanceQuery();
-    const { data: myApplicationsData, isLoading: isLoadingApplications } = useGetMyLeaveApplicationsQuery({ limit: 10 });
+    const { data: balanceData, isLoading: isLoadingBalance } =
+        useGetLeaveBalanceQuery();
+    const { data: myApplicationsData, isLoading: isLoadingApplications } =
+        useGetMyLeaveApplicationsQuery({ limit: 10 });
     const [calculateWorkingDays] = useLazyCalculateWorkingDaysQuery();
-    const [applyForLeave, { isLoading: isApplying }] = useApplyForLeaveMutation();
-    const [cancelApplication, { isLoading: isCancelling }] = useCancelLeaveApplicationMutation();
-    const [uploadDocument, { isLoading: isUploading }] = useUploadMedicalDocumentMutation();
+    const [applyForLeave, { isLoading: isApplying }] =
+        useApplyForLeaveMutation();
+    const [cancelApplication, { isLoading: isCancelling }] =
+        useCancelLeaveApplicationMutation();
+    const [uploadDocument, { isLoading: isUploading }] =
+        useUploadMedicalDocumentMutation();
 
     const balance = balanceData?.data;
     const myApplications = myApplicationsData?.data || [];
@@ -156,13 +187,25 @@ export default function LeaveApplyPage() {
 
         // Check balance (only for non-admin applying for themselves)
         if (!isAdmin) {
-            if (data.leaveType === 'annual' && balance && workingDaysCount > balance.annualLeaveRemaining) {
-                toast.error(`Insufficient annual leave. Remaining: ${balance.annualLeaveRemaining}`);
+            if (
+                data.leaveType === 'annual' &&
+                balance &&
+                workingDaysCount > balance.annualLeaveRemaining
+            ) {
+                toast.error(
+                    `Insufficient annual leave. Remaining: ${balance.annualLeaveRemaining}`,
+                );
                 return;
             }
 
-            if (data.leaveType === 'sick' && balance && workingDaysCount > balance.sickLeaveRemaining) {
-                toast.error(`Insufficient sick leave. Remaining: ${balance.sickLeaveRemaining}`);
+            if (
+                data.leaveType === 'sick' &&
+                balance &&
+                workingDaysCount > balance.sickLeaveRemaining
+            ) {
+                toast.error(
+                    `Insufficient sick leave. Remaining: ${balance.sickLeaveRemaining}`,
+                );
                 return;
             }
         }
@@ -192,11 +235,15 @@ export default function LeaveApplyPage() {
                     toast.success('Medical document uploaded successfully');
                 } catch (uploadError: any) {
                     console.error('Document upload failed:', uploadError);
-                    toast.error('Application submitted but document upload failed. Please contact HR.');
+                    toast.error(
+                        'Application submitted but document upload failed. Please contact HR.',
+                    );
                 }
             }
 
-            toast.success('Leave application submitted! Admin will review it shortly.');
+            toast.success(
+                'Leave application submitted! Admin will review it shortly.',
+            );
             reset();
             setStartDate(undefined);
             setEndDate(undefined);
@@ -251,16 +298,24 @@ export default function LeaveApplyPage() {
     };
 
     // Calculate progress percentages
-    const annualProgress = balance ? ((balance.annualLeaveUsed / balance.annualLeaveTotal) * 100) : 0;
-    const sickProgress = balance ? ((balance.sickLeaveUsed / balance.sickLeaveTotal) * 100) : 0;
+    const annualProgress = balance
+        ? (balance.annualLeaveUsed / balance.annualLeaveTotal) * 100
+        : 0;
+    const sickProgress = balance
+        ? (balance.sickLeaveUsed / balance.sickLeaveTotal) * 100
+        : 0;
 
     return (
         <div className="container mx-auto p-6 max-w-7xl">
             {/* Header */}
             <div className="mb-8">
-                <h1 className="text-3xl font-bold tracking-tight">Leave Application</h1>
+                <h1 className="text-3xl font-bold tracking-tight">
+                    Leave Application
+                </h1>
                 <p className="text-muted-foreground mt-1">
-                    {isAdmin ? 'Apply for leave on behalf of staff members' : 'Request time off and track your applications'}
+                    {isAdmin
+                        ? 'Apply for leave on behalf of staff members'
+                        : 'Request time off and track your applications'}
                 </p>
             </div>
 
@@ -280,7 +335,9 @@ export default function LeaveApplyPage() {
                                                 <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
                                                     <Briefcase className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                                                 </div>
-                                                <span className="font-medium">Annual Leave</span>
+                                                <span className="font-medium">
+                                                    Annual Leave
+                                                </span>
                                             </div>
                                             {isLoadingBalance ? (
                                                 <Skeleton className="h-10 w-24" />
@@ -288,16 +345,27 @@ export default function LeaveApplyPage() {
                                                 <>
                                                     <div className="flex items-baseline gap-1">
                                                         <span className="text-4xl font-bold text-blue-600 dark:text-blue-400">
-                                                            {balance?.annualLeaveRemaining || 0}
+                                                            {balance?.annualLeaveRemaining ||
+                                                                0}
                                                         </span>
                                                         <span className="text-muted-foreground text-sm">
-                                                            / {balance?.annualLeaveTotal || 12} days left
+                                                            /{' '}
+                                                            {balance?.annualLeaveTotal ||
+                                                                12}{' '}
+                                                            days left
                                                         </span>
                                                     </div>
                                                     <div className="space-y-1">
-                                                        <Progress value={annualProgress} className="h-2" />
+                                                        <Progress
+                                                            value={
+                                                                annualProgress
+                                                            }
+                                                            className="h-2"
+                                                        />
                                                         <p className="text-xs text-muted-foreground">
-                                                            {balance?.annualLeaveUsed || 0} days used this year
+                                                            {balance?.annualLeaveUsed ||
+                                                                0}{' '}
+                                                            days used this year
                                                         </p>
                                                     </div>
                                                 </>
@@ -317,7 +385,9 @@ export default function LeaveApplyPage() {
                                                 <div className="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
                                                     <ThermometerSun className="h-5 w-5 text-orange-600 dark:text-orange-400" />
                                                 </div>
-                                                <span className="font-medium">Sick Leave</span>
+                                                <span className="font-medium">
+                                                    Sick Leave
+                                                </span>
                                             </div>
                                             {isLoadingBalance ? (
                                                 <Skeleton className="h-10 w-24" />
@@ -325,16 +395,25 @@ export default function LeaveApplyPage() {
                                                 <>
                                                     <div className="flex items-baseline gap-1">
                                                         <span className="text-4xl font-bold text-orange-600 dark:text-orange-400">
-                                                            {balance?.sickLeaveRemaining || 0}
+                                                            {balance?.sickLeaveRemaining ||
+                                                                0}
                                                         </span>
                                                         <span className="text-muted-foreground text-sm">
-                                                            / {balance?.sickLeaveTotal || 14} days left
+                                                            /{' '}
+                                                            {balance?.sickLeaveTotal ||
+                                                                14}{' '}
+                                                            days left
                                                         </span>
                                                     </div>
                                                     <div className="space-y-1">
-                                                        <Progress value={sickProgress} className="h-2 [&>div]:bg-orange-500" />
+                                                        <Progress
+                                                            value={sickProgress}
+                                                            className="h-2 [&>div]:bg-orange-500"
+                                                        />
                                                         <p className="text-xs text-muted-foreground">
-                                                            {balance?.sickLeaveUsed || 0} days used this year
+                                                            {balance?.sickLeaveUsed ||
+                                                                0}{' '}
+                                                            days used this year
                                                         </p>
                                                     </div>
                                                 </>
@@ -364,19 +443,31 @@ export default function LeaveApplyPage() {
                             </div>
                         </CardHeader>
                         <CardContent>
-                            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+                            <form
+                                onSubmit={handleSubmit(onSubmit)}
+                                className="space-y-6"
+                            >
                                 {/* Staff Selection - Only for Admin */}
                                 {isAdmin && (
                                     <div className="space-y-2">
-                                        <Label className="text-base">Staff Member</Label>
-                                        <Select value={selectedStaffId} onValueChange={setSelectedStaffId}>
+                                        <Label className="text-base">
+                                            Staff Member
+                                        </Label>
+                                        <Select
+                                            value={selectedStaffId}
+                                            onValueChange={setSelectedStaffId}
+                                        >
                                             <SelectTrigger className="h-12">
                                                 <SelectValue placeholder="Select a staff member" />
                                             </SelectTrigger>
                                             <SelectContent>
                                                 {staffs.map((staff: any) => (
-                                                    <SelectItem key={staff._id} value={staff._id}>
-                                                        {staff.user?.name} ({staff.staffId})
+                                                    <SelectItem
+                                                        key={staff._id}
+                                                        value={staff._id}
+                                                    >
+                                                        {staff.user?.name} (
+                                                        {staff.staffId})
                                                     </SelectItem>
                                                 ))}
                                             </SelectContent>
@@ -386,58 +477,89 @@ export default function LeaveApplyPage() {
 
                                 {/* Leave Type Selection as Buttons */}
                                 <div className="space-y-3">
-                                    <Label className="text-base">Leave Type</Label>
+                                    <Label className="text-base">
+                                        Leave Type
+                                    </Label>
                                     <div className="grid grid-cols-2 gap-3">
                                         <button
                                             type="button"
-                                            onClick={() => setValue('leaveType', 'annual')}
+                                            onClick={() =>
+                                                setValue('leaveType', 'annual')
+                                            }
                                             className={cn(
-                                                "p-4 rounded-xl border-2 transition-all duration-200 text-left",
+                                                'p-4 rounded-xl border-2 transition-all duration-200 text-left',
                                                 leaveType === 'annual'
-                                                    ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
-                                                    : "border-border hover:border-blue-300 hover:bg-muted/50"
+                                                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                                                    : 'border-border hover:border-blue-300 hover:bg-muted/50',
                                             )}
                                         >
                                             <div className="flex items-center gap-3">
-                                                <div className={cn(
-                                                    "p-2 rounded-lg",
-                                                    leaveType === 'annual' ? "bg-blue-100 dark:bg-blue-800" : "bg-muted"
-                                                )}>
-                                                    <Briefcase className={cn(
-                                                        "h-5 w-5",
-                                                        leaveType === 'annual' ? "text-blue-600" : "text-muted-foreground"
-                                                    )} />
+                                                <div
+                                                    className={cn(
+                                                        'p-2 rounded-lg',
+                                                        leaveType === 'annual'
+                                                            ? 'bg-blue-100 dark:bg-blue-800'
+                                                            : 'bg-muted',
+                                                    )}
+                                                >
+                                                    <Briefcase
+                                                        className={cn(
+                                                            'h-5 w-5',
+                                                            leaveType ===
+                                                                'annual'
+                                                                ? 'text-blue-600'
+                                                                : 'text-muted-foreground',
+                                                        )}
+                                                    />
                                                 </div>
                                                 <div>
-                                                    <p className="font-semibold">Annual Leave</p>
-                                                    <p className="text-sm text-muted-foreground">Vacation, personal days</p>
+                                                    <p className="font-semibold">
+                                                        Annual Leave
+                                                    </p>
+                                                    <p className="text-sm text-muted-foreground">
+                                                        Vacation, personal days
+                                                    </p>
                                                 </div>
                                             </div>
                                         </button>
 
                                         <button
                                             type="button"
-                                            onClick={() => setValue('leaveType', 'sick')}
+                                            onClick={() =>
+                                                setValue('leaveType', 'sick')
+                                            }
                                             className={cn(
-                                                "p-4 rounded-xl border-2 transition-all duration-200 text-left",
+                                                'p-4 rounded-xl border-2 transition-all duration-200 text-left',
                                                 leaveType === 'sick'
-                                                    ? "border-orange-500 bg-orange-50 dark:bg-orange-900/20"
-                                                    : "border-border hover:border-orange-300 hover:bg-muted/50"
+                                                    ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20'
+                                                    : 'border-border hover:border-orange-300 hover:bg-muted/50',
                                             )}
                                         >
                                             <div className="flex items-center gap-3">
-                                                <div className={cn(
-                                                    "p-2 rounded-lg",
-                                                    leaveType === 'sick' ? "bg-orange-100 dark:bg-orange-800" : "bg-muted"
-                                                )}>
-                                                    <ThermometerSun className={cn(
-                                                        "h-5 w-5",
-                                                        leaveType === 'sick' ? "text-orange-600" : "text-muted-foreground"
-                                                    )} />
+                                                <div
+                                                    className={cn(
+                                                        'p-2 rounded-lg',
+                                                        leaveType === 'sick'
+                                                            ? 'bg-orange-100 dark:bg-orange-800'
+                                                            : 'bg-muted',
+                                                    )}
+                                                >
+                                                    <ThermometerSun
+                                                        className={cn(
+                                                            'h-5 w-5',
+                                                            leaveType === 'sick'
+                                                                ? 'text-orange-600'
+                                                                : 'text-muted-foreground',
+                                                        )}
+                                                    />
                                                 </div>
                                                 <div>
-                                                    <p className="font-semibold">Sick Leave</p>
-                                                    <p className="text-sm text-muted-foreground">Medical reasons</p>
+                                                    <p className="font-semibold">
+                                                        Sick Leave
+                                                    </p>
+                                                    <p className="text-sm text-muted-foreground">
+                                                        Medical reasons
+                                                    </p>
                                                 </div>
                                             </div>
                                         </button>
@@ -447,26 +569,38 @@ export default function LeaveApplyPage() {
                                 {/* Date Range */}
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div className="space-y-2">
-                                        <Label className="text-base">From</Label>
+                                        <Label className="text-base">
+                                            From
+                                        </Label>
                                         <Popover>
                                             <PopoverTrigger asChild>
                                                 <Button
                                                     variant="outline"
                                                     className={cn(
                                                         'w-full h-12 justify-start text-left font-normal',
-                                                        !startDate && 'text-muted-foreground'
+                                                        !startDate &&
+                                                            'text-muted-foreground',
                                                     )}
                                                 >
                                                     <CalendarIcon className="mr-2 h-4 w-4" />
-                                                    {startDate ? format(startDate, 'PPP') : 'Select start date'}
+                                                    {startDate
+                                                        ? format(
+                                                              startDate,
+                                                              'PPP',
+                                                          )
+                                                        : 'Select start date'}
                                                 </Button>
                                             </PopoverTrigger>
-                                            <PopoverContent className="w-auto p-0" align="start">
+                                            <PopoverContent
+                                                className="w-auto p-0"
+                                                align="start"
+                                            >
                                                 <Calendar
                                                     mode="single"
                                                     selected={startDate}
-                                                    onSelect={handleStartDateSelect}
-                                                    disabled={(date) => date < new Date()}
+                                                    onSelect={
+                                                        handleStartDateSelect
+                                                    }
                                                     initialFocus
                                                 />
                                             </PopoverContent>
@@ -481,19 +615,30 @@ export default function LeaveApplyPage() {
                                                     variant="outline"
                                                     className={cn(
                                                         'w-full h-12 justify-start text-left font-normal',
-                                                        !endDate && 'text-muted-foreground'
+                                                        !endDate &&
+                                                            'text-muted-foreground',
                                                     )}
                                                 >
                                                     <CalendarIcon className="mr-2 h-4 w-4" />
-                                                    {endDate ? format(endDate, 'PPP') : 'Select end date'}
+                                                    {endDate
+                                                        ? format(endDate, 'PPP')
+                                                        : 'Select end date'}
                                                 </Button>
                                             </PopoverTrigger>
-                                            <PopoverContent className="w-auto p-0" align="start">
+                                            <PopoverContent
+                                                className="w-auto p-0"
+                                                align="start"
+                                            >
                                                 <Calendar
                                                     mode="single"
                                                     selected={endDate}
-                                                    onSelect={handleEndDateSelect}
-                                                    disabled={(date) => date < (startDate || new Date())}
+                                                    onSelect={
+                                                        handleEndDateSelect
+                                                    }
+                                                    disabled={(date) =>
+                                                        !!startDate &&
+                                                        date < startDate
+                                                    }
                                                     initialFocus
                                                 />
                                             </PopoverContent>
@@ -509,10 +654,14 @@ export default function LeaveApplyPage() {
                                         </div>
                                         <div>
                                             <p className="font-semibold text-lg">
-                                                {workingDaysCount} Working {workingDaysCount === 1 ? 'Day' : 'Days'}
+                                                {workingDaysCount} Working{' '}
+                                                {workingDaysCount === 1
+                                                    ? 'Day'
+                                                    : 'Days'}
                                             </p>
                                             <p className="text-sm text-muted-foreground">
-                                                Weekends based on your shift are excluded
+                                                Weekends based on your shift are
+                                                excluded
                                             </p>
                                         </div>
                                     </div>
@@ -521,14 +670,16 @@ export default function LeaveApplyPage() {
                                 {/* Document Upload for Sick Leave */}
                                 {leaveType === 'sick' && (
                                     <div className="space-y-3">
-                                        <Label className="text-base">Medical Document (Optional)</Label>
+                                        <Label className="text-base">
+                                            Medical Document (Optional)
+                                        </Label>
                                         <div
                                             {...getRootProps()}
                                             className={cn(
                                                 'border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-200',
                                                 isDragActive
                                                     ? 'border-primary bg-primary/5 scale-[1.02]'
-                                                    : 'border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/30'
+                                                    : 'border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/30',
                                             )}
                                         >
                                             <input {...getInputProps()} />
@@ -538,9 +689,15 @@ export default function LeaveApplyPage() {
                                                         <FileCheck className="h-6 w-6 text-green-600" />
                                                     </div>
                                                     <div className="text-left">
-                                                        <p className="font-medium">{selectedFile.name}</p>
+                                                        <p className="font-medium">
+                                                            {selectedFile.name}
+                                                        </p>
                                                         <p className="text-sm text-muted-foreground">
-                                                            {(selectedFile.size / 1024).toFixed(1)} KB
+                                                            {(
+                                                                selectedFile.size /
+                                                                1024
+                                                            ).toFixed(1)}{' '}
+                                                            KB
                                                         </p>
                                                     </div>
                                                     <Button
@@ -550,7 +707,9 @@ export default function LeaveApplyPage() {
                                                         className="ml-2 h-8 w-8 text-destructive hover:bg-destructive/10"
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            setSelectedFile(null);
+                                                            setSelectedFile(
+                                                                null,
+                                                            );
                                                         }}
                                                     >
                                                         <X className="h-4 w-4" />
@@ -562,7 +721,9 @@ export default function LeaveApplyPage() {
                                                         <Upload className="h-8 w-8 text-muted-foreground" />
                                                     </div>
                                                     <p className="font-medium">
-                                                        {isDragActive ? 'Drop the file here' : 'Drop file here or click to upload'}
+                                                        {isDragActive
+                                                            ? 'Drop the file here'
+                                                            : 'Drop file here or click to upload'}
                                                     </p>
                                                     <p className="text-sm text-muted-foreground mt-1">
                                                         PDF, JPG, PNG (Max 5MB)
@@ -577,7 +738,10 @@ export default function LeaveApplyPage() {
                                 <div className="space-y-2">
                                     <Label className="text-base">Reason</Label>
                                     <Textarea
-                                        {...register('reason', { required: 'Please provide a reason for your leave' })}
+                                        {...register('reason', {
+                                            required:
+                                                'Please provide a reason for your leave',
+                                        })}
                                         placeholder="Please describe the reason for your leave request..."
                                         className="min-h-[120px] resize-none"
                                     />
@@ -591,14 +755,21 @@ export default function LeaveApplyPage() {
 
                                 <Button
                                     type="submit"
-                                    disabled={isApplying || isUploading || !startDate || !endDate}
+                                    disabled={
+                                        isApplying ||
+                                        isUploading ||
+                                        !startDate ||
+                                        !endDate
+                                    }
                                     className="w-full h-12 text-base font-semibold"
                                     size="lg"
                                 >
                                     {isApplying || isUploading ? (
                                         <>
                                             <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                                            {isApplying ? 'Submitting...' : 'Uploading...'}
+                                            {isApplying
+                                                ? 'Submitting...'
+                                                : 'Uploading...'}
                                         </>
                                     ) : (
                                         <>
@@ -622,8 +793,12 @@ export default function LeaveApplyPage() {
                                         <Clock className="h-5 w-5 text-primary" />
                                     </div>
                                     <div>
-                                        <CardTitle className="text-lg">My Applications</CardTitle>
-                                        <CardDescription>Recent leave requests</CardDescription>
+                                        <CardTitle className="text-lg">
+                                            My Applications
+                                        </CardTitle>
+                                        <CardDescription>
+                                            Recent leave requests
+                                        </CardDescription>
                                     </div>
                                 </div>
                             </CardHeader>
@@ -639,66 +814,129 @@ export default function LeaveApplyPage() {
                                         <div className="p-4 bg-muted rounded-full w-fit mx-auto mb-4">
                                             <CalendarDays className="h-10 w-10 text-muted-foreground" />
                                         </div>
-                                        <p className="font-medium text-muted-foreground">No applications yet</p>
+                                        <p className="font-medium text-muted-foreground">
+                                            No applications yet
+                                        </p>
                                         <p className="text-sm text-muted-foreground mt-1">
                                             Your leave requests will appear here
                                         </p>
                                     </div>
                                 ) : (
                                     <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
-                                        {myApplications.map((app: ILeaveApplication) => (
-                                            <div
-                                                key={app._id}
-                                                className="p-4 rounded-xl border bg-card hover:bg-muted/30 transition-colors"
-                                            >
-                                                <div className="flex items-start justify-between gap-2 mb-3">
-                                                    <div className="flex items-center gap-2">
-                                                        {getStatusIcon(app.status)}
-                                                        <Badge variant={getStatusBadgeVariant(app.status)} className="text-xs">
-                                                            {LEAVE_STATUS_LABELS[app.status]}
+                                        {myApplications.map(
+                                            (app: ILeaveApplication) => (
+                                                <div
+                                                    key={app._id}
+                                                    className="p-4 rounded-xl border bg-card hover:bg-muted/30 transition-colors"
+                                                >
+                                                    <div className="flex items-start justify-between gap-2 mb-3">
+                                                        <div className="flex items-center gap-2">
+                                                            {getStatusIcon(
+                                                                app.status,
+                                                            )}
+                                                            <Badge
+                                                                variant={getStatusBadgeVariant(
+                                                                    app.status,
+                                                                )}
+                                                                className="text-xs"
+                                                            >
+                                                                {
+                                                                    LEAVE_STATUS_LABELS[
+                                                                        app
+                                                                            .status
+                                                                    ]
+                                                                }
+                                                            </Badge>
+                                                        </div>
+                                                        <Badge
+                                                            variant="outline"
+                                                            className="text-xs font-normal"
+                                                        >
+                                                            {
+                                                                LEAVE_TYPE_LABELS[
+                                                                    app
+                                                                        .leaveType
+                                                                ]
+                                                            }
                                                         </Badge>
                                                     </div>
-                                                    <Badge variant="outline" className="text-xs font-normal">
-                                                        {LEAVE_TYPE_LABELS[app.leaveType]}
-                                                    </Badge>
-                                                </div>
 
-                                                <div className="space-y-2">
-                                                    <div className="flex items-center gap-2 text-sm">
-                                                        <CalendarIcon className="h-3.5 w-3.5 text-muted-foreground" />
-                                                        <span>
-                                                            {format(new Date(app.startDate), 'MMM dd')} - {format(new Date(app.endDate), 'MMM dd, yyyy')}
-                                                        </span>
+                                                    <div className="space-y-2">
+                                                        <div className="flex items-center gap-2 text-sm">
+                                                            <CalendarIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                                                            <span>
+                                                                {format(
+                                                                    new Date(
+                                                                        app.startDate,
+                                                                    ),
+                                                                    'MMM dd',
+                                                                )}{' '}
+                                                                -{' '}
+                                                                {format(
+                                                                    new Date(
+                                                                        app.endDate,
+                                                                    ),
+                                                                    'MMM dd, yyyy',
+                                                                )}
+                                                            </span>
+                                                        </div>
+                                                        <p className="text-sm font-medium">
+                                                            {
+                                                                app
+                                                                    .requestedDates
+                                                                    .length
+                                                            }{' '}
+                                                            day
+                                                            {app.requestedDates
+                                                                .length > 1
+                                                                ? 's'
+                                                                : ''}
+                                                        </p>
                                                     </div>
-                                                    <p className="text-sm font-medium">
-                                                        {app.requestedDates.length} day{app.requestedDates.length > 1 ? 's' : ''}
+
+                                                    {/* Status specific info */}
+                                                    {app.status ===
+                                                        'rejected' &&
+                                                        app.commentByApprover && (
+                                                            <p className="text-xs text-destructive mt-2 p-2 bg-destructive/10 rounded-lg">
+                                                                Reason:{' '}
+                                                                {
+                                                                    app.commentByApprover
+                                                                }
+                                                            </p>
+                                                        )}
+
+                                                    {app.status ===
+                                                        'pending' && (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={() =>
+                                                                handleCancel(
+                                                                    app._id,
+                                                                )
+                                                            }
+                                                            disabled={
+                                                                isCancelling
+                                                            }
+                                                            className="w-full mt-3 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                                        >
+                                                            Cancel Request
+                                                        </Button>
+                                                    )}
+
+                                                    <p className="text-xs text-muted-foreground mt-2">
+                                                        Applied{' '}
+                                                        {format(
+                                                            new Date(
+                                                                app.createdAt,
+                                                            ),
+                                                            'MMM dd, yyyy',
+                                                        )}
                                                     </p>
                                                 </div>
-
-                                                {/* Status specific info */}
-                                                {app.status === 'rejected' && app.commentByApprover && (
-                                                    <p className="text-xs text-destructive mt-2 p-2 bg-destructive/10 rounded-lg">
-                                                        Reason: {app.commentByApprover}
-                                                    </p>
-                                                )}
-
-                                                {app.status === 'pending' && (
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => handleCancel(app._id)}
-                                                        disabled={isCancelling}
-                                                        className="w-full mt-3 text-destructive hover:text-destructive hover:bg-destructive/10"
-                                                    >
-                                                        Cancel Request
-                                                    </Button>
-                                                )}
-
-                                                <p className="text-xs text-muted-foreground mt-2">
-                                                    Applied {format(new Date(app.createdAt), 'MMM dd, yyyy')}
-                                                </p>
-                                            </div>
-                                        ))}
+                                            ),
+                                        )}
                                     </div>
                                 )}
                             </CardContent>

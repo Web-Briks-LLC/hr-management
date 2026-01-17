@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
     useGetOrdersQuery,
     useCreateOrderMutation,
@@ -64,6 +64,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
     Loader2,
     ChevronLeft,
@@ -84,6 +85,7 @@ import {
     Search,
     Filter,
     X,
+    CheckSquare,
 } from 'lucide-react';
 import Link from 'next/link';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -103,6 +105,7 @@ import { DateTimePicker } from '@/components/shared/DateTimePicker';
 import { cn } from '@/lib/utils';
 import { useSession } from '@/lib/auth-client';
 import { QuickWithdrawDialog } from '@/components/earning/QuickWithdrawDialog';
+import { MultiWithdrawDialog } from '@/components/earning/MultiWithdrawDialog';
 import { DollarSign } from 'lucide-react';
 
 const statusColors: Record<OrderStatus, string> = {
@@ -137,7 +140,7 @@ const statusWorkflow: Record<OrderStatus, OrderStatus[]> = {
 // Helper function to check if a status transition is allowed
 const canTransitionTo = (
     currentStatus: OrderStatus,
-    targetStatus: OrderStatus
+    targetStatus: OrderStatus,
 ): boolean => {
     if (currentStatus === targetStatus) return false; // Can't transition to same status
     return statusWorkflow[currentStatus]?.includes(targetStatus) || false;
@@ -171,11 +174,18 @@ export default function OrdersPage() {
         useState(false);
     const [isQuickWithdrawDialogOpen, setIsQuickWithdrawDialogOpen] =
         useState(false);
+    const [isMultiWithdrawDialogOpen, setIsMultiWithdrawDialogOpen] =
+        useState(false);
+    const [isBulkDeleteDialogOpen, setIsBulkDeleteDialogOpen] = useState(false);
+    const [isSelectionMode, setIsSelectionMode] = useState(false);
     const [pendingStatusChange, setPendingStatusChange] = useState<{
         orderId: string;
         status: OrderStatus;
     } | null>(null);
     const [selectedOrder, setSelectedOrder] = useState<IOrder | null>(null);
+    const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(
+        new Set(),
+    );
 
     const [serverErrors, setServerErrors] = useState<
         Record<string, string[]> | undefined
@@ -200,7 +210,7 @@ export default function OrdersPage() {
     const currentYear = new Date().getFullYear();
     const years = Array.from(
         { length: currentYear - 2020 + 2 },
-        (_, i) => 2020 + i
+        (_, i) => 2020 + i,
     );
     const months = [
         { value: '1', label: 'January' },
@@ -247,9 +257,54 @@ export default function OrdersPage() {
     const stats = statsData?.data;
     const clients = clientsData?.clients || [];
 
+    // Get selected orders from IDs
+    const selectedOrders = useMemo(() => {
+        return orders.filter((order) => selectedOrderIds.has(order._id));
+    }, [orders, selectedOrderIds]);
+
+    // Check if all current page orders are selected
+    const allOrdersSelected = useMemo(() => {
+        return (
+            orders.length > 0 &&
+            orders.every((order) => selectedOrderIds.has(order._id))
+        );
+    }, [orders, selectedOrderIds]);
+
+    // Toggle single order selection
+    const toggleOrderSelection = (orderId: string) => {
+        setSelectedOrderIds((prev) => {
+            const newSet = new Set(prev);
+            if (newSet.has(orderId)) {
+                newSet.delete(orderId);
+            } else {
+                newSet.add(orderId);
+            }
+            return newSet;
+        });
+    };
+
+    // Toggle all orders on current page
+    const toggleAllOrders = (checked: boolean) => {
+        setSelectedOrderIds((prev) => {
+            const newSet = new Set(prev);
+            if (checked) {
+                orders.forEach((order) => newSet.add(order._id));
+            } else {
+                orders.forEach((order) => newSet.delete(order._id));
+            }
+            return newSet;
+        });
+    };
+
+    // Clear selection and exit selection mode
+    const clearSelection = () => {
+        setSelectedOrderIds(new Set());
+        setIsSelectionMode(false);
+    };
+
     const handleFilterChange = (
         key: keyof OrderFilters,
-        value: string | number | undefined
+        value: string | number | undefined,
     ) => {
         setFilters((prev) => ({ ...prev, [key]: value || undefined }));
         setPage(1);
@@ -305,9 +360,35 @@ export default function OrdersPage() {
         }
     };
 
+    const handleBulkDeleteOrders = async () => {
+        if (selectedOrderIds.size === 0) return;
+        const orderIdsArray = Array.from(selectedOrderIds);
+        let successCount = 0;
+        let errorCount = 0;
+
+        for (const orderId of orderIdsArray) {
+            try {
+                await deleteOrder(orderId).unwrap();
+                successCount++;
+            } catch {
+                errorCount++;
+            }
+        }
+
+        if (successCount > 0) {
+            toast.success(`${successCount} order(s) deleted successfully`);
+        }
+        if (errorCount > 0) {
+            toast.error(`Failed to delete ${errorCount} order(s)`);
+        }
+
+        setIsBulkDeleteDialogOpen(false);
+        clearSelection();
+    };
+
     const handleStatusChange = async (
         orderId: string,
-        newStatus: OrderStatus
+        newStatus: OrderStatus,
     ) => {
         // Guard against empty/undefined values
         if (!newStatus) {
@@ -329,7 +410,7 @@ export default function OrdersPage() {
                 data: { status: newStatus },
             }).unwrap();
             toast.success(
-                `Status updated to ${ORDER_STATUS_LABELS[newStatus]}`
+                `Status updated to ${ORDER_STATUS_LABELS[newStatus]}`,
             );
         } catch (error: unknown) {
             const err = error as ApiErrorResponse;
@@ -350,7 +431,7 @@ export default function OrdersPage() {
             toast.success(
                 `Status updated to ${
                     ORDER_STATUS_LABELS[pendingStatusChange.status]
-                }`
+                }`,
             );
             setIsStatusChangeDialogOpen(false);
             setPendingStatusChange(null);
@@ -611,6 +692,24 @@ export default function OrdersPage() {
                     </div>
                     {session?.user?.role !== 'team_leader' && (
                         <div className="flex gap-3">
+                            {/* Select Mode Toggle Button */}
+                            {!isSelectionMode ? (
+                                <Button
+                                    variant="outline"
+                                    onClick={() => setIsSelectionMode(true)}
+                                >
+                                    <CheckSquare className="mr-2 h-4 w-4" />
+                                    Select
+                                </Button>
+                            ) : (
+                                <Button
+                                    variant="outline"
+                                    onClick={clearSelection}
+                                >
+                                    <X className="mr-2 h-4 w-4" />
+                                    Cancel
+                                </Button>
+                            )}
                             <Button variant="outline" asChild>
                                 <Link href="/orders/invoice">
                                     <FileText className="mr-2 h-4 w-4" />
@@ -671,7 +770,7 @@ export default function OrdersPage() {
                                         onChange={(e) =>
                                             handleFilterChange(
                                                 'search',
-                                                e.target.value
+                                                e.target.value,
                                             )
                                         }
                                         className="pl-9 bg-background"
@@ -730,7 +829,7 @@ export default function OrdersPage() {
                                     onValueChange={(value) =>
                                         handleFilterChange(
                                             'status',
-                                            value as OrderStatus
+                                            value as OrderStatus,
                                         )
                                     }
                                 >
@@ -739,7 +838,7 @@ export default function OrdersPage() {
                                     </SelectTrigger>
                                     <SelectContent>
                                         {Object.entries(
-                                            ORDER_STATUS_LABELS
+                                            ORDER_STATUS_LABELS,
                                         ).map(([value, label]) => (
                                             <SelectItem
                                                 key={value}
@@ -757,7 +856,7 @@ export default function OrdersPage() {
                                     onValueChange={(value) =>
                                         handleFilterChange(
                                             'priority',
-                                            value as OrderPriority
+                                            value as OrderPriority,
                                         )
                                     }
                                 >
@@ -766,7 +865,7 @@ export default function OrdersPage() {
                                     </SelectTrigger>
                                     <SelectContent>
                                         {Object.entries(
-                                            ORDER_PRIORITY_LABELS
+                                            ORDER_PRIORITY_LABELS,
                                         ).map(([value, label]) => (
                                             <SelectItem
                                                 key={value}
@@ -830,6 +929,58 @@ export default function OrdersPage() {
                             </div>
                         </TooltipProvider>
                     </div>
+
+                    {/* Selection Action Bar */}
+                    {isSelectionMode && (
+                        <div className="flex items-center justify-between p-3 rounded-lg border bg-primary/5 border-primary/20">
+                            <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium">
+                                    {selectedOrderIds.size} order
+                                    {selectedOrderIds.size !== 1
+                                        ? 's'
+                                        : ''}{' '}
+                                    selected
+                                </span>
+                                {selectedOrderIds.size > 0 && (
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() =>
+                                            setSelectedOrderIds(new Set())
+                                        }
+                                        className="h-7 text-xs"
+                                    >
+                                        <X className="h-3 w-3 mr-1" />
+                                        Clear Selection
+                                    </Button>
+                                )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    variant="destructive"
+                                    size="sm"
+                                    onClick={() =>
+                                        setIsBulkDeleteDialogOpen(true)
+                                    }
+                                    disabled={selectedOrderIds.size === 0}
+                                >
+                                    <Trash2 className="h-4 w-4 mr-1" />
+                                    Delete ({selectedOrderIds.size})
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    onClick={() =>
+                                        setIsMultiWithdrawDialogOpen(true)
+                                    }
+                                    disabled={selectedOrderIds.size === 0}
+                                    className="bg-green-600 hover:bg-green-700 text-white"
+                                >
+                                    <DollarSign className="h-4 w-4 mr-1" />
+                                    Bulk Withdraw ({selectedOrderIds.size})
+                                </Button>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Table */}
                     <div className="border">
@@ -900,6 +1051,21 @@ export default function OrdersPage() {
                             <Table>
                                 <TableHeader>
                                     <TableRow>
+                                        {isSelectionMode && (
+                                            <TableHead className="border-r w-[50px]">
+                                                <Checkbox
+                                                    checked={allOrdersSelected}
+                                                    onCheckedChange={(
+                                                        checked,
+                                                    ) =>
+                                                        toggleAllOrders(
+                                                            !!checked,
+                                                        )
+                                                    }
+                                                    aria-label="Select all orders"
+                                                />
+                                            </TableHead>
+                                        )}
                                         <TableHead className="border-r">
                                             Order Date
                                         </TableHead>
@@ -933,7 +1099,9 @@ export default function OrdersPage() {
                                     {orders.length === 0 ? (
                                         <TableRow>
                                             <TableCell
-                                                colSpan={9}
+                                                colSpan={
+                                                    isSelectionMode ? 10 : 9
+                                                }
                                                 className="text-center py-8 text-muted-foreground"
                                             >
                                                 No orders found
@@ -941,13 +1109,37 @@ export default function OrdersPage() {
                                         </TableRow>
                                     ) : (
                                         orders.map((order: IOrder) => (
-                                            <TableRow key={order._id}>
+                                            <TableRow
+                                                key={order._id}
+                                                className={cn(
+                                                    isSelectionMode &&
+                                                        selectedOrderIds.has(
+                                                            order._id,
+                                                        ) &&
+                                                        'bg-muted/50',
+                                                )}
+                                            >
+                                                {isSelectionMode && (
+                                                    <TableCell className="border-r">
+                                                        <Checkbox
+                                                            checked={selectedOrderIds.has(
+                                                                order._id,
+                                                            )}
+                                                            onCheckedChange={() =>
+                                                                toggleOrderSelection(
+                                                                    order._id,
+                                                                )
+                                                            }
+                                                            aria-label={`Select ${order.orderName}`}
+                                                        />
+                                                    </TableCell>
+                                                )}
                                                 <TableCell className="border-r">
                                                     {format(
                                                         new Date(
-                                                            order.orderDate
+                                                            order.orderDate,
                                                         ),
-                                                        'PPP'
+                                                        'PPP',
                                                     )}
                                                 </TableCell>
                                                 <TableCell className="border-r">
@@ -995,18 +1187,18 @@ export default function OrdersPage() {
                                                 <TableCell className="border-r">
                                                     $
                                                     {order.totalPrice.toFixed(
-                                                        2
+                                                        2,
                                                     )}
                                                 </TableCell>
                                                 <TableCell className="border-r flex items-center justify-center w-auto">
                                                     <Select
                                                         value={order.status}
                                                         onValueChange={(
-                                                            value
+                                                            value,
                                                         ) =>
                                                             handleStatusChange(
                                                                 order._id,
-                                                                value as OrderStatus
+                                                                value as OrderStatus,
                                                             )
                                                         }
                                                         disabled={
@@ -1020,14 +1212,14 @@ export default function OrdersPage() {
                                                             className={cn(
                                                                 statusColors[
                                                                     order.status
-                                                                ]
+                                                                ],
                                                             )}
                                                         >
                                                             <SelectValue />
                                                         </SelectTrigger>
                                                         <SelectContent>
                                                             {Object.entries(
-                                                                ORDER_STATUS_LABELS
+                                                                ORDER_STATUS_LABELS,
                                                             ).map(
                                                                 ([
                                                                     value,
@@ -1043,13 +1235,13 @@ export default function OrdersPage() {
                                                                         disabled={
                                                                             !canTransitionTo(
                                                                                 order.status,
-                                                                                value as OrderStatus
+                                                                                value as OrderStatus,
                                                                             )
                                                                         }
                                                                     >
                                                                         {label}
                                                                     </SelectItem>
-                                                                )
+                                                                ),
                                                             )}
                                                         </SelectContent>
                                                     </Select>
@@ -1081,7 +1273,7 @@ export default function OrdersPage() {
                                                                         size="icon"
                                                                         onClick={() =>
                                                                             openViewDialog(
-                                                                                order
+                                                                                order,
                                                                             )
                                                                         }
                                                                     >
@@ -1101,7 +1293,7 @@ export default function OrdersPage() {
                                                                         size="icon"
                                                                         onClick={() =>
                                                                             openEditDialog(
-                                                                                order
+                                                                                order,
                                                                             )
                                                                         }
                                                                     >
@@ -1121,7 +1313,7 @@ export default function OrdersPage() {
                                                                         size="icon"
                                                                         onClick={() =>
                                                                             openExtendDialog(
-                                                                                order
+                                                                                order,
                                                                             )
                                                                         }
                                                                     >
@@ -1144,7 +1336,7 @@ export default function OrdersPage() {
                                                                         size="icon"
                                                                         onClick={() =>
                                                                             openRevisionDialog(
-                                                                                order
+                                                                                order,
                                                                             )
                                                                         }
                                                                     >
@@ -1167,7 +1359,7 @@ export default function OrdersPage() {
                                                                         size="icon"
                                                                         onClick={() =>
                                                                             openTimelineDialog(
-                                                                                order
+                                                                                order,
                                                                             )
                                                                         }
                                                                     >
@@ -1194,7 +1386,7 @@ export default function OrdersPage() {
                                                                                 ?.status !==
                                                                                 'paid' &&
                                                                             openQuickWithdrawDialog(
-                                                                                order
+                                                                                order,
                                                                             )
                                                                         }
                                                                         disabled={
@@ -1209,7 +1401,7 @@ export default function OrdersPage() {
                                                                                 .earning
                                                                                 ?.status ===
                                                                                 'paid' &&
-                                                                                'opacity-50 cursor-not-allowed text-muted-foreground'
+                                                                                'opacity-50 cursor-not-allowed text-muted-foreground',
                                                                         )}
                                                                     >
                                                                         <DollarSign className="h-4 w-4" />
@@ -1235,10 +1427,10 @@ export default function OrdersPage() {
                                                                         size="icon"
                                                                         onClick={() => {
                                                                             setSelectedOrder(
-                                                                                order
+                                                                                order,
                                                                             );
                                                                             setIsDeleteDialogOpen(
-                                                                                true
+                                                                                true,
                                                                             );
                                                                         }}
                                                                     >
@@ -1286,7 +1478,7 @@ export default function OrdersPage() {
                                     size="sm"
                                     onClick={() =>
                                         setPage((p) =>
-                                            Math.min(meta.totalPages, p + 1)
+                                            Math.min(meta.totalPages, p + 1),
                                         )
                                     }
                                     disabled={
@@ -1375,7 +1567,7 @@ export default function OrdersPage() {
                                     <p className="font-medium">
                                         {format(
                                             new Date(selectedOrder.orderDate),
-                                            'MMM dd, yyyy'
+                                            'MMM dd, yyyy',
                                         )}
                                     </p>
                                 </div>
@@ -1386,7 +1578,7 @@ export default function OrdersPage() {
                                     <p className="font-medium">
                                         {format(
                                             new Date(selectedOrder.deadline),
-                                            'MMM dd, yyyy h:mm a'
+                                            'MMM dd, yyyy h:mm a',
                                         )}
                                     </p>
                                     {selectedOrder.originalDeadline && (
@@ -1394,9 +1586,9 @@ export default function OrdersPage() {
                                             Original:{' '}
                                             {format(
                                                 new Date(
-                                                    selectedOrder.originalDeadline
+                                                    selectedOrder.originalDeadline,
                                                 ),
-                                                'MMM dd, yyyy'
+                                                'MMM dd, yyyy',
                                             )}
                                         </p>
                                     )}
@@ -1487,14 +1679,14 @@ export default function OrdersPage() {
                                                         <p className="text-xs text-muted-foreground mt-1">
                                                             {format(
                                                                 new Date(
-                                                                    rev.createdAt
+                                                                    rev.createdAt,
                                                                 ),
-                                                                'MMM dd, yyyy h:mm a'
+                                                                'MMM dd, yyyy h:mm a',
                                                             )}{' '}
                                                             by Admin
                                                         </p>
                                                     </div>
-                                                )
+                                                ),
                                             )}
                                         </div>
                                     </div>
@@ -1718,6 +1910,51 @@ export default function OrdersPage() {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+
+            {/* Bulk Delete Confirmation */}
+            <AlertDialog
+                open={isBulkDeleteDialogOpen}
+                onOpenChange={setIsBulkDeleteDialogOpen}
+            >
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>
+                            Delete Selected Orders
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Are you sure you want to delete{' '}
+                            <strong>{selectedOrderIds.size}</strong> selected
+                            order
+                            {selectedOrderIds.size !== 1 ? 's' : ''}? This
+                            action cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleBulkDeleteOrders}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            disabled={isDeleting}
+                        >
+                            {isDeleting && (
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            )}
+                            Delete {selectedOrderIds.size} Order
+                            {selectedOrderIds.size !== 1 ? 's' : ''}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            {/* Multi Withdraw Dialog */}
+            <MultiWithdrawDialog
+                isOpen={isMultiWithdrawDialogOpen}
+                onClose={() => setIsMultiWithdrawDialogOpen(false)}
+                orders={selectedOrders}
+                onSuccess={() => {
+                    clearSelection();
+                }}
+            />
         </div>
     );
 }
