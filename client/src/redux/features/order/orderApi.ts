@@ -76,7 +76,7 @@ export const orderApi = apiSlice.injectEndpoints({
             {
                 query: () => '/orders/years',
                 providesTags: [{ type: 'Order', id: 'YEARS' }],
-            }
+            },
         ),
 
         createOrder: builder.mutation<OrderResponse, CreateOrderInput>({
@@ -169,6 +169,7 @@ export const orderApi = apiSlice.injectEndpoints({
 
 export const {
     useGetOrdersQuery,
+    useLazyGetOrdersQuery,
     useGetOrderByIdQuery,
     useGetOrderStatsQuery,
     useGetOrdersByClientQuery,

@@ -27,7 +27,11 @@ export interface ExpenseQueryParams {
     search?: string;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
-    month?: string; // YYYY-MM format
+    month?: number;
+    year?: number;
+    startDate?: string;
+    endDate?: string;
+    filterType?: 'all' | 'today' | 'week' | 'month' | 'year' | 'range';
     branchId?: string;
     categoryId?: string;
     status?: string;

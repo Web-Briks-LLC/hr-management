@@ -1,5 +1,15 @@
 import { Types } from 'mongoose';
 import type { PipelineStage } from 'mongoose';
+import {
+    startOfDay,
+    endOfDay,
+    startOfWeek,
+    endOfWeek,
+    startOfMonth,
+    endOfMonth,
+    startOfYear,
+    endOfYear,
+} from 'date-fns';
 import ExpenseModel from '../models/expense.model.js';
 import ExpenseCategoryModel from '../models/expense-category.model.js';
 import type {
@@ -14,7 +24,7 @@ const getExpenseAggregationPipeline = (
     matchStage: any,
     skip: number,
     limit: number,
-    sortStage: any
+    sortStage: any,
 ): PipelineStage[] => [
     { $match: matchStage },
     { $sort: sortStage },
@@ -58,7 +68,76 @@ const getExpenseAggregationPipeline = (
             'createdBy.password': 0,
         },
     },
+    {
+        $project: {
+            categoryId: 0,
+            branchId: 0,
+            'createdBy.password': 0,
+        },
+    },
 ];
+
+// Build date filter based on filterType
+const buildDateFilter = (params: ExpenseQueryParams): any => {
+    const filter: any = {};
+    const now = new Date();
+
+    switch (params.filterType) {
+        case 'today':
+            filter.date = {
+                $gte: startOfDay(now),
+                $lte: endOfDay(now),
+            };
+            break;
+        case 'week':
+            filter.date = {
+                $gte: startOfWeek(now, { weekStartsOn: 0 }),
+                $lte: endOfWeek(now, { weekStartsOn: 0 }),
+            };
+            break;
+        case 'month':
+            if (params.month && params.year) {
+                const monthStart = new Date(params.year, params.month - 1, 1);
+                const monthEnd = endOfMonth(monthStart);
+                filter.date = {
+                    $gte: monthStart,
+                    $lte: monthEnd,
+                };
+            } else {
+                filter.date = {
+                    $gte: startOfMonth(now),
+                    $lte: endOfMonth(now),
+                };
+            }
+            break;
+        case 'year':
+            if (params.year) {
+                filter.date = {
+                    $gte: new Date(params.year, 0, 1),
+                    $lte: new Date(params.year, 11, 31, 23, 59, 59, 999),
+                };
+            } else {
+                filter.date = {
+                    $gte: startOfYear(now),
+                    $lte: endOfYear(now),
+                };
+            }
+            break;
+        case 'range':
+            if (params.startDate || params.endDate) {
+                filter.date = {};
+                if (params.startDate) {
+                    filter.date.$gte = startOfDay(new Date(params.startDate));
+                }
+                if (params.endDate) {
+                    filter.date.$lte = endOfDay(new Date(params.endDate));
+                }
+            }
+            break;
+    }
+
+    return filter;
+};
 
 // Build match stage from query params
 const buildMatchStage = (params: ExpenseQueryParams): any => {
@@ -80,15 +159,13 @@ const buildMatchStage = (params: ExpenseQueryParams): any => {
         match.status = params.status;
     }
 
-    if (params.month) {
-        // Month format: YYYY-MM
-        const parts = params.month.split('-').map(Number);
-        const year = parts[0] ?? 0;
-        const month = parts[1] ?? 1;
-        const startDate = new Date(year, month - 1, 1);
-        const endDate = new Date(year, month, 0, 23, 59, 59, 999);
-        match.date = { $gte: startDate, $lte: endDate };
+    if (params.status) {
+        match.status = params.status;
     }
+
+    // Add date filter
+    const dateFilter = buildDateFilter(params);
+    Object.assign(match, dateFilter);
 
     return match;
 };
@@ -107,7 +184,7 @@ const getAllExpensesFromDB = async (params: ExpenseQueryParams) => {
 
     const [expenses, countResult] = await Promise.all([
         ExpenseModel.aggregate(
-            getExpenseAggregationPipeline(matchStage, skip, limit, sortStage)
+            getExpenseAggregationPipeline(matchStage, skip, limit, sortStage),
         ),
         ExpenseModel.countDocuments(matchStage),
     ]);
@@ -125,13 +202,13 @@ const getAllExpensesFromDB = async (params: ExpenseQueryParams) => {
 
 // Get expense statistics
 const getExpenseStatsFromDB = async (
-    branchId?: string
+    branchId?: string,
 ): Promise<ExpenseStats> => {
     const now = new Date();
     const startOfToday = new Date(
         now.getFullYear(),
         now.getMonth(),
-        now.getDate()
+        now.getDate(),
     );
     const endOfToday = new Date(
         now.getFullYear(),
@@ -140,7 +217,7 @@ const getExpenseStatsFromDB = async (
         23,
         59,
         59,
-        999
+        999,
     );
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const endOfMonth = new Date(
@@ -150,7 +227,7 @@ const getExpenseStatsFromDB = async (
         23,
         59,
         59,
-        999
+        999,
     );
     const startOfYear = new Date(now.getFullYear(), 0, 1);
     const endOfYear = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
@@ -204,7 +281,7 @@ const getExpenseStatsFromDB = async (
 
 // Create expense
 const createExpenseInDB = async (
-    payload: Partial<IExpense> & { createdBy: string }
+    payload: Partial<IExpense> & { createdBy: string },
 ) => {
     const result = await ExpenseModel.create(payload);
     return result;
@@ -215,7 +292,7 @@ const getExpenseByIdFromDB = async (id: string) => {
     const result = await ExpenseModel.aggregate(
         getExpenseAggregationPipeline({ _id: new Types.ObjectId(id) }, 0, 1, {
             date: -1,
-        })
+        }),
     );
     return result[0] || null;
 };
@@ -253,7 +330,7 @@ const createCategoryInDB = async (payload: Partial<IExpenseCategory>) => {
 // Update category
 const updateCategoryInDB = async (
     id: string,
-    payload: Partial<IExpenseCategory>
+    payload: Partial<IExpenseCategory>,
 ) => {
     const result = await ExpenseCategoryModel.findByIdAndUpdate(id, payload, {
         new: true,
@@ -266,7 +343,7 @@ const deleteCategoryFromDB = async (id: string) => {
     const result = await ExpenseCategoryModel.findByIdAndUpdate(
         id,
         { isActive: false },
-        { new: true }
+        { new: true },
     );
     return result;
 };

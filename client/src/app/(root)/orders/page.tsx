@@ -10,6 +10,7 @@ import {
     useUpdateOrderStatusMutation,
     useExtendDeadlineMutation,
     useAddRevisionMutation,
+    useLazyGetOrdersQuery,
 } from '@/redux/features/order/orderApi';
 import { useGetClientsQuery } from '@/redux/features/client/clientApi';
 import type {
@@ -251,6 +252,8 @@ export default function OrdersPage() {
         useExtendDeadlineMutation();
     const [addRevision, { isLoading: isAddingRevision }] =
         useAddRevisionMutation();
+    const [triggerGetAll, { isLoading: isLoadingAll }] =
+        useLazyGetOrdersQuery();
 
     const orders = orderData?.data || [];
     const meta = orderData?.meta;
@@ -290,10 +293,34 @@ export default function OrdersPage() {
             if (checked) {
                 orders.forEach((order) => newSet.add(order._id));
             } else {
+                // If unchecking "Select All Page", we should probably clear specific page IDs
+                // But if "All Total" was selected, user expects to clear just this page?
+                // Standard behavior: Uncheck header = Uncheck all visible.
                 orders.forEach((order) => newSet.delete(order._id));
             }
             return newSet;
         });
+    };
+
+    const handleSelectAllMatches = async () => {
+        if (!meta) return;
+        try {
+            const result = await triggerGetAll({
+                ...filters,
+                limit: meta.total,
+                month: selectedMonth ? parseInt(selectedMonth) : undefined,
+                year: selectedYear ? parseInt(selectedYear) : undefined,
+            }).unwrap();
+
+            if (result.data) {
+                const allIds = result.data.map((o) => o._id);
+                setSelectedOrderIds(new Set(allIds));
+                toast.success(`All ${allIds.length} orders selected`);
+            }
+        } catch (error) {
+            console.error('Failed to select all', error);
+            toast.error('Failed to select all orders');
+        }
     };
 
     // Clear selection and exit selection mode
@@ -982,6 +1009,34 @@ export default function OrdersPage() {
                         </div>
                     )}
 
+                    {/* Select All Matching Banner */}
+                    {isSelectionMode &&
+                        allOrdersSelected &&
+                        meta &&
+                        meta.total > selectedOrderIds.size && (
+                            <div className="flex items-center justify-center p-2 bg-blue-50/50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900 rounded-lg text-sm text-blue-600 dark:text-blue-400">
+                                <span>
+                                    All {orders.length} orders on this page are
+                                    selected.
+                                </span>
+                                <Button
+                                    variant="link"
+                                    className="ml-2 h-auto p-0 font-semibold"
+                                    onClick={handleSelectAllMatches}
+                                    disabled={isLoadingAll}
+                                >
+                                    {isLoadingAll ? (
+                                        <>
+                                            <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                                            Selecting all {meta.total} orders...
+                                        </>
+                                    ) : (
+                                        `Select all ${meta.total} orders`
+                                    )}
+                                </Button>
+                            </div>
+                        )}
+
                     {/* Table */}
                     <div className="border">
                         {isLoading ? (
@@ -1455,11 +1510,48 @@ export default function OrdersPage() {
                     </div>
 
                     {/* Pagination */}
-                    {meta && meta.totalPages > 1 && (
+                    {meta && (
                         <div className="flex items-center justify-between">
-                            <div className="text-sm text-muted-foreground">
-                                Page {meta.page} of {meta.totalPages} (
-                                {meta.total} total)
+                            <div className="flex items-center gap-6">
+                                <div className="text-sm text-muted-foreground">
+                                    Page {meta.page} of{' '}
+                                    {Math.max(1, meta.totalPages)} ({meta.total}{' '}
+                                    total)
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <p className="text-sm font-medium">
+                                        Rows per page
+                                    </p>
+                                    <Select
+                                        value={`${filters.limit || 10}`}
+                                        onValueChange={(value) => {
+                                            handleFilterChange(
+                                                'limit',
+                                                Number(value),
+                                            );
+                                        }}
+                                    >
+                                        <SelectTrigger className="h-8 w-[70px]">
+                                            <SelectValue
+                                                placeholder={
+                                                    filters.limit || 10
+                                                }
+                                            />
+                                        </SelectTrigger>
+                                        <SelectContent side="top">
+                                            {[10, 20, 30, 40, 50].map(
+                                                (pageSize) => (
+                                                    <SelectItem
+                                                        key={pageSize}
+                                                        value={`${pageSize}`}
+                                                    >
+                                                        {pageSize}
+                                                    </SelectItem>
+                                                ),
+                                            )}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
                             </div>
                             <div className="flex gap-2">
                                 <Button
@@ -1470,7 +1562,7 @@ export default function OrdersPage() {
                                     }
                                     disabled={page === 1 || isFetching}
                                 >
-                                    <ChevronLeft />
+                                    <ChevronLeft className="h-4 w-4 mr-2" />
                                     Previous
                                 </Button>
                                 <Button
@@ -1482,11 +1574,11 @@ export default function OrdersPage() {
                                         )
                                     }
                                     disabled={
-                                        page === meta.totalPages || isFetching
+                                        page >= meta.totalPages || isFetching
                                     }
                                 >
                                     Next
-                                    <ChevronRight />
+                                    <ChevronRight className="h-4 w-4 ml-2" />
                                 </Button>
                             </div>
                         </div>
