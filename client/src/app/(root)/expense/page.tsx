@@ -214,10 +214,24 @@ export default function ExpensePage() {
         isFetching,
     } = useGetExpensesQuery(queryParams);
 
-    // For stats, we only pass branch filter if selected
-    const { data: stats, isLoading: isLoadingStats } = useGetExpenseStatsQuery(
-        branchFilter !== 'all' ? branchFilter : undefined,
-    );
+    // For stats, pass filters if selected
+    const statsParams = useMemo(() => {
+        const params: { branchId?: string; year?: number; month?: number } = {};
+
+        if (branchFilter !== 'all') params.branchId = branchFilter;
+
+        if (filterType === 'month') {
+            params.month = selectedMonth;
+            params.year = selectedYear;
+        } else if (filterType === 'year') {
+            params.year = selectedYear;
+        }
+
+        return params;
+    }, [branchFilter, filterType, selectedMonth, selectedYear]);
+
+    const { data: stats, isLoading: isLoadingStats } =
+        useGetExpenseStatsQuery(statsParams);
 
     const { data: categories } = useGetExpenseCategoriesQuery(undefined);
     const { data: branchesData } = useGetAllBranchesQuery(undefined);

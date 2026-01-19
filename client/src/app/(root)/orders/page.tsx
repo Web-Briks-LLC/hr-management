@@ -11,6 +11,7 @@ import {
     useExtendDeadlineMutation,
     useAddRevisionMutation,
     useLazyGetOrdersQuery,
+    useGetOrderYearsQuery,
 } from '@/redux/features/order/orderApi';
 import { useGetClientsQuery } from '@/redux/features/client/clientApi';
 import type {
@@ -206,13 +207,21 @@ export default function OrdersPage() {
     // Date filter state
     const [selectedMonth, setSelectedMonth] = useState<string>('');
     const [selectedYear, setSelectedYear] = useState<string>('');
+    const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
-    // Generate year options (from 2020 to current year + 1)
-    const currentYear = new Date().getFullYear();
-    const years = Array.from(
-        { length: currentYear - 2020 + 2 },
-        (_, i) => 2020 + i,
-    );
+    // Queries
+    const { data: yearsData } = useGetOrderYearsQuery();
+    const sortedYears = useMemo(() => {
+        if (!yearsData?.data) {
+            const currentYear = new Date().getFullYear();
+            return Array.from(
+                { length: currentYear - 2020 + 2 },
+                (_, i) => 2020 + i,
+            );
+        }
+        return yearsData.data.sort((a, b) => b - a);
+    }, [yearsData]);
+
     const months = [
         { value: '1', label: 'January' },
         { value: '2', label: 'February' },
@@ -389,28 +398,35 @@ export default function OrdersPage() {
 
     const handleBulkDeleteOrders = async () => {
         if (selectedOrderIds.size === 0) return;
+        setIsBulkDeleting(true);
         const orderIdsArray = Array.from(selectedOrderIds);
-        let successCount = 0;
-        let errorCount = 0;
 
-        for (const orderId of orderIdsArray) {
-            try {
-                await deleteOrder(orderId).unwrap();
-                successCount++;
-            } catch {
-                errorCount++;
+        try {
+            const results = await Promise.allSettled(
+                orderIdsArray.map((id) => deleteOrder(id).unwrap()),
+            );
+
+            const successCount = results.filter(
+                (r) => r.status === 'fulfilled',
+            ).length;
+            const errorCount = results.filter(
+                (r) => r.status === 'rejected',
+            ).length;
+
+            if (successCount > 0) {
+                toast.success(`${successCount} order(s) deleted successfully`);
             }
+            if (errorCount > 0) {
+                toast.error(`Failed to delete ${errorCount} order(s)`);
+            }
+        } catch (error) {
+            console.error('Bulk delete error:', error);
+            toast.error('An unexpected error occurred during bulk deletion');
+        } finally {
+            setIsBulkDeleting(false);
+            setIsBulkDeleteDialogOpen(false);
+            clearSelection();
         }
-
-        if (successCount > 0) {
-            toast.success(`${successCount} order(s) deleted successfully`);
-        }
-        if (errorCount > 0) {
-            toast.error(`Failed to delete ${errorCount} order(s)`);
-        }
-
-        setIsBulkDeleteDialogOpen(false);
-        clearSelection();
     };
 
     const handleStatusChange = async (
@@ -839,7 +855,7 @@ export default function OrdersPage() {
                                         <SelectValue placeholder="All Years" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {years.map((year) => (
+                                        {sortedYears.map((year) => (
                                             <SelectItem
                                                 key={year}
                                                 value={year.toString()}
@@ -2024,11 +2040,14 @@ export default function OrdersPage() {
                     <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
                         <AlertDialogAction
-                            onClick={handleBulkDeleteOrders}
+                            onClick={(e) => {
+                                e.preventDefault();
+                                handleBulkDeleteOrders();
+                            }}
                             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                            disabled={isDeleting}
+                            disabled={isBulkDeleting}
                         >
-                            {isDeleting && (
+                            {isBulkDeleting && (
                                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                             )}
                             Delete {selectedOrderIds.size} Order

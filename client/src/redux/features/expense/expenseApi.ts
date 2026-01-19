@@ -56,10 +56,14 @@ export const expenseApi = apiSlice.injectEndpoints({
             providesTags: ['Expense'],
         }),
         getExpenseStats: builder.query({
-            query: (branchId?: string) => ({
+            query: (params?: {
+                branchId?: string;
+                year?: number;
+                month?: number;
+            }) => ({
                 url: '/expenses/stats',
                 method: 'GET',
-                params: branchId ? { branchId } : {},
+                params: params || {},
             }),
             transformResponse: (response: { data: ExpenseStats }) =>
                 response.data,

@@ -22,19 +22,26 @@ export interface IExpense extends Document {
 }
 
 export interface ExpenseQueryParams {
-    page?: number;
-    limit?: number;
-    search?: string;
-    sortBy?: string;
-    sortOrder?: 'asc' | 'desc';
-    month?: number;
-    year?: number;
-    startDate?: string;
-    endDate?: string;
-    filterType?: 'all' | 'today' | 'week' | 'month' | 'year' | 'range';
-    branchId?: string;
-    categoryId?: string;
-    status?: string;
+    page?: number | undefined;
+    limit?: number | undefined;
+    search?: string | undefined;
+    sortBy?: string | undefined;
+    sortOrder?: 'asc' | 'desc' | undefined;
+    month?: number | undefined;
+    year?: number | undefined;
+    startDate?: string | undefined;
+    endDate?: string | undefined;
+    filterType?:
+        | 'all'
+        | 'today'
+        | 'week'
+        | 'month'
+        | 'year'
+        | 'range'
+        | undefined;
+    branchId?: string | undefined;
+    categoryId?: string | undefined;
+    status?: string | undefined;
 }
 
 export interface ExpenseStats {

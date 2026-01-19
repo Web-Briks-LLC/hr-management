@@ -203,8 +203,17 @@ const getAllExpensesFromDB = async (params: ExpenseQueryParams) => {
 // Get expense statistics
 const getExpenseStatsFromDB = async (
     branchId?: string,
+    year?: number,
+    month?: number,
 ): Promise<ExpenseStats> => {
     const now = new Date();
+
+    // Determine the reference date based on inputs or use current date
+    const targetYear = year || now.getFullYear();
+    const targetMonth = month ? month - 1 : now.getMonth(); // input month is 1-based
+
+    // Calculate ranges
+    // Today is always actual today (or we could make it relative to selected month? keeping actual today for now)
     const startOfToday = new Date(
         now.getFullYear(),
         now.getMonth(),
@@ -219,18 +228,22 @@ const getExpenseStatsFromDB = async (
         59,
         999,
     );
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    // Selected Month Range
+    const startOfMonth = new Date(targetYear, targetMonth, 1);
     const endOfMonth = new Date(
-        now.getFullYear(),
-        now.getMonth() + 1,
+        targetYear,
+        targetMonth + 1,
         0,
         23,
         59,
         59,
         999,
     );
-    const startOfYear = new Date(now.getFullYear(), 0, 1);
-    const endOfYear = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
+
+    // Selected Year Range
+    const startOfYear = new Date(targetYear, 0, 1);
+    const endOfYear = new Date(targetYear, 11, 31, 23, 59, 59, 999);
 
     const branchMatch = branchId
         ? { branchId: new Types.ObjectId(branchId) }
@@ -267,7 +280,13 @@ const getExpenseStatsFromDB = async (
     ]);
 
     // Calculate average monthly expense for the year
-    const monthsPassed = now.getMonth() + 1;
+    let monthsPassed = 12;
+    if (targetYear === now.getFullYear()) {
+        monthsPassed = now.getMonth() + 1;
+    } else if (targetYear > now.getFullYear()) {
+        monthsPassed = 0;
+    }
+
     const yearTotal = yearResult[0]?.total || 0;
     const avgMonthly = monthsPassed > 0 ? yearTotal / monthsPassed : 0;
 

@@ -12,7 +12,9 @@ const getAllExpenses = async (req: Request, res: Response) => {
             search: req.query.search as string,
             sortBy: req.query.sortBy as string,
             sortOrder: req.query.sortOrder as 'asc' | 'desc',
-            month: req.query.month as string,
+            ...(req.query.month
+                ? { month: parseInt(req.query.month as string) }
+                : {}),
             branchId: req.query.branchId as string,
             categoryId: req.query.categoryId as string,
             status: req.query.status as string,
@@ -34,7 +36,24 @@ const getAllExpenses = async (req: Request, res: Response) => {
 const getExpenseStats = async (req: Request, res: Response) => {
     try {
         const branchId = req.query.branchId as string | undefined;
-        const result = await ExpenseServices.getExpenseStatsFromDB(branchId);
+        let year: number | undefined;
+        let month: number | undefined;
+
+        if (req.query.year) {
+            const parsedYear = parseInt(req.query.year as string);
+            if (!isNaN(parsedYear)) year = parsedYear;
+        }
+
+        if (req.query.month) {
+            const parsedMonth = parseInt(req.query.month as string);
+            if (!isNaN(parsedMonth)) month = parsedMonth;
+        }
+
+        const result = await ExpenseServices.getExpenseStatsFromDB(
+            branchId,
+            year,
+            month,
+        );
         res.status(200).json({
             success: true,
             data: result,
