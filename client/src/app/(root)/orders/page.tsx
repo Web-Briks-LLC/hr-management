@@ -219,7 +219,7 @@ export default function OrdersPage() {
                 (_, i) => 2020 + i,
             );
         }
-        return yearsData.data.sort((a, b) => b - a);
+        return [...yearsData.data].sort((a, b) => b - a);
     }, [yearsData]);
 
     const months = [
