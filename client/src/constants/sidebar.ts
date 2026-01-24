@@ -67,7 +67,12 @@ export const sidebarGroups: SidebarGroup[] = [
                 title: 'Orders',
                 url: '/orders',
                 icon: IconPackage,
-                access: [Role.SUPER_ADMIN, Role.ADMIN, Role.TEAM_LEADER],
+                access: [
+                    Role.SUPER_ADMIN,
+                    Role.ADMIN,
+                    Role.HR_MANAGER,
+                    Role.TEAM_LEADER,
+                ],
             },
             {
                 title: 'Earnings',
