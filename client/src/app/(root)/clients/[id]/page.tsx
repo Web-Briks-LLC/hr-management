@@ -149,7 +149,7 @@ export default function ClientDetailsPage() {
                 (_, i) => 2020 + i,
             );
         }
-        return yearsData.data.sort((a, b) => b - a);
+        return [...yearsData.data].sort((a, b) => b - a);
     }, [yearsData]);
 
     const formatCurrency = (amount: number, currency: string = 'USD') => {
