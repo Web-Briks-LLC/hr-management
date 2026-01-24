@@ -4,7 +4,7 @@ import { useSession } from '@/lib/auth-client';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef } from 'react';
 import { canAccess } from '@/utils/canAccess';
-import { Role } from '@/consonants/role';
+import { Role } from '@/constants/role';
 
 const publicRoutes = new Set([
     '/sign-in',
@@ -19,11 +19,7 @@ const LoadingSpinner = () => (
     </div>
 );
 
-export default function AuthGuard({
-    children,
-}: {
-    children: React.ReactNode;
-}) {
+export default function AuthGuard({ children }: { children: React.ReactNode }) {
     const { data: session, isPending } = useSession();
     const pathname = usePathname();
     const router = useRouter();

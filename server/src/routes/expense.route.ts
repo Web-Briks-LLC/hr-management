@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import ExpenseController from '../controllers/expense.controller.js';
 import { authorize } from '../middlewares/authorize.js';
-import { Role } from '../consonants/role.js';
+import { Role } from '../constants/role.js';
 
 const router: Router = Router();
 
@@ -12,7 +12,7 @@ router.get('/', authorize(...allowedRoles), ExpenseController.getAllExpenses);
 router.get(
     '/stats',
     authorize(...allowedRoles),
-    ExpenseController.getExpenseStats
+    ExpenseController.getExpenseStats,
 );
 router.post('/', authorize(...allowedRoles), ExpenseController.createExpense);
 
@@ -20,39 +20,39 @@ router.post('/', authorize(...allowedRoles), ExpenseController.createExpense);
 router.get(
     '/categories',
     authorize(...allowedRoles),
-    ExpenseController.getAllCategories
+    ExpenseController.getAllCategories,
 );
 router.post(
     '/categories',
     authorize(...allowedRoles),
-    ExpenseController.createCategory
+    ExpenseController.createCategory,
 );
 router.patch(
     '/categories/:id',
     authorize(...allowedRoles),
-    ExpenseController.updateCategory
+    ExpenseController.updateCategory,
 );
 router.delete(
     '/categories/:id',
     authorize(...allowedRoles),
-    ExpenseController.deleteCategory
+    ExpenseController.deleteCategory,
 );
 
 // Expense routes with :id parameter (last, to catch remaining)
 router.get(
     '/:id',
     authorize(...allowedRoles),
-    ExpenseController.getExpenseById
+    ExpenseController.getExpenseById,
 );
 router.patch(
     '/:id',
     authorize(...allowedRoles),
-    ExpenseController.updateExpense
+    ExpenseController.updateExpense,
 );
 router.delete(
     '/:id',
     authorize(...allowedRoles),
-    ExpenseController.deleteExpense
+    ExpenseController.deleteExpense,
 );
 
 export const expenseRoute = router;

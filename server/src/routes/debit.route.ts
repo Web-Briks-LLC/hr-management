@@ -9,7 +9,7 @@ import {
     updateDebit,
     deleteDebit,
     getDebitStats,
-} from '../controllers/DebitController.js';
+} from '../controllers/debit.controller.js';
 
 export const debitRoute = Router();
 

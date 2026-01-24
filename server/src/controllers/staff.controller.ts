@@ -7,7 +7,6 @@ const getStaffs = async (_req: Request, res: Response) => {
 
         return res.json({ success: true, staffs });
     } catch (err) {
-        console.log(err);
         return res
             .status(500)
             .json({ success: false, message: (err as Error).message });
@@ -202,7 +201,7 @@ async function exportStaffs(_req: Request, res: Response) {
         res.setHeader('Content-Type', 'text/csv');
         res.setHeader(
             'Content-Disposition',
-            `attachment; filename=staff-export-${Date.now()}.csv`
+            `attachment; filename=staff-export-${Date.now()}.csv`,
         );
 
         return res.send(csvContent);

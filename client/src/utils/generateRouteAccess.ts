@@ -1,5 +1,5 @@
-import { sidebarData } from '@/consonants/sidebar';
-import { Role } from '@/consonants/role';
+import { sidebarData } from '@/constants/sidebar';
+import { Role } from '@/constants/role';
 
 export function generateRouteAccess() {
     const map: Record<string, Role[]> = {};

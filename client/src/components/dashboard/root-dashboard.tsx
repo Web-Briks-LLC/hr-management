@@ -2,7 +2,7 @@
 
 import { useSession } from '@/lib/auth-client';
 import { Spinner } from '../ui/spinner';
-import { Role } from '@/consonants/role';
+import { Role } from '@/constants/role';
 import StaffDashboard from './staff-dashboard/staff-dashboard';
 import AdminDashboard from './admin-dashboard/admin-dashboard';
 

@@ -12,9 +12,15 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
 import { toast } from 'sonner';
-import { Role } from '@/consonants/role';
+import { Role } from '@/constants/role';
 
 export default function SendInvitation() {
     const [createInvitation, { isLoading }] = useCreateInvitationMutation();
@@ -30,7 +36,13 @@ export default function SendInvitation() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (!formData.email || !formData.role || !formData.designation || !formData.salary || !formData.branchId) {
+        if (
+            !formData.email ||
+            !formData.role ||
+            !formData.designation ||
+            !formData.salary ||
+            !formData.branchId
+        ) {
             toast.error('Please fill in all required fields');
             return;
         }
@@ -77,7 +89,8 @@ export default function SendInvitation() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <Label htmlFor="email">
-                                Email <span className="text-destructive">*</span>
+                                Email{' '}
+                                <span className="text-destructive">*</span>
                             </Label>
                             <Input
                                 id="email"
@@ -85,7 +98,10 @@ export default function SendInvitation() {
                                 placeholder="staff@example.com"
                                 value={formData.email}
                                 onChange={(e) =>
-                                    setFormData({ ...formData, email: e.target.value })
+                                    setFormData({
+                                        ...formData,
+                                        email: e.target.value,
+                                    })
                                 }
                                 required
                             />
@@ -105,24 +121,36 @@ export default function SendInvitation() {
                                     <SelectValue placeholder="Select role" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value={Role.STAFF}>Staff</SelectItem>
-                                    <SelectItem value={Role.TEAM_LEADER}>Team Leader</SelectItem>
-                                    <SelectItem value={Role.HR_MANAGER}>HR Manager</SelectItem>
-                                    <SelectItem value={Role.ADMIN}>Admin</SelectItem>
+                                    <SelectItem value={Role.STAFF}>
+                                        Staff
+                                    </SelectItem>
+                                    <SelectItem value={Role.TEAM_LEADER}>
+                                        Team Leader
+                                    </SelectItem>
+                                    <SelectItem value={Role.HR_MANAGER}>
+                                        HR Manager
+                                    </SelectItem>
+                                    <SelectItem value={Role.ADMIN}>
+                                        Admin
+                                    </SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
 
                         <div className="space-y-2">
                             <Label htmlFor="designation">
-                                Designation <span className="text-destructive">*</span>
+                                Designation{' '}
+                                <span className="text-destructive">*</span>
                             </Label>
                             <Input
                                 id="designation"
                                 placeholder="e.g., Software Engineer"
                                 value={formData.designation}
                                 onChange={(e) =>
-                                    setFormData({ ...formData, designation: e.target.value })
+                                    setFormData({
+                                        ...formData,
+                                        designation: e.target.value,
+                                    })
                                 }
                                 required
                             />
@@ -135,14 +163,18 @@ export default function SendInvitation() {
                                 placeholder="e.g., Engineering"
                                 value={formData.department}
                                 onChange={(e) =>
-                                    setFormData({ ...formData, department: e.target.value })
+                                    setFormData({
+                                        ...formData,
+                                        department: e.target.value,
+                                    })
                                 }
                             />
                         </div>
 
                         <div className="space-y-2">
                             <Label htmlFor="salary">
-                                Salary <span className="text-destructive">*</span>
+                                Salary{' '}
+                                <span className="text-destructive">*</span>
                             </Label>
                             <Input
                                 id="salary"
@@ -150,7 +182,10 @@ export default function SendInvitation() {
                                 placeholder="50000"
                                 value={formData.salary}
                                 onChange={(e) =>
-                                    setFormData({ ...formData, salary: e.target.value })
+                                    setFormData({
+                                        ...formData,
+                                        salary: e.target.value,
+                                    })
                                 }
                                 required
                             />
@@ -163,13 +198,20 @@ export default function SendInvitation() {
                                 placeholder="Optional"
                                 value={formData.branchId}
                                 onChange={(e) =>
-                                    setFormData({ ...formData, branchId: e.target.value })
+                                    setFormData({
+                                        ...formData,
+                                        branchId: e.target.value,
+                                    })
                                 }
                             />
                         </div>
                     </div>
 
-                    <Button type="submit" disabled={isLoading} className="w-full md:w-auto">
+                    <Button
+                        type="submit"
+                        disabled={isLoading}
+                        className="w-full md:w-auto"
+                    >
                         {isLoading ? 'Sending...' : 'Send Invitation'}
                     </Button>
                 </form>

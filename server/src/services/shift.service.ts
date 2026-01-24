@@ -1,5 +1,5 @@
 import { Types } from 'mongoose';
-import { Role } from '../consonants/role.js';
+import { Role } from '../constants/role.js';
 import ShiftModel from '../models/shift.model.js';
 import StaffModel from '../models/staff.model.js';
 import type { IShift } from '../types/shift.type.js';
@@ -34,7 +34,7 @@ async function getMyShiftFromDB(userId: string) {
 const createShift = async (
     payload: IShift,
     userId: string,
-    userRole: string
+    userRole: string,
 ) => {
     let branchId: any = null;
 
@@ -99,7 +99,7 @@ const updateShift = async (
     id: string,
     payload: Partial<IShift>,
     userId: string,
-    userRole: string
+    userRole: string,
 ) => {
     let query: any = { _id: id };
 

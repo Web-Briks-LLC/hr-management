@@ -18,7 +18,7 @@ import { returnFileFormatRoute } from './return-file-format.route.js';
 import { earningRoute } from './earning.route.js';
 import { metadataRoute } from './metadata.route.js';
 import { profitShareRoute } from './profit-share.route.js';
-import { debitRoute } from './debitRoutes.js';
+import { debitRoute } from './debit.route.js';
 import invoiceRoute from './invoice.route.js';
 import { leaveRoute } from './leave.route.js';
 import { noticeRoute } from './notice.route.js';

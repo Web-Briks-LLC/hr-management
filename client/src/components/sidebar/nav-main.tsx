@@ -10,10 +10,10 @@ import {
 } from '@/components/ui/sidebar';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { sidebarGroups } from '@/consonants/sidebar';
+import { sidebarGroups } from '@/constants/sidebar';
 import { useSession } from '@/lib/auth-client';
 import { Skeleton } from '../ui/skeleton';
-import { Role } from '@/consonants/role';
+import { Role } from '@/constants/role';
 import Link from 'next/link';
 
 export function NavMain() {
@@ -43,7 +43,7 @@ export function NavMain() {
         .map((group) => ({
             ...group,
             items: group.items.filter((item) =>
-                userRole ? item.access.includes(userRole) : false
+                userRole ? item.access.includes(userRole) : false,
             ),
         }))
         .filter((group) => group.items.length > 0);
@@ -63,7 +63,7 @@ export function NavMain() {
                                         tooltip={item.title}
                                         className={cn(
                                             pathname.startsWith(item.url) &&
-                                            'bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground'
+                                                'bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground',
                                         )}
                                         asChild
                                     >

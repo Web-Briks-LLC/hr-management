@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import ClientController from '../controllers/client.controller.js';
 import { authorize } from '../middlewares/authorize.js';
-import { Role } from '../consonants/role.js';
+import { Role } from '../constants/role.js';
 
 const router: Router = Router();
 
@@ -14,14 +14,14 @@ router.get('/', authorize(...allowedRoles), ClientController.getAllClients);
 router.get(
     '/check-id/:clientId',
     authorize(...allowedRoles),
-    ClientController.checkClientId
+    ClientController.checkClientId,
 );
 
 // Get client stats (must be before :id route)
 router.get(
     '/:id/stats',
     authorize(...allowedRoles),
-    ClientController.getClientStats
+    ClientController.getClientStats,
 );
 
 // Get client by ID
@@ -37,7 +37,7 @@ router.patch('/:id', authorize(...allowedRoles), ClientController.updateClient);
 router.delete(
     '/:id',
     authorize(...allowedRoles),
-    ClientController.deleteClient
+    ClientController.deleteClient,
 );
 
 export const clientRoute = router;

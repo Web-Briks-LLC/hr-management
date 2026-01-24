@@ -8,7 +8,7 @@ import type {
 
 // Build match stage from query params
 const buildMatchStage = (
-    params: ClientQueryParams
+    params: ClientQueryParams,
 ): Record<string, unknown> => {
     const match: Record<string, unknown> = {};
 
@@ -47,7 +47,7 @@ const generateSuggestedIds = async (baseId: string): Promise<string[]> => {
             currentNum++;
             const suggestedId = `${prefix}${String(currentNum).padStart(
                 numLength,
-                '0'
+                '0',
             )}`;
             const exists = await ClientModel.findOne({ clientId: suggestedId });
             if (!exists) {
@@ -75,7 +75,7 @@ const generateSuggestedIds = async (baseId: string): Promise<string[]> => {
 // Check if client ID exists
 const checkClientIdExists = async (
     clientId: string,
-    excludeId?: string
+    excludeId?: string,
 ): Promise<boolean> => {
     const query: Record<string, unknown> = { clientId };
     if (excludeId) {
@@ -87,7 +87,7 @@ const checkClientIdExists = async (
 
 // Check client ID availability and return suggestions if taken
 const checkClientIdAvailability = async (
-    clientId: string
+    clientId: string,
 ): Promise<{ available: boolean; suggestions?: string[] }> => {
     const exists = await checkClientIdExists(clientId);
     if (exists) {
@@ -190,7 +190,7 @@ class ClientIdExistsError extends Error {
 
 // Create client
 const createClientInDB = async (
-    payload: CreateClientInput & { createdBy: string }
+    payload: CreateClientInput & { createdBy: string },
 ) => {
     // Check if client ID already exists
     const clientIdExists = await checkClientIdExists(payload.clientId);
@@ -198,7 +198,7 @@ const createClientInDB = async (
         const suggestions = await generateSuggestedIds(payload.clientId);
         throw new ClientIdExistsError(
             `Client ID "${payload.clientId}" already exists`,
-            suggestions
+            suggestions,
         );
     }
 
@@ -236,7 +236,7 @@ const updateClientInDB = async (id: string, payload: UpdateClientInput) => {
             const suggestions = await generateSuggestedIds(payload.clientId);
             throw new ClientIdExistsError(
                 `Client ID "${payload.clientId}" already exists`,
-                suggestions
+                suggestions,
             );
         }
     }
@@ -267,13 +267,12 @@ const deleteClientFromDB = async (id: string) => {
 // Get client financial stats
 const getClientStatsFromDB = async (clientId: string) => {
     const { default: OrderModel } = await import('../models/order.model.js');
-    const { default: EarningModel } = await import(
-        '../models/earning.model.js'
-    );
+    const { default: EarningModel } =
+        await import('../models/earning.model.js');
 
     const clientObjectId = new Types.ObjectId(clientId);
 
-    // Get total orders count and total amount from orders
+    // Get total orders count, total amount, and total images from orders
     const orderStats = await OrderModel.aggregate([
         { $match: { clientId: clientObjectId } },
         {
@@ -281,30 +280,36 @@ const getClientStatsFromDB = async (clientId: string) => {
                 _id: null,
                 totalOrders: { $sum: 1 },
                 totalAmount: { $sum: '$totalPrice' },
+                totalImages: { $sum: '$imageQuantity' },
             },
         },
     ]);
 
-    // Get total paid amount from earnings
+    // Get total paid amount and total BDT from earnings
     const earningStats = await EarningModel.aggregate([
         { $match: { clientId: clientObjectId } },
         {
             $group: {
                 _id: null,
                 paidAmount: { $sum: '$amount' },
+                totalBDT: { $sum: '$amountInBDT' },
             },
         },
     ]);
 
     const totalOrders = orderStats[0]?.totalOrders || 0;
     const totalAmount = orderStats[0]?.totalAmount || 0;
+    const totalImages = orderStats[0]?.totalImages || 0;
     const paidAmount = earningStats[0]?.paidAmount || 0;
+    const totalBDT = earningStats[0]?.totalBDT || 0;
     const dueAmount = totalAmount - paidAmount;
 
     return {
         totalOrders,
         totalAmount,
+        totalImages,
         paidAmount,
+        totalBDT,
         dueAmount: Math.max(0, dueAmount), // Ensure due is not negative
     };
 };

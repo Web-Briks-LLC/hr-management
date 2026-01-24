@@ -12,7 +12,7 @@ import {
     DialogTrigger,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Role } from '@/consonants/role';
+import { Role } from '@/constants/role';
 import { useSession } from '@/lib/auth-client';
 import { useGetAllShiftsQuery } from '@/redux/features/shift/shiftApi';
 import { useGetStaffsQuery } from '@/redux/features/staff/staffApi';
@@ -49,7 +49,7 @@ const shiftAssignSchema = z.object({
         .date()
         .refine(
             (date) => date >= new Date(new Date().setHours(0, 0, 0, 0)),
-            'Start date must be today or later'
+            'Start date must be today or later',
         ),
 });
 
@@ -68,7 +68,7 @@ export default function AssignShift() {
         isFetching: isStaffsFetching,
     } = useGetStaffsQuery(
         {},
-        { skip: !session || session.user.role === Role.STAFF }
+        { skip: !session || session.user.role === Role.STAFF },
     );
 
     const {
@@ -77,7 +77,7 @@ export default function AssignShift() {
         isFetching: isShiftsFetching,
     } = useGetAllShiftsQuery(
         {},
-        { skip: !session || session.user.role === Role.STAFF }
+        { skip: !session || session.user.role === Role.STAFF },
     );
 
     const [assignShift, { isLoading: isAssigning }] = useAssignShiftMutation();
@@ -103,7 +103,7 @@ export default function AssignShift() {
 
     const handleAddStaff = (staffId: string) => {
         const staff = staffsData?.staffs?.find(
-            (s: IStaff) => s._id === staffId
+            (s: IStaff) => s._id === staffId,
         );
 
         if (staff && !selectedStaffs.find((s) => s._id === staffId)) {
@@ -113,7 +113,7 @@ export default function AssignShift() {
 
             form.setValue(
                 'staffIds',
-                newStaffs.map((s) => s._id)
+                newStaffs.map((s) => s._id),
             );
         }
     };
@@ -125,7 +125,7 @@ export default function AssignShift() {
 
         form.setValue(
             'staffIds',
-            newStaffs.map((s) => s._id)
+            newStaffs.map((s) => s._id),
         );
     };
 
@@ -137,7 +137,7 @@ export default function AssignShift() {
                 startDate: data.startDate.toISOString(),
             }).unwrap();
 
-            console.log(result)
+            console.log(result);
 
             if (result.success) {
                 toast.success(result.message);
@@ -234,8 +234,8 @@ export default function AssignShift() {
                                                 (staff: IStaff) =>
                                                     !selectedStaffs.find(
                                                         (s) =>
-                                                            s._id === staff._id
-                                                    )
+                                                            s._id === staff._id,
+                                                    ),
                                             )
                                             .map((staff: IStaff) => (
                                                 <SelectItem
@@ -254,7 +254,7 @@ export default function AssignShift() {
                                                                 {getInitials(
                                                                     staff.user
                                                                         ?.name ||
-                                                                        'U'
+                                                                        'U',
                                                                 )}
                                                             </AvatarFallback>
                                                         </Avatar>
@@ -318,7 +318,7 @@ export default function AssignShift() {
                                                     <AvatarFallback>
                                                         {getInitials(
                                                             staff.user?.name ||
-                                                                'U'
+                                                                'U',
                                                         )}
                                                     </AvatarFallback>
                                                 </Avatar>
@@ -331,7 +331,7 @@ export default function AssignShift() {
                                                     size="icon"
                                                     onClick={() =>
                                                         handleRemoveStaff(
-                                                            staff._id
+                                                            staff._id,
                                                         )
                                                     }
                                                 >

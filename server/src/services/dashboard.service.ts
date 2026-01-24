@@ -6,7 +6,7 @@ import EarningModel from '../models/earning.model.js';
 import ExpenseModel from '../models/expense.model.js';
 import OrderModel from '../models/order.model.js';
 import { client } from '../lib/db.js';
-import { Role } from '../consonants/role.js';
+import { Role } from '../constants/role.js';
 import envConfig from '../config/env.config.js';
 import type {
     IDashboardStats,
@@ -92,14 +92,14 @@ const getTodayAttendanceOverview = async (): Promise<IAttendanceOverview> => {
 
     const total = attendanceRecords.length;
     const present = attendanceRecords.filter(
-        (r) => r.status === 'present' || r.status === 'late'
+        (r) => r.status === 'present' || r.status === 'late',
     ).length;
     const absent = attendanceRecords.filter(
-        (r) => r.status === 'absent'
+        (r) => r.status === 'absent',
     ).length;
     const late = attendanceRecords.filter((r) => r.status === 'late').length;
     const onLeave = attendanceRecords.filter(
-        (r) => r.status === 'on_leave'
+        (r) => r.status === 'on_leave',
     ).length;
 
     const presentPercentage = total > 0 ? (present / total) * 100 : 0;
@@ -130,13 +130,13 @@ const getMonthlyAttendanceStats =
 
         const totalWorkingDays = attendanceRecords.length;
         const totalPresent = attendanceRecords.filter(
-            (r) => r.status === 'present' || r.status === 'late'
+            (r) => r.status === 'present' || r.status === 'late',
         ).length;
         const totalAbsent = attendanceRecords.filter(
-            (r) => r.status === 'absent'
+            (r) => r.status === 'absent',
         ).length;
         const totalLate = attendanceRecords.filter(
-            (r) => r.status === 'late'
+            (r) => r.status === 'late',
         ).length;
 
         const averageAttendance =
@@ -158,13 +158,13 @@ const getOvertimeSummary = async (): Promise<IOvertimeSummary> => {
 
     const total = overtimeRecords.length;
     const pending = overtimeRecords.filter(
-        (r) => r.status === 'pending'
+        (r) => r.status === 'pending',
     ).length;
     const approved = overtimeRecords.filter(
-        (r) => r.status === 'approved'
+        (r) => r.status === 'approved',
     ).length;
     const rejected = overtimeRecords.filter(
-        (r) => r.status === 'rejected'
+        (r) => r.status === 'rejected',
     ).length;
 
     // Completed is not a valid status in IOvertime, so we'll count approved as completed
@@ -172,7 +172,7 @@ const getOvertimeSummary = async (): Promise<IOvertimeSummary> => {
 
     const totalMinutes = overtimeRecords.reduce(
         (sum, r) => sum + (r.durationMinutes || 0),
-        0
+        0,
     );
     const totalHours = Math.round((totalMinutes / 60) * 100) / 100;
 

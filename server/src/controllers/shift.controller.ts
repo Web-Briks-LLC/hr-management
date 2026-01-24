@@ -18,7 +18,6 @@ async function getMyShift(req: Request, res: Response) {
             shift,
         });
     } catch (error) {
-        console.log(error)
         return res.status(500).json({
             success: false,
             message: (error as Error).message,
@@ -94,7 +93,7 @@ const updateShift = async (req: Request, res: Response) => {
             id,
             req.body,
             userId,
-            userRole
+            userRole,
         );
 
         return res.status(200).json({

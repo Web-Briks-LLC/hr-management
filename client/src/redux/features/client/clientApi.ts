@@ -67,7 +67,9 @@ export const clientApi = apiSlice.injectEndpoints({
             {
                 totalOrders: number;
                 totalAmount: number;
+                totalImages: number;
                 paidAmount: number;
+                totalBDT: number;
                 dueAmount: number;
             },
             string
@@ -80,7 +82,9 @@ export const clientApi = apiSlice.injectEndpoints({
                 data: {
                     totalOrders: number;
                     totalAmount: number;
+                    totalImages: number;
                     paidAmount: number;
+                    totalBDT: number;
                     dueAmount: number;
                 };
             }) => response.data,

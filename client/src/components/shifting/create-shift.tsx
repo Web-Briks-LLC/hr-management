@@ -13,7 +13,7 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Role } from '@/consonants/role';
+import { Role } from '@/constants/role';
 import { useSession } from '@/lib/auth-client';
 import { toast } from 'sonner';
 import { Plus } from 'lucide-react';
@@ -159,7 +159,7 @@ export default function CreateShift() {
                             onChange={(e) =>
                                 form.setValue(
                                     'code',
-                                    e.target.value.toUpperCase()
+                                    e.target.value.toUpperCase(),
                                 )
                             }
                         />
@@ -184,14 +184,16 @@ export default function CreateShift() {
                                         <SelectValue placeholder="Select branch" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {branchData?.branches?.map((b: IBranch) => (
-                                            <SelectItem
-                                                key={b._id}
-                                                value={b._id}
-                                            >
-                                                {b.name}
-                                            </SelectItem>
-                                        ))}
+                                        {branchData?.branches?.map(
+                                            (b: IBranch) => (
+                                                <SelectItem
+                                                    key={b._id}
+                                                    value={b._id}
+                                                >
+                                                    {b.name}
+                                                </SelectItem>
+                                            ),
+                                        )}
                                     </SelectContent>
                                 </Select>
                             )}
@@ -243,12 +245,12 @@ export default function CreateShift() {
                                             onClick={() => {
                                                 const updated =
                                                     field.value.includes(
-                                                        day.value
+                                                        day.value,
                                                     )
                                                         ? field.value.filter(
                                                               (d) =>
                                                                   d !==
-                                                                  day.value
+                                                                  day.value,
                                                           )
                                                         : [
                                                               ...field.value,

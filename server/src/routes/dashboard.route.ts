@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import DashboardController from '../controllers/dashboard.controller.js';
 import { authorize } from '../middlewares/authorize.js';
-import { Role } from '../consonants/role.js';
+import { Role } from '../constants/role.js';
 
 const router: Router = Router();
 
@@ -9,7 +9,7 @@ const router: Router = Router();
 router.get(
     '/admin',
     authorize(Role.SUPER_ADMIN, Role.ADMIN, Role.HR_MANAGER),
-    DashboardController.getAdminDashboard
+    DashboardController.getAdminDashboard,
 );
 
 export const dashboardRoute = router;

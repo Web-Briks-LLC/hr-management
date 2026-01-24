@@ -245,10 +245,6 @@ async function updateOrderStatus(req: Request, res: Response) {
         const { status, note } = req.body;
         const userId = req.user?.id;
 
-        console.log('updateOrderStatus - id:', id);
-        console.log('updateOrderStatus - body:', req.body);
-        console.log('updateOrderStatus - status:', status);
-
         if (!id) {
             return res.status(400).json({ message: 'Order ID is required' });
         }
@@ -265,7 +261,7 @@ async function updateOrderStatus(req: Request, res: Response) {
             id,
             status,
             userId,
-            note
+            note,
         );
 
         if (!order) {
@@ -307,7 +303,7 @@ async function extendDeadline(req: Request, res: Response) {
             id,
             new Date(newDeadline),
             reason || 'Deadline extended',
-            userId
+            userId,
         );
 
         if (!order) {
@@ -386,7 +382,7 @@ async function getOrdersByClient(req: Request, res: Response) {
 
         const orders = await orderService.getOrdersByClientFromDB(
             clientId,
-            limit ? parseInt(limit as string) : 10
+            limit ? parseInt(limit as string) : 10,
         );
 
         return res.status(200).json({

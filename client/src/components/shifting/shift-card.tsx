@@ -31,7 +31,7 @@ import { useUpdateShiftMutation } from '@/redux/features/shift/shiftApi';
 import UpdateShift from './update-shift';
 import { IShift } from '@/types/shift.type';
 import { useSession } from '@/lib/auth-client';
-import { Role } from '@/consonants/role';
+import { Role } from '@/constants/role';
 import ShiftDeleteAlert from './shift-delete-alert';
 
 interface ShiftCardProps {

@@ -14,7 +14,7 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Role } from '@/consonants/role';
+import { Role } from '@/constants/role';
 import { useSession } from '@/lib/auth-client';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { IconPlus } from '@tabler/icons-react';
@@ -83,9 +83,7 @@ export default function CreateBranch() {
     return (
         <Dialog open={!!open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button
-                    disabled={isLoading || !canCreate}
-                >
+                <Button disabled={isLoading || !canCreate}>
                     <IconPlus />
                     New Branch
                 </Button>
@@ -122,7 +120,7 @@ export default function CreateBranch() {
                             onChange={(e) =>
                                 form.setValue(
                                     'code',
-                                    e.target.value.toUpperCase()
+                                    e.target.value.toUpperCase(),
                                 )
                             }
                         />

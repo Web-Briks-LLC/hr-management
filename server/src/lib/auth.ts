@@ -3,7 +3,7 @@ import { mongodbAdapter } from 'better-auth/adapters/mongodb';
 import { client } from './db.js';
 import { sendMail } from './nodemailer.js';
 import envConfig from '../config/env.config.js';
-import { Role } from '../consonants/role.js';
+import { Role } from '../constants/role.js';
 
 const { db_name, better_auth_secret, trusted_origins } = envConfig;
 const mongoClient = await client();
@@ -47,7 +47,7 @@ export const auth = betterAuth({
             } catch (error) {
                 console.error(
                     `[Auth] Failed to send reset password email to ${data.user.email}:`,
-                    error
+                    error,
                 );
             }
         },

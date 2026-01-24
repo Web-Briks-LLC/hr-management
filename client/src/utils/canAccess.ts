@@ -1,6 +1,6 @@
-import { Role } from '@/consonants/role';
+import { Role } from '@/constants/role';
 import { generateRouteAccess } from './generateRouteAccess';
-import { blockedRoute } from '@/consonants/blocked-route';
+import { blockedRoute } from '@/constants/blocked-route';
 
 export function canAccess(userRole: Role, pathname: string): boolean {
     const autoMap = generateRouteAccess();
@@ -13,7 +13,7 @@ export function canAccess(userRole: Role, pathname: string): boolean {
     const matchedRoute = Object.keys(routeAccessMap)
         .sort((a, b) => b.length - a.length)
         .find(
-            (route) => pathname === route || pathname.startsWith(route + '/')
+            (route) => pathname === route || pathname.startsWith(route + '/'),
         );
 
     if (!matchedRoute) return true;
