@@ -264,17 +264,62 @@ const deleteClientFromDB = async (id: string) => {
     return result;
 };
 
-// Get client financial stats
-const getClientStatsFromDB = async (clientId: string) => {
+// Get client financial stats with optional filters
+interface ClientStatsFilters {
+    month?: number | undefined;
+    year?: number | undefined;
+    status?: string | undefined;
+    priority?: string | undefined;
+    search?: string | undefined;
+}
+
+const getClientStatsFromDB = async (
+    clientId: string,
+    filters?: ClientStatsFilters,
+) => {
     const { default: OrderModel } = await import('../models/order.model.js');
     const { default: EarningModel } =
         await import('../models/earning.model.js');
 
     const clientObjectId = new Types.ObjectId(clientId);
 
+    // Build order match query
+    const orderMatch: Record<string, unknown> = { clientId: clientObjectId };
+
+    // Add date filters
+    if (filters?.month || filters?.year) {
+        const dateConditions: Record<string, unknown>[] = [];
+        if (filters.month) {
+            dateConditions.push({
+                $eq: [{ $month: '$orderDate' }, filters.month],
+            });
+        }
+        if (filters.year) {
+            dateConditions.push({
+                $eq: [{ $year: '$orderDate' }, filters.year],
+            });
+        }
+        orderMatch.$expr = { $and: dateConditions };
+    }
+
+    // Add status filter
+    if (filters?.status) {
+        orderMatch.status = filters.status;
+    }
+
+    // Add priority filter
+    if (filters?.priority) {
+        orderMatch.priority = filters.priority;
+    }
+
+    // Add search filter
+    if (filters?.search) {
+        orderMatch.orderName = { $regex: filters.search, $options: 'i' };
+    }
+
     // Get total orders count, total amount, and total images from orders
     const orderStats = await OrderModel.aggregate([
-        { $match: { clientId: clientObjectId } },
+        { $match: orderMatch },
         {
             $group: {
                 _id: null,
@@ -285,9 +330,18 @@ const getClientStatsFromDB = async (clientId: string) => {
         },
     ]);
 
-    // Get total paid amount and total BDT from earnings
+    // Get order IDs that match the filters for earning lookup
+    const matchingOrderIds = await OrderModel.find(orderMatch).select('_id');
+    const orderIdList = matchingOrderIds.map((o) => o._id);
+
+    // Get total paid amount and total BDT from earnings for matching orders
+    const earningMatch: Record<string, unknown> = {
+        clientId: clientObjectId,
+        orderId: { $in: orderIdList },
+    };
+
     const earningStats = await EarningModel.aggregate([
-        { $match: { clientId: clientObjectId } },
+        { $match: earningMatch },
         {
             $group: {
                 _id: null,

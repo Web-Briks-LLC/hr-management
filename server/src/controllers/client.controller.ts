@@ -95,7 +95,7 @@ const createClient = async (req: Request, res: Response) => {
                 errors: {
                     clientId: [
                         `${error.message}. Try: ${error.suggestions.join(
-                            ', '
+                            ', ',
                         )}`,
                     ],
                 },
@@ -130,7 +130,7 @@ const updateClient = async (req: Request, res: Response) => {
 
         const result = await ClientServices.updateClientInDB(
             id,
-            validationResult.data
+            validationResult.data,
         );
         if (!result) {
             res.status(404).json({
@@ -154,7 +154,7 @@ const updateClient = async (req: Request, res: Response) => {
                 errors: {
                     clientId: [
                         `${error.message}. Try: ${error.suggestions.join(
-                            ', '
+                            ', ',
                         )}`,
                     ],
                 },
@@ -228,7 +228,20 @@ const getClientStats = async (req: Request, res: Response) => {
         const { id } = req.params;
         if (!id) throw new Error('Client ID is required');
 
-        const result = await ClientServices.getClientStatsFromDB(id);
+        // Extract filter parameters from query
+        const filters = {
+            month: req.query.month
+                ? parseInt(req.query.month as string)
+                : undefined,
+            year: req.query.year
+                ? parseInt(req.query.year as string)
+                : undefined,
+            status: req.query.status as string | undefined,
+            priority: req.query.priority as string | undefined,
+            search: req.query.search as string | undefined,
+        };
+
+        const result = await ClientServices.getClientStatsFromDB(id, filters);
         res.status(200).json({
             success: true,
             data: result,

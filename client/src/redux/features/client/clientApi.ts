@@ -72,11 +72,19 @@ export const clientApi = apiSlice.injectEndpoints({
                 totalBDT: number;
                 dueAmount: number;
             },
-            string
+            {
+                clientId: string;
+                month?: number;
+                year?: number;
+                status?: string;
+                priority?: string;
+                search?: string;
+            }
         >({
-            query: (clientId) => ({
+            query: ({ clientId, ...filters }) => ({
                 url: `/clients/${clientId}/stats`,
                 method: 'GET',
+                params: filters,
             }),
             transformResponse: (response: {
                 data: {

@@ -119,8 +119,14 @@ export default function ClientDetailsPage() {
     // Queries
     const { data: client, isLoading: isLoadingClient } =
         useGetClientByIdQuery(clientId);
-    const { data: stats, isLoading: isLoadingStats } =
-        useGetClientStatsQuery(clientId);
+    const { data: stats, isLoading: isLoadingStats } = useGetClientStatsQuery({
+        clientId,
+        month: selectedMonth ? parseInt(selectedMonth) : undefined,
+        year: selectedYear ? parseInt(selectedYear) : undefined,
+        status: selectedStatus || undefined,
+        priority: selectedPriority || undefined,
+        search: search || undefined,
+    });
     const { data: yearsData } = useGetOrderYearsQuery();
     const {
         data: ordersData,
