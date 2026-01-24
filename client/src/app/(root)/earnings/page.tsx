@@ -56,6 +56,8 @@ import {
     Loader2,
     ChevronLeft,
     ChevronRight,
+    ChevronsLeft,
+    ChevronsRight,
     Eye,
     Clock,
     CheckCircle2,
@@ -120,13 +122,15 @@ const YEARS = Array.from({ length: 5 }, (_, i) => currentYear - i);
 
 export default function EarningsPage() {
     const [page, setPage] = useState(1);
+    const [limit, setLimit] = useState(20);
+    const perPageOptions = [10, 20, 50, 100];
     const [filterType, setFilterType] = useState<FilterType>('all');
     const [statusFilter, setStatusFilter] = useState<EarningStatus | 'all'>(
-        'all'
+        'all',
     );
     const [clientFilter, setClientFilter] = useState<string>('all');
     const [selectedMonth, setSelectedMonth] = useState(
-        new Date().getMonth() + 1
+        new Date().getMonth() + 1,
     );
     const [selectedYear, setSelectedYear] = useState(currentYear);
     const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>({});
@@ -138,7 +142,7 @@ export default function EarningsPage() {
     const [isBulkWithdrawDialogOpen, setIsBulkWithdrawDialogOpen] =
         useState(false);
     const [selectedEarning, setSelectedEarning] = useState<IEarning | null>(
-        null
+        null,
     );
 
     // Withdraw form state
@@ -158,7 +162,7 @@ export default function EarningsPage() {
 
     // Build filters
     const filters = useMemo<EarningFilters>(() => {
-        const f: EarningFilters = { page, limit: 20 };
+        const f: EarningFilters = { page, limit };
 
         if (statusFilter !== 'all') f.status = statusFilter;
 
@@ -193,6 +197,7 @@ export default function EarningsPage() {
         return f;
     }, [
         page,
+        limit,
         filterType,
         statusFilter,
         clientFilter,
@@ -208,7 +213,7 @@ export default function EarningsPage() {
         isFetching,
     } = useGetEarningsQuery(filters);
     const { data: statsData, isLoading: isLoadingStats } =
-        useGetEarningStatsQuery(filterType !== 'all' ? filters : undefined);
+        useGetEarningStatsQuery(filters);
     const { data: clientsData } = useGetClientsQuery({ limit: 100 });
     const { data: ratesData } = useGetCurrencyRatesQuery({
         month: bulkMonth,
@@ -268,7 +273,7 @@ export default function EarningsPage() {
     // Get rate from currency rates or default
     const getRateForCurrency = (currency: string): number => {
         const rate = ratesData?.data?.rates?.find(
-            (r) => r.currency === currency
+            (r) => r.currency === currency,
         );
         return rate?.rate || 120;
     };
@@ -292,9 +297,11 @@ export default function EarningsPage() {
 
     const formatCurrency = (amount: number, curr: string = 'BDT') => {
         if (curr === 'BDT') {
-            return `৳${amount.toLocaleString('en-BD', {
-                minimumFractionDigits: 2,
-            })}`;
+            return new Intl.NumberFormat('bn-BD', {
+                style: 'currency',
+                currency: 'BDT',
+                maximumFractionDigits: 0,
+            }).format(amount);
         }
         const symbol = CURRENCY_SYMBOLS[curr] || '$';
         return `${symbol}${amount.toFixed(2)}`;
@@ -335,7 +342,7 @@ export default function EarningsPage() {
 
     const handleStatusChange = async (
         earning: IEarning,
-        newStatus: EarningStatus
+        newStatus: EarningStatus,
     ) => {
         if (newStatus === 'paid' && earning.status === 'unpaid') {
             handleWithdraw(earning);
@@ -391,7 +398,7 @@ export default function EarningsPage() {
             }).unwrap();
 
             toast.success(
-                `${bulkOrdersData.orders.length} earnings withdrawn successfully`
+                `${bulkOrdersData.orders.length} earnings withdrawn successfully`,
             );
             setIsBulkWithdrawDialogOpen(false);
             setBulkClientId('');
@@ -428,48 +435,113 @@ export default function EarningsPage() {
                     </p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-                    <StatsCard
-                        title="Unpaid Earnings"
-                        value={stats?.filteredUnpaidCount || 0}
-                        amount={formatCurrency(
-                            stats?.filteredUnpaidAmount || 0,
-                            'USD'
-                        )}
-                        icon={Clock}
-                        color="text-orange-500"
-                        bg="bg-orange-500/10"
-                        isLoading={isLoadingStats}
-                    />
-                    <StatsCard
-                        title="Paid Earnings"
-                        value={stats?.filteredPaidCount || 0}
-                        amount={formatCurrency(
-                            stats?.filteredPaidAmount || 0,
-                            'USD'
-                        )}
-                        icon={CheckCircle2}
-                        color="text-green-500"
-                        bg="bg-green-500/10"
-                        isLoading={isLoadingStats}
-                    />
-                    <StatsCard
-                        title="Paid (BDT)"
-                        amount={formatCurrency(stats?.filteredPaidBDT || 0)}
-                        icon={TrendingUp}
-                        color="text-blue-500"
-                        bg="bg-blue-500/10"
-                        isLoading={isLoadingStats}
-                    />
-                    <StatsCard
-                        title="Total Paid (Lifetime)"
-                        amount={formatCurrency(stats?.totalPaidBDT || 0)}
-                        subtext={`${stats?.totalPaidCount || 0} transactions`}
-                        icon={Wallet}
-                        color="text-purple-500"
-                        bg="bg-purple-500/10"
-                        isLoading={isLoadingStats}
-                    />
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {/* Total Earnings Card */}
+                    <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-slate-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-slate-500/5 hover:border-slate-500/30">
+                        <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-slate-500/10 blur-2xl transition-all duration-300 group-hover:bg-slate-500/20" />
+                        <div className="relative">
+                            <div className="flex items-center justify-between mb-3">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-500/10 text-slate-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-slate-500/20">
+                                    <DollarSign className="h-5 w-5" />
+                                </div>
+                            </div>
+                            {isLoadingStats ? (
+                                <Skeleton className="h-8 w-20" />
+                            ) : (
+                                <h3 className="text-3xl font-bold tracking-tight text-slate-600 dark:text-slate-300">
+                                    {(stats?.filteredPaidCount || 0) +
+                                        (stats?.filteredUnpaidCount || 0)}
+                                </h3>
+                            )}
+                            <p className="text-xs text-muted-foreground mt-1">
+                                Total Earnings
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Unpaid Card */}
+                    <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-orange-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-orange-500/5 hover:border-orange-500/30">
+                        <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-orange-500/10 blur-2xl transition-all duration-300 group-hover:bg-orange-500/20" />
+                        <div className="relative">
+                            <div className="flex items-center justify-between mb-3">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-500/10 text-orange-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-orange-500/20">
+                                    <Clock className="h-5 w-5" />
+                                </div>
+                            </div>
+                            {isLoadingStats ? (
+                                <Skeleton className="h-8 w-24" />
+                            ) : (
+                                <>
+                                    <h3 className="text-3xl font-bold tracking-tight text-orange-600 dark:text-orange-400">
+                                        {stats?.filteredUnpaidCount || 0}
+                                    </h3>
+                                    <p className="text-sm font-medium text-orange-600/80 dark:text-orange-400/80 mt-0.5">
+                                        {formatCurrency(
+                                            stats?.filteredUnpaidAmount || 0,
+                                            'USD',
+                                        )}
+                                    </p>
+                                </>
+                            )}
+                            <p className="text-xs text-muted-foreground mt-1">
+                                Unpaid
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Paid Card */}
+                    <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-green-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-green-500/5 hover:border-green-500/30">
+                        <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-green-500/10 blur-2xl transition-all duration-300 group-hover:bg-green-500/20" />
+                        <div className="relative">
+                            <div className="flex items-center justify-between mb-3">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-500/10 text-green-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-green-500/20">
+                                    <CheckCircle2 className="h-5 w-5" />
+                                </div>
+                            </div>
+                            {isLoadingStats ? (
+                                <Skeleton className="h-8 w-24" />
+                            ) : (
+                                <>
+                                    <h3 className="text-3xl font-bold tracking-tight text-green-600 dark:text-green-400">
+                                        {stats?.filteredPaidCount || 0}
+                                    </h3>
+                                    <p className="text-sm font-medium text-green-600/80 dark:text-green-400/80 mt-0.5">
+                                        {formatCurrency(
+                                            stats?.filteredPaidAmount || 0,
+                                            'USD',
+                                        )}
+                                    </p>
+                                </>
+                            )}
+                            <p className="text-xs text-muted-foreground mt-1">
+                                Paid
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Paid BDT Card */}
+                    <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-blue-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/5 hover:border-blue-500/30">
+                        <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-blue-500/10 blur-2xl transition-all duration-300 group-hover:bg-blue-500/20" />
+                        <div className="relative">
+                            <div className="flex items-center justify-between mb-3">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/10 text-blue-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-blue-500/20">
+                                    <TrendingUp className="h-5 w-5" />
+                                </div>
+                            </div>
+                            {isLoadingStats ? (
+                                <Skeleton className="h-8 w-28" />
+                            ) : (
+                                <h3 className="text-3xl font-bold tracking-tight text-blue-600 dark:text-blue-400">
+                                    {formatCurrency(
+                                        stats?.filteredPaidBDT || 0,
+                                    )}
+                                </h3>
+                            )}
+                            <p className="text-xs text-muted-foreground mt-1">
+                                Paid BDT
+                            </p>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -606,12 +678,12 @@ export default function EarningsPage() {
                                                 <>
                                                     {format(
                                                         dateRange.from,
-                                                        'MMM dd'
+                                                        'MMM dd',
                                                     )}{' '}
                                                     -{' '}
                                                     {format(
                                                         dateRange.to,
-                                                        'MMM dd'
+                                                        'MMM dd',
                                                     )}
                                                 </>
                                             ) : (
@@ -773,7 +845,7 @@ export default function EarningsPage() {
                                             <TableCell className="whitespace-nowrap text-muted-foreground">
                                                 {format(
                                                     new Date(earning.orderDate),
-                                                    'MMM dd, yyyy'
+                                                    'MMM dd, yyyy',
                                                 )}
                                             </TableCell>
                                             <TableCell
@@ -788,7 +860,7 @@ export default function EarningsPage() {
                                             <TableCell className="text-right font-medium">
                                                 {formatCurrency(
                                                     earning.orderAmount,
-                                                    earning.currency
+                                                    earning.currency,
                                                 )}
                                             </TableCell>
                                             <TableCell>
@@ -797,7 +869,7 @@ export default function EarningsPage() {
                                                     onValueChange={(v) =>
                                                         handleStatusChange(
                                                             earning,
-                                                            v as EarningStatus
+                                                            v as EarningStatus,
                                                         )
                                                     }
                                                     disabled={isToggling}
@@ -808,7 +880,7 @@ export default function EarningsPage() {
                                                             earning.status ===
                                                                 'paid'
                                                                 ? 'text-green-600 font-medium hover:text-green-700'
-                                                                : 'text-orange-600 font-medium hover:text-orange-700'
+                                                                : 'text-orange-600 font-medium hover:text-orange-700',
                                                         )}
                                                     >
                                                         <div className="flex items-center gap-1.5">
@@ -843,7 +915,7 @@ export default function EarningsPage() {
                                                 {earning.status === 'paid' ? (
                                                     <span className="font-mono text-green-600/90 font-medium">
                                                         {formatCurrency(
-                                                            earning.amountInBDT
+                                                            earning.amountInBDT,
                                                         )}
                                                     </span>
                                                 ) : (
@@ -860,10 +932,10 @@ export default function EarningsPage() {
                                                         className="h-8 w-8 text-foreground/70 hover:text-primary"
                                                         onClick={() => {
                                                             setSelectedEarning(
-                                                                earning
+                                                                earning,
                                                             );
                                                             setIsViewDialogOpen(
-                                                                true
+                                                                true,
                                                             );
                                                         }}
                                                     >
@@ -877,7 +949,7 @@ export default function EarningsPage() {
                                                             className="h-8 w-8 text-foreground/70 hover:text-green-600"
                                                             onClick={() =>
                                                                 handleWithdraw(
-                                                                    earning
+                                                                    earning,
                                                                 )
                                                             }
                                                         >
@@ -890,10 +962,10 @@ export default function EarningsPage() {
                                                         className="h-8 w-8 text-foreground/70 hover:text-destructive"
                                                         onClick={() => {
                                                             setSelectedEarning(
-                                                                earning
+                                                                earning,
                                                             );
                                                             setIsDeleteDialogOpen(
-                                                                true
+                                                                true,
                                                             );
                                                         }}
                                                     >
@@ -909,41 +981,162 @@ export default function EarningsPage() {
                     </div>
 
                     {/* Pagination */}
-                    {meta && meta.totalPages > 1 && (
-                        <div className="flex items-center justify-between pt-2">
-                            <p className="text-sm text-muted-foreground">
-                                Showing {(page - 1) * 20 + 1} to{' '}
-                                {Math.min(page * 20, meta.total)} of{' '}
-                                {meta.total} entries
-                            </p>
-                            <div className="flex gap-2">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() =>
-                                        setPage((p) => Math.max(1, p - 1))
-                                    }
-                                    disabled={page === 1 || isFetching}
+                    {meta && (
+                        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t">
+                            <div className="flex items-center gap-2">
+                                <p className="text-sm text-muted-foreground">
+                                    Showing {(page - 1) * limit + 1} to{' '}
+                                    {Math.min(page * limit, meta.total)} of{' '}
+                                    {meta.total} entries
+                                </p>
+                                <Select
+                                    value={limit.toString()}
+                                    onValueChange={(value) => {
+                                        setLimit(parseInt(value));
+                                        setPage(1);
+                                    }}
                                 >
-                                    <ChevronLeft className="h-4 w-4 mr-1" />{' '}
-                                    Previous
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() =>
-                                        setPage((p) =>
-                                            Math.min(meta.totalPages, p + 1)
-                                        )
-                                    }
-                                    disabled={
-                                        page === meta.totalPages || isFetching
-                                    }
-                                >
-                                    Next{' '}
-                                    <ChevronRight className="h-4 w-4 ml-1" />
-                                </Button>
+                                    <SelectTrigger className="h-8 w-[70px]">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {perPageOptions.map((option) => (
+                                            <SelectItem
+                                                key={option}
+                                                value={option.toString()}
+                                            >
+                                                {option}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
+                            {meta.totalPages > 1 && (
+                                <div className="flex items-center gap-1">
+                                    <Button
+                                        variant="outline"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        onClick={() => setPage(1)}
+                                        disabled={page === 1 || isFetching}
+                                    >
+                                        <ChevronsLeft className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        onClick={() =>
+                                            setPage((p) => Math.max(1, p - 1))
+                                        }
+                                        disabled={page === 1 || isFetching}
+                                    >
+                                        <ChevronLeft className="h-4 w-4" />
+                                    </Button>
+                                    {(() => {
+                                        const totalPages = meta.totalPages;
+                                        const pageNumbers: (number | string)[] =
+                                            [];
+                                        if (totalPages <= 7) {
+                                            for (
+                                                let i = 1;
+                                                i <= totalPages;
+                                                i++
+                                            ) {
+                                                pageNumbers.push(i);
+                                            }
+                                        } else {
+                                            if (page <= 3) {
+                                                pageNumbers.push(
+                                                    1,
+                                                    2,
+                                                    3,
+                                                    4,
+                                                    '...',
+                                                    totalPages,
+                                                );
+                                            } else if (page >= totalPages - 2) {
+                                                pageNumbers.push(
+                                                    1,
+                                                    '...',
+                                                    totalPages - 3,
+                                                    totalPages - 2,
+                                                    totalPages - 1,
+                                                    totalPages,
+                                                );
+                                            } else {
+                                                pageNumbers.push(
+                                                    1,
+                                                    '...',
+                                                    page - 1,
+                                                    page,
+                                                    page + 1,
+                                                    '...',
+                                                    totalPages,
+                                                );
+                                            }
+                                        }
+                                        return pageNumbers.map((num, idx) =>
+                                            num === '...' ? (
+                                                <span
+                                                    key={`ellipsis-${idx}`}
+                                                    className="px-2 text-muted-foreground"
+                                                >
+                                                    ...
+                                                </span>
+                                            ) : (
+                                                <Button
+                                                    key={num}
+                                                    variant={
+                                                        page === num
+                                                            ? 'default'
+                                                            : 'outline'
+                                                    }
+                                                    size="icon"
+                                                    className="h-8 w-8"
+                                                    onClick={() =>
+                                                        setPage(num as number)
+                                                    }
+                                                    disabled={isFetching}
+                                                >
+                                                    {num}
+                                                </Button>
+                                            ),
+                                        );
+                                    })()}
+                                    <Button
+                                        variant="outline"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        onClick={() =>
+                                            setPage((p) =>
+                                                Math.min(
+                                                    meta.totalPages,
+                                                    p + 1,
+                                                ),
+                                            )
+                                        }
+                                        disabled={
+                                            page === meta.totalPages ||
+                                            isFetching
+                                        }
+                                    >
+                                        <ChevronRight className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        onClick={() => setPage(meta.totalPages)}
+                                        disabled={
+                                            page === meta.totalPages ||
+                                            isFetching
+                                        }
+                                    >
+                                        <ChevronsRight className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            )}
                         </div>
                     )}
                 </CardContent>
@@ -971,7 +1164,7 @@ export default function EarningsPage() {
                                     <span className="font-semibold">
                                         {formatCurrency(
                                             selectedEarning.orderAmount,
-                                            selectedEarning.currency
+                                            selectedEarning.currency,
                                         )}
                                     </span>
                                 </div>
@@ -1039,7 +1232,7 @@ export default function EarningsPage() {
                                         Net:{' '}
                                         {formatCurrency(
                                             withdrawNetAmount,
-                                            selectedEarning.currency
+                                            selectedEarning.currency,
                                         )}
                                     </span>
                                     <span>Rate: {withdrawRateNum}</span>
@@ -1138,9 +1331,9 @@ export default function EarningsPage() {
                                         <div className="font-medium">
                                             {format(
                                                 new Date(
-                                                    selectedEarning.orderDate
+                                                    selectedEarning.orderDate,
                                                 ),
-                                                'MMM dd, yyyy'
+                                                'MMM dd, yyyy',
                                             )}
                                         </div>
                                     </div>
@@ -1151,7 +1344,7 @@ export default function EarningsPage() {
                                         <div className="font-medium">
                                             {formatCurrency(
                                                 selectedEarning.orderAmount,
-                                                selectedEarning.currency
+                                                selectedEarning.currency,
                                             )}
                                         </div>
                                     </div>
@@ -1170,7 +1363,7 @@ export default function EarningsPage() {
                                                     {formatCurrency(
                                                         selectedEarning.fees +
                                                             selectedEarning.tax,
-                                                        selectedEarning.currency
+                                                        selectedEarning.currency,
                                                     )}
                                                 </div>
                                             </div>
@@ -1181,7 +1374,7 @@ export default function EarningsPage() {
                                                 <div className="font-medium">
                                                     {formatCurrency(
                                                         selectedEarning.netAmount,
-                                                        selectedEarning.currency
+                                                        selectedEarning.currency,
                                                     )}
                                                 </div>
                                             </div>
@@ -1204,9 +1397,9 @@ export default function EarningsPage() {
                                                     {selectedEarning.paidAt
                                                         ? format(
                                                               new Date(
-                                                                  selectedEarning.paidAt
+                                                                  selectedEarning.paidAt,
                                                               ),
-                                                              'P'
+                                                              'P',
                                                           )
                                                         : '-'}
                                                 </div>
@@ -1218,7 +1411,7 @@ export default function EarningsPage() {
                                             </span>
                                             <span className="text-lg font-bold text-green-700 dark:text-green-500">
                                                 {formatCurrency(
-                                                    selectedEarning.amountInBDT
+                                                    selectedEarning.amountInBDT,
                                                 )}
                                             </span>
                                         </div>
@@ -1259,7 +1452,7 @@ export default function EarningsPage() {
                             Generate and process withdrawal for{' '}
                             {format(
                                 new Date(bulkYear, bulkMonth - 1),
-                                'MMMM yyyy'
+                                'MMMM yyyy',
                             )}
                         </DialogDescription>
                     </DialogHeader>
@@ -1327,7 +1520,7 @@ export default function EarningsPage() {
                                     <SelectTrigger
                                         className={cn(
                                             'bg-background transition-colors',
-                                            !bulkClientId && 'border-dashed'
+                                            !bulkClientId && 'border-dashed',
                                         )}
                                     >
                                         <SelectValue
@@ -1352,9 +1545,9 @@ export default function EarningsPage() {
                                                     {format(
                                                         new Date(
                                                             bulkYear,
-                                                            bulkMonth - 1
+                                                            bulkMonth - 1,
                                                         ),
-                                                        'MMMM yyyy'
+                                                        'MMMM yyyy',
                                                     )}
                                                 </p>
                                             </div>
@@ -1379,7 +1572,7 @@ export default function EarningsPage() {
                                                             </Badge>
                                                         </div>
                                                     </SelectItem>
-                                                )
+                                                ),
                                             )
                                         )}
                                     </SelectContent>
@@ -1421,7 +1614,7 @@ export default function EarningsPage() {
                                                     <p className="text-2xl font-bold mt-1 text-primary">
                                                         {formatCurrency(
                                                             bulkOrdersData.totalAmount,
-                                                            bulkOrdersData.currency
+                                                            bulkOrdersData.currency,
                                                         )}
                                                     </p>
                                                 </div>
@@ -1458,7 +1651,7 @@ export default function EarningsPage() {
                                                     value={bulkFees}
                                                     onChange={(e) =>
                                                         setBulkFees(
-                                                            e.target.value
+                                                            e.target.value,
                                                         )
                                                     }
                                                     className="pl-7 bg-muted/40"
@@ -1482,7 +1675,7 @@ export default function EarningsPage() {
                                                     value={bulkTax}
                                                     onChange={(e) =>
                                                         setBulkTax(
-                                                            e.target.value
+                                                            e.target.value,
                                                         )
                                                     }
                                                     className="pl-7 bg-muted/40"
@@ -1517,7 +1710,7 @@ export default function EarningsPage() {
                                                     value={bulkRate}
                                                     onChange={(e) =>
                                                         setBulkRate(
-                                                            e.target.value
+                                                            e.target.value,
                                                         )
                                                     }
                                                     className="pl-7 bg-muted/40"
@@ -1542,12 +1735,12 @@ export default function EarningsPage() {
                                                 * Includes deductions for fees (
                                                 {formatCurrency(
                                                     bulkFeesNum,
-                                                    bulkOrdersData.currency
+                                                    bulkOrdersData.currency,
                                                 )}
                                                 ) and tax (
                                                 {formatCurrency(
                                                     bulkTaxNum,
-                                                    bulkOrdersData.currency
+                                                    bulkOrdersData.currency,
                                                 )}
                                                 )
                                             </p>
@@ -1557,7 +1750,7 @@ export default function EarningsPage() {
                                                 Net:{' '}
                                                 {formatCurrency(
                                                     bulkNetAmount,
-                                                    bulkOrdersData.currency
+                                                    bulkOrdersData.currency,
                                                 )}
                                             </div>
                                         </div>
@@ -1658,58 +1851,5 @@ export default function EarningsPage() {
                 </AlertDialogContent>
             </AlertDialog>
         </div>
-    );
-}
-
-// Stats Card Component
-function StatsCard({
-    title,
-    value,
-    amount,
-    subtext,
-    icon: Icon,
-    color,
-    bg,
-    isLoading,
-}: any) {
-    return (
-        <Card className="border-border/50 shadow-sm hover:shadow-md transition-shadow">
-            <CardContent className="p-6">
-                <div className="flex items-center justify-between space-x-4">
-                    <div className="flex items-center space-x-4">
-                        <div className={cn('p-3 rounded-full', bg)}>
-                            <Icon className={cn('h-6 w-6', color)} />
-                        </div>
-                        <div>
-                            <p className="text-sm font-medium text-muted-foreground">
-                                {title}
-                            </p>
-                            {isLoading ? (
-                                <Skeleton className="h-7 w-24 mt-1" />
-                            ) : (
-                                <div className="flex items-baseline gap-2">
-                                    <h3 className="text-2xl font-bold tracking-tight">
-                                        {amount}
-                                    </h3>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-                {value !== undefined && !isLoading && (
-                    <div className="mt-4 flex items-center text-xs text-muted-foreground">
-                        <span className={cn('font-medium', color)}>
-                            {value}
-                        </span>
-                        <span className="ml-1">pending transactions</span>
-                    </div>
-                )}
-                {subtext && !isLoading && (
-                    <div className="mt-4 flex items-center text-xs text-muted-foreground">
-                        {subtext}
-                    </div>
-                )}
-            </CardContent>
-        </Card>
     );
 }
