@@ -1,8 +1,21 @@
 'use client';
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { Pie, PieChart, Cell, Legend } from 'recharts';
+import * as React from 'react';
+import { Label, Pie, PieChart } from 'recharts';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardFooter,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
+import {
+    ChartConfig,
+    ChartContainer,
+    ChartTooltip,
+    ChartTooltipContent,
+} from '@/components/ui/chart';
 import type { AttendanceOverview } from '@/types/dashboard.type';
 
 interface AttendanceOverviewChartProps {
@@ -10,6 +23,9 @@ interface AttendanceOverviewChartProps {
 }
 
 const chartConfig = {
+    visitors: {
+        label: 'Staff',
+    },
     present: {
         label: 'Present',
         color: 'hsl(var(--chart-1))',
@@ -28,45 +44,102 @@ const chartConfig = {
     },
 } satisfies ChartConfig;
 
-export function AttendanceOverviewChart({ data }: AttendanceOverviewChartProps) {
-    const chartData = [
-        { name: 'Present', value: data.present, fill: 'hsl(var(--chart-1))' },
-        { name: 'Late', value: data.late, fill: 'hsl(var(--chart-2))' },
-        { name: 'Absent', value: data.absent, fill: 'hsl(var(--chart-3))' },
-        { name: 'On Leave', value: data.onLeave, fill: 'hsl(var(--chart-4))' },
-    ].filter((item) => item.value > 0);
+export function AttendanceOverviewChart({
+    data,
+}: AttendanceOverviewChartProps) {
+    const chartData = React.useMemo(() => {
+        return [
+            {
+                browser: 'present',
+                visitors: data.present,
+                fill: 'var(--color-present)',
+            },
+            { browser: 'late', visitors: data.late, fill: 'var(--color-late)' },
+            {
+                browser: 'absent',
+                visitors: data.absent,
+                fill: 'var(--color-absent)',
+            },
+            {
+                browser: 'onLeave',
+                visitors: data.onLeave,
+                fill: 'var(--color-onLeave)',
+            },
+        ].filter((item) => item.visitors > 0);
+    }, [data]);
+
+    const totalVisitors = React.useMemo(() => {
+        return chartData.reduce((acc, curr) => acc + curr.visitors, 0);
+    }, [chartData]);
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Today's Attendance</CardTitle>
-                <CardDescription>
-                    {data.presentPercentage.toFixed(1)}% attendance rate
-                </CardDescription>
+        <Card className="flex flex-col">
+            <CardHeader className="items-center pb-0">
+                <CardTitle>Attendance Distribution</CardTitle>
+                <CardDescription>Today's Overview</CardDescription>
             </CardHeader>
-            <CardContent>
-                <ChartContainer config={chartConfig} className="h-[300px] w-full">
+            <CardContent className="flex-1 pb-0">
+                <ChartContainer
+                    config={chartConfig}
+                    className="mx-auto aspect-square max-h-[250px]"
+                >
                     <PieChart>
-                        <ChartTooltip content={<ChartTooltipContent />} />
+                        <ChartTooltip
+                            cursor={false}
+                            content={<ChartTooltipContent hideLabel />}
+                        />
                         <Pie
                             data={chartData}
-                            cx="50%"
-                            cy="50%"
-                            labelLine={false}
-                            label={({ name, percent }) =>
-                                `${name}: ${(percent * 100).toFixed(0)}%`
-                            }
-                            outerRadius={80}
-                            dataKey="value"
+                            dataKey="visitors"
+                            nameKey="browser"
+                            innerRadius={60}
+                            strokeWidth={5}
                         >
-                            {chartData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={entry.fill} />
-                            ))}
+                            <Label
+                                content={({ viewBox }) => {
+                                    if (
+                                        viewBox &&
+                                        'cx' in viewBox &&
+                                        'cy' in viewBox
+                                    ) {
+                                        return (
+                                            <text
+                                                x={viewBox.cx}
+                                                y={viewBox.cy}
+                                                textAnchor="middle"
+                                                dominantBaseline="middle"
+                                            >
+                                                <tspan
+                                                    x={viewBox.cx}
+                                                    y={viewBox.cy}
+                                                    className="fill-foreground text-3xl font-bold"
+                                                >
+                                                    {totalVisitors.toLocaleString()}
+                                                </tspan>
+                                                <tspan
+                                                    x={viewBox.cx}
+                                                    y={(viewBox.cy || 0) + 24}
+                                                    className="fill-muted-foreground text-sm"
+                                                >
+                                                    Total Staff
+                                                </tspan>
+                                            </text>
+                                        );
+                                    }
+                                }}
+                            />
                         </Pie>
-                        <Legend />
                     </PieChart>
                 </ChartContainer>
             </CardContent>
+            <CardFooter className="flex-col gap-2 text-sm">
+                <div className="flex items-center gap-2 font-medium leading-none">
+                    Attendance Rate: {data.presentPercentage.toFixed(1)}%
+                </div>
+                <div className="leading-none text-muted-foreground">
+                    Showing total staff distribution for today
+                </div>
+            </CardFooter>
         </Card>
     );
 }

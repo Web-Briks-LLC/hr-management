@@ -1,4 +1,4 @@
- 'use client';
+'use client';
 
 import { useEffect, useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
@@ -35,7 +35,21 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
-import { Loader2, Plus } from 'lucide-react';
+import {
+    Command,
+    CommandEmpty,
+    CommandGroup,
+    CommandInput,
+    CommandItem,
+    CommandList,
+} from '@/components/ui/command';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
+import { Loader2, Plus, X, Check, ChevronsUpDown } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { DatePicker } from '@/components/shared/DatePicker';
 import { DateTimePicker } from '@/components/shared/DateTimePicker';
@@ -77,24 +91,27 @@ export function OrderForm({
     isEditMode = false,
 }: OrderFormProps) {
     const [selectedServices, setSelectedServices] = useState<string[]>(
-        defaultValues?.services || []
+        defaultValues?.services || [],
     );
     const [orderDate, setOrderDate] = useState<Date | undefined>(
-        defaultValues?.orderDate ? new Date(defaultValues.orderDate) : new Date()
+        defaultValues?.orderDate
+            ? new Date(defaultValues.orderDate)
+            : new Date(),
     );
     const [deadline, setDeadline] = useState<Date | undefined>(
-        defaultValues?.deadline ? new Date(defaultValues.deadline) : undefined
+        defaultValues?.deadline ? new Date(defaultValues.deadline) : undefined,
     );
-    const [isNewServiceDialogOpen, setIsNewServiceDialogOpen] = useState(false);
-    const [isNewFormatDialogOpen, setIsNewFormatDialogOpen] = useState(false);
+    const [isNewServiceMode, setIsNewServiceMode] = useState(false);
+    const [isNewFormatMode, setIsNewFormatMode] = useState(false);
     const [newServiceName, setNewServiceName] = useState('');
     const [newServiceDescription, setNewServiceDescription] = useState('');
     const [newFormatName, setNewFormatName] = useState('');
     const [newFormatExtension, setNewFormatExtension] = useState('');
-    
+
     // Service search with debounce
     const [serviceSearchInput, setServiceSearchInput] = useState('');
     const [debouncedServiceSearch, setDebouncedServiceSearch] = useState('');
+    const [openClient, setOpenClient] = useState(false);
 
     const {
         register,
@@ -124,12 +141,13 @@ export function OrderForm({
     });
 
     const { data: servicesData, isLoading: isLoadingServices } =
-        useGetServicesQuery({ isActive: true });
+        useGetServicesQuery({ isActive: true, limit: 1000 });
     const { data: formatsData, isLoading: isLoadingFormats } =
         useGetReturnFileFormatsQuery({ isActive: true });
     const { data: clientsData, isLoading: isLoadingClients } =
         useGetClientsQuery({ limit: 100 });
-    const { data: staffsData, isLoading: isLoadingStaffs } = useGetStaffsQuery(undefined);
+    const { data: staffsData, isLoading: isLoadingStaffs } =
+        useGetStaffsQuery(undefined);
 
     const [createService, { isLoading: isCreatingService }] =
         useCreateServiceMutation();
@@ -140,7 +158,7 @@ export function OrderForm({
     const formats = formatsData?.data || [];
     const clients = clientsData?.clients || [];
     const staffs = staffsData?.staffs || [];
-    
+
     // Debounce service search (300ms delay)
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -148,13 +166,13 @@ export function OrderForm({
         }, 300);
         return () => clearTimeout(timer);
     }, [serviceSearchInput]);
-    
+
     // Filter services based on debounced search
     const filteredServices = useMemo(() => {
         if (!debouncedServiceSearch.trim()) return services;
         const searchLower = debouncedServiceSearch.toLowerCase();
-        return services.filter((service: { name: string }) => 
-            service.name.toLowerCase().includes(searchLower)
+        return services.filter((service: { name: string }) =>
+            service.name.toLowerCase().includes(searchLower),
         );
     }, [services, debouncedServiceSearch]);
 
@@ -163,7 +181,9 @@ export function OrderForm({
     const totalPrice = watch('totalPrice');
 
     // Track which field the user is editing - 'perImage' or 'total'
-    const [priceMode, setPriceMode] = useState<'perImage' | 'total'>('perImage');
+    const [priceMode, setPriceMode] = useState<'perImage' | 'total'>(
+        'perImage',
+    );
 
     // Auto-calculate based on which field was last edited
     useEffect(() => {
@@ -183,7 +203,6 @@ export function OrderForm({
             }
         }
     }, [imageQuantity, perImagePrice, totalPrice, priceMode, setValue]);
-
 
     // Set server errors
     useEffect(() => {
@@ -220,7 +239,7 @@ export function OrderForm({
         setSelectedServices((prev) =>
             prev.includes(serviceId)
                 ? prev.filter((id) => id !== serviceId)
-                : [...prev, serviceId]
+                : [...prev, serviceId],
         );
     };
 
@@ -238,7 +257,7 @@ export function OrderForm({
             setSelectedServices((prev) => [...prev, result.data._id]);
             setNewServiceName('');
             setNewServiceDescription('');
-            setIsNewServiceDialogOpen(false);
+            setIsNewServiceMode(false);
         } catch (error: unknown) {
             const err = error as { data?: { message?: string } };
             toast.error(err?.data?.message || 'Failed to create service');
@@ -259,7 +278,7 @@ export function OrderForm({
             setValue('returnFileFormat', result.data._id);
             setNewFormatName('');
             setNewFormatExtension('');
-            setIsNewFormatDialogOpen(false);
+            setIsNewFormatMode(false);
         } catch (error: unknown) {
             const err = error as { data?: { message?: string } };
             toast.error(err?.data?.message || 'Failed to create file format');
@@ -291,24 +310,73 @@ export function OrderForm({
             </div>
 
             {/* Client */}
-            <div className="space-y-2">
+            <div className="space-y-2 flex flex-col">
                 <Label htmlFor="clientId">Client *</Label>
-                <Select
-                    value={watch('clientId')}
-                    onValueChange={(value) => setValue('clientId', value)}
-                    disabled={isLoadingClients}
-                >
-                    <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select client" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {clients.map((client) => (
-                            <SelectItem key={client._id} value={client._id}>
-                                {client.name} ({client.clientId})
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
+                <Popover open={openClient} onOpenChange={setOpenClient}>
+                    <PopoverTrigger asChild>
+                        <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={openClient}
+                            className={cn(
+                                'w-full justify-between',
+                                !watch('clientId') && 'text-muted-foreground',
+                            )}
+                            disabled={isLoadingClients}
+                        >
+                            {watch('clientId')
+                                ? clients.find(
+                                      (client) =>
+                                          client._id === watch('clientId'),
+                                  )?.name
+                                : 'Select client'}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                        <Command>
+                            <CommandInput placeholder="Search client..." />
+                            <CommandList>
+                                <CommandEmpty>No client found.</CommandEmpty>
+                                <CommandGroup>
+                                    {clients.map((client) => (
+                                        <CommandItem
+                                            key={client._id}
+                                            value={client.name}
+                                            keywords={[
+                                                client.name,
+                                                client.clientId,
+                                            ]} // Search by name and ID
+                                            onSelect={() => {
+                                                setValue(
+                                                    'clientId',
+                                                    client._id,
+                                                );
+                                                setOpenClient(false);
+                                            }}
+                                        >
+                                            <Check
+                                                className={cn(
+                                                    'mr-2 h-4 w-4',
+                                                    watch('clientId') ===
+                                                        client._id
+                                                        ? 'opacity-100'
+                                                        : 'opacity-0',
+                                                )}
+                                            />
+                                            <span className="flex flex-col">
+                                                <span>{client.name}</span>
+                                                <span className="text-xs text-muted-foreground">
+                                                    {client.clientId}
+                                                </span>
+                                            </span>
+                                        </CommandItem>
+                                    ))}
+                                </CommandGroup>
+                            </CommandList>
+                        </Command>
+                    </PopoverContent>
+                </Popover>
                 {errors.clientId && (
                     <p className="text-sm text-destructive">
                         {errors.clientId.message}
@@ -377,7 +445,10 @@ export function OrderForm({
                         value={perImagePrice || ''}
                         onChange={(e) => {
                             setPriceMode('perImage');
-                            setValue('perImagePrice', Number(e.target.value) || 0);
+                            setValue(
+                                'perImagePrice',
+                                Number(e.target.value) || 0,
+                            );
                         }}
                     />
                     {errors.perImagePrice && (
@@ -402,85 +473,77 @@ export function OrderForm({
                         }}
                     />
                 </div>
-
             </div>
 
-
-
             {/* Services */}
-            <div className="space-y-2">
+            <div className="space-y-3">
                 <div className="flex items-center justify-between">
                     <Label>Services *</Label>
-                    <Dialog
-                        open={isNewServiceDialogOpen}
-                        onOpenChange={setIsNewServiceDialogOpen}
+                    <Button
+                        type="button"
+                        variant={isNewServiceMode ? 'secondary' : 'outline'}
+                        size="sm"
+                        onClick={() => setIsNewServiceMode(!isNewServiceMode)}
                     >
-                        <DialogTrigger asChild>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                            >
+                        {isNewServiceMode ? (
+                            <>
+                                <X className="h-4 w-4 mr-1" />
+                                Cancel
+                            </>
+                        ) : (
+                            <>
                                 <Plus className="h-4 w-4 mr-1" />
                                 New Service
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                            <DialogHeader>
-                                <DialogTitle>Create New Service</DialogTitle>
-                                <DialogDescription>
-                                    Add a new service type
-                                </DialogDescription>
-                            </DialogHeader>
-                            <div className="space-y-4">
-                                <div className="space-y-2">
-                                    <Label>Service Name *</Label>
-                                    <Input
-                                        value={newServiceName}
-                                        onChange={(e) =>
-                                            setNewServiceName(e.target.value)
-                                        }
-                                        placeholder="e.g., Clipping Path"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>Description</Label>
-                                    <Textarea
-                                        value={newServiceDescription}
-                                        onChange={(e) =>
-                                            setNewServiceDescription(
-                                                e.target.value
-                                            )
-                                        }
-                                        placeholder="Optional description"
-                                    />
-                                </div>
-                                <div className="flex justify-end gap-2">
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        onClick={() =>
-                                            setIsNewServiceDialogOpen(false)
-                                        }
-                                    >
-                                        Cancel
-                                    </Button>
-                                    <Button
-                                        type="button"
-                                        onClick={handleCreateService}
-                                        disabled={isCreatingService}
-                                    >
-                                        {isCreatingService && (
-                                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                        )}
-                                        Create
-                                    </Button>
-                                </div>
-                            </div>
-                        </DialogContent>
-                    </Dialog>
+                            </>
+                        )}
+                    </Button>
                 </div>
-                
+
+                {isNewServiceMode && (
+                    <div className="p-4 border rounded-lg bg-muted/50 space-y-4 animate-in fade-in slide-in-from-top-2">
+                        <div className="space-y-2">
+                            <Label htmlFor="new-service-name">
+                                Service Name *
+                            </Label>
+                            <Input
+                                id="new-service-name"
+                                value={newServiceName}
+                                onChange={(e) =>
+                                    setNewServiceName(e.target.value)
+                                }
+                                placeholder="e.g., Clipping Path"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="new-service-desc">
+                                Description
+                            </Label>
+                            <Textarea
+                                id="new-service-desc"
+                                value={newServiceDescription}
+                                onChange={(e) =>
+                                    setNewServiceDescription(e.target.value)
+                                }
+                                placeholder="Optional description"
+                                rows={2}
+                            />
+                        </div>
+                        <div className="flex justify-end">
+                            <Button
+                                type="button"
+                                onClick={handleCreateService}
+                                disabled={isCreatingService}
+                                size="sm"
+                            >
+                                {isCreatingService && (
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                )}
+                                Create Service
+                            </Button>
+                        </div>
+                    </div>
+                )}
+
                 {/* Service Search Input */}
                 <Input
                     placeholder="Search services..."
@@ -488,7 +551,7 @@ export function OrderForm({
                     onChange={(e) => setServiceSearchInput(e.target.value)}
                     className="h-9"
                 />
-                
+
                 {isLoadingServices ? (
                     <p className="text-sm text-muted-foreground">
                         Loading services...
@@ -508,7 +571,7 @@ export function OrderForm({
                                     <Checkbox
                                         id={`service-${service._id}`}
                                         checked={selectedServices.includes(
-                                            service._id
+                                            service._id,
                                         )}
                                         onCheckedChange={() =>
                                             handleServiceToggle(service._id)
@@ -533,80 +596,74 @@ export function OrderForm({
             </div>
 
             {/* Return File Format */}
-            <div className="space-y-2">
+            <div className="space-y-3">
                 <div className="flex items-center justify-between">
                     <Label>Return File Format *</Label>
-                    <Dialog
-                        open={isNewFormatDialogOpen}
-                        onOpenChange={setIsNewFormatDialogOpen}
+                    <Button
+                        type="button"
+                        variant={isNewFormatMode ? 'secondary' : 'outline'}
+                        size="sm"
+                        onClick={() => setIsNewFormatMode(!isNewFormatMode)}
                     >
-                        <DialogTrigger asChild>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                            >
+                        {isNewFormatMode ? (
+                            <>
+                                <X className="h-4 w-4 mr-1" />
+                                Cancel
+                            </>
+                        ) : (
+                            <>
                                 <Plus className="h-4 w-4 mr-1" />
                                 New Format
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                            <DialogHeader>
-                                <DialogTitle>
-                                    Create New File Format
-                                </DialogTitle>
-                                <DialogDescription>
-                                    Add a new output file format
-                                </DialogDescription>
-                            </DialogHeader>
-                            <div className="space-y-4">
-                                <div className="space-y-2">
-                                    <Label>Format Name *</Label>
-                                    <Input
-                                        value={newFormatName}
-                                        onChange={(e) =>
-                                            setNewFormatName(e.target.value)
-                                        }
-                                        placeholder="e.g., JPEG"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>Extension *</Label>
-                                    <Input
-                                        value={newFormatExtension}
-                                        onChange={(e) =>
-                                            setNewFormatExtension(
-                                                e.target.value
-                                            )
-                                        }
-                                        placeholder="e.g., jpg"
-                                    />
-                                </div>
-                                <div className="flex justify-end gap-2">
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        onClick={() =>
-                                            setIsNewFormatDialogOpen(false)
-                                        }
-                                    >
-                                        Cancel
-                                    </Button>
-                                    <Button
-                                        type="button"
-                                        onClick={handleCreateFormat}
-                                        disabled={isCreatingFormat}
-                                    >
-                                        {isCreatingFormat && (
-                                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                        )}
-                                        Create
-                                    </Button>
-                                </div>
-                            </div>
-                        </DialogContent>
-                    </Dialog>
+                            </>
+                        )}
+                    </Button>
                 </div>
+
+                {isNewFormatMode && (
+                    <div className="p-4 border rounded-lg bg-muted/50 space-y-4 animate-in fade-in slide-in-from-top-2">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="new-format-name">
+                                    Format Name *
+                                </Label>
+                                <Input
+                                    id="new-format-name"
+                                    value={newFormatName}
+                                    onChange={(e) =>
+                                        setNewFormatName(e.target.value)
+                                    }
+                                    placeholder="e.g., JPEG"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="new-format-ext">
+                                    Extension *
+                                </Label>
+                                <Input
+                                    id="new-format-ext"
+                                    value={newFormatExtension}
+                                    onChange={(e) =>
+                                        setNewFormatExtension(e.target.value)
+                                    }
+                                    placeholder="e.g., jpg"
+                                />
+                            </div>
+                        </div>
+                        <div className="flex justify-end">
+                            <Button
+                                type="button"
+                                onClick={handleCreateFormat}
+                                disabled={isCreatingFormat}
+                                size="sm"
+                            >
+                                {isCreatingFormat && (
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                )}
+                                Create Format
+                            </Button>
+                        </div>
+                    </div>
+                )}
                 <Select
                     value={watch('returnFileFormat')}
                     onValueChange={(value) =>
@@ -659,7 +716,10 @@ export function OrderForm({
                 <Select
                     value={watch('assignedTo') || '_unassigned'}
                     onValueChange={(value) =>
-                        setValue('assignedTo', value === '_unassigned' ? '' : value)
+                        setValue(
+                            'assignedTo',
+                            value === '_unassigned' ? '' : value,
+                        )
                     }
                 >
                     <SelectTrigger className="w-full">
@@ -669,7 +729,8 @@ export function OrderForm({
                         <SelectItem value="_unassigned">Unassigned</SelectItem>
                         {staffs.map((staff: any) => (
                             <SelectItem key={staff._id} value={staff._id}>
-                                {staff.user?.name || 'Unknown'} ({staff.ids?.staffId || staff.staffId})
+                                {staff.user?.name || 'Unknown'} (
+                                {staff.ids?.staffId || staff.staffId})
                             </SelectItem>
                         ))}
                     </SelectContent>
