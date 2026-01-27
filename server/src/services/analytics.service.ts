@@ -27,7 +27,7 @@ const MONTH_NAMES = [
 ];
 
 async function getFinanceAnalytics(
-    params: AnalyticsQueryParams
+    params: AnalyticsQueryParams,
 ): Promise<IFinanceAnalytics> {
     const now = new Date();
     const monthsToFetch = params.months || 12;
@@ -187,7 +187,7 @@ async function getFinanceAnalytics(
     const totalEarnings = totalEarningsResult[0]?.total || 0;
     const totalExpenses = totalExpensesResult[0]?.total || 0;
     const deliveredData = deliveredOrdersResult[0] || { count: 0, revenue: 0 };
-    const unpaidRevenue = (unpaidOrdersResult[0]?.total || 0) * 120;
+    const unpaidRevenue = unpaidOrdersResult[0]?.total || 0;
 
     // Get total profit transfers (shared amount)
     const profitTransferResult = await ProfitTransferModel.aggregate([
@@ -216,7 +216,7 @@ async function getFinanceAnalytics(
         totalEarnings,
         totalExpenses,
         totalProfit: totalEarnings - totalExpenses,
-        totalRevenue: deliveredData.revenue * 120,
+        totalRevenue: deliveredData.revenue,
         unpaidRevenue,
         totalShared,
         totalDebit,
@@ -233,13 +233,13 @@ async function getFinanceAnalytics(
         const yr = date.getFullYear();
 
         const earningData = monthlyEarnings.find(
-            (e: any) => e._id.month === month && e._id.year === yr
+            (e: any) => e._id.month === month && e._id.year === yr,
         );
         const expenseData = monthlyExpenses.find(
-            (e: any) => e._id.month === month && e._id.year === yr
+            (e: any) => e._id.month === month && e._id.year === yr,
         );
         const orderData = monthlyOrders.find(
-            (o: any) => o._id.month === month && o._id.year === yr
+            (o: any) => o._id.month === month && o._id.year === yr,
         );
 
         const earnings = earningData?.total || 0;
@@ -253,13 +253,13 @@ async function getFinanceAnalytics(
             expenses,
             profit: earnings - expenses,
             orderCount: orderData?.count || 0,
-            orderRevenue: (orderData?.revenue || 0) * 120,
+            orderRevenue: orderData?.revenue || 0,
         });
     }
 
     // Build client breakdown
     const clientOrdersMap = new Map(
-        clientOrders.map((c: any) => [c._id?.toString(), c])
+        clientOrders.map((c: any) => [c._id?.toString(), c]),
     );
 
     const clientBreakdown: IClientFinance[] = clientEarnings.map((c: any) => {
@@ -272,7 +272,7 @@ async function getFinanceAnalytics(
             clientName: c.client?.name || 'Unknown',
             totalEarnings: c.totalEarnings,
             totalOrders: orderData.totalOrders,
-            totalRevenue: orderData.totalRevenue * 120,
+            totalRevenue: orderData.totalRevenue,
             unpaidRevenue: 0,
         };
     });

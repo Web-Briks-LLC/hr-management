@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { useGetFinanceAnalyticsQuery } from '@/redux/features/analytics/analyticsApi';
 import {
     useGetExpensesQuery,
     useGetExpenseStatsQuery,
@@ -250,7 +251,17 @@ export default function ExpensePage() {
     const pagination = expenseData?.pagination;
     const branches: Branch[] = branchesData?.branches || [];
 
+    const { data: financeData } = useGetFinanceAnalyticsQuery({ months: 1 });
+    const finalAmount = financeData?.summary?.finalAmount || 0;
+
     const handleCreateExpense = async (data: ExpenseFormData) => {
+        if (finalAmount <= 0) {
+            toast.error(
+                'Cannot add expense when Final Amount (Profit - Shared + Debit) is 0 or negative',
+            );
+            return;
+        }
+
         try {
             await createExpense({
                 ...data,
