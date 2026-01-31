@@ -84,12 +84,14 @@ async function getFinanceAnalytics(
         createdAt: { $gte: startDate, $lte: endDate },
     };
     const unpaidOrderFilter: any = {
-        status: { $ne: 'cancelled' },
+        status: { $in: ['completed', 'delivered'] },
         createdAt: { $gte: startDate, $lte: endDate },
     };
 
     // Get paid order IDs for unpaid calculation
-    const paidOrderIds = await EarningModel.distinct('orderIds');
+    const paidOrderIds = await EarningModel.distinct('orderId', {
+        status: 'paid',
+    });
 
     // Parallel fetch all data
     const [
