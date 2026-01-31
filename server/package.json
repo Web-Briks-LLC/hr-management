@@ -18,12 +18,16 @@
         "@types/multer": "^2.0.0",
         "@types/node": "^24.10.1",
         "@types/nodemailer": "^7.0.4",
+        "@types/react": "^19.2.10",
+        "@types/react-dom": "^19.2.3",
         "baseline-browser-mapping": "^2.9.19",
         "nodemon": "^3.1.11",
         "tsx": "^4.21.0",
         "typescript": "^5.9.3"
     },
     "dependencies": {
+        "@react-email/components": "^1.0.6",
+        "@react-email/render": "^2.0.4",
         "better-auth": "^1.4.5",
         "cloudinary": "^2.8.0",
         "cors": "^2.8.5",
@@ -33,6 +37,8 @@
         "mongodb": "^7.0.0",
         "mongoose": "^9.0.0",
         "multer": "^2.0.2",
-        "nodemailer": "^7.0.11"
+        "nodemailer": "^7.0.11",
+        "react": "^19.2.4",
+        "react-dom": "^19.2.4"
     }
 }

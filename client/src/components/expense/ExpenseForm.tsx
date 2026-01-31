@@ -15,13 +15,16 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { DatePicker } from '@/components/shared/DatePicker';
-import { Loader2, Plus } from 'lucide-react';
+import { Loader, Plus } from 'lucide-react';
 import type { ExpenseCategory } from '@/redux/features/expense/expenseApi';
 
 // Zod schema for expense form validation
 export const expenseFormSchema = z.object({
     date: z.date({ message: 'Date is required' }),
-    title: z.string().min(1, 'Title is required').min(3, 'Title must be at least 3 characters'),
+    title: z
+        .string()
+        .min(1, 'Title is required')
+        .min(3, 'Title must be at least 3 characters'),
     categoryId: z.string().min(1, 'Category is required'),
     branchId: z.string().min(1, 'Branch is required'),
     amount: z
@@ -94,17 +97,24 @@ export function ExpenseForm({
     };
 
     return (
-        <form onSubmit={handleSubmit(handleFormSubmit)} className="grid gap-4 py-4">
+        <form
+            onSubmit={handleSubmit(handleFormSubmit)}
+            className="grid gap-4 py-4"
+        >
             {/* Date Field */}
             <div className="grid grid-cols-4 items-start gap-4">
                 <Label className="text-right pt-2">Date *</Label>
                 <div className="col-span-3">
                     <DatePicker
                         value={watch('date')}
-                        onChange={(date) => setValue('date', date || new Date())}
+                        onChange={(date) =>
+                            setValue('date', date || new Date())
+                        }
                     />
                     {errors.date && (
-                        <p className="text-sm text-destructive mt-1">{errors.date.message}</p>
+                        <p className="text-sm text-destructive mt-1">
+                            {errors.date.message}
+                        </p>
                     )}
                 </div>
             </div>
@@ -121,7 +131,9 @@ export function ExpenseForm({
                         {...register('title')}
                     />
                     {errors.title && (
-                        <p className="text-sm text-destructive mt-1">{errors.title.message}</p>
+                        <p className="text-sm text-destructive mt-1">
+                            {errors.title.message}
+                        </p>
                     )}
                 </div>
             </div>
@@ -133,7 +145,9 @@ export function ExpenseForm({
                     <div className="flex gap-2">
                         <Select
                             value={watch('categoryId')}
-                            onValueChange={(value) => setValue('categoryId', value)}
+                            onValueChange={(value) =>
+                                setValue('categoryId', value)
+                            }
                         >
                             <SelectTrigger className="flex-1 w-full">
                                 <SelectValue placeholder="Select category" />
@@ -156,7 +170,9 @@ export function ExpenseForm({
                         </Button>
                     </div>
                     {errors.categoryId && (
-                        <p className="text-sm text-destructive mt-1">{errors.categoryId.message}</p>
+                        <p className="text-sm text-destructive mt-1">
+                            {errors.categoryId.message}
+                        </p>
                     )}
                 </div>
             </div>
@@ -181,7 +197,9 @@ export function ExpenseForm({
                         </SelectContent>
                     </Select>
                     {errors.branchId && (
-                        <p className="text-sm text-destructive mt-1">{errors.branchId.message}</p>
+                        <p className="text-sm text-destructive mt-1">
+                            {errors.branchId.message}
+                        </p>
                     )}
                 </div>
             </div>
@@ -201,14 +219,32 @@ export function ExpenseForm({
                         onKeyDown={(e) => {
                             // Allow: backspace, delete, tab, escape, enter, arrows
                             if (
-                                ['Backspace', 'Delete', 'Tab', 'Escape', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key) ||
+                                [
+                                    'Backspace',
+                                    'Delete',
+                                    'Tab',
+                                    'Escape',
+                                    'Enter',
+                                    'ArrowLeft',
+                                    'ArrowRight',
+                                    'ArrowUp',
+                                    'ArrowDown',
+                                    'Home',
+                                    'End',
+                                ].includes(e.key) ||
                                 // Allow: Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X
-                                ((e.ctrlKey || e.metaKey) && ['a', 'c', 'v', 'x'].includes(e.key.toLowerCase()))
+                                ((e.ctrlKey || e.metaKey) &&
+                                    ['a', 'c', 'v', 'x'].includes(
+                                        e.key.toLowerCase(),
+                                    ))
                             ) {
                                 return;
                             }
                             // Allow: decimal point (only one)
-                            if (e.key === '.' && !e.currentTarget.value.includes('.')) {
+                            if (
+                                e.key === '.' &&
+                                !e.currentTarget.value.includes('.')
+                            ) {
                                 return;
                             }
                             // Block if not a number
@@ -225,7 +261,9 @@ export function ExpenseForm({
                         }}
                     />
                     {errors.amount && (
-                        <p className="text-sm text-destructive mt-1">{errors.amount.message}</p>
+                        <p className="text-sm text-destructive mt-1">
+                            {errors.amount.message}
+                        </p>
                     )}
                 </div>
             </div>
@@ -236,9 +274,9 @@ export function ExpenseForm({
                 <div className="col-span-3">
                     <Select
                         value={watch('status')}
-                        onValueChange={(value: 'pending' | 'paid' | 'partial_paid') =>
-                            setValue('status', value)
-                        }
+                        onValueChange={(
+                            value: 'pending' | 'paid' | 'partial_paid',
+                        ) => setValue('status', value)}
                     >
                         <SelectTrigger className="w-full">
                             <SelectValue />
@@ -274,7 +312,9 @@ export function ExpenseForm({
                     Cancel
                 </Button>
                 <Button type="submit" disabled={isSubmitting}>
-                    {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    {isSubmitting && (
+                        <Loader className="h-4 w-4  animate-spin" />
+                    )}
                     {submitLabel}
                 </Button>
             </div>

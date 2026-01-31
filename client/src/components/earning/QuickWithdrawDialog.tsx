@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, DollarSign, Calculator } from 'lucide-react';
+import { Loader, DollarSign, Calculator } from 'lucide-react';
 import { useWithdrawEarningMutation } from '@/redux/features/earning/earningApi';
 import type { IOrder } from '@/types/order.type';
 import { toast } from 'sonner';
@@ -201,7 +201,7 @@ export function QuickWithdrawDialog({
                     </Button>
                     <Button onClick={handleWithdraw} disabled={isLoading}>
                         {isLoading && (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            <Loader className=" h-4 w-4 animate-spin" />
                         )}
                         Confirm Withdraw
                     </Button>

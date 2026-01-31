@@ -10,6 +10,7 @@ import {
     useDeleteExpenseMutation,
     useGetExpenseCategoriesQuery,
     useCreateExpenseCategoryMutation,
+    useGetExpenseYearsQuery,
     type Expense,
     type ExpenseCategory,
     type ExpenseQueryParams,
@@ -66,7 +67,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { Calendar } from '@/components/ui/calendar';
 import {
-    Loader2,
+    Loader,
     ChevronLeft,
     ChevronRight,
     Plus,
@@ -77,6 +78,9 @@ import {
     BarChart3,
     Edit2,
     Filter,
+    Download,
+    CheckCircle2,
+    Clock,
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
@@ -86,6 +90,7 @@ import {
     ExpenseForm,
     type ExpenseFormData,
 } from '@/components/expense/ExpenseForm';
+import { ExportExpenseDialog } from '@/components/expense/ExportExpenseDialog';
 
 const statusOptions = [
     {
@@ -119,7 +124,6 @@ const MONTHS = [
 ];
 
 const currentYear = new Date().getFullYear();
-const YEARS = Array.from({ length: 5 }, (_, i) => currentYear - i);
 
 interface Branch {
     _id: string;
@@ -150,6 +154,7 @@ export default function ExpensePage() {
     const [isAddCategoryDialogOpen, setIsAddCategoryDialogOpen] =
         useState(false);
     const [newCategoryName, setNewCategoryName] = useState('');
+    const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
 
     // Default form values for edit
     const [editDefaultValues, setEditDefaultValues] = useState<
@@ -236,6 +241,11 @@ export default function ExpensePage() {
 
     const { data: categories } = useGetExpenseCategoriesQuery(undefined);
     const { data: branchesData } = useGetAllBranchesQuery(undefined);
+    const { data: yearsData } = useGetExpenseYearsQuery(undefined);
+    const years =
+        yearsData && yearsData.length > 0
+            ? yearsData
+            : Array.from({ length: 5 }, (_, i) => currentYear - i);
 
     // Mutations
     const [createExpense, { isLoading: isCreating }] =
@@ -343,76 +353,93 @@ export default function ExpensePage() {
         <div className="space-y-6">
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {isLoadingStats ? (
-                    <>
-                        {[...Array(4)].map((_, i) => (
-                            <Card key={i}>
-                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                    <Skeleton className="h-4 w-24" />
-                                    <Skeleton className="h-4 w-4" />
-                                </CardHeader>
-                                <CardContent>
-                                    <Skeleton className="h-8 w-32" />
-                                </CardContent>
-                            </Card>
-                        ))}
-                    </>
-                ) : (
-                    <>
-                        <Card>
-                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">
-                                    Today&apos;s Expense
-                                </CardTitle>
-                                <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-2xl font-bold truncate">
-                                    {formatCurrency(stats?.today || 0)}
-                                </div>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">
-                                    This Month
-                                </CardTitle>
-                                <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-2xl font-bold truncate">
-                                    {formatCurrency(stats?.thisMonth || 0)}
-                                </div>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">
-                                    This Year
-                                </CardTitle>
-                                <DollarSign className="h-4 w-4 text-muted-foreground" />
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-2xl font-bold truncate">
-                                    {formatCurrency(stats?.thisYear || 0)}
-                                </div>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">
-                                    Avg Monthly
-                                </CardTitle>
-                                <BarChart3 className="h-4 w-4 text-muted-foreground" />
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-2xl font-bold truncate">
-                                    {formatCurrency(stats?.avgMonthly || 0)}
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </>
-                )}
+                {/* Today's Expense Card */}
+                <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-violet-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-violet-500/5 hover:border-violet-500/30">
+                    <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-violet-500/10 blur-2xl transition-all duration-300 group-hover:bg-violet-500/20" />
+                    <div className="relative">
+                        <div className="flex items-center justify-between mb-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/10 text-violet-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-violet-500/20">
+                                <CalendarIcon className="h-5 w-5" />
+                            </div>
+                        </div>
+                        {isLoadingStats ? (
+                            <Skeleton className="h-8 w-24" />
+                        ) : (
+                            <h3 className="text-3xl font-bold tracking-tight text-violet-600 dark:text-violet-400">
+                                {formatCurrency(stats?.today || 0)}
+                            </h3>
+                        )}
+                        <p className="text-xs text-muted-foreground mt-1">
+                            Today&apos;s Expense
+                        </p>
+                    </div>
+                </div>
+
+                {/* This Month Card */}
+                <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-pink-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-pink-500/5 hover:border-pink-500/30">
+                    <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-pink-500/10 blur-2xl transition-all duration-300 group-hover:bg-pink-500/20" />
+                    <div className="relative">
+                        <div className="flex items-center justify-between mb-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-pink-500/10 text-pink-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-pink-500/20">
+                                <TrendingUp className="h-5 w-5" />
+                            </div>
+                        </div>
+                        {isLoadingStats ? (
+                            <Skeleton className="h-8 w-24" />
+                        ) : (
+                            <h3 className="text-3xl font-bold tracking-tight text-pink-600 dark:text-pink-400">
+                                {formatCurrency(stats?.thisMonth || 0)}
+                            </h3>
+                        )}
+                        <p className="text-xs text-muted-foreground mt-1">
+                            This Month
+                        </p>
+                    </div>
+                </div>
+
+                {/* This Year Card */}
+                <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-orange-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-orange-500/5 hover:border-orange-500/30">
+                    <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-orange-500/10 blur-2xl transition-all duration-300 group-hover:bg-orange-500/20" />
+                    <div className="relative">
+                        <div className="flex items-center justify-between mb-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-500/10 text-orange-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-orange-500/20">
+                                <DollarSign className="h-5 w-5" />
+                            </div>
+                        </div>
+                        {isLoadingStats ? (
+                            <Skeleton className="h-8 w-24" />
+                        ) : (
+                            <h3 className="text-3xl font-bold tracking-tight text-orange-600 dark:text-orange-400">
+                                {formatCurrency(stats?.thisYear || 0)}
+                            </h3>
+                        )}
+                        <p className="text-xs text-muted-foreground mt-1">
+                            This Year
+                        </p>
+                    </div>
+                </div>
+
+                {/* Avg Monthly Card */}
+                <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-emerald-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-emerald-500/5 hover:border-emerald-500/30">
+                    <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-emerald-500/10 blur-2xl transition-all duration-300 group-hover:bg-emerald-500/20" />
+                    <div className="relative">
+                        <div className="flex items-center justify-between mb-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-emerald-500/20">
+                                <BarChart3 className="h-5 w-5" />
+                            </div>
+                        </div>
+                        {isLoadingStats ? (
+                            <Skeleton className="h-8 w-24" />
+                        ) : (
+                            <h3 className="text-3xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400">
+                                {formatCurrency(stats?.avgMonthly || 0)}
+                            </h3>
+                        )}
+                        <p className="text-xs text-muted-foreground mt-1">
+                            Avg Monthly
+                        </p>
+                    </div>
+                </div>
             </div>
 
             {/* Main Card */}
@@ -426,41 +453,57 @@ export default function ExpensePage() {
                             Track and manage company expenses
                         </CardDescription>
                     </div>
-                    <Dialog
-                        open={isAddDialogOpen}
-                        onOpenChange={setIsAddDialogOpen}
-                    >
-                        <DialogTrigger asChild>
-                            <Button>
-                                <Plus className="mr-2 h-4 w-4" />
-                                Add Expense
+                    <div className="grid grid-cols-2 gap-4">
+                        <Dialog>
+                            <Button
+                                onClick={() => setIsExportDialogOpen(true)}
+                                variant="outline"
+                            >
+                                <Download className=" h-4 w-4" />
+                                Export
                             </Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-md">
-                            <DialogHeader>
-                                <DialogTitle>Add New Expense</DialogTitle>
-                                <DialogDescription>
-                                    Fill in the details to add a new expense
-                                </DialogDescription>
-                            </DialogHeader>
-                            <ExpenseForm
-                                onSubmit={handleCreateExpense}
-                                isSubmitting={isCreating}
-                                categories={categories}
-                                branches={branches}
-                                onAddCategory={() =>
-                                    setIsAddCategoryDialogOpen(true)
-                                }
-                                submitLabel="Create"
-                                onCancel={() => setIsAddDialogOpen(false)}
+                            <ExportExpenseDialog
+                                open={isExportDialogOpen}
+                                onOpenChange={setIsExportDialogOpen}
+                                availableYears={years}
                             />
-                        </DialogContent>
-                    </Dialog>
+                        </Dialog>
+                        <Dialog
+                            open={isAddDialogOpen}
+                            onOpenChange={setIsAddDialogOpen}
+                        >
+                            <DialogTrigger asChild>
+                                <Button>
+                                    <Plus className=" h-4 w-4" />
+                                    Add Expense
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-md">
+                                <DialogHeader>
+                                    <DialogTitle>Add New Expense</DialogTitle>
+                                    <DialogDescription>
+                                        Fill in the details to add a new expense
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <ExpenseForm
+                                    onSubmit={handleCreateExpense}
+                                    isSubmitting={isCreating}
+                                    categories={categories}
+                                    branches={branches}
+                                    onAddCategory={() =>
+                                        setIsAddCategoryDialogOpen(true)
+                                    }
+                                    submitLabel="Create"
+                                    onCancel={() => setIsAddDialogOpen(false)}
+                                />
+                            </DialogContent>
+                        </Dialog>
+                    </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     {/* Filters Toolbar */}
                     <div className="flex flex-wrap items-center gap-3 p-4 bg-muted/30 rounded-lg border border-border/50">
-                        <div className="flex items-center gap-2 mr-2">
+                        <div className="flex items-center gap-2 ">
                             <div className="bg-primary/10 p-2 rounded-full">
                                 <Filter className="h-4 w-4 text-primary" />
                             </div>
@@ -534,7 +577,7 @@ export default function ExpensePage() {
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {YEARS.map((y) => (
+                                        {years.map((y: number) => (
                                             <SelectItem
                                                 key={y}
                                                 value={y.toString()}
@@ -558,7 +601,7 @@ export default function ExpensePage() {
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {YEARS.map((y) => (
+                                    {years.map((y: number) => (
                                         <SelectItem
                                             key={y}
                                             value={y.toString()}
@@ -577,7 +620,7 @@ export default function ExpensePage() {
                                         variant="outline"
                                         className="w-[240px] h-9 bg-background/60 justify-start text-left font-normal animate-in fade-in slide-in-from-left-2"
                                     >
-                                        <CalendarIcon className="mr-2 h-4 w-4" />
+                                        <CalendarIcon className=" h-4 w-4" />
                                         {dateRange.from ? (
                                             dateRange.to ? (
                                                 <>
@@ -925,7 +968,7 @@ export default function ExpensePage() {
                                     }
                                     disabled={page === 1 || isFetching}
                                 >
-                                    <ChevronLeft className="h-4 w-4 mr-2" />
+                                    <ChevronLeft className="h-4 w-4 " />
                                     Previous
                                 </Button>
                                 <Button
@@ -997,7 +1040,7 @@ export default function ExpensePage() {
                             disabled={isDeleting}
                         >
                             {isDeleting && (
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                <Loader className="h-4 w-4  animate-spin" />
                             )}
                             Delete
                         </AlertDialogAction>
@@ -1044,7 +1087,7 @@ export default function ExpensePage() {
                             disabled={isCreatingCategory}
                         >
                             {isCreatingCategory && (
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                <Loader className="h-4 w-4  animate-spin" />
                             )}
                             Create
                         </Button>

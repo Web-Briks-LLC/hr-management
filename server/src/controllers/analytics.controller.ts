@@ -9,10 +9,14 @@ async function getFinanceAnalytics(req: Request, res: Response) {
         const months = req.query.months
             ? parseInt(req.query.months as string)
             : 12;
+        const month = req.query.month
+            ? parseInt(req.query.month as string)
+            : undefined;
 
         const analytics = await analyticsService.getFinanceAnalytics({
             year,
-            months,
+            months, // still passed but service prioritizes date logic
+            month,
         });
 
         res.status(200).json({
@@ -28,6 +32,23 @@ async function getFinanceAnalytics(req: Request, res: Response) {
     }
 }
 
+async function getAnalyticsYears(_req: Request, res: Response) {
+    try {
+        const years = await analyticsService.getAvailableAnalyticsYears();
+        res.status(200).json({
+            success: true,
+            data: years,
+        });
+    } catch (error) {
+        console.error('Error getting analytics years:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch analytics years',
+        });
+    }
+}
+
 export default {
     getFinanceAnalytics,
+    getAnalyticsYears,
 };

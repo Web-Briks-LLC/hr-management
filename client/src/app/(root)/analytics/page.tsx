@@ -1,7 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { useGetFinanceAnalyticsQuery } from '@/redux/features/analytics/analyticsApi';
+import {
+    useGetAnalyticsYearsQuery,
+    useGetFinanceAnalyticsQuery,
+} from '@/redux/features/analytics/analyticsApi';
 import {
     Card,
     CardContent,
@@ -87,8 +90,25 @@ const pieChartConfig = {
 } satisfies ChartConfig;
 
 export default function FinanceAnalyticsPage() {
-    const [months, setMonths] = useState<number>(12);
-    const { data, isLoading } = useGetFinanceAnalyticsQuery({ months });
+    const currentYear = new Date().getFullYear();
+    const [selectedYear, setSelectedYear] = useState<string>(
+        currentYear.toString(),
+    );
+    const [selectedMonth, setSelectedMonth] = useState<string>('all');
+
+    // Fetch available years
+    const { data: availableYears = [] } = useGetAnalyticsYearsQuery();
+
+    // Combine fetched years with current year and unique them
+    const years = Array.from(new Set([currentYear, ...availableYears])).sort(
+        (a, b) => b - a,
+    );
+
+    const { data, isLoading } = useGetFinanceAnalyticsQuery({
+        year: parseInt(selectedYear),
+        month: selectedMonth === 'all' ? undefined : parseInt(selectedMonth),
+        months: 12, // Default for compatibility, though service might ignore it if year is set
+    });
 
     if (isLoading) {
         return (
@@ -135,7 +155,8 @@ export default function FinanceAnalyticsPage() {
         return <div>No analytics data available</div>;
     }
 
-    const { summary, monthlyTrends, clientBreakdown, expensesByCategory } = data;
+    const { summary, monthlyTrends, clientBreakdown, expensesByCategory } =
+        data;
 
     return (
         <div className="space-y-6">
@@ -147,19 +168,45 @@ export default function FinanceAnalyticsPage() {
                         Track your earnings, expenses, and profit trends
                     </p>
                 </div>
-                <Select
-                    value={months.toString()}
-                    onValueChange={(v) => setMonths(parseInt(v))}
-                >
-                    <SelectTrigger className="w-36">
-                        <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="6">Last 6 months</SelectItem>
-                        <SelectItem value="12">Last 12 months</SelectItem>
-                        <SelectItem value="24">Last 24 months</SelectItem>
-                    </SelectContent>
-                </Select>
+                <div className="flex gap-2">
+                    <Select
+                        value={selectedMonth}
+                        onValueChange={setSelectedMonth}
+                    >
+                        <SelectTrigger className="w-[140px]">
+                            <SelectValue placeholder="Month" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Months</SelectItem>
+                            {Array.from({ length: 12 }, (_, i) => i + 1).map(
+                                (m) => (
+                                    <SelectItem key={m} value={m.toString()}>
+                                        {new Date(0, m - 1).toLocaleString(
+                                            'default',
+                                            { month: 'long' },
+                                        )}
+                                    </SelectItem>
+                                ),
+                            )}
+                        </SelectContent>
+                    </Select>
+
+                    <Select
+                        value={selectedYear}
+                        onValueChange={setSelectedYear}
+                    >
+                        <SelectTrigger className="w-[100px]">
+                            <SelectValue placeholder="Year" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {years.map((y) => (
+                                <SelectItem key={y} value={y.toString()}>
+                                    {y}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
             </div>
 
             {/* Summary Stats */}
@@ -211,10 +258,11 @@ export default function FinanceAnalyticsPage() {
                     </CardHeader>
                     <CardContent>
                         <div
-                            className={`text-2xl font-bold ${summary.totalProfit >= 0
-                                ? 'text-blue-600'
-                                : 'text-red-600'
-                                }`}
+                            className={`text-2xl font-bold ${
+                                summary.totalProfit >= 0
+                                    ? 'text-blue-600'
+                                    : 'text-red-600'
+                            }`}
                         >
                             {formatCurrency(summary.totalProfit)}
                         </div>
@@ -266,7 +314,9 @@ export default function FinanceAnalyticsPage() {
                         <TrendingUp className="h-4 w-4 text-emerald-600" />
                     </CardHeader>
                     <CardContent>
-                        <div className={`text-2xl font-bold ${(summary.finalAmount || 0) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                        <div
+                            className={`text-2xl font-bold ${(summary.finalAmount || 0) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}
+                        >
                             {formatCurrency(summary.finalAmount || 0)}
                         </div>
                         <p className="text-xs text-muted-foreground">
@@ -283,7 +333,7 @@ export default function FinanceAnalyticsPage() {
                     <CardHeader>
                         <CardTitle>Earnings vs Expenses</CardTitle>
                         <CardDescription>
-                            Monthly comparison over the last {months} months
+                            Monthly comparison for {selectedYear}
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -292,7 +342,10 @@ export default function FinanceAnalyticsPage() {
                             className="h-[300px] w-full"
                         >
                             <BarChart data={monthlyTrends}>
-                                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                                <CartesianGrid
+                                    strokeDasharray="3 3"
+                                    className="stroke-muted"
+                                />
                                 <XAxis
                                     dataKey="monthName"
                                     tickLine={false}
@@ -336,7 +389,7 @@ export default function FinanceAnalyticsPage() {
                     <CardHeader>
                         <CardTitle>Profit Trend</CardTitle>
                         <CardDescription>
-                            Monthly profit over the last {months} months
+                            Monthly profit for {selectedYear}
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -345,7 +398,10 @@ export default function FinanceAnalyticsPage() {
                             className="h-[300px] w-full"
                         >
                             <LineChart data={monthlyTrends}>
-                                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                                <CartesianGrid
+                                    strokeDasharray="3 3"
+                                    className="stroke-muted"
+                                />
                                 <XAxis
                                     dataKey="monthName"
                                     tickLine={false}
@@ -403,9 +459,17 @@ export default function FinanceAnalyticsPage() {
                                 const othersTotal = expensesByCategory
                                     .slice(5)
                                     .reduce((sum, cat) => sum + cat.total, 0);
-                                const chartData = othersTotal > 0
-                                    ? [...top5, { categoryId: 'others', categoryName: 'Others', total: othersTotal }]
-                                    : top5;
+                                const chartData =
+                                    othersTotal > 0
+                                        ? [
+                                              ...top5,
+                                              {
+                                                  categoryId: 'others',
+                                                  categoryName: 'Others',
+                                                  total: othersTotal,
+                                              },
+                                          ]
+                                        : top5;
 
                                 return (
                                     <ChartContainer
@@ -416,10 +480,15 @@ export default function FinanceAnalyticsPage() {
                                             data={chartData}
                                             layout="vertical"
                                         >
-                                            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                                            <CartesianGrid
+                                                strokeDasharray="3 3"
+                                                className="stroke-muted"
+                                            />
                                             <XAxis
                                                 type="number"
-                                                tickFormatter={(v) => formatCurrency(v)}
+                                                tickFormatter={(v) =>
+                                                    formatCurrency(v)
+                                                }
                                                 tickLine={false}
                                                 axisLine={false}
                                                 className="text-xs"
@@ -436,7 +505,9 @@ export default function FinanceAnalyticsPage() {
                                                 content={
                                                     <ChartTooltipContent
                                                         formatter={(value) =>
-                                                            formatCurrency(Number(value))
+                                                            formatCurrency(
+                                                                Number(value),
+                                                            )
                                                         }
                                                     />
                                                 }
@@ -477,7 +548,10 @@ export default function FinanceAnalyticsPage() {
                                     data={clientBreakdown.slice(0, 5)}
                                     layout="vertical"
                                 >
-                                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                                    <CartesianGrid
+                                        strokeDasharray="3 3"
+                                        className="stroke-muted"
+                                    />
                                     <XAxis
                                         type="number"
                                         tickFormatter={(v) => formatCurrency(v)}
@@ -497,7 +571,9 @@ export default function FinanceAnalyticsPage() {
                                         content={
                                             <ChartTooltipContent
                                                 formatter={(value) =>
-                                                    formatCurrency(Number(value))
+                                                    formatCurrency(
+                                                        Number(value),
+                                                    )
                                                 }
                                             />
                                         }
@@ -529,7 +605,10 @@ export default function FinanceAnalyticsPage() {
                         className="h-[250px] w-full"
                     >
                         <BarChart data={monthlyTrends}>
-                            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                            <CartesianGrid
+                                strokeDasharray="3 3"
+                                className="stroke-muted"
+                            />
                             <XAxis
                                 dataKey="monthName"
                                 tickLine={false}
@@ -550,9 +629,7 @@ export default function FinanceAnalyticsPage() {
                                 axisLine={false}
                                 className="text-xs"
                             />
-                            <ChartTooltip
-                                content={<ChartTooltipContent />}
-                            />
+                            <ChartTooltip content={<ChartTooltipContent />} />
                             <Bar
                                 yAxisId="left"
                                 dataKey="orderRevenue"

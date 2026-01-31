@@ -48,7 +48,7 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover';
-import { Loader2, Plus, X, Check, ChevronsUpDown } from 'lucide-react';
+import { Loader, Plus, X, Check, ChevronsUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { DatePicker } from '@/components/shared/DatePicker';
@@ -357,7 +357,7 @@ export function OrderForm({
                                         >
                                             <Check
                                                 className={cn(
-                                                    'mr-2 h-4 w-4',
+                                                    ' h-4 w-4',
                                                     watch('clientId') ===
                                                         client._id
                                                         ? 'opacity-100'
@@ -536,7 +536,7 @@ export function OrderForm({
                                 size="sm"
                             >
                                 {isCreatingService && (
-                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                    <Loader className="h-4 w-4  animate-spin" />
                                 )}
                                 Create Service
                             </Button>
@@ -657,7 +657,7 @@ export function OrderForm({
                                 size="sm"
                             >
                                 {isCreatingFormat && (
-                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                    <Loader className="h-4 w-4  animate-spin" />
                                 )}
                                 Create Format
                             </Button>
@@ -776,7 +776,7 @@ export function OrderForm({
                 </Button>
                 <Button type="submit" disabled={isSubmitting}>
                     {isSubmitting && (
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        <Loader className="h-4 w-4  animate-spin" />
                     )}
                     {submitLabel}
                 </Button>

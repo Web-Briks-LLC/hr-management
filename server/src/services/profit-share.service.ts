@@ -19,7 +19,7 @@ import type {
 
 async function createShareholderInDB(
     data: CreateShareholderData,
-    userId: string
+    userId: string,
 ): Promise<IShareholder> {
     // Check if adding this percentage would exceed 100%
     const currentTotal = await getTotalAllocatedPercentage();
@@ -27,7 +27,7 @@ async function createShareholderInDB(
         throw new Error(
             `Cannot add shareholder. Total percentage would be ${
                 currentTotal + data.percentage
-            }%. Maximum allowed is 100%. Currently allocated: ${currentTotal}%`
+            }%. Maximum allowed is 100%. Currently allocated: ${currentTotal}%`,
         );
     }
 
@@ -40,7 +40,7 @@ async function createShareholderInDB(
 }
 
 async function getAllShareholdersFromDB(
-    params: ShareholderQueryParams
+    params: ShareholderQueryParams,
 ): Promise<{
     shareholders: IShareholderPopulated[];
     total: number;
@@ -116,7 +116,7 @@ async function getAllShareholdersFromDB(
 }
 
 async function getShareholderByIdFromDB(
-    id: string
+    id: string,
 ): Promise<IShareholderPopulated | null> {
     const result = await ShareholderModel.aggregate([
         { $match: { _id: new (await import('mongoose')).Types.ObjectId(id) } },
@@ -165,7 +165,7 @@ async function getShareholderByIdFromDB(
 
 async function updateShareholderInDB(
     id: string,
-    data: UpdateShareholderData
+    data: UpdateShareholderData,
 ): Promise<IShareholder | null> {
     // If updating percentage, validate it won't exceed 100%
     if (data.percentage !== undefined) {
@@ -178,7 +178,7 @@ async function updateShareholderInDB(
 
         if (newTotal > 100) {
             throw new Error(
-                `Cannot update percentage. Total would be ${newTotal}%. Maximum allowed is 100%.`
+                `Cannot update percentage. Total would be ${newTotal}%. Maximum allowed is 100%.`,
             );
         }
     }
@@ -190,7 +190,7 @@ async function updateShareholderInDB(
 }
 
 async function deleteShareholderFromDB(
-    id: string
+    id: string,
 ): Promise<IShareholder | null> {
     return ShareholderModel.findByIdAndDelete(id).lean();
 }
@@ -208,11 +208,11 @@ async function getTotalAllocatedPercentage(): Promise<number> {
 async function getProfitSummaryFromDB(
     periodType: 'month' | 'year',
     year: number,
-    month?: number
+    month?: number,
 ): Promise<ProfitSummary> {
     const earningsMatch: Record<string, unknown> = {
         year,
-        status: 'completed',
+        status: 'paid',
     };
 
     if (periodType === 'month' && month) {
@@ -233,10 +233,12 @@ async function getProfitSummaryFromDB(
                 },
             },
             {
-                $match:
-                    periodType === 'month' && month
+                $match: {
+                    status: { $in: ['paid', 'partial_paid'] },
+                    ...(periodType === 'month' && month
                         ? { expenseMonth: month, expenseYear: year }
-                        : { expenseYear: year },
+                        : { expenseYear: year }),
+                },
             },
             { $group: { _id: null, total: { $sum: '$amount' } } },
         ]),
@@ -262,19 +264,19 @@ async function getProfitSummaryFromDB(
 
 async function distributeProfitInDB(
     data: DistributeProfitData,
-    userId: string
+    userId: string,
 ): Promise<IProfitDistribution[]> {
     // Get profit summary
     const summary = await getProfitSummaryFromDB(
         data.periodType,
         data.year,
-        data.month
+        data.month,
     );
 
     // Only check for positive net profit if not using customAmount
     if (!data.customAmount && summary.netProfit <= 0) {
         throw new Error(
-            `Cannot distribute profit. Net profit is ৳${summary.netProfit.toLocaleString()}. There must be positive profit to distribute.`
+            `Cannot distribute profit. Net profit is ৳${summary.netProfit.toLocaleString()}. There must be positive profit to distribute.`,
         );
     }
 
@@ -303,20 +305,19 @@ async function distributeProfitInDB(
         existingFilter.month = data.month;
     }
 
-    const existingDistributions = await ProfitDistributionModel.find(
-        existingFilter
-    );
+    const existingDistributions =
+        await ProfitDistributionModel.find(existingFilter);
     if (existingDistributions.length > 0) {
         const existingNames = existingDistributions.map((d) => {
             const sh = shareholders.find(
-                (s) => s._id.toString() === d.shareholderId.toString()
+                (s) => s._id.toString() === d.shareholderId.toString(),
             );
             return sh?.name || 'Unknown';
         });
         throw new Error(
             `Profit already distributed to: ${existingNames.join(
-                ', '
-            )} for this period`
+                ', ',
+            )} for this period`,
         );
     }
 
@@ -346,12 +347,12 @@ async function distributeProfitInDB(
     });
 
     return ProfitDistributionModel.insertMany(
-        distributions
+        distributions,
     ) as unknown as Promise<IProfitDistribution[]>;
 }
 
 async function getDistributionsFromDB(
-    params: DistributionQueryParams
+    params: DistributionQueryParams,
 ): Promise<{
     distributions: IProfitDistributionPopulated[];
     total: number;

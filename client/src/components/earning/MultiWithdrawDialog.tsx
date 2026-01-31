@@ -14,7 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, DollarSign, Calculator, X } from 'lucide-react';
+import { Loader, DollarSign, Calculator, X } from 'lucide-react';
 import { useBulkWithdrawEarningsMutation } from '@/redux/features/earning/earningApi';
 import type { IOrder } from '@/types/order.type';
 import { toast } from 'sonner';
@@ -270,7 +270,7 @@ export function MultiWithdrawDialog({
                         disabled={isLoading || unpaidOrders.length === 0}
                     >
                         {isLoading && (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            <Loader className=" h-4 w-4 animate-spin" />
                         )}
                         Withdraw {unpaidOrders.length} Orders
                     </Button>

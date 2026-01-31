@@ -12,7 +12,7 @@ import {
     Briefcase,
     ExternalLink,
     CheckCircle,
-    Loader2,
+    Loader,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -33,7 +33,10 @@ import {
 } from '@/components/ui/select';
 import { useUpdateApplicationStatusMutation } from '@/redux/features/career/careerApi';
 import type { IJobApplication, ApplicationStatus } from '@/types/career.type';
-import { APPLICATION_STATUS_LABELS, APPLICATION_STATUS_COLORS } from '@/types/career.type';
+import {
+    APPLICATION_STATUS_LABELS,
+    APPLICATION_STATUS_COLORS,
+} from '@/types/career.type';
 import { toast } from 'sonner';
 
 interface ApplicationDetailsModalProps {
@@ -41,7 +44,10 @@ interface ApplicationDetailsModalProps {
     onClose: () => void;
 }
 
-export function ApplicationDetailsModal({ application, onClose }: ApplicationDetailsModalProps) {
+export function ApplicationDetailsModal({
+    application,
+    onClose,
+}: ApplicationDetailsModalProps) {
     const [updateStatus, { isLoading }] = useUpdateApplicationStatusMutation();
     const [status, setStatus] = useState<ApplicationStatus>(application.status);
     const [notes, setNotes] = useState(application.notes || '');
@@ -79,13 +85,19 @@ export function ApplicationDetailsModal({ application, onClose }: ApplicationDet
                         <div className="grid grid-cols-2 gap-3 text-sm">
                             <div className="flex items-center gap-2">
                                 <Mail className="h-4 w-4 text-muted-foreground" />
-                                <a href={`mailto:${application.email}`} className="text-primary hover:underline">
+                                <a
+                                    href={`mailto:${application.email}`}
+                                    className="text-primary hover:underline"
+                                >
                                     {application.email}
                                 </a>
                             </div>
                             <div className="flex items-center gap-2">
                                 <Phone className="h-4 w-4 text-muted-foreground" />
-                                <a href={`tel:${application.phone}`} className="hover:underline">
+                                <a
+                                    href={`tel:${application.phone}`}
+                                    className="hover:underline"
+                                >
                                     {application.phone}
                                 </a>
                             </div>
@@ -95,22 +107,37 @@ export function ApplicationDetailsModal({ application, onClose }: ApplicationDet
                         <div className="flex flex-wrap gap-2 pt-2">
                             {application.facebook && (
                                 <Button variant="outline" size="sm" asChild>
-                                    <a href={application.facebook} target="_blank" rel="noopener noreferrer">
-                                        Facebook <ExternalLink className="h-3 w-3 ml-1" />
+                                    <a
+                                        href={application.facebook}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                    >
+                                        Facebook{' '}
+                                        <ExternalLink className="h-3 w-3 ml-1" />
                                     </a>
                                 </Button>
                             )}
                             {application.linkedin && (
                                 <Button variant="outline" size="sm" asChild>
-                                    <a href={application.linkedin} target="_blank" rel="noopener noreferrer">
-                                        LinkedIn <ExternalLink className="h-3 w-3 ml-1" />
+                                    <a
+                                        href={application.linkedin}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                    >
+                                        LinkedIn{' '}
+                                        <ExternalLink className="h-3 w-3 ml-1" />
                                     </a>
                                 </Button>
                             )}
                             {application.portfolio && (
                                 <Button variant="outline" size="sm" asChild>
-                                    <a href={application.portfolio} target="_blank" rel="noopener noreferrer">
-                                        Portfolio <ExternalLink className="h-3 w-3 ml-1" />
+                                    <a
+                                        href={application.portfolio}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                    >
+                                        Portfolio{' '}
+                                        <ExternalLink className="h-3 w-3 ml-1" />
                                     </a>
                                 </Button>
                             )}
@@ -119,9 +146,13 @@ export function ApplicationDetailsModal({ application, onClose }: ApplicationDet
 
                     {/* Position Info */}
                     <div className="space-y-2">
-                        <Label className="text-muted-foreground">Applied For</Label>
+                        <Label className="text-muted-foreground">
+                            Applied For
+                        </Label>
                         <div className="p-3 border rounded-lg">
-                            <div className="font-medium">{application.jobPosition?.title}</div>
+                            <div className="font-medium">
+                                {application.jobPosition?.title}
+                            </div>
                             <div className="text-sm text-muted-foreground">
                                 {application.jobPosition?.company}
                             </div>
@@ -136,34 +167,65 @@ export function ApplicationDetailsModal({ application, onClose }: ApplicationDet
 
                     {/* Experience */}
                     <div className="space-y-2">
-                        <Label className="text-muted-foreground">Experience Level</Label>
-                        <Badge variant="outline" className="text-base py-1 px-3">
-                            {application.hasExperience ? '✅ Experienced' : '🆕 Fresher'}
+                        <Label className="text-muted-foreground">
+                            Experience Level
+                        </Label>
+                        <Badge
+                            variant="outline"
+                            className="text-base py-1 px-3"
+                        >
+                            {application.hasExperience
+                                ? '✅ Experienced'
+                                : '🆕 Fresher'}
                         </Badge>
                     </div>
 
                     {/* Work Experience Details */}
-                    {application.hasExperience && application.experiences && application.experiences.length > 0 && (
-                        <div className="space-y-3">
-                            <Label className="text-muted-foreground">Work Experience</Label>
-                            {application.experiences.map((exp, index) => (
-                                <div key={index} className="p-3 border rounded-lg space-y-1">
-                                    <div className="font-medium">{exp.position}</div>
-                                    <div className="text-sm text-muted-foreground">{exp.company}</div>
-                                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                        <Calendar className="h-3 w-3" />
-                                        {format(new Date(exp.startDate), 'MMM yyyy')} -{' '}
-                                        {exp.isCurrent ? 'Present' : exp.endDate ? format(new Date(exp.endDate), 'MMM yyyy') : 'N/A'}
+                    {application.hasExperience &&
+                        application.experiences &&
+                        application.experiences.length > 0 && (
+                            <div className="space-y-3">
+                                <Label className="text-muted-foreground">
+                                    Work Experience
+                                </Label>
+                                {application.experiences.map((exp, index) => (
+                                    <div
+                                        key={index}
+                                        className="p-3 border rounded-lg space-y-1"
+                                    >
+                                        <div className="font-medium">
+                                            {exp.position}
+                                        </div>
+                                        <div className="text-sm text-muted-foreground">
+                                            {exp.company}
+                                        </div>
+                                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                            <Calendar className="h-3 w-3" />
+                                            {format(
+                                                new Date(exp.startDate),
+                                                'MMM yyyy',
+                                            )}{' '}
+                                            -{' '}
+                                            {exp.isCurrent
+                                                ? 'Present'
+                                                : exp.endDate
+                                                  ? format(
+                                                        new Date(exp.endDate),
+                                                        'MMM yyyy',
+                                                    )
+                                                  : 'N/A'}
+                                        </div>
                                     </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
+                                ))}
+                            </div>
+                        )}
 
                     {/* Cover Letter */}
                     {application.coverLetter && (
                         <div className="space-y-2">
-                            <Label className="text-muted-foreground">Cover Letter</Label>
+                            <Label className="text-muted-foreground">
+                                Cover Letter
+                            </Label>
                             <div className="p-3 border rounded-lg text-sm whitespace-pre-wrap">
                                 {application.coverLetter}
                             </div>
@@ -172,10 +234,16 @@ export function ApplicationDetailsModal({ application, onClose }: ApplicationDet
 
                     {/* CV Download */}
                     <div className="space-y-2">
-                        <Label className="text-muted-foreground">Resume/CV</Label>
+                        <Label className="text-muted-foreground">
+                            Resume/CV
+                        </Label>
                         <Button variant="outline" className="w-full" asChild>
-                            <a href={application.cvFile?.url} target="_blank" rel="noopener noreferrer">
-                                <Download className="h-4 w-4 mr-2" />
+                            <a
+                                href={application.cvFile?.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                            >
+                                <Download className="h-4 w-4 " />
                                 Download CV ({application.cvFile?.fileName})
                             </a>
                         </Button>
@@ -184,31 +252,54 @@ export function ApplicationDetailsModal({ application, onClose }: ApplicationDet
                     {/* Application Date */}
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Calendar className="h-4 w-4" />
-                        Applied on {format(new Date(application.createdAt), 'MMMM dd, yyyy hh:mm a')}
+                        Applied on{' '}
+                        {format(
+                            new Date(application.createdAt),
+                            'MMMM dd, yyyy hh:mm a',
+                        )}
                     </div>
 
                     {/* Status Update Section */}
                     <div className="border-t pt-6 space-y-4">
                         <h4 className="font-semibold">Update Status</h4>
-                        
+
                         <div className="flex items-center gap-3">
                             <Label className="min-w-[80px]">Current:</Label>
-                            <Badge className={APPLICATION_STATUS_COLORS[application.status]}>
+                            <Badge
+                                className={
+                                    APPLICATION_STATUS_COLORS[
+                                        application.status
+                                    ]
+                                }
+                            >
                                 {APPLICATION_STATUS_LABELS[application.status]}
                             </Badge>
                         </div>
 
                         <div className="space-y-2">
                             <Label htmlFor="status">New Status</Label>
-                            <Select value={status} onValueChange={(val) => setStatus(val as ApplicationStatus)}>
+                            <Select
+                                value={status}
+                                onValueChange={(val) =>
+                                    setStatus(val as ApplicationStatus)
+                                }
+                            >
                                 <SelectTrigger>
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="pending">Pending</SelectItem>
-                                    <SelectItem value="reviewed">Reviewed</SelectItem>
-                                    <SelectItem value="shortlisted">Shortlisted</SelectItem>
-                                    <SelectItem value="rejected">Rejected</SelectItem>
+                                    <SelectItem value="pending">
+                                        Pending
+                                    </SelectItem>
+                                    <SelectItem value="reviewed">
+                                        Reviewed
+                                    </SelectItem>
+                                    <SelectItem value="shortlisted">
+                                        Shortlisted
+                                    </SelectItem>
+                                    <SelectItem value="rejected">
+                                        Rejected
+                                    </SelectItem>
                                     <SelectItem value="hired">Hired</SelectItem>
                                 </SelectContent>
                             </Select>
@@ -231,11 +322,16 @@ export function ApplicationDetailsModal({ application, onClose }: ApplicationDet
                         <Button variant="outline" onClick={onClose}>
                             Close
                         </Button>
-                        <Button onClick={handleStatusUpdate} disabled={isLoading || status === application.status}>
+                        <Button
+                            onClick={handleStatusUpdate}
+                            disabled={
+                                isLoading || status === application.status
+                            }
+                        >
                             {isLoading ? (
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                <Loader className="h-4 w-4  animate-spin" />
                             ) : (
-                                <CheckCircle className="h-4 w-4 mr-2" />
+                                <CheckCircle className="h-4 w-4 " />
                             )}
                             Update Status
                         </Button>

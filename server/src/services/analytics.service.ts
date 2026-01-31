@@ -1,4 +1,4 @@
-import { subMonths } from 'date-fns';
+import { endOfMonth, endOfYear } from 'date-fns';
 import EarningModel from '../models/earning.model.js';
 import ExpenseModel from '../models/expense.model.js';
 import OrderModel from '../models/order.model.js';
@@ -26,12 +26,67 @@ const MONTH_NAMES = [
     'Dec',
 ];
 
+async function getAvailableAnalyticsYears(): Promise<number[]> {
+    const earningYears = await EarningModel.aggregate([
+        { $project: { year: { $year: '$orderDate' } } },
+        { $group: { _id: null, years: { $addToSet: '$year' } } },
+    ]);
+    const expenseYears = await ExpenseModel.aggregate([
+        { $project: { year: { $year: '$date' } } },
+        { $group: { _id: null, years: { $addToSet: '$year' } } },
+    ]);
+
+    const distinctEarningYears = earningYears[0]?.years || [];
+    const distinctExpenseYears = expenseYears[0]?.years || [];
+
+    // Merge and unique
+    const allYears = Array.from(
+        new Set([
+            ...distinctEarningYears,
+            ...distinctExpenseYears,
+            new Date().getFullYear(),
+        ]),
+    );
+    return allYears.map(Number).sort((a, b) => b - a); // Descending
+}
+
 async function getFinanceAnalytics(
     params: AnalyticsQueryParams,
 ): Promise<IFinanceAnalytics> {
     const now = new Date();
-    const monthsToFetch = params.months || 12;
     const year = params.year || now.getFullYear();
+    const month = params.month; // Optional: 1-12
+
+    // Determine date range
+    let startDate: Date;
+    let endDate: Date;
+
+    if (month) {
+        // Specific Month
+        startDate = new Date(year, month - 1, 1);
+        endDate = endOfMonth(startDate);
+    } else {
+        // Whole Year
+        startDate = new Date(year, 0, 1);
+        endDate = endOfYear(startDate);
+    }
+
+    // Common Date Filters
+    const earningFilter: any = {
+        status: 'paid', // Use 'paid' NOT 'completed'
+        orderDate: { $gte: startDate, $lte: endDate },
+    };
+    const expenseFilter: any = {
+        date: { $gte: startDate, $lte: endDate },
+    };
+    const orderFilter: any = {
+        status: 'delivered',
+        createdAt: { $gte: startDate, $lte: endDate },
+    };
+    const unpaidOrderFilter: any = {
+        status: { $ne: 'cancelled' },
+        createdAt: { $gte: startDate, $lte: endDate },
+    };
 
     // Get paid order IDs for unpaid calculation
     const paidOrderIds = await EarningModel.distinct('orderIds');
@@ -56,18 +111,21 @@ async function getFinanceAnalytics(
     ] = await Promise.all([
         // Total earnings
         EarningModel.aggregate([
-            { $match: { status: 'completed' } },
+            { $match: earningFilter },
             { $group: { _id: null, total: { $sum: '$amountInBDT' } } },
         ]),
         // Total expenses
         ExpenseModel.aggregate([
+            { $match: expenseFilter },
             { $group: { _id: null, total: { $sum: '$amount' } } },
         ]),
-        // Total orders
-        OrderModel.countDocuments(),
+        // Total orders (count only)
+        OrderModel.countDocuments({
+            createdAt: { $gte: startDate, $lte: endDate },
+        }),
         // Delivered orders with revenue
         OrderModel.aggregate([
-            { $match: { status: 'delivered' } },
+            { $match: orderFilter },
             {
                 $group: {
                     _id: null,
@@ -80,25 +138,44 @@ async function getFinanceAnalytics(
         OrderModel.aggregate([
             {
                 $match: {
-                    status: { $ne: 'cancelled' },
+                    ...unpaidOrderFilter,
                     _id: { $nin: paidOrderIds },
                 },
             },
             { $group: { _id: null, total: { $sum: '$totalPrice' } } },
         ]),
-        // Monthly earnings (last N months)
+        // Monthly earnings (Full Year for Trends)
         EarningModel.aggregate([
-            { $match: { status: 'completed', year: { $gte: year - 1 } } },
+            {
+                $match: {
+                    status: 'paid',
+                    orderDate: {
+                        $gte: new Date(year, 0, 1),
+                        $lte: new Date(year, 11, 31),
+                    },
+                },
+            },
             {
                 $group: {
-                    _id: { month: '$month', year: '$year' },
+                    _id: {
+                        month: { $month: '$orderDate' },
+                        year: { $year: '$orderDate' },
+                    },
                     total: { $sum: '$amountInBDT' },
                 },
             },
-            { $sort: { '_id.year': 1, '_id.month': 1 } },
+            { $sort: { '_id.month': 1 } },
         ]),
-        // Monthly expenses (last N months)
+        // Monthly expenses (Full Year)
         ExpenseModel.aggregate([
+            {
+                $match: {
+                    date: {
+                        $gte: new Date(year, 0, 1),
+                        $lte: new Date(year, 11, 31),
+                    },
+                },
+            },
             {
                 $group: {
                     _id: {
@@ -108,11 +185,19 @@ async function getFinanceAnalytics(
                     total: { $sum: '$amount' },
                 },
             },
-            { $sort: { '_id.year': 1, '_id.month': 1 } },
+            { $sort: { '_id.month': 1 } },
         ]),
-        // Monthly orders
+        // Monthly orders (Full Year)
         OrderModel.aggregate([
-            { $match: { status: 'delivered' } },
+            {
+                $match: {
+                    status: 'delivered',
+                    createdAt: {
+                        $gte: new Date(year, 0, 1),
+                        $lte: new Date(year, 11, 31),
+                    },
+                },
+            },
             {
                 $group: {
                     _id: {
@@ -123,11 +208,11 @@ async function getFinanceAnalytics(
                     revenue: { $sum: '$totalPrice' },
                 },
             },
-            { $sort: { '_id.year': 1, '_id.month': 1 } },
+            { $sort: { '_id.month': 1 } },
         ]),
-        // Client earnings
+        // Client earnings (Filtered by selected period)
         EarningModel.aggregate([
-            { $match: { status: 'completed' } },
+            { $match: earningFilter },
             {
                 $group: {
                     _id: '$clientId',
@@ -146,9 +231,9 @@ async function getFinanceAnalytics(
             { $sort: { totalEarnings: -1 } },
             { $limit: 10 },
         ]),
-        // Client orders
+        // Client orders (Filtered by selected period)
         OrderModel.aggregate([
-            { $match: { status: 'delivered' } },
+            { $match: orderFilter },
             {
                 $group: {
                     _id: '$clientId',
@@ -157,8 +242,9 @@ async function getFinanceAnalytics(
                 },
             },
         ]),
-        // Expenses by category
+        // Expenses by category (Filtered by selected period)
         ExpenseModel.aggregate([
+            { $match: expenseFilter },
             {
                 $group: {
                     _id: '$categoryId',
@@ -189,19 +275,32 @@ async function getFinanceAnalytics(
     const deliveredData = deliveredOrdersResult[0] || { count: 0, revenue: 0 };
     const unpaidRevenue = unpaidOrdersResult[0]?.total || 0;
 
-    // Get total profit transfers (shared amount)
+    // Get total profit transfers (shared amount) - Filtered?
+    // Profit transfers usually have a date.
     const profitTransferResult = await ProfitTransferModel.aggregate([
+        { $match: { date: { $gte: startDate, $lte: endDate } } },
         { $group: { _id: null, total: { $sum: '$amount' } } },
     ]);
     const totalShared = profitTransferResult[0]?.total || 0;
 
-    // Get debit balance (Borrow - Return = net amount owed to us)
+    // Get debit balance - Filtered?
+    // Debits have dates.
     const debitBorrowResult = await DebitModel.aggregate([
-        { $match: { type: DebitType.BORROW } },
+        {
+            $match: {
+                type: DebitType.BORROW,
+                date: { $gte: startDate, $lte: endDate },
+            },
+        },
         { $group: { _id: null, total: { $sum: '$amount' } } },
     ]);
     const debitReturnResult = await DebitModel.aggregate([
-        { $match: { type: DebitType.RETURN } },
+        {
+            $match: {
+                type: DebitType.RETURN,
+                date: { $gte: startDate, $lte: endDate },
+            },
+        },
         { $group: { _id: null, total: { $sum: '$amount' } } },
     ]);
     const totalBorrow = debitBorrowResult[0]?.total || 0;
@@ -225,30 +324,25 @@ async function getFinanceAnalytics(
         deliveredOrders: deliveredData.count,
     };
 
-    // Build monthly trends (last 12 months)
+    // Build monthly trends (12 months of the selected year)
+    // Note: If 'month' param was passed, this still returns full year trends to keep charts context,
+    // OR it could return just that one month.
+    // Decision: Return full year trends so charts look good (contextual).
     const monthlyTrends: IMonthlyFinance[] = [];
-    for (let i = monthsToFetch - 1; i >= 0; i--) {
-        const date = subMonths(now, i);
-        const month = date.getMonth() + 1;
-        const yr = date.getFullYear();
 
-        const earningData = monthlyEarnings.find(
-            (e: any) => e._id.month === month && e._id.year === yr,
-        );
-        const expenseData = monthlyExpenses.find(
-            (e: any) => e._id.month === month && e._id.year === yr,
-        );
-        const orderData = monthlyOrders.find(
-            (o: any) => o._id.month === month && o._id.year === yr,
-        );
+    // Loop for 12 months of the requested year
+    for (let m = 1; m <= 12; m++) {
+        const earningData = monthlyEarnings.find((e: any) => e._id.month === m);
+        const expenseData = monthlyExpenses.find((e: any) => e._id.month === m);
+        const orderData = monthlyOrders.find((o: any) => o._id.month === m);
 
         const earnings = earningData?.total || 0;
         const expenses = expenseData?.total || 0;
 
         monthlyTrends.push({
-            month,
-            year: yr,
-            monthName: MONTH_NAMES[month - 1] || '',
+            month: m,
+            year: year,
+            monthName: MONTH_NAMES[m - 1] || '',
             earnings,
             expenses,
             profit: earnings - expenses,
@@ -294,4 +388,5 @@ async function getFinanceAnalytics(
 
 export default {
     getFinanceAnalytics,
+    getAvailableAnalyticsYears,
 };

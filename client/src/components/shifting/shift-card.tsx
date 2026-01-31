@@ -105,7 +105,7 @@ export default function ShiftCard({ shift }: ShiftCardProps) {
                                     <DropdownMenuItem
                                         onClick={() => setOpenEdit(true)}
                                     >
-                                        <Pencil className="mr-2 h-4 w-4" />
+                                        <Pencil className=" h-4 w-4" />
                                         Edit
                                     </DropdownMenuItem>
 

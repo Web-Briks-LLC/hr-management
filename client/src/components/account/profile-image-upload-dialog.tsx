@@ -72,7 +72,7 @@ export function ProfileImageUploadDialog() {
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
             <DialogTrigger asChild>
                 <Button className="absolute -top-16 right-0 group-hover/profile-image:top-0">
-                    <SquarePenIcon className="mr-2 h-4 w-4" />
+                    <SquarePenIcon className=" h-4 w-4" />
                     Update Image
                 </Button>
             </DialogTrigger>
@@ -92,7 +92,7 @@ export function ProfileImageUploadDialog() {
                             'relative flex h-48 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed transition',
                             isDragActive
                                 ? 'border-primary bg-primary/10'
-                                : 'border-muted-foreground/30'
+                                : 'border-muted-foreground/30',
                         )}
                     >
                         <Input {...getInputProps()} />

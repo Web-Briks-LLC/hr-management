@@ -53,7 +53,7 @@ import {
     TrendingUp,
     Wallet,
     Calendar as CalendarIcon,
-    Loader2,
+    Loader,
     ChevronLeft,
     ChevronRight,
     ChevronsLeft,
@@ -557,7 +557,7 @@ export default function EarningsPage() {
                             className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
                             onClick={() => setIsBulkWithdrawDialogOpen(true)}
                         >
-                            <Download className="mr-2 h-4 w-4" />
+                            <Download className=" h-4 w-4" />
                             Monthly Withdraw
                         </Button>
                     </div>
@@ -566,7 +566,7 @@ export default function EarningsPage() {
                 <CardContent className="space-y-6">
                     {/* Filters Toolbar */}
                     <div className="flex flex-wrap items-center gap-3 p-4 bg-muted/30 rounded-lg border border-border/50">
-                        <div className="flex items-center gap-2 mr-2">
+                        <div className="flex items-center gap-2 ">
                             <div className="bg-primary/10 p-2 rounded-full">
                                 <Filter className="h-4 w-4 text-primary" />
                             </div>
@@ -672,7 +672,7 @@ export default function EarningsPage() {
                                         variant="outline"
                                         className="w-[240px] h-9 bg-background/60 justify-start text-left font-normal animate-in fade-in slide-in-from-left-2"
                                     >
-                                        <CalendarIcon className="mr-2 h-4 w-4" />
+                                        <CalendarIcon className=" h-4 w-4" />
                                         {dateRange.from ? (
                                             dateRange.to ? (
                                                 <>
@@ -1266,7 +1266,7 @@ export default function EarningsPage() {
                             className="bg-green-600 hover:bg-green-700 text-white"
                         >
                             {isWithdrawing && (
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                <Loader className="h-4 w-4  animate-spin" />
                             )}
                             Confirm Withdrawal
                         </Button>
@@ -1583,7 +1583,7 @@ export default function EarningsPage() {
                         {/* Statement Content */}
                         {isLoadingClientOrders ? (
                             <div className="py-12 flex flex-col items-center justify-center space-y-3 opacity-80">
-                                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                                <Loader className="h-8 w-8 animate-spin text-primary" />
                                 <span className="text-sm font-medium">
                                     Fetching orders...
                                 </span>
@@ -1807,7 +1807,7 @@ export default function EarningsPage() {
                             >
                                 {isBulkWithdrawing ? (
                                     <>
-                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />{' '}
+                                        <Loader className=" h-4 w-4 animate-spin" />{' '}
                                         Processing...
                                     </>
                                 ) : (
@@ -1843,7 +1843,7 @@ export default function EarningsPage() {
                             className="bg-destructive hover:bg-destructive/90"
                         >
                             {isDeleting && (
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                <Loader className="h-4 w-4  animate-spin" />
                             )}
                             Delete Record
                         </AlertDialogAction>

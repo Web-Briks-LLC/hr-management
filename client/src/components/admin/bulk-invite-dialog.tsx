@@ -1,10 +1,17 @@
 'use client';
 
 import { useState } from 'react';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Upload, Download, Loader2, CheckCircle2, XCircle } from 'lucide-react';
+import { Upload, Download, Loader, CheckCircle2, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { parse } from 'papaparse';
 
@@ -79,7 +86,7 @@ jane@example.com,Team Leader,HR,team_leader,60000,BRANCH_ID_HERE,SHIFT_ID_HERE,7
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
                 <Button variant="outline">
-                    <Upload className="mr-2 h-4 w-4" />
+                    <Upload className=" h-4 w-4" />
                     Bulk Invite
                 </Button>
             </DialogTrigger>
@@ -96,13 +103,19 @@ jane@example.com,Team Leader,HR,team_leader,60000,BRANCH_ID_HERE,SHIFT_ID_HERE,7
                         <CardContent className="pt-6">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <h3 className="font-semibold">Step 1: Download Template</h3>
+                                    <h3 className="font-semibold">
+                                        Step 1: Download Template
+                                    </h3>
                                     <p className="text-sm text-muted-foreground">
-                                        Download the CSV template and fill in employee details
+                                        Download the CSV template and fill in
+                                        employee details
                                     </p>
                                 </div>
-                                <Button onClick={downloadTemplate} variant="outline">
-                                    <Download className="mr-2 h-4 w-4" />
+                                <Button
+                                    onClick={downloadTemplate}
+                                    variant="outline"
+                                >
+                                    <Download className=" h-4 w-4" />
                                     Download
                                 </Button>
                             </div>
@@ -113,9 +126,12 @@ jane@example.com,Team Leader,HR,team_leader,60000,BRANCH_ID_HERE,SHIFT_ID_HERE,7
                         <CardContent className="pt-6">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <h3 className="font-semibold">Step 2: Upload CSV</h3>
+                                    <h3 className="font-semibold">
+                                        Step 2: Upload CSV
+                                    </h3>
                                     <p className="text-sm text-muted-foreground">
-                                        Upload the filled CSV file to send invitations
+                                        Upload the filled CSV file to send
+                                        invitations
                                     </p>
                                 </div>
                                 <div>
@@ -132,12 +148,12 @@ jane@example.com,Team Leader,HR,team_leader,60000,BRANCH_ID_HERE,SHIFT_ID_HERE,7
                                             <span>
                                                 {isUploading ? (
                                                     <>
-                                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                        <Loader className=" h-4 w-4 animate-spin" />
                                                         Processing...
                                                     </>
                                                 ) : (
                                                     <>
-                                                        <Upload className="mr-2 h-4 w-4" />
+                                                        <Upload className=" h-4 w-4" />
                                                         Upload CSV
                                                     </>
                                                 )}
@@ -152,28 +168,41 @@ jane@example.com,Team Leader,HR,team_leader,60000,BRANCH_ID_HERE,SHIFT_ID_HERE,7
                     {results && (
                         <Card>
                             <CardContent className="pt-6">
-                                <h3 className="font-semibold mb-4">Upload Results</h3>
+                                <h3 className="font-semibold mb-4">
+                                    Upload Results
+                                </h3>
                                 <div className="space-y-2">
                                     <div className="flex items-center gap-2 text-green-600">
                                         <CheckCircle2 className="h-4 w-4" />
-                                        <span>{results.success.length} invitations sent successfully</span>
+                                        <span>
+                                            {results.success.length} invitations
+                                            sent successfully
+                                        </span>
                                     </div>
                                     {results.failed.length > 0 && (
                                         <div className="flex items-center gap-2 text-red-600">
                                             <XCircle className="h-4 w-4" />
-                                            <span>{results.failed.length} invitations failed</span>
+                                            <span>
+                                                {results.failed.length}{' '}
+                                                invitations failed
+                                            </span>
                                         </div>
                                     )}
                                 </div>
                                 {results.failed.length > 0 && (
                                     <div className="mt-4 p-4 bg-red-50 dark:bg-red-900/10 rounded-lg border border-red-200 dark:border-red-800">
-                                        <p className="text-sm font-semibold text-red-800 dark:text-red-200 mb-2">Failed Invitations:</p>
+                                        <p className="text-sm font-semibold text-red-800 dark:text-red-200 mb-2">
+                                            Failed Invitations:
+                                        </p>
                                         <ul className="text-sm text-red-700 dark:text-red-300 space-y-1">
-                                            {results.failed.map((fail: any, idx: number) => (
-                                                <li key={idx}>
-                                                    {fail.email}: {fail.error}
-                                                </li>
-                                            ))}
+                                            {results.failed.map(
+                                                (fail: any, idx: number) => (
+                                                    <li key={idx}>
+                                                        {fail.email}:{' '}
+                                                        {fail.error}
+                                                    </li>
+                                                ),
+                                            )}
                                         </ul>
                                     </div>
                                 )}

@@ -61,7 +61,7 @@ export function TransferProfitDialog() {
     const [errors, setErrors] = useState<Record<string, string>>({});
 
     const handleChange = (
-        e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+        e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
     ) => {
         const { name, value } = e.target;
         setFormData((prev) => ({ ...prev, [name]: value }));
@@ -95,7 +95,10 @@ export function TransferProfitDialog() {
                 businessId: formData.businessId,
                 amount: parseFloat(formData.amount),
                 periodType: formData.periodType,
-                month: formData.periodType === 'month' ? formData.month : undefined,
+                month:
+                    formData.periodType === 'month'
+                        ? formData.month
+                        : undefined,
                 year: formData.year,
                 notes: formData.notes || undefined,
             }).unwrap();
@@ -125,7 +128,7 @@ export function TransferProfitDialog() {
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
                 <Button variant="outline">
-                    <IconArrowRight className="mr-2 size-4" />
+                    <IconArrowRight className=" size-4" />
                     Transfer Profit
                 </Button>
             </DialogTrigger>
@@ -142,7 +145,10 @@ export function TransferProfitDialog() {
                         <Select
                             value={formData.businessId}
                             onValueChange={(v) =>
-                                setFormData((prev) => ({ ...prev, businessId: v }))
+                                setFormData((prev) => ({
+                                    ...prev,
+                                    businessId: v,
+                                }))
                             }
                         >
                             <SelectTrigger>
@@ -150,14 +156,19 @@ export function TransferProfitDialog() {
                             </SelectTrigger>
                             <SelectContent>
                                 {businesses.map((business) => (
-                                    <SelectItem key={business._id} value={business._id}>
+                                    <SelectItem
+                                        key={business._id}
+                                        value={business._id}
+                                    >
                                         {business.name}
                                     </SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
                         {errors.businessId && (
-                            <p className="text-sm text-destructive">{errors.businessId}</p>
+                            <p className="text-sm text-destructive">
+                                {errors.businessId}
+                            </p>
                         )}
                     </div>
 
@@ -172,7 +183,9 @@ export function TransferProfitDialog() {
                             onChange={handleChange}
                         />
                         {errors.amount && (
-                            <p className="text-sm text-destructive">{errors.amount}</p>
+                            <p className="text-sm text-destructive">
+                                {errors.amount}
+                            </p>
                         )}
                     </div>
 
@@ -181,7 +194,10 @@ export function TransferProfitDialog() {
                         <Select
                             value={formData.periodType}
                             onValueChange={(v: 'month' | 'year') =>
-                                setFormData((prev) => ({ ...prev, periodType: v }))
+                                setFormData((prev) => ({
+                                    ...prev,
+                                    periodType: v,
+                                }))
                             }
                         >
                             <SelectTrigger>
@@ -212,14 +228,19 @@ export function TransferProfitDialog() {
                                     </SelectTrigger>
                                     <SelectContent>
                                         {months.map((m) => (
-                                            <SelectItem key={m.value} value={m.value.toString()}>
+                                            <SelectItem
+                                                key={m.value}
+                                                value={m.value.toString()}
+                                            >
                                                 {m.label}
                                             </SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
                                 {errors.month && (
-                                    <p className="text-sm text-destructive">{errors.month}</p>
+                                    <p className="text-sm text-destructive">
+                                        {errors.month}
+                                    </p>
                                 )}
                             </div>
                         )}
@@ -229,7 +250,10 @@ export function TransferProfitDialog() {
                             <Select
                                 value={formData.year.toString()}
                                 onValueChange={(v) =>
-                                    setFormData((prev) => ({ ...prev, year: Number(v) }))
+                                    setFormData((prev) => ({
+                                        ...prev,
+                                        year: Number(v),
+                                    }))
                                 }
                             >
                                 <SelectTrigger>
@@ -237,7 +261,10 @@ export function TransferProfitDialog() {
                                 </SelectTrigger>
                                 <SelectContent>
                                     {years.map((y) => (
-                                        <SelectItem key={y} value={y.toString()}>
+                                        <SelectItem
+                                            key={y}
+                                            value={y.toString()}
+                                        >
                                             {y}
                                         </SelectItem>
                                     ))}

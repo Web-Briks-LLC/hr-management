@@ -25,7 +25,7 @@ import {
     useDistributeProfitMutation,
 } from '@/redux/features/profitShare/profitShareApi';
 import { useGetFinanceAnalyticsQuery } from '@/redux/features/analytics/analyticsApi';
-import { Loader2, Share2, Wallet, TrendingUp } from 'lucide-react';
+import { Loader, Share2, Wallet, TrendingUp } from 'lucide-react';
 import { toast } from 'sonner';
 
 const months = [
@@ -52,7 +52,9 @@ const years = Array.from({ length: 5 }, (_, i) => ({
 export default function ShareProfitDialog() {
     const [open, setOpen] = useState(false);
     const [selectedPartnerId, setSelectedPartnerId] = useState('');
-    const [selectedMonth, setSelectedMonth] = useState(String(new Date().getMonth() + 1));
+    const [selectedMonth, setSelectedMonth] = useState(
+        String(new Date().getMonth() + 1),
+    );
     const [selectedYear, setSelectedYear] = useState(String(currentYear));
     const [amount, setAmount] = useState('');
     const [notes, setNotes] = useState('');
@@ -61,11 +63,13 @@ export default function ShareProfitDialog() {
     const { data: analyticsData } = useGetFinanceAnalyticsQuery({ months: 12 });
     const [distributeProfit, { isLoading }] = useDistributeProfitMutation();
 
-    const shareholders = shareholdersData?.data?.filter((s) => s.isActive) || [];
+    const shareholders =
+        shareholdersData?.data?.filter((s) => s.isActive) || [];
     const analytics = analyticsData?.summary;
 
     // Calculate available profit (Profit + Debit)
-    const availableProfit = (analytics?.totalProfit || 0) + (analytics?.totalDebit || 0);
+    const availableProfit =
+        (analytics?.totalProfit || 0) + (analytics?.totalDebit || 0);
 
     const formatCurrency = (value: number) => {
         return new Intl.NumberFormat('en-BD', {
@@ -76,7 +80,9 @@ export default function ShareProfitDialog() {
         }).format(value);
     };
 
-    const selectedPartner = shareholders.find((s) => s._id === selectedPartnerId);
+    const selectedPartner = shareholders.find(
+        (s) => s._id === selectedPartnerId,
+    );
 
     const handleSubmit = async () => {
         if (!selectedPartnerId) {
@@ -91,7 +97,9 @@ export default function ShareProfitDialog() {
         }
 
         if (shareAmount > availableProfit) {
-            toast.warning(`Amount exceeds available profit of ${formatCurrency(availableProfit)}`);
+            toast.warning(
+                `Amount exceeds available profit of ${formatCurrency(availableProfit)}`,
+            );
         }
 
         try {
@@ -105,7 +113,9 @@ export default function ShareProfitDialog() {
                 customAmount: shareAmount,
             }).unwrap();
 
-            toast.success(`Successfully shared ${formatCurrency(shareAmount)} with ${selectedPartner?.name}`);
+            toast.success(
+                `Successfully shared ${formatCurrency(shareAmount)} with ${selectedPartner?.name}`,
+            );
             setOpen(false);
             // Reset form
             setSelectedPartnerId('');
@@ -173,13 +183,19 @@ export default function ShareProfitDialog() {
                     {/* Partner Selection */}
                     <div className="space-y-2">
                         <Label>Select Partner *</Label>
-                        <Select value={selectedPartnerId} onValueChange={setSelectedPartnerId}>
+                        <Select
+                            value={selectedPartnerId}
+                            onValueChange={setSelectedPartnerId}
+                        >
                             <SelectTrigger>
                                 <SelectValue placeholder="Choose a partner" />
                             </SelectTrigger>
                             <SelectContent>
                                 {shareholders.map((shareholder) => (
-                                    <SelectItem key={shareholder._id} value={shareholder._id}>
+                                    <SelectItem
+                                        key={shareholder._id}
+                                        value={shareholder._id}
+                                    >
                                         <div className="flex items-center gap-2">
                                             <span>{shareholder.name}</span>
                                             <span className="text-muted-foreground text-xs">
@@ -192,7 +208,8 @@ export default function ShareProfitDialog() {
                         </Select>
                         {shareholders.length === 0 && (
                             <p className="text-xs text-muted-foreground">
-                                No active shareholders found. Add shareholders first.
+                                No active shareholders found. Add shareholders
+                                first.
                             </p>
                         )}
                     </div>
@@ -201,13 +218,19 @@ export default function ShareProfitDialog() {
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <Label>Month</Label>
-                            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                            <Select
+                                value={selectedMonth}
+                                onValueChange={setSelectedMonth}
+                            >
                                 <SelectTrigger>
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {months.map((month) => (
-                                        <SelectItem key={month.value} value={month.value}>
+                                        <SelectItem
+                                            key={month.value}
+                                            value={month.value}
+                                        >
                                             {month.label}
                                         </SelectItem>
                                     ))}
@@ -216,13 +239,19 @@ export default function ShareProfitDialog() {
                         </div>
                         <div className="space-y-2">
                             <Label>Year</Label>
-                            <Select value={selectedYear} onValueChange={setSelectedYear}>
+                            <Select
+                                value={selectedYear}
+                                onValueChange={setSelectedYear}
+                            >
                                 <SelectTrigger>
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {years.map((year) => (
-                                        <SelectItem key={year.value} value={year.value}>
+                                        <SelectItem
+                                            key={year.value}
+                                            value={year.value}
+                                        >
                                             {year.label}
                                         </SelectItem>
                                     ))}
@@ -250,7 +279,10 @@ export default function ShareProfitDialog() {
                         </div>
                         {parseFloat(amount) > 0 && selectedPartner && (
                             <p className="text-sm text-muted-foreground">
-                                {selectedPartner.name} will receive <span className="font-semibold text-primary">{formatCurrency(parseFloat(amount))}</span>
+                                {selectedPartner.name} will receive{' '}
+                                <span className="font-semibold text-primary">
+                                    {formatCurrency(parseFloat(amount))}
+                                </span>
                             </p>
                         )}
                     </div>
@@ -269,17 +301,23 @@ export default function ShareProfitDialog() {
 
                     {/* Actions */}
                     <div className="flex justify-end gap-3 pt-2">
-                        <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setOpen(false)}
+                        >
                             Cancel
                         </Button>
                         <Button
                             onClick={handleSubmit}
-                            disabled={isLoading || !selectedPartnerId || !amount}
+                            disabled={
+                                isLoading || !selectedPartnerId || !amount
+                            }
                             className="gap-2"
                         >
                             {isLoading ? (
                                 <>
-                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    <Loader className="h-4 w-4 animate-spin" />
                                     Sharing...
                                 </>
                             ) : (

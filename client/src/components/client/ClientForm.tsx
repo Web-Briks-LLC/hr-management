@@ -15,7 +15,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Loader2 } from 'lucide-react';
+import { Loader } from 'lucide-react';
 import { useLazyCheckClientIdQuery } from '@/redux/features/client/clientApi';
 
 // Zod schema for client form validation
@@ -25,9 +25,18 @@ export const clientFormSchema = z.object({
         .min(1, 'Client ID is required')
         .min(2, 'Client ID must be at least 2 characters')
         .max(50, 'Client ID must be at most 50 characters')
-        .regex(/^[A-Za-z0-9_-]+$/, 'Client ID can only contain letters, numbers, hyphens, and underscores'),
-    name: z.string().min(1, 'Name is required').min(2, 'Name must be at least 2 characters'),
-    email: z.string().min(1, 'Email is required').email('Invalid email address'),
+        .regex(
+            /^[A-Za-z0-9_-]+$/,
+            'Client ID can only contain letters, numbers, hyphens, and underscores',
+        ),
+    name: z
+        .string()
+        .min(1, 'Name is required')
+        .min(2, 'Name must be at least 2 characters'),
+    email: z
+        .string()
+        .min(1, 'Email is required')
+        .email('Invalid email address'),
     phone: z.string().optional(),
     address: z.string().optional(),
     officeAddress: z.string().optional(),
@@ -71,7 +80,8 @@ export function ClientForm({
     serverErrors,
     isEditMode = false,
 }: ClientFormProps) {
-    const [checkClientId, { isFetching: isCheckingId }] = useLazyCheckClientIdQuery();
+    const [checkClientId, { isFetching: isCheckingId }] =
+        useLazyCheckClientIdQuery();
     const [clientIdError, setClientIdError] = useState<string | null>(null);
     const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -120,7 +130,7 @@ export function ClientForm({
                 if (!result.available) {
                     const suggestions = result.suggestions?.join(', ') || '';
                     setClientIdError(
-                        `Client ID "${clientIdValue}" already exists.${suggestions ? ` Try: ${suggestions}` : ''}`
+                        `Client ID "${clientIdValue}" already exists.${suggestions ? ` Try: ${suggestions}` : ''}`,
                     );
                 } else {
                     setClientIdError(null);
@@ -179,12 +189,14 @@ export function ClientForm({
                         />
                         {isCheckingId && !isEditMode && (
                             <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                                <Loader className="h-4 w-4 animate-spin text-muted-foreground" />
                             </div>
                         )}
                     </div>
                     {getFieldError('clientId') && (
-                        <p className="text-sm text-destructive mt-1">{getFieldError('clientId')}</p>
+                        <p className="text-sm text-destructive mt-1">
+                            {getFieldError('clientId')}
+                        </p>
                     )}
                     {!isEditMode && !getFieldError('clientId') && (
                         <p className="text-xs text-muted-foreground mt-1">
@@ -206,7 +218,9 @@ export function ClientForm({
                         {...register('name')}
                     />
                     {getFieldError('name') && (
-                        <p className="text-sm text-destructive mt-1">{getFieldError('name')}</p>
+                        <p className="text-sm text-destructive mt-1">
+                            {getFieldError('name')}
+                        </p>
                     )}
                 </div>
             </div>
@@ -224,7 +238,9 @@ export function ClientForm({
                         {...register('email')}
                     />
                     {getFieldError('email') && (
-                        <p className="text-sm text-destructive mt-1">{getFieldError('email')}</p>
+                        <p className="text-sm text-destructive mt-1">
+                            {getFieldError('email')}
+                        </p>
                     )}
                 </div>
             </div>
@@ -301,14 +317,19 @@ export function ClientForm({
                 <div className="col-span-3">
                     <Select
                         value={watch('currency') || ''}
-                        onValueChange={(value) => setValue('currency', value || undefined)}
+                        onValueChange={(value) =>
+                            setValue('currency', value || undefined)
+                        }
                     >
                         <SelectTrigger className="w-full">
                             <SelectValue placeholder="Select currency (optional)" />
                         </SelectTrigger>
                         <SelectContent>
                             {currencyOptions.map((opt) => (
-                                <SelectItem key={opt.value || 'none'} value={opt.value || 'none'}>
+                                <SelectItem
+                                    key={opt.value || 'none'}
+                                    value={opt.value || 'none'}
+                                >
                                     {opt.label}
                                 </SelectItem>
                             ))}
@@ -339,8 +360,13 @@ export function ClientForm({
                 <Button type="button" variant="outline" onClick={onCancel}>
                     Cancel
                 </Button>
-                <Button type="submit" disabled={isSubmitting || (!!clientIdError && !isEditMode)}>
-                    {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                <Button
+                    type="submit"
+                    disabled={isSubmitting || (!!clientIdError && !isEditMode)}
+                >
+                    {isSubmitting && (
+                        <Loader className="h-4 w-4  animate-spin" />
+                    )}
                     {submitLabel}
                 </Button>
             </div>

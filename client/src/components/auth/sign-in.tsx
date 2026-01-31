@@ -169,7 +169,7 @@ export default function SigninForm() {
                         className="w-full"
                         disabled={isLoading}
                     >
-                        {isLoading && <Spinner className="mr-2" />}
+                        {isLoading && <Spinner className="" />}
                         Sign In
                     </Button>
                 </CardFooter>

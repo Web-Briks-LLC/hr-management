@@ -30,12 +30,17 @@ import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default function OvertimeList() {
-    const { data: overtimeData, isLoading, isError, error } = useGetAllOvertimeQuery({});
+    const {
+        data: overtimeData,
+        isLoading,
+        isError,
+        error,
+    } = useGetAllOvertimeQuery({});
     const [deleteOvertime] = useDeleteOvertimeMutation();
 
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [selectedOvertime, setSelectedOvertime] = useState<IOvertime | null>(
-        null
+        null,
     );
 
     const handleDelete = async (id: string) => {
@@ -59,7 +64,8 @@ export default function OvertimeList() {
     };
 
     if (isLoading) return <div>Loading overtime records...</div>;
-    if (isError) return <div className="text-red-500">Error loading records.</div>;
+    if (isError)
+        return <div className="text-red-500">Error loading records.</div>;
 
     const records = (overtimeData as IOvertime[]) || [];
 
@@ -117,7 +123,7 @@ export default function OvertimeList() {
                                             <TableCell>
                                                 {format(
                                                     new Date(ot.date),
-                                                    'MMM dd, yyyy'
+                                                    'MMM dd, yyyy',
                                                 )}
                                             </TableCell>
                                             <TableCell className="capitalize">
@@ -125,7 +131,7 @@ export default function OvertimeList() {
                                             </TableCell>
                                             <TableCell>
                                                 {Math.floor(
-                                                    ot.durationMinutes / 60
+                                                    ot.durationMinutes / 60,
                                                 )}
                                                 h {ot.durationMinutes % 60}m
                                             </TableCell>
@@ -142,7 +148,9 @@ export default function OvertimeList() {
                                             </TableCell>
                                             <TableCell className="text-right">
                                                 <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild>
+                                                    <DropdownMenuTrigger
+                                                        asChild
+                                                    >
                                                         <Button
                                                             variant="ghost"
                                                             className="h-8 w-8 p-0"
@@ -162,18 +170,18 @@ export default function OvertimeList() {
                                                                 handleEdit(ot)
                                                             }
                                                         >
-                                                            <Edit className="mr-2 h-4 w-4" />{' '}
+                                                            <Edit className=" h-4 w-4" />{' '}
                                                             Edit
                                                         </DropdownMenuItem>
                                                         <DropdownMenuItem
                                                             onClick={() =>
                                                                 handleDelete(
-                                                                    ot._id
+                                                                    ot._id,
                                                                 )
                                                             }
                                                             className="text-red-600"
                                                         >
-                                                            <Trash className="mr-2 h-4 w-4" />{' '}
+                                                            <Trash className=" h-4 w-4" />{' '}
                                                             Delete
                                                         </DropdownMenuItem>
                                                     </DropdownMenuContent>

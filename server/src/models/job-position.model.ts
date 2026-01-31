@@ -116,12 +116,11 @@ const jobPositionSchema = new Schema<IJobPosition>(
     },
     {
         timestamps: true,
-    }
+    },
 );
 
 // Indexes
 jobPositionSchema.index({ isOpened: 1, deadline: -1 });
-jobPositionSchema.index({ slug: 1 });
 
 const JobPositionModel = model<IJobPosition>('JobPosition', jobPositionSchema);
 

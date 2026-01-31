@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Plus, Trash2, Loader2 } from 'lucide-react';
+import { X, Plus, Trash2, Loader } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -25,11 +25,16 @@ interface PositionFormModalProps {
     onClose: () => void;
 }
 
-export function PositionFormModal({ position, onClose }: PositionFormModalProps) {
+export function PositionFormModal({
+    position,
+    onClose,
+}: PositionFormModalProps) {
     const isEditing = !!position;
 
-    const [createPosition, { isLoading: isCreating }] = useCreatePositionMutation();
-    const [updatePosition, { isLoading: isUpdating }] = useUpdatePositionMutation();
+    const [createPosition, { isLoading: isCreating }] =
+        useCreatePositionMutation();
+    const [updatePosition, { isLoading: isUpdating }] =
+        useUpdatePositionMutation();
 
     const isLoading = isCreating || isUpdating;
 
@@ -66,9 +71,16 @@ export function PositionFormModal({ position, onClose }: PositionFormModalProps)
                 deadline: position.deadline.split('T')[0],
                 companyHistory: position.companyHistory,
                 description: position.description,
-                responsibilities: position.responsibilities.length > 0 ? position.responsibilities : [''],
-                requirements: position.requirements.length > 0 ? position.requirements : [''],
-                benefits: position.benefits.length > 0 ? position.benefits : [''],
+                responsibilities:
+                    position.responsibilities.length > 0
+                        ? position.responsibilities
+                        : [''],
+                requirements:
+                    position.requirements.length > 0
+                        ? position.requirements
+                        : [''],
+                benefits:
+                    position.benefits.length > 0 ? position.benefits : [''],
                 shift: position.shift || '',
                 gender: position.gender || '',
                 isOpened: position.isOpened,
@@ -76,21 +88,33 @@ export function PositionFormModal({ position, onClose }: PositionFormModalProps)
         }
     }, [position]);
 
-    const handleChange = (field: keyof CreateJobPositionInput, value: unknown) => {
+    const handleChange = (
+        field: keyof CreateJobPositionInput,
+        value: unknown,
+    ) => {
         setFormData((prev) => ({ ...prev, [field]: value }));
     };
 
-    const handleArrayChange = (field: 'responsibilities' | 'requirements' | 'benefits', index: number, value: string) => {
+    const handleArrayChange = (
+        field: 'responsibilities' | 'requirements' | 'benefits',
+        index: number,
+        value: string,
+    ) => {
         const arr = [...(formData[field] || [])];
         arr[index] = value;
         handleChange(field, arr);
     };
 
-    const addArrayItem = (field: 'responsibilities' | 'requirements' | 'benefits') => {
+    const addArrayItem = (
+        field: 'responsibilities' | 'requirements' | 'benefits',
+    ) => {
         handleChange(field, [...(formData[field] || []), '']);
     };
 
-    const removeArrayItem = (field: 'responsibilities' | 'requirements' | 'benefits', index: number) => {
+    const removeArrayItem = (
+        field: 'responsibilities' | 'requirements' | 'benefits',
+        index: number,
+    ) => {
         const arr = [...(formData[field] || [])];
         arr.splice(index, 1);
         handleChange(field, arr.length > 0 ? arr : ['']);
@@ -109,7 +133,10 @@ export function PositionFormModal({ position, onClose }: PositionFormModalProps)
 
         try {
             if (isEditing && position) {
-                await updatePosition({ id: position._id, ...cleanData }).unwrap();
+                await updatePosition({
+                    id: position._id,
+                    ...cleanData,
+                }).unwrap();
                 toast.success('Position updated successfully');
             } else {
                 await createPosition(cleanData).unwrap();
@@ -117,7 +144,11 @@ export function PositionFormModal({ position, onClose }: PositionFormModalProps)
             }
             onClose();
         } catch {
-            toast.error(isEditing ? 'Failed to update position' : 'Failed to create position');
+            toast.error(
+                isEditing
+                    ? 'Failed to update position'
+                    : 'Failed to create position',
+            );
         }
     };
 
@@ -126,7 +157,9 @@ export function PositionFormModal({ position, onClose }: PositionFormModalProps)
             <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>
-                        {isEditing ? 'Edit Job Position' : 'Create New Job Position'}
+                        {isEditing
+                            ? 'Edit Job Position'
+                            : 'Create New Job Position'}
                     </DialogTitle>
                 </DialogHeader>
 
@@ -138,7 +171,9 @@ export function PositionFormModal({ position, onClose }: PositionFormModalProps)
                             <Input
                                 id="title"
                                 value={formData.title}
-                                onChange={(e) => handleChange('title', e.target.value)}
+                                onChange={(e) =>
+                                    handleChange('title', e.target.value)
+                                }
                                 required
                                 placeholder="e.g. Full Stack Developer"
                             />
@@ -148,7 +183,9 @@ export function PositionFormModal({ position, onClose }: PositionFormModalProps)
                             <Input
                                 id="company"
                                 value={formData.company}
-                                onChange={(e) => handleChange('company', e.target.value)}
+                                onChange={(e) =>
+                                    handleChange('company', e.target.value)
+                                }
                                 required
                             />
                         </div>
@@ -160,7 +197,9 @@ export function PositionFormModal({ position, onClose }: PositionFormModalProps)
                             <Input
                                 id="location"
                                 value={formData.location}
-                                onChange={(e) => handleChange('location', e.target.value)}
+                                onChange={(e) =>
+                                    handleChange('location', e.target.value)
+                                }
                                 required
                             />
                         </div>
@@ -170,7 +209,9 @@ export function PositionFormModal({ position, onClose }: PositionFormModalProps)
                                 id="deadline"
                                 type="date"
                                 value={formData.deadline}
-                                onChange={(e) => handleChange('deadline', e.target.value)}
+                                onChange={(e) =>
+                                    handleChange('deadline', e.target.value)
+                                }
                                 required
                             />
                         </div>
@@ -184,7 +225,12 @@ export function PositionFormModal({ position, onClose }: PositionFormModalProps)
                                 type="number"
                                 min="1"
                                 value={formData.vacancies}
-                                onChange={(e) => handleChange('vacancies', parseInt(e.target.value) || 1)}
+                                onChange={(e) =>
+                                    handleChange(
+                                        'vacancies',
+                                        parseInt(e.target.value) || 1,
+                                    )
+                                }
                             />
                         </div>
                         <div className="space-y-2">
@@ -192,7 +238,9 @@ export function PositionFormModal({ position, onClose }: PositionFormModalProps)
                             <Input
                                 id="jobType"
                                 value={formData.jobType}
-                                onChange={(e) => handleChange('jobType', e.target.value)}
+                                onChange={(e) =>
+                                    handleChange('jobType', e.target.value)
+                                }
                                 placeholder="e.g. Work at office"
                             />
                         </div>
@@ -201,7 +249,9 @@ export function PositionFormModal({ position, onClose }: PositionFormModalProps)
                             <Input
                                 id="salary"
                                 value={formData.salary}
-                                onChange={(e) => handleChange('salary', e.target.value)}
+                                onChange={(e) =>
+                                    handleChange('salary', e.target.value)
+                                }
                                 placeholder="e.g. Negotiable"
                             />
                         </div>
@@ -213,7 +263,9 @@ export function PositionFormModal({ position, onClose }: PositionFormModalProps)
                             <Input
                                 id="officeTime"
                                 value={formData.officeTime}
-                                onChange={(e) => handleChange('officeTime', e.target.value)}
+                                onChange={(e) =>
+                                    handleChange('officeTime', e.target.value)
+                                }
                                 placeholder="e.g. 10:00 AM - 7:00 PM"
                             />
                         </div>
@@ -222,16 +274,22 @@ export function PositionFormModal({ position, onClose }: PositionFormModalProps)
                             <Input
                                 id="shift"
                                 value={formData.shift}
-                                onChange={(e) => handleChange('shift', e.target.value)}
+                                onChange={(e) =>
+                                    handleChange('shift', e.target.value)
+                                }
                                 placeholder="e.g. Evening & Night Shift"
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="gender">Target Gender (Optional)</Label>
+                            <Label htmlFor="gender">
+                                Target Gender (Optional)
+                            </Label>
                             <Input
                                 id="gender"
                                 value={formData.gender}
-                                onChange={(e) => handleChange('gender', e.target.value)}
+                                onChange={(e) =>
+                                    handleChange('gender', e.target.value)
+                                }
                                 placeholder="e.g. Female"
                             />
                         </div>
@@ -243,7 +301,9 @@ export function PositionFormModal({ position, onClose }: PositionFormModalProps)
                         <Textarea
                             id="description"
                             value={formData.description}
-                            onChange={(e) => handleChange('description', e.target.value)}
+                            onChange={(e) =>
+                                handleChange('description', e.target.value)
+                            }
                             required
                             rows={4}
                             placeholder="Describe the job role and what you're looking for..."
@@ -251,11 +311,15 @@ export function PositionFormModal({ position, onClose }: PositionFormModalProps)
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="companyHistory">Company Description</Label>
+                        <Label htmlFor="companyHistory">
+                            Company Description
+                        </Label>
                         <Textarea
                             id="companyHistory"
                             value={formData.companyHistory}
-                            onChange={(e) => handleChange('companyHistory', e.target.value)}
+                            onChange={(e) =>
+                                handleChange('companyHistory', e.target.value)
+                            }
                             rows={3}
                             placeholder="Brief history or description of the company..."
                         />
@@ -265,7 +329,12 @@ export function PositionFormModal({ position, onClose }: PositionFormModalProps)
                     <div className="space-y-3">
                         <div className="flex items-center justify-between">
                             <Label>Responsibilities</Label>
-                            <Button type="button" variant="outline" size="sm" onClick={() => addArrayItem('responsibilities')}>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => addArrayItem('responsibilities')}
+                            >
                                 <Plus className="h-3 w-3 mr-1" /> Add
                             </Button>
                         </div>
@@ -273,11 +342,28 @@ export function PositionFormModal({ position, onClose }: PositionFormModalProps)
                             <div key={index} className="flex gap-2">
                                 <Input
                                     value={item}
-                                    onChange={(e) => handleArrayChange('responsibilities', index, e.target.value)}
+                                    onChange={(e) =>
+                                        handleArrayChange(
+                                            'responsibilities',
+                                            index,
+                                            e.target.value,
+                                        )
+                                    }
                                     placeholder="Enter responsibility..."
                                 />
-                                {(formData.responsibilities?.length || 0) > 1 && (
-                                    <Button type="button" variant="ghost" size="icon" onClick={() => removeArrayItem('responsibilities', index)}>
+                                {(formData.responsibilities?.length || 0) >
+                                    1 && (
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() =>
+                                            removeArrayItem(
+                                                'responsibilities',
+                                                index,
+                                            )
+                                        }
+                                    >
                                         <Trash2 className="h-4 w-4 text-destructive" />
                                     </Button>
                                 )}
@@ -289,7 +375,12 @@ export function PositionFormModal({ position, onClose }: PositionFormModalProps)
                     <div className="space-y-3">
                         <div className="flex items-center justify-between">
                             <Label>Requirements</Label>
-                            <Button type="button" variant="outline" size="sm" onClick={() => addArrayItem('requirements')}>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => addArrayItem('requirements')}
+                            >
                                 <Plus className="h-3 w-3 mr-1" /> Add
                             </Button>
                         </div>
@@ -297,11 +388,27 @@ export function PositionFormModal({ position, onClose }: PositionFormModalProps)
                             <div key={index} className="flex gap-2">
                                 <Input
                                     value={item}
-                                    onChange={(e) => handleArrayChange('requirements', index, e.target.value)}
+                                    onChange={(e) =>
+                                        handleArrayChange(
+                                            'requirements',
+                                            index,
+                                            e.target.value,
+                                        )
+                                    }
                                     placeholder="Enter requirement..."
                                 />
                                 {(formData.requirements?.length || 0) > 1 && (
-                                    <Button type="button" variant="ghost" size="icon" onClick={() => removeArrayItem('requirements', index)}>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() =>
+                                            removeArrayItem(
+                                                'requirements',
+                                                index,
+                                            )
+                                        }
+                                    >
                                         <Trash2 className="h-4 w-4 text-destructive" />
                                     </Button>
                                 )}
@@ -313,7 +420,12 @@ export function PositionFormModal({ position, onClose }: PositionFormModalProps)
                     <div className="space-y-3">
                         <div className="flex items-center justify-between">
                             <Label>Benefits</Label>
-                            <Button type="button" variant="outline" size="sm" onClick={() => addArrayItem('benefits')}>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => addArrayItem('benefits')}
+                            >
                                 <Plus className="h-3 w-3 mr-1" /> Add
                             </Button>
                         </div>
@@ -321,11 +433,24 @@ export function PositionFormModal({ position, onClose }: PositionFormModalProps)
                             <div key={index} className="flex gap-2">
                                 <Input
                                     value={item}
-                                    onChange={(e) => handleArrayChange('benefits', index, e.target.value)}
+                                    onChange={(e) =>
+                                        handleArrayChange(
+                                            'benefits',
+                                            index,
+                                            e.target.value,
+                                        )
+                                    }
                                     placeholder="Enter benefit..."
                                 />
                                 {(formData.benefits?.length || 0) > 1 && (
-                                    <Button type="button" variant="ghost" size="icon" onClick={() => removeArrayItem('benefits', index)}>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() =>
+                                            removeArrayItem('benefits', index)
+                                        }
+                                    >
                                         <Trash2 className="h-4 w-4 text-destructive" />
                                     </Button>
                                 )}
@@ -336,25 +461,40 @@ export function PositionFormModal({ position, onClose }: PositionFormModalProps)
                     {/* Status Toggle */}
                     <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
                         <div>
-                            <Label htmlFor="isOpened" className="text-base font-medium">Position Status</Label>
+                            <Label
+                                htmlFor="isOpened"
+                                className="text-base font-medium"
+                            >
+                                Position Status
+                            </Label>
                             <p className="text-sm text-muted-foreground">
-                                {formData.isOpened ? 'Position is open for applications' : 'Position is closed'}
+                                {formData.isOpened
+                                    ? 'Position is open for applications'
+                                    : 'Position is closed'}
                             </p>
                         </div>
                         <Switch
                             id="isOpened"
                             checked={formData.isOpened}
-                            onCheckedChange={(checked) => handleChange('isOpened', checked)}
+                            onCheckedChange={(checked) =>
+                                handleChange('isOpened', checked)
+                            }
                         />
                     </div>
 
                     {/* Actions */}
                     <div className="flex justify-end gap-3 pt-4 border-t">
-                        <Button type="button" variant="outline" onClick={onClose}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={onClose}
+                        >
                             Cancel
                         </Button>
                         <Button type="submit" disabled={isLoading}>
-                            {isLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                            {isLoading && (
+                                <Loader className="h-4 w-4  animate-spin" />
+                            )}
                             {isEditing ? 'Update Position' : 'Create Position'}
                         </Button>
                     </div>

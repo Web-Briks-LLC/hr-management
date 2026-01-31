@@ -13,7 +13,7 @@ import {
     UserX,
     Clock,
     CheckCircle,
-    Loader2,
+    Loader,
     Search,
     X,
     ChevronLeft,
@@ -99,7 +99,7 @@ function StatusSelect({
         try {
             await onStatusChange(
                 application._id,
-                newStatus as ApplicationStatus
+                newStatus as ApplicationStatus,
             );
         } finally {
             setIsUpdating(false);
@@ -119,7 +119,7 @@ function StatusSelect({
                     }`}
                 >
                     {isUpdating ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
+                        <Loader className="h-3 w-3 animate-spin" />
                     ) : (
                         <SelectValue />
                     )}
@@ -255,7 +255,7 @@ function Pagination({
                         >
                             {page}
                         </span>
-                    )
+                    ),
                 )}
 
                 <Button
@@ -346,7 +346,7 @@ export default function CareersPage() {
     const totalApplications = stats
         ? Object.values(stats.byStatus).reduce(
               (a: number, b: number) => a + b,
-              0
+              0,
           )
         : 0;
 
@@ -367,12 +367,12 @@ export default function CareersPage() {
 
     const handleStatusChange = async (
         id: string,
-        status: ApplicationStatus
+        status: ApplicationStatus,
     ) => {
         try {
             await updateStatus({ id, status }).unwrap();
             toast.success(
-                `Status updated to ${APPLICATION_STATUS_LABELS[status]}`
+                `Status updated to ${APPLICATION_STATUS_LABELS[status]}`,
             );
         } catch {
             toast.error('Failed to update status');
@@ -619,7 +619,7 @@ export default function CareersPage() {
 
                             {isFetching && (
                                 <div className="ml-auto flex items-center gap-2 text-muted-foreground">
-                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    <Loader className="h-4 w-4 animate-spin" />
                                     <span className="text-sm">Loading...</span>
                                 </div>
                             )}
@@ -713,7 +713,7 @@ export default function CareersPage() {
                                             <TableCell>
                                                 {format(
                                                     new Date(app.createdAt),
-                                                    'MMM dd, yyyy'
+                                                    'MMM dd, yyyy',
                                                 )}
                                             </TableCell>
                                             <TableCell className="text-right">
@@ -723,7 +723,7 @@ export default function CareersPage() {
                                                         size="icon"
                                                         onClick={() =>
                                                             setSelectedApplication(
-                                                                app
+                                                                app,
                                                             )
                                                         }
                                                         title="View Details"
@@ -751,7 +751,7 @@ export default function CareersPage() {
                                                         size="icon"
                                                         onClick={() =>
                                                             setDeleteTarget(
-                                                                app._id
+                                                                app._id,
                                                             )
                                                         }
                                                         title="Delete"

@@ -1,7 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import {
@@ -11,9 +17,22 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { useGetProfitSummaryQuery, useGetShareholdersQuery } from '@/redux/features/profitShare/profitShareApi';
+import {
+    useGetProfitSummaryQuery,
+    useGetShareholdersQuery,
+} from '@/redux/features/profitShare/profitShareApi';
 import { useGetFinanceAnalyticsQuery } from '@/redux/features/analytics/analyticsApi';
-import { Loader2, TrendingUp, TrendingDown, Wallet, PieChart, DollarSign, CreditCard, AlertCircle, Calculator } from 'lucide-react';
+import {
+    Loader,
+    TrendingUp,
+    TrendingDown,
+    Wallet,
+    PieChart,
+    DollarSign,
+    CreditCard,
+    AlertCircle,
+    Calculator,
+} from 'lucide-react';
 import DistributeProfitDialog from './distribute-profit-dialog';
 import ShareProfitDialog from './share-profit-dialog';
 
@@ -40,14 +59,17 @@ const years = Array.from({ length: 5 }, (_, i) => ({
 
 export default function ProfitOverview() {
     const [periodType, setPeriodType] = useState<'month' | 'year'>('month');
-    const [selectedMonth, setSelectedMonth] = useState(String(new Date().getMonth() + 1));
+    const [selectedMonth, setSelectedMonth] = useState(
+        String(new Date().getMonth() + 1),
+    );
     const [selectedYear, setSelectedYear] = useState(String(currentYear));
 
-    const { data: summaryData, isLoading: isLoadingSummary } = useGetProfitSummaryQuery({
-        periodType,
-        month: periodType === 'month' ? parseInt(selectedMonth) : undefined,
-        year: parseInt(selectedYear),
-    });
+    const { data: summaryData, isLoading: isLoadingSummary } =
+        useGetProfitSummaryQuery({
+            periodType,
+            month: periodType === 'month' ? parseInt(selectedMonth) : undefined,
+            year: parseInt(selectedYear),
+        });
 
     const { data: shareholdersData } = useGetShareholdersQuery();
     const { data: analyticsData } = useGetFinanceAnalyticsQuery({ months: 12 });
@@ -76,7 +98,8 @@ export default function ProfitOverview() {
                         Profit Summary
                     </CardTitle>
                     <CardDescription>
-                        View earnings, expenses, and net profit for a selected period
+                        View earnings, expenses, and net profit for a selected
+                        period
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -85,13 +108,17 @@ export default function ProfitOverview() {
                             <Label>Period Type</Label>
                             <Select
                                 value={periodType}
-                                onValueChange={(value: 'month' | 'year') => setPeriodType(value)}
+                                onValueChange={(value: 'month' | 'year') =>
+                                    setPeriodType(value)
+                                }
                             >
                                 <SelectTrigger className="w-[140px]">
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="month">Monthly</SelectItem>
+                                    <SelectItem value="month">
+                                        Monthly
+                                    </SelectItem>
                                     <SelectItem value="year">Yearly</SelectItem>
                                 </SelectContent>
                             </Select>
@@ -100,13 +127,19 @@ export default function ProfitOverview() {
                         {periodType === 'month' && (
                             <div className="space-y-2">
                                 <Label>Month</Label>
-                                <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                                <Select
+                                    value={selectedMonth}
+                                    onValueChange={setSelectedMonth}
+                                >
                                     <SelectTrigger className="w-[140px]">
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
                                         {months.map((month) => (
-                                            <SelectItem key={month.value} value={month.value}>
+                                            <SelectItem
+                                                key={month.value}
+                                                value={month.value}
+                                            >
                                                 {month.label}
                                             </SelectItem>
                                         ))}
@@ -117,13 +150,19 @@ export default function ProfitOverview() {
 
                         <div className="space-y-2">
                             <Label>Year</Label>
-                            <Select value={selectedYear} onValueChange={setSelectedYear}>
+                            <Select
+                                value={selectedYear}
+                                onValueChange={setSelectedYear}
+                            >
                                 <SelectTrigger className="w-[120px]">
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {years.map((year) => (
-                                        <SelectItem key={year.value} value={year.value}>
+                                        <SelectItem
+                                            key={year.value}
+                                            value={year.value}
+                                        >
                                             {year.label}
                                         </SelectItem>
                                     ))}
@@ -137,7 +176,7 @@ export default function ProfitOverview() {
             {/* Summary Cards */}
             {isLoadingSummary ? (
                 <div className="flex items-center justify-center py-12">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    <Loader className="h-8 w-8 animate-spin text-primary" />
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -150,7 +189,9 @@ export default function ProfitOverview() {
                                         Total Earnings
                                     </p>
                                     <p className="text-2xl font-bold text-green-700 dark:text-green-300 mt-1">
-                                        {formatCurrency(summary?.totalEarnings || 0)}
+                                        {formatCurrency(
+                                            summary?.totalEarnings || 0,
+                                        )}
                                     </p>
                                 </div>
                                 <div className="rounded-full bg-green-100 dark:bg-green-900/50 p-2">
@@ -169,7 +210,9 @@ export default function ProfitOverview() {
                                         Total Expenses
                                     </p>
                                     <p className="text-2xl font-bold text-red-700 dark:text-red-300 mt-1">
-                                        {formatCurrency(summary?.totalExpenses || 0)}
+                                        {formatCurrency(
+                                            summary?.totalExpenses || 0,
+                                        )}
                                     </p>
                                 </div>
                                 <div className="rounded-full bg-red-100 dark:bg-red-900/50 p-2">
@@ -181,42 +224,49 @@ export default function ProfitOverview() {
 
                     {/* Net Profit */}
                     <Card
-                        className={`bg-gradient-to-br ${(summary?.netProfit || 0) >= 0
-                            ? 'from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-blue-200 dark:border-blue-800'
-                            : 'from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border-amber-200 dark:border-amber-800'
-                            }`}
+                        className={`bg-gradient-to-br ${
+                            (summary?.netProfit || 0) >= 0
+                                ? 'from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-blue-200 dark:border-blue-800'
+                                : 'from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border-amber-200 dark:border-amber-800'
+                        }`}
                     >
                         <CardContent className="p-6">
                             <div className="flex items-start justify-between">
                                 <div>
                                     <p
-                                        className={`text-sm font-medium ${(summary?.netProfit || 0) >= 0
-                                            ? 'text-blue-600 dark:text-blue-400'
-                                            : 'text-amber-600 dark:text-amber-400'
-                                            }`}
+                                        className={`text-sm font-medium ${
+                                            (summary?.netProfit || 0) >= 0
+                                                ? 'text-blue-600 dark:text-blue-400'
+                                                : 'text-amber-600 dark:text-amber-400'
+                                        }`}
                                     >
                                         Net Profit
                                     </p>
                                     <p
-                                        className={`text-2xl font-bold mt-1 ${(summary?.netProfit || 0) >= 0
-                                            ? 'text-blue-700 dark:text-blue-300'
-                                            : 'text-amber-700 dark:text-amber-300'
-                                            }`}
+                                        className={`text-2xl font-bold mt-1 ${
+                                            (summary?.netProfit || 0) >= 0
+                                                ? 'text-blue-700 dark:text-blue-300'
+                                                : 'text-amber-700 dark:text-amber-300'
+                                        }`}
                                     >
-                                        {formatCurrency(summary?.netProfit || 0)}
+                                        {formatCurrency(
+                                            summary?.netProfit || 0,
+                                        )}
                                     </p>
                                 </div>
                                 <div
-                                    className={`rounded-full p-2 ${(summary?.netProfit || 0) >= 0
-                                        ? 'bg-blue-100 dark:bg-blue-900/50'
-                                        : 'bg-amber-100 dark:bg-amber-900/50'
-                                        }`}
+                                    className={`rounded-full p-2 ${
+                                        (summary?.netProfit || 0) >= 0
+                                            ? 'bg-blue-100 dark:bg-blue-900/50'
+                                            : 'bg-amber-100 dark:bg-amber-900/50'
+                                    }`}
                                 >
                                     <Wallet
-                                        className={`h-5 w-5 ${(summary?.netProfit || 0) >= 0
-                                            ? 'text-blue-600 dark:text-blue-400'
-                                            : 'text-amber-600 dark:text-amber-400'
-                                            }`}
+                                        className={`h-5 w-5 ${
+                                            (summary?.netProfit || 0) >= 0
+                                                ? 'text-blue-600 dark:text-blue-400'
+                                                : 'text-amber-600 dark:text-amber-400'
+                                        }`}
                                     />
                                 </div>
                             </div>
@@ -232,7 +282,9 @@ export default function ProfitOverview() {
                                         Debit Balance
                                     </p>
                                     <p className="text-2xl font-bold text-purple-700 dark:text-purple-300 mt-1">
-                                        {formatCurrency(analytics?.totalDebit || 0)}
+                                        {formatCurrency(
+                                            analytics?.totalDebit || 0,
+                                        )}
                                     </p>
                                     <p className="text-xs text-purple-500 dark:text-purple-400 mt-0.5">
                                         Borrow - Return
@@ -254,7 +306,9 @@ export default function ProfitOverview() {
                                         Unpaid Revenue
                                     </p>
                                     <p className="text-2xl font-bold text-orange-700 dark:text-orange-300 mt-1">
-                                        {formatCurrency(analytics?.unpaidRevenue || 0)}
+                                        {formatCurrency(
+                                            analytics?.unpaidRevenue || 0,
+                                        )}
                                     </p>
                                     <p className="text-xs text-orange-500 dark:text-orange-400 mt-0.5">
                                         Not yet withdrawn
@@ -275,8 +329,12 @@ export default function ProfitOverview() {
                                     <p className="text-sm font-medium text-teal-600 dark:text-teal-400">
                                         Final Amount
                                     </p>
-                                    <p className={`text-2xl font-bold mt-1 ${(analytics?.finalAmount || 0) >= 0 ? 'text-teal-700 dark:text-teal-300' : 'text-red-700 dark:text-red-300'}`}>
-                                        {formatCurrency(analytics?.finalAmount || 0)}
+                                    <p
+                                        className={`text-2xl font-bold mt-1 ${(analytics?.finalAmount || 0) >= 0 ? 'text-teal-700 dark:text-teal-300' : 'text-red-700 dark:text-red-300'}`}
+                                    >
+                                        {formatCurrency(
+                                            analytics?.finalAmount || 0,
+                                        )}
                                     </p>
                                     <p className="text-xs text-teal-500 dark:text-teal-400 mt-0.5">
                                         Profit - Shared + Debit
@@ -296,7 +354,9 @@ export default function ProfitOverview() {
                 <CardContent className="p-6">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div>
-                            <h3 className="font-semibold">Share & Distribute Profit</h3>
+                            <h3 className="font-semibold">
+                                Share & Distribute Profit
+                            </h3>
                             <p className="text-sm text-muted-foreground">
                                 {activeShareholders.length === 0
                                     ? 'Add shareholders first to share or distribute profits'

@@ -31,7 +31,7 @@ export function AddBusinessDialog() {
     const [errors, setErrors] = useState<Record<string, string>>({});
 
     const handleChange = (
-        e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+        e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
     ) => {
         const { name, value } = e.target;
         setFormData((prev) => ({ ...prev, [name]: value }));
@@ -45,7 +45,10 @@ export function AddBusinessDialog() {
         if (!formData.name || formData.name.length < 2) {
             newErrors.name = 'Name must be at least 2 characters';
         }
-        if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+        if (
+            formData.email &&
+            !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)
+        ) {
             newErrors.email = 'Invalid email';
         }
         setErrors(newErrors);
@@ -81,7 +84,7 @@ export function AddBusinessDialog() {
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
                 <Button>
-                    <IconPlus className="mr-2 size-4" />
+                    <IconPlus className=" size-4" />
                     Add Business
                 </Button>
             </DialogTrigger>
@@ -103,7 +106,9 @@ export function AddBusinessDialog() {
                             onChange={handleChange}
                         />
                         {errors.name && (
-                            <p className="text-sm text-destructive">{errors.name}</p>
+                            <p className="text-sm text-destructive">
+                                {errors.name}
+                            </p>
                         )}
                     </div>
 
@@ -120,7 +125,9 @@ export function AddBusinessDialog() {
 
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                            <Label htmlFor="contactPerson">Contact Person</Label>
+                            <Label htmlFor="contactPerson">
+                                Contact Person
+                            </Label>
                             <Input
                                 id="contactPerson"
                                 name="contactPerson"
@@ -153,7 +160,9 @@ export function AddBusinessDialog() {
                             onChange={handleChange}
                         />
                         {errors.email && (
-                            <p className="text-sm text-destructive">{errors.email}</p>
+                            <p className="text-sm text-destructive">
+                                {errors.email}
+                            </p>
                         )}
                     </div>
 

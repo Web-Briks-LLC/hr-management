@@ -128,7 +128,7 @@ export default function StaffDashboard({ user }: { user: User }) {
                                         ) : (
                                             formatDuration(
                                                 monthlyStats?.totalOvertimeMinutes ||
-                                                0
+                                                    0,
                                             )
                                         )}
                                     </div>
@@ -162,7 +162,7 @@ export default function StaffDashboard({ user }: { user: User }) {
                                         variant="outline"
                                         className="w-full"
                                     >
-                                        <AlertCircle className="mr-2 h-4 w-4" />
+                                        <AlertCircle className=" h-4 w-4" />
                                         Unlock
                                     </Button>
                                 </CardContent>
@@ -183,7 +183,7 @@ export default function StaffDashboard({ user }: { user: User }) {
                                         variant="outline"
                                         className="w-full"
                                     >
-                                        <FileText className="mr-2 h-4 w-4" />
+                                        <FileText className=" h-4 w-4" />
                                         PIN
                                     </Button>
                                 </CardContent>

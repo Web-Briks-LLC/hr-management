@@ -7,7 +7,7 @@ import {
     Clock,
     CheckCircle,
     AlertCircle,
-    Loader2,
+    Loader,
     XCircle,
     PackageCheck,
     RotateCcw,
@@ -20,7 +20,7 @@ interface OrderTimelineProps {
 
 const statusIcons: Record<string, React.ReactNode> = {
     pending: <Clock className="h-4 w-4 text-yellow-500" />,
-    in_progress: <Loader2 className="h-4 w-4 text-blue-500" />,
+    in_progress: <Loader className="h-4 w-4 text-blue-500" />,
     quality_check: <ClipboardCheck className="h-4 w-4 text-purple-500" />,
     revision: <RotateCcw className="h-4 w-4 text-orange-500" />,
     completed: <CheckCircle className="h-4 w-4 text-green-500" />,
@@ -42,7 +42,7 @@ export function OrderTimeline({ timeline }: OrderTimelineProps) {
     // Sort timeline by timestamp descending (newest first)
     const sortedTimeline = [...timeline].sort(
         (a, b) =>
-            new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+            new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
     );
 
     return (
@@ -76,7 +76,7 @@ export function OrderTimeline({ timeline }: OrderTimelineProps) {
                                     <span className="text-xs text-muted-foreground">
                                         {format(
                                             new Date(entry.timestamp),
-                                            'MMM d, yyyy h:mm a'
+                                            'MMM d, yyyy h:mm a',
                                         )}
                                     </span>
                                 </div>

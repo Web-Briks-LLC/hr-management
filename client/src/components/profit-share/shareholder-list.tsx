@@ -1,7 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -17,7 +23,7 @@ import {
     useDeleteShareholderMutation,
     type IShareholder,
 } from '@/redux/features/profitShare/profitShareApi';
-import { Loader2, Plus, Trash2, Edit, Users, Percent } from 'lucide-react';
+import { Loader, Plus, Trash2, Edit, Users, Percent } from 'lucide-react';
 import { toast } from 'sonner';
 import {
     AlertDialog,
@@ -36,7 +42,8 @@ import AddShareholderDialog from './add-shareholder-dialog';
 export default function ShareholderList() {
     const { data, isLoading, isFetching } = useGetShareholdersQuery();
     const [deleteShareholder] = useDeleteShareholderMutation();
-    const [editingShareholder, setEditingShareholder] = useState<IShareholder | null>(null);
+    const [editingShareholder, setEditingShareholder] =
+        useState<IShareholder | null>(null);
     const [dialogOpen, setDialogOpen] = useState(false);
 
     const handleDelete = async (id: string) => {
@@ -63,8 +70,10 @@ export default function ShareholderList() {
             <Card>
                 <CardContent className="flex items-center justify-center py-16">
                     <div className="flex flex-col items-center gap-2">
-                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                        <p className="text-sm text-muted-foreground">Loading shareholders...</p>
+                        <Loader className="h-8 w-8 animate-spin text-primary" />
+                        <p className="text-sm text-muted-foreground">
+                            Loading shareholders...
+                        </p>
                     </div>
                 </CardContent>
             </Card>
@@ -103,9 +112,13 @@ export default function ShareholderList() {
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                             <Percent className="h-4 w-4 text-muted-foreground" />
-                            <span className="font-medium">Total Allocation</span>
+                            <span className="font-medium">
+                                Total Allocation
+                            </span>
                         </div>
-                        <span className={`font-bold ${totalPercentage === 100 ? 'text-green-600' : 'text-amber-600'}`}>
+                        <span
+                            className={`font-bold ${totalPercentage === 100 ? 'text-green-600' : 'text-amber-600'}`}
+                        >
                             {totalPercentage.toFixed(2)}%
                         </span>
                     </div>
@@ -113,10 +126,13 @@ export default function ShareholderList() {
                     <p className="text-sm text-muted-foreground">
                         {totalPercentage < 100 ? (
                             <span className="text-amber-600">
-                                {remainingPercentage.toFixed(2)}% remaining to allocate
+                                {remainingPercentage.toFixed(2)}% remaining to
+                                allocate
                             </span>
                         ) : (
-                            <span className="text-green-600">Fully allocated</span>
+                            <span className="text-green-600">
+                                Fully allocated
+                            </span>
                         )}
                     </p>
                 </div>
@@ -126,45 +142,80 @@ export default function ShareholderList() {
                     <Table>
                         <TableHeader>
                             <TableRow className="bg-muted/50">
-                                <TableHead className="font-semibold">Shareholder</TableHead>
-                                <TableHead className="font-semibold">Percentage</TableHead>
-                                <TableHead className="font-semibold">Status</TableHead>
-                                <TableHead className="text-right font-semibold">Actions</TableHead>
+                                <TableHead className="font-semibold">
+                                    Shareholder
+                                </TableHead>
+                                <TableHead className="font-semibold">
+                                    Percentage
+                                </TableHead>
+                                <TableHead className="font-semibold">
+                                    Status
+                                </TableHead>
+                                <TableHead className="text-right font-semibold">
+                                    Actions
+                                </TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {shareholders.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={4} className="h-32 text-center">
+                                    <TableCell
+                                        colSpan={4}
+                                        className="h-32 text-center"
+                                    >
                                         <div className="flex flex-col items-center gap-2 text-muted-foreground">
                                             <Users className="h-8 w-8 opacity-50" />
                                             <p>No shareholders added</p>
-                                            <p className="text-sm">Add shareholders to distribute profits</p>
+                                            <p className="text-sm">
+                                                Add shareholders to distribute
+                                                profits
+                                            </p>
                                         </div>
                                     </TableCell>
                                 </TableRow>
                             ) : (
                                 shareholders.map((shareholder) => (
-                                    <TableRow key={shareholder._id} className="hover:bg-muted/30">
+                                    <TableRow
+                                        key={shareholder._id}
+                                        className="hover:bg-muted/30"
+                                    >
                                         <TableCell>
                                             <div className="flex flex-col gap-0.5">
-                                                <span className="font-medium">{shareholder.name}</span>
+                                                <span className="font-medium">
+                                                    {shareholder.name}
+                                                </span>
                                                 <span className="text-sm text-muted-foreground">
                                                     {shareholder.email}
                                                 </span>
                                             </div>
                                         </TableCell>
                                         <TableCell>
-                                            <Badge variant="secondary" className="font-mono">
-                                                {shareholder.percentage.toFixed(2)}%
+                                            <Badge
+                                                variant="secondary"
+                                                className="font-mono"
+                                            >
+                                                {shareholder.percentage.toFixed(
+                                                    2,
+                                                )}
+                                                %
                                             </Badge>
                                         </TableCell>
                                         <TableCell>
                                             <Badge
-                                                variant={shareholder.isActive ? 'default' : 'outline'}
-                                                className={shareholder.isActive ? 'bg-green-500' : ''}
+                                                variant={
+                                                    shareholder.isActive
+                                                        ? 'default'
+                                                        : 'outline'
+                                                }
+                                                className={
+                                                    shareholder.isActive
+                                                        ? 'bg-green-500'
+                                                        : ''
+                                                }
                                             >
-                                                {shareholder.isActive ? 'Active' : 'Inactive'}
+                                                {shareholder.isActive
+                                                    ? 'Active'
+                                                    : 'Inactive'}
                                             </Badge>
                                         </TableCell>
                                         <TableCell className="text-right">
@@ -172,7 +223,9 @@ export default function ShareholderList() {
                                                 <Button
                                                     size="icon"
                                                     variant="ghost"
-                                                    onClick={() => handleEdit(shareholder)}
+                                                    onClick={() =>
+                                                        handleEdit(shareholder)
+                                                    }
                                                     className="h-8 w-8"
                                                 >
                                                     <Edit className="h-4 w-4" />
@@ -189,16 +242,36 @@ export default function ShareholderList() {
                                                     </AlertDialogTrigger>
                                                     <AlertDialogContent>
                                                         <AlertDialogHeader>
-                                                            <AlertDialogTitle>Remove Shareholder?</AlertDialogTitle>
+                                                            <AlertDialogTitle>
+                                                                Remove
+                                                                Shareholder?
+                                                            </AlertDialogTitle>
                                                             <AlertDialogDescription>
-                                                                Are you sure you want to remove &quot;{shareholder.name}&quot;?
-                                                                This will free up {shareholder.percentage}% for reallocation.
+                                                                Are you sure you
+                                                                want to remove
+                                                                &quot;
+                                                                {
+                                                                    shareholder.name
+                                                                }
+                                                                &quot;? This
+                                                                will free up{' '}
+                                                                {
+                                                                    shareholder.percentage
+                                                                }
+                                                                % for
+                                                                reallocation.
                                                             </AlertDialogDescription>
                                                         </AlertDialogHeader>
                                                         <AlertDialogFooter>
-                                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                            <AlertDialogCancel>
+                                                                Cancel
+                                                            </AlertDialogCancel>
                                                             <AlertDialogAction
-                                                                onClick={() => handleDelete(shareholder._id)}
+                                                                onClick={() =>
+                                                                    handleDelete(
+                                                                        shareholder._id,
+                                                                    )
+                                                                }
                                                                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                                                             >
                                                                 Remove
@@ -216,7 +289,9 @@ export default function ShareholderList() {
                 </div>
 
                 {isFetching && !isLoading && (
-                    <div className="text-sm text-muted-foreground text-center">Refreshing...</div>
+                    <div className="text-sm text-muted-foreground text-center">
+                        Refreshing...
+                    </div>
                 )}
             </CardContent>
         </Card>

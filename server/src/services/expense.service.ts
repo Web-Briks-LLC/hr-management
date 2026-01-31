@@ -298,6 +298,27 @@ const getExpenseStatsFromDB = async (
     };
 };
 
+// Get available expense years
+const getAvailableExpenseYearsFromDB = async () => {
+    const result = await ExpenseModel.aggregate([
+        {
+            $group: {
+                _id: { $year: '$date' },
+            },
+        },
+        {
+            $sort: { _id: -1 },
+        },
+        {
+            $project: {
+                _id: 0,
+                year: '$_id',
+            },
+        },
+    ]);
+    return result.map((r) => r.year);
+};
+
 // Create expense
 const createExpenseInDB = async (
     payload: Partial<IExpense> & { createdBy: string },
@@ -369,6 +390,7 @@ const deleteCategoryFromDB = async (id: string) => {
 
 export default {
     getAllExpensesFromDB,
+    getAvailableExpenseYearsFromDB,
     getExpenseStatsFromDB,
     createExpenseInDB,
     getExpenseByIdFromDB,

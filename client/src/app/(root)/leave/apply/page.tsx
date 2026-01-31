@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form';
 import { format } from 'date-fns';
 import {
     Calendar as CalendarIcon,
-    Loader2,
+    Loader,
     FileCheck,
     Clock,
     CheckCircle2,
@@ -582,7 +582,7 @@ export default function LeaveApplyPage() {
                                                             'text-muted-foreground',
                                                     )}
                                                 >
-                                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                                    <CalendarIcon className=" h-4 w-4" />
                                                     {startDate
                                                         ? format(
                                                               startDate,
@@ -619,7 +619,7 @@ export default function LeaveApplyPage() {
                                                             'text-muted-foreground',
                                                     )}
                                                 >
-                                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                                    <CalendarIcon className=" h-4 w-4" />
                                                     {endDate
                                                         ? format(endDate, 'PPP')
                                                         : 'Select end date'}
@@ -766,14 +766,14 @@ export default function LeaveApplyPage() {
                                 >
                                     {isApplying || isUploading ? (
                                         <>
-                                            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                                            <Loader className=" h-5 w-5 animate-spin" />
                                             {isApplying
                                                 ? 'Submitting...'
                                                 : 'Uploading...'}
                                         </>
                                     ) : (
                                         <>
-                                            <FileCheck className="mr-2 h-5 w-5" />
+                                            <FileCheck className=" h-5 w-5" />
                                             Submit Leave Request
                                         </>
                                     )}

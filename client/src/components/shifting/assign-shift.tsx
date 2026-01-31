@@ -363,7 +363,7 @@ export default function AssignShift() {
                             }
                         >
                             {isAssigning ? (
-                                <Spinner className="mr-2" />
+                                <Spinner className="" />
                             ) : (
                                 `Assign to ${selectedStaffs.length} Staff${
                                     selectedStaffs.length !== 1 ? 's' : ''

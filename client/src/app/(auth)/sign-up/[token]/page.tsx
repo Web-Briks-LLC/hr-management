@@ -2,12 +2,21 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { useValidateTokenQuery, useAcceptInvitationMutation } from '@/redux/features/invitation/invitationApi';
+import {
+    useValidateTokenQuery,
+    useAcceptInvitationMutation,
+} from '@/redux/features/invitation/invitationApi';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2 } from 'lucide-react';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
+import { Loader } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function SignupPage() {
@@ -16,7 +25,8 @@ export default function SignupPage() {
     const token = params.token as string;
 
     const { data, isLoading, error } = useValidateTokenQuery(token);
-    const [acceptInvitation, { isLoading: isAccepting }] = useAcceptInvitationMutation();
+    const [acceptInvitation, { isLoading: isAccepting }] =
+        useAcceptInvitationMutation();
 
     const [formData, setFormData] = useState({
         name: '',
@@ -55,7 +65,7 @@ export default function SignupPage() {
     if (isLoading) {
         return (
             <div className="flex items-center justify-center min-h-screen">
-                <Loader2 className="h-8 w-8 animate-spin" />
+                <Loader className="h-8 w-8 animate-spin" />
             </div>
         );
     }
@@ -64,7 +74,12 @@ export default function SignupPage() {
         let errorMessage = 'This invitation link is invalid or has expired.';
 
         if (error) {
-            if ('data' in error && typeof error.data === 'object' && error.data && 'message' in error.data) {
+            if (
+                'data' in error &&
+                typeof error.data === 'object' &&
+                error.data &&
+                'message' in error.data
+            ) {
                 errorMessage = (error.data as any).message;
             } else if ('message' in error) {
                 errorMessage = error.message as string; // SerializedError
@@ -75,7 +90,9 @@ export default function SignupPage() {
             <div className="flex items-center justify-center min-h-screen">
                 <Card className="w-full max-w-md">
                     <CardHeader>
-                        <CardTitle className="text-destructive">Invalid Invitation</CardTitle>
+                        <CardTitle className="text-destructive">
+                            Invalid Invitation
+                        </CardTitle>
                         <CardDescription className="text-destructive font-medium">
                             {errorMessage}
                         </CardDescription>
@@ -100,10 +117,24 @@ export default function SignupPage() {
                     <div className="mb-6 p-4 bg-muted rounded-lg">
                         <h3 className="font-semibold mb-2">Position Details</h3>
                         <div className="space-y-1 text-sm">
-                            <p><span className="font-medium">Role:</span> {invitation.role}</p>
-                            <p><span className="font-medium">Department:</span> {invitation.department || 'N/A'}</p>
-                            <p><span className="font-medium">Designation:</span> {invitation.designation}</p>
-                            <p><span className="font-medium">Salary:</span> ৳{invitation.salary.toLocaleString()}</p>
+                            <p>
+                                <span className="font-medium">Role:</span>{' '}
+                                {invitation.role}
+                            </p>
+                            <p>
+                                <span className="font-medium">Department:</span>{' '}
+                                {invitation.department || 'N/A'}
+                            </p>
+                            <p>
+                                <span className="font-medium">
+                                    Designation:
+                                </span>{' '}
+                                {invitation.designation}
+                            </p>
+                            <p>
+                                <span className="font-medium">Salary:</span> ৳
+                                {invitation.salary.toLocaleString()}
+                            </p>
                         </div>
                     </div>
 
@@ -113,7 +144,12 @@ export default function SignupPage() {
                             <Input
                                 id="name"
                                 value={formData.name}
-                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                onChange={(e) =>
+                                    setFormData({
+                                        ...formData,
+                                        name: e.target.value,
+                                    })
+                                }
                                 required
                             />
                         </div>
@@ -123,7 +159,12 @@ export default function SignupPage() {
                             <Input
                                 id="phone"
                                 value={formData.phone}
-                                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                                onChange={(e) =>
+                                    setFormData({
+                                        ...formData,
+                                        phone: e.target.value,
+                                    })
+                                }
                                 required
                             />
                         </div>
@@ -134,18 +175,30 @@ export default function SignupPage() {
                                 id="password"
                                 type="password"
                                 value={formData.password}
-                                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                                onChange={(e) =>
+                                    setFormData({
+                                        ...formData,
+                                        password: e.target.value,
+                                    })
+                                }
                                 required
                             />
                         </div>
 
                         <div>
-                            <Label htmlFor="confirmPassword">Confirm Password *</Label>
+                            <Label htmlFor="confirmPassword">
+                                Confirm Password *
+                            </Label>
                             <Input
                                 id="confirmPassword"
                                 type="password"
                                 value={formData.confirmPassword}
-                                onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                                onChange={(e) =>
+                                    setFormData({
+                                        ...formData,
+                                        confirmPassword: e.target.value,
+                                    })
+                                }
                                 required
                             />
                         </div>
@@ -155,14 +208,23 @@ export default function SignupPage() {
                             <Input
                                 id="address"
                                 value={formData.address}
-                                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                                onChange={(e) =>
+                                    setFormData({
+                                        ...formData,
+                                        address: e.target.value,
+                                    })
+                                }
                             />
                         </div>
 
-                        <Button type="submit" className="w-full" disabled={isAccepting}>
+                        <Button
+                            type="submit"
+                            className="w-full"
+                            disabled={isAccepting}
+                        >
                             {isAccepting ? (
                                 <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    <Loader className=" h-4 w-4 animate-spin" />
                                     Creating Account...
                                 </>
                             ) : (

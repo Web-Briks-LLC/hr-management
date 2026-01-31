@@ -1,11 +1,30 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { Loader2, Download, Filter } from 'lucide-react';
+import { Loader, Download, Filter } from 'lucide-react';
 import { format } from 'date-fns';
 
 export default function AuditLogViewer() {
@@ -29,9 +48,12 @@ export default function AuditLogViewer() {
             if (filters.entity) params.append('entity', filters.entity);
             if (filters.limit) params.append('limit', filters.limit);
 
-            const response = await fetch(`/api/analytics/audit-logs?${params}`, {
-                credentials: 'include',
-            });
+            const response = await fetch(
+                `/api/analytics/audit-logs?${params}`,
+                {
+                    credentials: 'include',
+                },
+            );
             const data = await response.json();
             if (data.success) {
                 setLogs(data.data);
@@ -45,15 +67,26 @@ export default function AuditLogViewer() {
 
     const exportLogs = () => {
         const csv = [
-            ['Date', 'User ID', 'Action', 'Entity', 'Entity ID', 'IP Address'].join(','),
-            ...logs.map(log => [
-                format(new Date(log.createdAt), 'yyyy-MM-dd HH:mm:ss'),
-                log.userId,
-                log.action,
-                log.entity,
-                log.entityId || '',
-                log.ipAddress || '',
-            ].map(cell => `"${cell}"`).join(','))
+            [
+                'Date',
+                'User ID',
+                'Action',
+                'Entity',
+                'Entity ID',
+                'IP Address',
+            ].join(','),
+            ...logs.map((log) =>
+                [
+                    format(new Date(log.createdAt), 'yyyy-MM-dd HH:mm:ss'),
+                    log.userId,
+                    log.action,
+                    log.entity,
+                    log.entityId || '',
+                    log.ipAddress || '',
+                ]
+                    .map((cell) => `"${cell}"`)
+                    .join(','),
+            ),
         ].join('\n');
 
         const blob = new Blob([csv], { type: 'text/csv' });
@@ -75,7 +108,9 @@ export default function AuditLogViewer() {
         };
 
         return (
-            <span className={`px-2 py-1 rounded-full text-xs font-medium ${colors[action] || colors.VIEW}`}>
+            <span
+                className={`px-2 py-1 rounded-full text-xs font-medium ${colors[action] || colors.VIEW}`}
+            >
                 {action}
             </span>
         );
@@ -87,10 +122,16 @@ export default function AuditLogViewer() {
                 <div className="flex items-center justify-between">
                     <div>
                         <CardTitle>Audit Logs</CardTitle>
-                        <CardDescription>System activity and security logs</CardDescription>
+                        <CardDescription>
+                            System activity and security logs
+                        </CardDescription>
                     </div>
-                    <Button onClick={exportLogs} variant="outline" disabled={logs.length === 0}>
-                        <Download className="mr-2 h-4 w-4" />
+                    <Button
+                        onClick={exportLogs}
+                        variant="outline"
+                        disabled={logs.length === 0}
+                    >
+                        <Download className=" h-4 w-4" />
                         Export CSV
                     </Button>
                 </div>
@@ -103,7 +144,12 @@ export default function AuditLogViewer() {
                         <span className="text-sm font-medium">Filters:</span>
                     </div>
 
-                    <Select value={filters.action} onValueChange={(value) => setFilters({ ...filters, action: value })}>
+                    <Select
+                        value={filters.action}
+                        onValueChange={(value) =>
+                            setFilters({ ...filters, action: value })
+                        }
+                    >
                         <SelectTrigger className="w-[180px]">
                             <SelectValue placeholder="All Actions" />
                         </SelectTrigger>
@@ -118,7 +164,12 @@ export default function AuditLogViewer() {
                         </SelectContent>
                     </Select>
 
-                    <Select value={filters.entity} onValueChange={(value) => setFilters({ ...filters, entity: value })}>
+                    <Select
+                        value={filters.entity}
+                        onValueChange={(value) =>
+                            setFilters({ ...filters, entity: value })
+                        }
+                    >
                         <SelectTrigger className="w-[180px]">
                             <SelectValue placeholder="All Entities" />
                         </SelectTrigger>
@@ -126,12 +177,19 @@ export default function AuditLogViewer() {
                             <SelectItem value="">All Entities</SelectItem>
                             <SelectItem value="Staff">Staff</SelectItem>
                             <SelectItem value="User">User</SelectItem>
-                            <SelectItem value="Invitation">Invitation</SelectItem>
+                            <SelectItem value="Invitation">
+                                Invitation
+                            </SelectItem>
                             <SelectItem value="Salary">Salary</SelectItem>
                         </SelectContent>
                     </Select>
 
-                    <Select value={filters.limit} onValueChange={(value) => setFilters({ ...filters, limit: value })}>
+                    <Select
+                        value={filters.limit}
+                        onValueChange={(value) =>
+                            setFilters({ ...filters, limit: value })
+                        }
+                    >
                         <SelectTrigger className="w-[120px]">
                             <SelectValue />
                         </SelectTrigger>
@@ -147,7 +205,7 @@ export default function AuditLogViewer() {
                 {/* Table */}
                 {isLoading ? (
                     <div className="flex items-center justify-center py-10">
-                        <Loader2 className="h-8 w-8 animate-spin" />
+                        <Loader className="h-8 w-8 animate-spin" />
                     </div>
                 ) : (
                     <div className="rounded-md border">
@@ -165,7 +223,10 @@ export default function AuditLogViewer() {
                             <TableBody>
                                 {logs.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={6} className="text-center text-muted-foreground">
+                                        <TableCell
+                                            colSpan={6}
+                                            className="text-center text-muted-foreground"
+                                        >
                                             No audit logs found
                                         </TableCell>
                                     </TableRow>
@@ -173,14 +234,27 @@ export default function AuditLogViewer() {
                                     logs.map((log) => (
                                         <TableRow key={log._id}>
                                             <TableCell className="font-medium">
-                                                {format(new Date(log.createdAt), 'MMM dd, yyyy HH:mm:ss')}
+                                                {format(
+                                                    new Date(log.createdAt),
+                                                    'MMM dd, yyyy HH:mm:ss',
+                                                )}
                                             </TableCell>
-                                            <TableCell>{getActionBadge(log.action)}</TableCell>
+                                            <TableCell>
+                                                {getActionBadge(log.action)}
+                                            </TableCell>
                                             <TableCell>{log.entity}</TableCell>
-                                            <TableCell className="font-mono text-xs">{log.userId}</TableCell>
-                                            <TableCell className="text-sm">{log.ipAddress || 'N/A'}</TableCell>
+                                            <TableCell className="font-mono text-xs">
+                                                {log.userId}
+                                            </TableCell>
+                                            <TableCell className="text-sm">
+                                                {log.ipAddress || 'N/A'}
+                                            </TableCell>
                                             <TableCell className="text-sm text-muted-foreground">
-                                                {log.details ? JSON.stringify(log.details).substring(0, 50) + '...' : 'N/A'}
+                                                {log.details
+                                                    ? JSON.stringify(
+                                                          log.details,
+                                                      ).substring(0, 50) + '...'
+                                                    : 'N/A'}
                                             </TableCell>
                                         </TableRow>
                                     ))

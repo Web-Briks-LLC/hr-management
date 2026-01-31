@@ -109,15 +109,27 @@ export const expenseApi = apiSlice.injectEndpoints({
             }),
             invalidatesTags: ['ExpenseCategory'],
         }),
+        getExpenseYears: builder.query({
+            query: () => ({
+                url: '/expenses/years',
+                method: 'GET',
+            }),
+            transformResponse: (response: { data: number[] }) => response.data,
+            // Don't provide specific tags, but maybe invalidate on expense creation?
+            // For now, caching is fine as years don't change often.
+            providesTags: ['Expense'],
+        }),
     }),
 });
 
 export const {
     useGetExpensesQuery,
+    useLazyGetExpensesQuery,
     useGetExpenseStatsQuery,
     useCreateExpenseMutation,
     useUpdateExpenseMutation,
     useDeleteExpenseMutation,
     useGetExpenseCategoriesQuery,
     useCreateExpenseCategoryMutation,
+    useGetExpenseYearsQuery,
 } = expenseApi;

@@ -38,6 +38,8 @@ router.delete(
     ExpenseController.deleteCategory,
 );
 
+router.get('/years', ExpenseController.getExpenseYears);
+
 // Expense routes with :id parameter (last, to catch remaining)
 router.get(
     '/:id',

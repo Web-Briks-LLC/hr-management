@@ -1,13 +1,35 @@
 'use client';
 
 import { useState } from 'react';
-import { useGetAllAttendanceQuery, useUpdateAttendanceStatusMutation } from '@/redux/features/attendance/attendanceApi';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    useGetAllAttendanceQuery,
+    useUpdateAttendanceStatusMutation,
+} from '@/redux/features/attendance/attendanceApi';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import { Loader, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 
@@ -49,7 +71,7 @@ export default function AttendancePage() {
     };
 
     const handleFilterChange = (key: string, value: string) => {
-        setFilters(prev => ({ ...prev, [key]: value }));
+        setFilters((prev) => ({ ...prev, [key]: value }));
         setPage(1); // Reset to first page when filtering
     };
 
@@ -73,33 +95,54 @@ export default function AttendancePage() {
                     {/* Filters */}
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <div>
-                            <label className="text-sm font-medium mb-2 block">Start Date</label>
+                            <label className="text-sm font-medium mb-2 block">
+                                Start Date
+                            </label>
                             <Input
                                 type="date"
                                 value={filters.startDate}
-                                onChange={(e) => handleFilterChange('startDate', e.target.value)}
+                                onChange={(e) =>
+                                    handleFilterChange(
+                                        'startDate',
+                                        e.target.value,
+                                    )
+                                }
                             />
                         </div>
                         <div>
-                            <label className="text-sm font-medium mb-2 block">End Date</label>
+                            <label className="text-sm font-medium mb-2 block">
+                                End Date
+                            </label>
                             <Input
                                 type="date"
                                 value={filters.endDate}
-                                onChange={(e) => handleFilterChange('endDate', e.target.value)}
+                                onChange={(e) =>
+                                    handleFilterChange(
+                                        'endDate',
+                                        e.target.value,
+                                    )
+                                }
                             />
                         </div>
                         <div>
-                            <label className="text-sm font-medium mb-2 block">Status</label>
+                            <label className="text-sm font-medium mb-2 block">
+                                Status
+                            </label>
                             <Select
                                 value={filters.status}
-                                onValueChange={(value) => handleFilterChange('status', value)}
+                                onValueChange={(value) =>
+                                    handleFilterChange('status', value)
+                                }
                             >
                                 <SelectTrigger>
                                     <SelectValue placeholder="All statuses" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {statusOptions.map(option => (
-                                        <SelectItem key={option.value} value={option.value}>
+                                    {statusOptions.map((option) => (
+                                        <SelectItem
+                                            key={option.value}
+                                            value={option.value}
+                                        >
                                             {option.label}
                                         </SelectItem>
                                     ))}
@@ -110,7 +153,12 @@ export default function AttendancePage() {
                             <Button
                                 variant="outline"
                                 onClick={() => {
-                                    setFilters({ startDate: '', endDate: '', status: '', staffId: '' });
+                                    setFilters({
+                                        startDate: '',
+                                        endDate: '',
+                                        status: '',
+                                        staffId: '',
+                                    });
                                     setPage(1);
                                 }}
                             >
@@ -123,7 +171,7 @@ export default function AttendancePage() {
                     <div className="border rounded-lg">
                         {isLoading ? (
                             <div className="flex items-center justify-center py-8">
-                                <Loader2 className="h-8 w-8 animate-spin" />
+                                <Loader className="h-8 w-8 animate-spin" />
                             </div>
                         ) : (
                             <Table>
@@ -143,7 +191,10 @@ export default function AttendancePage() {
                                 <TableBody>
                                     {records.length === 0 ? (
                                         <TableRow>
-                                            <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                                            <TableCell
+                                                colSpan={9}
+                                                className="text-center py-8 text-muted-foreground"
+                                            >
                                                 No attendance records found
                                             </TableCell>
                                         </TableRow>
@@ -151,40 +202,82 @@ export default function AttendancePage() {
                                         records.map((record: any) => (
                                             <TableRow key={record._id}>
                                                 <TableCell className="font-medium">
-                                                    {record.staffId?.staffId || 'N/A'}
+                                                    {record.staffId?.staffId ||
+                                                        'N/A'}
                                                 </TableCell>
                                                 <TableCell>
-                                                    {record.staffId?.staffId || 'N/A'}
+                                                    {record.staffId?.staffId ||
+                                                        'N/A'}
                                                 </TableCell>
                                                 <TableCell>
-                                                    {record.staffId?.designation || 'N/A'}
+                                                    {record.staffId
+                                                        ?.designation || 'N/A'}
                                                 </TableCell>
                                                 <TableCell>
-                                                    {format(new Date(record.date), 'MMM dd, yyyy')}
+                                                    {format(
+                                                        new Date(record.date),
+                                                        'MMM dd, yyyy',
+                                                    )}
                                                 </TableCell>
                                                 <TableCell>
-                                                    {record.checkInAt ? format(new Date(record.checkInAt), 'HH:mm') : '-'}
+                                                    {record.checkInAt
+                                                        ? format(
+                                                              new Date(
+                                                                  record.checkInAt,
+                                                              ),
+                                                              'HH:mm',
+                                                          )
+                                                        : '-'}
                                                 </TableCell>
                                                 <TableCell>
-                                                    {record.checkOutAt ? format(new Date(record.checkOutAt), 'HH:mm') : '-'}
+                                                    {record.checkOutAt
+                                                        ? format(
+                                                              new Date(
+                                                                  record.checkOutAt,
+                                                              ),
+                                                              'HH:mm',
+                                                          )
+                                                        : '-'}
                                                 </TableCell>
                                                 <TableCell>
                                                     <Select
                                                         value={record.status}
-                                                        onValueChange={(value) => handleStatusChange(record._id, value)}
+                                                        onValueChange={(
+                                                            value,
+                                                        ) =>
+                                                            handleStatusChange(
+                                                                record._id,
+                                                                value,
+                                                            )
+                                                        }
                                                         disabled={isFetching}
                                                     >
                                                         <SelectTrigger className="w-32">
                                                             <SelectValue />
                                                         </SelectTrigger>
                                                         <SelectContent>
-                                                            {statusOptions.map(option => (
-                                                                <SelectItem key={option.value} value={option.value}>
-                                                                    <span className={option.color}>
-                                                                        {option.label}
-                                                                    </span>
-                                                                </SelectItem>
-                                                            ))}
+                                                            {statusOptions.map(
+                                                                (option) => (
+                                                                    <SelectItem
+                                                                        key={
+                                                                            option.value
+                                                                        }
+                                                                        value={
+                                                                            option.value
+                                                                        }
+                                                                    >
+                                                                        <span
+                                                                            className={
+                                                                                option.color
+                                                                            }
+                                                                        >
+                                                                            {
+                                                                                option.label
+                                                                            }
+                                                                        </span>
+                                                                    </SelectItem>
+                                                                ),
+                                                            )}
                                                         </SelectContent>
                                                     </Select>
                                                 </TableCell>
@@ -206,13 +299,16 @@ export default function AttendancePage() {
                     {pagination && pagination.pages > 1 && (
                         <div className="flex items-center justify-between">
                             <div className="text-sm text-muted-foreground">
-                                Page {pagination.page} of {pagination.pages} ({pagination.total} total records)
+                                Page {pagination.page} of {pagination.pages} (
+                                {pagination.total} total records)
                             </div>
                             <div className="flex gap-2">
                                 <Button
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                                    onClick={() =>
+                                        setPage((p) => Math.max(1, p - 1))
+                                    }
                                     disabled={page === 1 || isFetching}
                                 >
                                     <ChevronLeft className="h-4 w-4" />
@@ -221,8 +317,14 @@ export default function AttendancePage() {
                                 <Button
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => setPage(p => Math.min(pagination.pages, p + 1))}
-                                    disabled={page === pagination.pages || isFetching}
+                                    onClick={() =>
+                                        setPage((p) =>
+                                            Math.min(pagination.pages, p + 1),
+                                        )
+                                    }
+                                    disabled={
+                                        page === pagination.pages || isFetching
+                                    }
                                 >
                                     Next
                                     <ChevronRight className="h-4 w-4" />

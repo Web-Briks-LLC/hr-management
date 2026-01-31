@@ -1,12 +1,19 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
-import { Eye, EyeOff, Loader2, DollarSign } from 'lucide-react';
+import { Eye, EyeOff, Loader, DollarSign } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function ViewSalaryDialog() {
@@ -14,7 +21,10 @@ export default function ViewSalaryDialog() {
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
-    const [salaryData, setSalaryData] = useState<{ salary: number; salaryVisibleToEmployee: boolean } | null>(null);
+    const [salaryData, setSalaryData] = useState<{
+        salary: number;
+        salaryVisibleToEmployee: boolean;
+    } | null>(null);
     const [showSalary, setShowSalary] = useState(false);
 
     // Auto-hide salary after 30 seconds
@@ -59,7 +69,9 @@ export default function ViewSalaryDialog() {
             setSalaryData(data.data);
             setShowSalary(true);
             setPassword('');
-            toast.success('Password verified! Salary will be hidden after 30 seconds.');
+            toast.success(
+                'Password verified! Salary will be hidden after 30 seconds.',
+            );
         } catch (err: any) {
             toast.error(err.message || 'Invalid password');
         } finally {
@@ -75,13 +87,16 @@ export default function ViewSalaryDialog() {
     };
 
     return (
-        <Dialog open={open} onOpenChange={(isOpen) => {
-            if (!isOpen) handleClose();
-            else setOpen(true);
-        }}>
+        <Dialog
+            open={open}
+            onOpenChange={(isOpen) => {
+                if (!isOpen) handleClose();
+                else setOpen(true);
+            }}
+        >
             <DialogTrigger asChild>
                 <Button variant="outline">
-                    <DollarSign className="mr-2 h-4 w-4" />
+                    <DollarSign className=" h-4 w-4" />
                     View My Salary
                 </Button>
             </DialogTrigger>
@@ -102,7 +117,9 @@ export default function ViewSalaryDialog() {
                                     id="password"
                                     type={showPassword ? 'text' : 'password'}
                                     value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
+                                    onChange={(e) =>
+                                        setPassword(e.target.value)
+                                    }
                                     placeholder="Enter your password"
                                     required
                                 />
@@ -111,7 +128,9 @@ export default function ViewSalaryDialog() {
                                     variant="ghost"
                                     size="sm"
                                     className="absolute right-0 top-0 h-full px-3"
-                                    onClick={() => setShowPassword(!showPassword)}
+                                    onClick={() =>
+                                        setShowPassword(!showPassword)
+                                    }
                                 >
                                     {showPassword ? (
                                         <EyeOff className="h-4 w-4" />
@@ -123,13 +142,17 @@ export default function ViewSalaryDialog() {
                         </div>
 
                         <div className="flex justify-end gap-2">
-                            <Button type="button" variant="outline" onClick={handleClose}>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={handleClose}
+                            >
                                 Cancel
                             </Button>
                             <Button type="submit" disabled={isLoading}>
                                 {isLoading ? (
                                     <>
-                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        <Loader className=" h-4 w-4 animate-spin" />
                                         Verifying...
                                     </>
                                 ) : (
@@ -143,7 +166,9 @@ export default function ViewSalaryDialog() {
                         <Card className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-green-200 dark:border-green-800">
                             <CardContent className="pt-6">
                                 <div className="text-center">
-                                    <p className="text-sm text-muted-foreground mb-2">Your Monthly Salary</p>
+                                    <p className="text-sm text-muted-foreground mb-2">
+                                        Your Monthly Salary
+                                    </p>
                                     <p className="text-4xl font-bold text-green-600 dark:text-green-400">
                                         ৳{salaryData?.salary.toLocaleString()}
                                     </p>
@@ -153,14 +178,14 @@ export default function ViewSalaryDialog() {
 
                         <div className="p-4 bg-yellow-50 dark:bg-yellow-900/10 rounded-lg border border-yellow-200 dark:border-yellow-800">
                             <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                                🔒 <strong>Security Notice:</strong> This information will automatically hide after 30 seconds for your security.
+                                🔒 <strong>Security Notice:</strong> This
+                                information will automatically hide after 30
+                                seconds for your security.
                             </p>
                         </div>
 
                         <div className="flex justify-end">
-                            <Button onClick={handleClose}>
-                                Close
-                            </Button>
+                            <Button onClick={handleClose}>Close</Button>
                         </div>
                     </div>
                 )}

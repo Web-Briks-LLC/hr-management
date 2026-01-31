@@ -15,6 +15,9 @@ const getAllExpenses = async (req: Request, res: Response) => {
             ...(req.query.month
                 ? { month: parseInt(req.query.month as string) }
                 : {}),
+            ...(req.query.year
+                ? { year: parseInt(req.query.year as string) }
+                : {}),
             branchId: req.query.branchId as string,
             categoryId: req.query.categoryId as string,
             status: req.query.status as string,
@@ -29,6 +32,21 @@ const getAllExpenses = async (req: Request, res: Response) => {
         res.status(500).json({
             success: false,
             message: error.message || 'Failed to fetch expenses',
+        });
+    }
+};
+
+const getExpenseYears = async (_req: Request, res: Response) => {
+    try {
+        const result = await ExpenseServices.getAvailableExpenseYearsFromDB();
+        res.status(200).json({
+            success: true,
+            data: result,
+        });
+    } catch (error: any) {
+        res.status(500).json({
+            success: false,
+            message: error.message || 'Failed to fetch expense years',
         });
     }
 };
@@ -216,6 +234,7 @@ const deleteCategory = async (req: Request, res: Response) => {
 
 export default {
     getAllExpenses,
+    getExpenseYears,
     getExpenseStats,
     createExpense,
     getExpenseById,

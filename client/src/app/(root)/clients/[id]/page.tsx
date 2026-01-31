@@ -238,7 +238,7 @@ export default function ClientDetailsPage() {
                             exist.
                         </p>
                         <Button onClick={() => router.push('/clients')}>
-                            <ArrowLeft className="h-4 w-4 mr-2" />
+                            <ArrowLeft className="h-4 w-4 " />
                             Back to Clients
                         </Button>
                     </CardContent>

@@ -1,8 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
+import { Loader, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface SalaryHistoryProps {
@@ -22,9 +28,12 @@ export default function SalaryHistoryTimeline({ staffId }: SalaryHistoryProps) {
     const fetchHistory = async () => {
         setIsLoading(true);
         try {
-            const response = await fetch(`/api/analytics/salary-history/${staffId}`, {
-                credentials: 'include',
-            });
+            const response = await fetch(
+                `/api/analytics/salary-history/${staffId}`,
+                {
+                    credentials: 'include',
+                },
+            );
             const data = await response.json();
             if (data.success) {
                 setHistory(data.data);
@@ -47,7 +56,7 @@ export default function SalaryHistoryTimeline({ staffId }: SalaryHistoryProps) {
 
     const getChangePercentage = (previous: number, current: number) => {
         if (previous === 0) return 0;
-        return ((current - previous) / previous * 100).toFixed(1);
+        return (((current - previous) / previous) * 100).toFixed(1);
     };
 
     const getChangeColor = (previous: number, current: number) => {
@@ -60,7 +69,7 @@ export default function SalaryHistoryTimeline({ staffId }: SalaryHistoryProps) {
         return (
             <Card>
                 <CardContent className="flex items-center justify-center py-10">
-                    <Loader2 className="h-8 w-8 animate-spin" />
+                    <Loader className="h-8 w-8 animate-spin" />
                 </CardContent>
             </Card>
         );
@@ -74,7 +83,9 @@ export default function SalaryHistoryTimeline({ staffId }: SalaryHistoryProps) {
             </CardHeader>
             <CardContent>
                 {history.length === 0 ? (
-                    <p className="text-center text-muted-foreground py-8">No salary history available</p>
+                    <p className="text-center text-muted-foreground py-8">
+                        No salary history available
+                    </p>
                 ) : (
                     <div className="relative">
                         {/* Timeline Line */}
@@ -83,10 +94,16 @@ export default function SalaryHistoryTimeline({ staffId }: SalaryHistoryProps) {
                         {/* Timeline Items */}
                         <div className="space-y-6">
                             {history.map((item, index) => (
-                                <div key={item._id} className="relative flex gap-4">
+                                <div
+                                    key={item._id}
+                                    className="relative flex gap-4"
+                                >
                                     {/* Timeline Dot */}
                                     <div className="relative z-10 flex items-center justify-center w-16 h-16 rounded-full bg-background border-2 border-primary">
-                                        {getChangeIcon(item.previousSalary, item.newSalary)}
+                                        {getChangeIcon(
+                                            item.previousSalary,
+                                            item.newSalary,
+                                        )}
                                     </div>
 
                                     {/* Content */}
@@ -95,39 +112,76 @@ export default function SalaryHistoryTimeline({ staffId }: SalaryHistoryProps) {
                                             <div className="flex items-start justify-between mb-2">
                                                 <div>
                                                     <p className="text-sm text-muted-foreground">
-                                                        {format(new Date(item.effectiveDate || item.createdAt), 'MMM dd, yyyy')}
+                                                        {format(
+                                                            new Date(
+                                                                item.effectiveDate ||
+                                                                    item.createdAt,
+                                                            ),
+                                                            'MMM dd, yyyy',
+                                                        )}
                                                     </p>
                                                     <p className="text-xs text-muted-foreground mt-1">
-                                                        {format(new Date(item.createdAt), 'HH:mm:ss')}
+                                                        {format(
+                                                            new Date(
+                                                                item.createdAt,
+                                                            ),
+                                                            'HH:mm:ss',
+                                                        )}
                                                     </p>
                                                 </div>
-                                                <span className={`text-sm font-medium ${getChangeColor(item.previousSalary, item.newSalary)}`}>
-                                                    {item.newSalary > item.previousSalary ? '+' : ''}
-                                                    {getChangePercentage(item.previousSalary, item.newSalary)}%
+                                                <span
+                                                    className={`text-sm font-medium ${getChangeColor(item.previousSalary, item.newSalary)}`}
+                                                >
+                                                    {item.newSalary >
+                                                    item.previousSalary
+                                                        ? '+'
+                                                        : ''}
+                                                    {getChangePercentage(
+                                                        item.previousSalary,
+                                                        item.newSalary,
+                                                    )}
+                                                    %
                                                 </span>
                                             </div>
 
                                             <div className="grid grid-cols-2 gap-4 mt-3">
                                                 <div>
-                                                    <p className="text-xs text-muted-foreground">Previous Salary</p>
-                                                    <p className="text-lg font-semibold">৳{item.previousSalary.toLocaleString()}</p>
+                                                    <p className="text-xs text-muted-foreground">
+                                                        Previous Salary
+                                                    </p>
+                                                    <p className="text-lg font-semibold">
+                                                        ৳
+                                                        {item.previousSalary.toLocaleString()}
+                                                    </p>
                                                 </div>
                                                 <div>
-                                                    <p className="text-xs text-muted-foreground">New Salary</p>
-                                                    <p className="text-lg font-semibold">৳{item.newSalary.toLocaleString()}</p>
+                                                    <p className="text-xs text-muted-foreground">
+                                                        New Salary
+                                                    </p>
+                                                    <p className="text-lg font-semibold">
+                                                        ৳
+                                                        {item.newSalary.toLocaleString()}
+                                                    </p>
                                                 </div>
                                             </div>
 
                                             {item.reason && (
                                                 <div className="mt-3 pt-3 border-t">
-                                                    <p className="text-xs text-muted-foreground">Reason</p>
-                                                    <p className="text-sm mt-1">{item.reason}</p>
+                                                    <p className="text-xs text-muted-foreground">
+                                                        Reason
+                                                    </p>
+                                                    <p className="text-sm mt-1">
+                                                        {item.reason}
+                                                    </p>
                                                 </div>
                                             )}
 
                                             <div className="mt-3 pt-3 border-t">
                                                 <p className="text-xs text-muted-foreground">
-                                                    Changed by: <span className="font-mono">{item.changedBy}</span>
+                                                    Changed by:{' '}
+                                                    <span className="font-mono">
+                                                        {item.changedBy}
+                                                    </span>
                                                 </p>
                                             </div>
                                         </div>

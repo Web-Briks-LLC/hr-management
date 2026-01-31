@@ -10,12 +10,15 @@ import {
     PDFViewer,
     PDFDownloadLink,
     Font,
+    pdf,
 } from '@react-pdf/renderer';
 import type { IOrder } from '@/types/order.type';
 import type { Client } from '@/types/client.type';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
-import { Download } from 'lucide-react';
+import { Download, Mail } from 'lucide-react';
+import { useState } from 'react';
+import { toast } from 'sonner';
 
 // Register fonts if needed (optional)
 Font.register({
@@ -257,7 +260,7 @@ const styles = StyleSheet.create({
     },
 });
 
-interface InvoicePDFProps {
+export interface InvoicePDFProps {
     client: Client;
     orders: IOrder[];
     month: string;
@@ -291,13 +294,20 @@ const TableRow = ({
     index: number;
     formatCurrency: (n: number) => string;
 }) => (
-    <View style={[styles.tableRow, index % 2 !== 0 ? styles.tableRowEven : {}]} wrap={false}>
+    <View
+        style={[styles.tableRow, index % 2 !== 0 ? styles.tableRowEven : {}]}
+        wrap={false}
+    >
         <Text style={[styles.tableCell, styles.colNo]}>{index + 1}</Text>
         <Text style={[styles.tableCell, styles.colDate]}>
             {format(new Date(order.orderDate), 'MMM do, yyyy')}
         </Text>
-        <Text style={[styles.tableCell, styles.colName]}>{order.orderName}</Text>
-        <Text style={[styles.tableCell, styles.colQty]}>{order.imageQuantity}</Text>
+        <Text style={[styles.tableCell, styles.colName]}>
+            {order.orderName}
+        </Text>
+        <Text style={[styles.tableCell, styles.colQty]}>
+            {order.imageQuantity}
+        </Text>
         <Text style={[styles.tableCell, styles.colRate]}>
             {formatCurrency(order.perImagePrice)}
         </Text>
@@ -307,7 +317,7 @@ const TableRow = ({
     </View>
 );
 
-const InvoiceDocument = ({
+export const InvoiceDocument = ({
     client,
     orders,
     month,
@@ -344,7 +354,9 @@ const InvoiceDocument = ({
                         <Text style={styles.invoiceDetailText}>
                             Invoice No: {invoiceNumber}
                         </Text>
-                        <Text style={styles.invoiceDetailText}>Date: {issueDate}</Text>
+                        <Text style={styles.invoiceDetailText}>
+                            Date: {issueDate}
+                        </Text>
                     </View>
                 </View>
 
@@ -352,9 +364,15 @@ const InvoiceDocument = ({
                 <View style={styles.addressContainer}>
                     {/* Bill From (Left) - Teal Box */}
                     <View style={styles.addressBox}>
-                        <View style={[styles.accentBar, styles.billFromAccent]} />
-                        <View style={[styles.addressContent, styles.billFromBox]}>
-                            <Text style={[styles.boxTitle, styles.billFromText]}>
+                        <View
+                            style={[styles.accentBar, styles.billFromAccent]}
+                        />
+                        <View
+                            style={[styles.addressContent, styles.billFromBox]}
+                        >
+                            <Text
+                                style={[styles.boxTitle, styles.billFromText]}
+                            >
                                 BILL FROM
                             </Text>
                             <Text style={[styles.boxText, styles.billFromText]}>
@@ -373,16 +391,19 @@ const InvoiceDocument = ({
                     <View style={styles.addressBox}>
                         <View style={[styles.accentBar, styles.billToAccent]} />
                         <View style={[styles.addressContent, styles.billToBox]}>
-                            <Text style={[styles.boxTitle, styles.billToText]}>BILL TO</Text>
+                            <Text style={[styles.boxTitle, styles.billToText]}>
+                                BILL TO
+                            </Text>
                             <Text style={[styles.boxText, styles.billToText]}>
                                 {client.name}
                             </Text>
                             <Text style={[styles.boxText, styles.billToText]}>
-                                {(client.address && client.address !== 'N/A')
+                                {client.address && client.address !== 'N/A'
                                     ? client.address
-                                    : (client.officeAddress && client.officeAddress !== 'N/A')
-                                        ? client.officeAddress
-                                        : 'Address not provided'}
+                                    : client.officeAddress &&
+                                        client.officeAddress !== 'N/A'
+                                      ? client.officeAddress
+                                      : 'Address not provided'}
                             </Text>
                         </View>
                     </View>
@@ -417,8 +438,8 @@ const InvoiceDocument = ({
                 {/* Footer */}
                 <View style={styles.footer} fixed>
                     <Text style={styles.footerText}>
-                        Web Briks LLC — Excellence in Editing and Design. For inquiry
-                        info@webbriks.com
+                        Web Briks LLC — Excellence in Editing and Design. For
+                        inquiry info@webbriks.com
                     </Text>
                 </View>
 
@@ -437,10 +458,66 @@ const InvoiceDocument = ({
 
 export default function InvoicePDF(props: InvoicePDFProps) {
     const fileName = `Invoice_${props.client.clientId}_${props.month}_${props.year}.pdf`;
+    const [isSending, setIsSending] = useState(false);
+
+    const handleSendEmail = async () => {
+        if (!props.client.email && !props.client.officeAddress) {
+            toast.error('Client email not found');
+            return;
+        }
+
+        // Use provided email or fallback to a placeholder/display error if crucial
+        const clientEmail = props.client.email || '';
+        if (!clientEmail) {
+            toast.error('Client email is missing.');
+            return;
+        }
+
+        try {
+            setIsSending(true);
+            const blob = await pdf(<InvoiceDocument {...props} />).toBlob();
+
+            const formData = new FormData();
+            formData.append('file', blob, fileName);
+            formData.append('to', clientEmail);
+            formData.append('clientName', props.client.name);
+            formData.append('month', props.month);
+            formData.append('year', props.year);
+
+            const response = await fetch(
+                'http://localhost:5000/api/invoices/send-email',
+                {
+                    method: 'POST',
+                    body: formData,
+                    credentials: 'include',
+                },
+            );
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Failed to send email');
+            }
+
+            toast.success('Invoice sent successfully to ' + clientEmail);
+        } catch (error: any) {
+            console.error('Error sending email:', error);
+            toast.error(error.message || 'Failed to send email');
+        } finally {
+            setIsSending(false);
+        }
+    };
 
     return (
         <div className="flex flex-col gap-4">
-            <div className="flex justify-end">
+            <div className="flex justify-end gap-2">
+                <Button
+                    className="bg-orange-500 hover:bg-orange-600"
+                    disabled={isSending}
+                    onClick={handleSendEmail}
+                >
+                    <Mail className="h-4 w-4 " />
+                    {isSending ? 'Sending...' : 'Send to Client'}
+                </Button>
                 <PDFDownloadLink
                     document={<InvoiceDocument {...props} />}
                     fileName={fileName}
@@ -448,9 +525,9 @@ export default function InvoicePDF(props: InvoicePDFProps) {
                     {({ loading }) => (
                         <Button
                             className="bg-teal-500 hover:bg-teal-600"
-                            disabled={loading}
+                            disabled={loading || isSending}
                         >
-                            <Download className="h-4 w-4 mr-2" />
+                            <Download className="h-4 w-4 " />
                             {loading ? 'Generating PDF...' : 'Download PDF'}
                         </Button>
                     )}

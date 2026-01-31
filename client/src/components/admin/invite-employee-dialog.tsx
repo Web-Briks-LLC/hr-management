@@ -24,10 +24,15 @@ import { useGetAllBranchesQuery } from '@/redux/features/branch/branchApi';
 import { useGetAllShiftsQuery } from '@/redux/features/shift/shiftApi';
 import { useGetMetadataByTypeQuery } from '@/redux/features/metadata/metadataApi';
 import { useSession } from '@/lib/auth-client';
-import { Loader2, UserPlus } from 'lucide-react';
+import { Loader, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 
-type RoleType = 'staff' | 'team_leader' | 'admin' | 'super_admin' | 'hr_manager';
+type RoleType =
+    | 'staff'
+    | 'team_leader'
+    | 'admin'
+    | 'super_admin'
+    | 'hr_manager';
 
 const ROLE_LABELS: Record<RoleType, string> = {
     staff: 'Staff',
@@ -64,7 +69,13 @@ export default function InviteEmployeeDialog() {
         const baseRoles: RoleType[] = ['staff', 'team_leader'];
 
         if (currentUserRole === 'super_admin') {
-            return ['staff', 'team_leader', 'admin', 'super_admin', 'hr_manager'];
+            return [
+                'staff',
+                'team_leader',
+                'admin',
+                'super_admin',
+                'hr_manager',
+            ];
         }
 
         if (currentUserRole === 'admin') {
@@ -81,7 +92,9 @@ export default function InviteEmployeeDialog() {
     const availableRoles = getAvailableRoles();
 
     // Admin roles don't require branch assignment
-    const isAdminRole = ['admin', 'super_admin', 'hr_manager'].includes(formData.role);
+    const isAdminRole = ['admin', 'super_admin', 'hr_manager'].includes(
+        formData.role,
+    );
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -93,8 +106,14 @@ export default function InviteEmployeeDialog() {
                 role: formData.role,
                 department: formData.department || undefined,
                 designation: formData.designation,
-                branchId: formData.branchId && formData.branchId !== 'unassigned' ? formData.branchId : undefined,
-                shiftId: formData.shiftId === 'unassigned' ? undefined : (formData.shiftId || undefined),
+                branchId:
+                    formData.branchId && formData.branchId !== 'unassigned'
+                        ? formData.branchId
+                        : undefined,
+                shiftId:
+                    formData.shiftId === 'unassigned'
+                        ? undefined
+                        : formData.shiftId || undefined,
                 expiryHours: Number(formData.expiryHours),
             }).unwrap();
 
@@ -127,7 +146,8 @@ export default function InviteEmployeeDialog() {
                 <DialogHeader>
                     <DialogTitle>Invite Team Member</DialogTitle>
                     <DialogDescription>
-                        Send an invitation email to a new team member with their position details.
+                        Send an invitation email to a new team member with their
+                        position details.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -141,7 +161,12 @@ export default function InviteEmployeeDialog() {
                                 type="email"
                                 placeholder="john@example.com"
                                 value={formData.email}
-                                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                onChange={(e) =>
+                                    setFormData({
+                                        ...formData,
+                                        email: e.target.value,
+                                    })
+                                }
                                 required
                             />
                         </div>
@@ -151,7 +176,9 @@ export default function InviteEmployeeDialog() {
                             <Label htmlFor="role">Role *</Label>
                             <Select
                                 value={formData.role}
-                                onValueChange={(value: RoleType) => setFormData({ ...formData, role: value })}
+                                onValueChange={(value: RoleType) =>
+                                    setFormData({ ...formData, role: value })
+                                }
                             >
                                 <SelectTrigger className="w-full">
                                     <SelectValue />
@@ -171,7 +198,12 @@ export default function InviteEmployeeDialog() {
                             <Label htmlFor="designation">Designation *</Label>
                             <Select
                                 value={formData.designation}
-                                onValueChange={(value) => setFormData({ ...formData, designation: value })}
+                                onValueChange={(value) =>
+                                    setFormData({
+                                        ...formData,
+                                        designation: value,
+                                    })
+                                }
                             >
                                 <SelectTrigger className="w-full">
                                     <SelectValue placeholder="Select designation" />
@@ -191,7 +223,12 @@ export default function InviteEmployeeDialog() {
                             <Label htmlFor="department">Department</Label>
                             <Select
                                 value={formData.department}
-                                onValueChange={(value) => setFormData({ ...formData, department: value })}
+                                onValueChange={(value) =>
+                                    setFormData({
+                                        ...formData,
+                                        department: value,
+                                    })
+                                }
                             >
                                 <SelectTrigger className="w-full">
                                     <SelectValue placeholder="Select department" />
@@ -215,7 +252,12 @@ export default function InviteEmployeeDialog() {
                                 min="0"
                                 placeholder="50000"
                                 value={formData.salary}
-                                onChange={(e) => setFormData({ ...formData, salary: e.target.value })}
+                                onChange={(e) =>
+                                    setFormData({
+                                        ...formData,
+                                        salary: e.target.value,
+                                    })
+                                }
                                 required
                             />
                         </div>
@@ -227,20 +269,32 @@ export default function InviteEmployeeDialog() {
                             </Label>
                             <Select
                                 value={formData.branchId}
-                                onValueChange={(value) => setFormData({ ...formData, branchId: value })}
+                                onValueChange={(value) =>
+                                    setFormData({
+                                        ...formData,
+                                        branchId: value,
+                                    })
+                                }
                             >
                                 <SelectTrigger className="w-full">
                                     <SelectValue placeholder="Select branch" />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {isAdminRole && (
-                                        <SelectItem value="unassigned">None</SelectItem>
-                                    )}
-                                    {branchesData?.branches?.map((branch: any) => (
-                                        <SelectItem key={branch._id} value={branch._id}>
-                                            {branch.name}
+                                        <SelectItem value="unassigned">
+                                            None
                                         </SelectItem>
-                                    ))}
+                                    )}
+                                    {branchesData?.branches?.map(
+                                        (branch: any) => (
+                                            <SelectItem
+                                                key={branch._id}
+                                                value={branch._id}
+                                            >
+                                                {branch.name}
+                                            </SelectItem>
+                                        ),
+                                    )}
                                 </SelectContent>
                             </Select>
                         </div>
@@ -250,15 +304,22 @@ export default function InviteEmployeeDialog() {
                             <Label htmlFor="shift">Shift (Optional)</Label>
                             <Select
                                 value={formData.shiftId}
-                                onValueChange={(value) => setFormData({ ...formData, shiftId: value })}
+                                onValueChange={(value) =>
+                                    setFormData({ ...formData, shiftId: value })
+                                }
                             >
                                 <SelectTrigger className="w-full">
                                     <SelectValue placeholder="Select shift" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="unassigned">None</SelectItem>
+                                    <SelectItem value="unassigned">
+                                        None
+                                    </SelectItem>
                                     {shiftsData?.shifts?.map((shift: any) => (
-                                        <SelectItem key={shift._id} value={shift._id}>
+                                        <SelectItem
+                                            key={shift._id}
+                                            value={shift._id}
+                                        >
                                             {shift.name}
                                         </SelectItem>
                                     ))}
@@ -271,7 +332,12 @@ export default function InviteEmployeeDialog() {
                             <Label htmlFor="expiry">Link Expiry *</Label>
                             <Select
                                 value={formData.expiryHours}
-                                onValueChange={(value) => setFormData({ ...formData, expiryHours: value })}
+                                onValueChange={(value) =>
+                                    setFormData({
+                                        ...formData,
+                                        expiryHours: value,
+                                    })
+                                }
                             >
                                 <SelectTrigger className="w-full">
                                     <SelectValue />
@@ -287,13 +353,21 @@ export default function InviteEmployeeDialog() {
                     </div>
 
                     <div className="flex justify-end gap-2 pt-4 border-t">
-                        <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setOpen(false)}
+                        >
                             Cancel
                         </Button>
-                        <Button type="submit" disabled={isLoading} className="gap-2">
+                        <Button
+                            type="submit"
+                            disabled={isLoading}
+                            className="gap-2"
+                        >
                             {isLoading ? (
                                 <>
-                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    <Loader className="h-4 w-4 animate-spin" />
                                     Sending...
                                 </>
                             ) : (

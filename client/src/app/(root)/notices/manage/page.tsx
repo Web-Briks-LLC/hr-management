@@ -2,7 +2,16 @@
 
 import { useState } from 'react';
 import { format } from 'date-fns';
-import { Plus, Megaphone, Pin, Pencil, Trash2, Eye, EyeOff, BarChart3 } from 'lucide-react';
+import {
+    Plus,
+    Megaphone,
+    Pin,
+    Pencil,
+    Trash2,
+    Eye,
+    EyeOff,
+    BarChart3,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -54,7 +63,12 @@ import {
     useDeleteNoticeMutation,
     useGetNoticeStatsQuery,
 } from '@/redux/features/notice/noticeApi';
-import type { INotice, NoticeCategory, NoticePriority, CreateNoticeInput } from '@/types/notice.type';
+import type {
+    INotice,
+    NoticeCategory,
+    NoticePriority,
+    CreateNoticeInput,
+} from '@/types/notice.type';
 import {
     NOTICE_PRIORITY_LABELS,
     NOTICE_CATEGORY_LABELS,
@@ -107,7 +121,9 @@ export default function NoticeManagePage() {
                 toast.success('Notice published and notifications sent!');
             }
         } catch (error: any) {
-            toast.error(error?.data?.message || 'Failed to update publish status');
+            toast.error(
+                error?.data?.message || 'Failed to update publish status',
+            );
         }
     };
 
@@ -130,13 +146,15 @@ export default function NoticeManagePage() {
                         <Megaphone className="h-6 w-6" />
                         Notice Management
                     </h1>
-                    <p className="text-muted-foreground">Create and manage company notices</p>
+                    <p className="text-muted-foreground">
+                        Create and manage company notices
+                    </p>
                 </div>
 
                 <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
                     <DialogTrigger asChild>
                         <Button>
-                            <Plus className="mr-2 h-4 w-4" />
+                            <Plus className=" h-4 w-4" />
                             Create Notice
                         </Button>
                     </DialogTrigger>
@@ -144,10 +162,14 @@ export default function NoticeManagePage() {
                         <DialogHeader>
                             <DialogTitle>Create New Notice</DialogTitle>
                             <DialogDescription>
-                                Create a notice. You can publish it later to notify all users.
+                                Create a notice. You can publish it later to
+                                notify all users.
                             </DialogDescription>
                         </DialogHeader>
-                        <NoticeForm onSubmit={handleCreate} isLoading={isCreating} />
+                        <NoticeForm
+                            onSubmit={handleCreate}
+                            isLoading={isCreating}
+                        />
                     </DialogContent>
                 </Dialog>
             </div>
@@ -176,7 +198,9 @@ export default function NoticeManagePage() {
                                 <TableHead>Priority</TableHead>
                                 <TableHead>Status</TableHead>
                                 <TableHead>Created</TableHead>
-                                <TableHead className="text-right">Actions</TableHead>
+                                <TableHead className="text-right">
+                                    Actions
+                                </TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -184,42 +208,91 @@ export default function NoticeManagePage() {
                                 <TableRow key={notice._id}>
                                     <TableCell>
                                         <div className="flex items-center gap-2">
-                                            {notice.isPinned && <Pin className="h-4 w-4 text-amber-500" />}
-                                            <span className="font-medium">{notice.title}</span>
+                                            {notice.isPinned && (
+                                                <Pin className="h-4 w-4 text-amber-500" />
+                                            )}
+                                            <span className="font-medium">
+                                                {notice.title}
+                                            </span>
                                         </div>
                                     </TableCell>
                                     <TableCell>
-                                        <Badge className={NOTICE_CATEGORY_COLORS[notice.category]} variant="outline">
-                                            {NOTICE_CATEGORY_LABELS[notice.category]}
+                                        <Badge
+                                            className={
+                                                NOTICE_CATEGORY_COLORS[
+                                                    notice.category
+                                                ]
+                                            }
+                                            variant="outline"
+                                        >
+                                            {
+                                                NOTICE_CATEGORY_LABELS[
+                                                    notice.category
+                                                ]
+                                            }
                                         </Badge>
                                     </TableCell>
                                     <TableCell>
-                                        <Badge className={NOTICE_PRIORITY_COLORS[notice.priority]} variant="outline">
-                                            {NOTICE_PRIORITY_LABELS[notice.priority]}
+                                        <Badge
+                                            className={
+                                                NOTICE_PRIORITY_COLORS[
+                                                    notice.priority
+                                                ]
+                                            }
+                                            variant="outline"
+                                        >
+                                            {
+                                                NOTICE_PRIORITY_LABELS[
+                                                    notice.priority
+                                                ]
+                                            }
                                         </Badge>
                                     </TableCell>
                                     <TableCell>
-                                        <Badge variant={notice.isPublished ? 'default' : 'secondary'}>
-                                            {notice.isPublished ? 'Published' : 'Draft'}
+                                        <Badge
+                                            variant={
+                                                notice.isPublished
+                                                    ? 'default'
+                                                    : 'secondary'
+                                            }
+                                        >
+                                            {notice.isPublished
+                                                ? 'Published'
+                                                : 'Draft'}
                                         </Badge>
                                     </TableCell>
                                     <TableCell className="text-muted-foreground text-sm">
-                                        {format(new Date(notice.createdAt), 'MMM dd, yyyy')}
+                                        {format(
+                                            new Date(notice.createdAt),
+                                            'MMM dd, yyyy',
+                                        )}
                                     </TableCell>
                                     <TableCell className="text-right">
                                         <div className="flex justify-end gap-1">
                                             <Button
                                                 variant="ghost"
                                                 size="icon"
-                                                onClick={() => handlePublishToggle(notice)}
-                                                title={notice.isPublished ? 'Unpublish' : 'Publish'}
+                                                onClick={() =>
+                                                    handlePublishToggle(notice)
+                                                }
+                                                title={
+                                                    notice.isPublished
+                                                        ? 'Unpublish'
+                                                        : 'Publish'
+                                                }
                                             >
-                                                {notice.isPublished ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                                {notice.isPublished ? (
+                                                    <EyeOff className="h-4 w-4" />
+                                                ) : (
+                                                    <Eye className="h-4 w-4" />
+                                                )}
                                             </Button>
                                             <Button
                                                 variant="ghost"
                                                 size="icon"
-                                                onClick={() => setStatsNoticeId(notice._id)}
+                                                onClick={() =>
+                                                    setStatsNoticeId(notice._id)
+                                                }
                                                 title="View Stats"
                                             >
                                                 <BarChart3 className="h-4 w-4" />
@@ -227,7 +300,9 @@ export default function NoticeManagePage() {
                                             <Button
                                                 variant="ghost"
                                                 size="icon"
-                                                onClick={() => setEditingNotice(notice)}
+                                                onClick={() =>
+                                                    setEditingNotice(notice)
+                                                }
                                             >
                                                 <Pencil className="h-4 w-4" />
                                             </Button>
@@ -235,7 +310,11 @@ export default function NoticeManagePage() {
                                                 variant="ghost"
                                                 size="icon"
                                                 className="text-destructive hover:text-destructive"
-                                                onClick={() => setDeleteNoticeId(notice._id)}
+                                                onClick={() =>
+                                                    setDeleteNoticeId(
+                                                        notice._id,
+                                                    )
+                                                }
                                             >
                                                 <Trash2 className="h-4 w-4" />
                                             </Button>
@@ -250,14 +329,19 @@ export default function NoticeManagePage() {
 
             {/* Edit Dialog */}
             {editingNotice && (
-                <Dialog open={!!editingNotice} onOpenChange={(open) => !open && setEditingNotice(null)}>
+                <Dialog
+                    open={!!editingNotice}
+                    onOpenChange={(open) => !open && setEditingNotice(null)}
+                >
                     <DialogContent className="max-w-xl">
                         <DialogHeader>
                             <DialogTitle>Edit Notice</DialogTitle>
                         </DialogHeader>
                         <NoticeForm
                             initialData={editingNotice}
-                            onSubmit={(data) => handleUpdate(editingNotice._id, data)}
+                            onSubmit={(data) =>
+                                handleUpdate(editingNotice._id, data)
+                            }
                             isLoading={isUpdating}
                         />
                     </DialogContent>
@@ -265,7 +349,10 @@ export default function NoticeManagePage() {
             )}
 
             {/* Delete Confirmation */}
-            <AlertDialog open={!!deleteNoticeId} onOpenChange={(open) => !open && setDeleteNoticeId(null)}>
+            <AlertDialog
+                open={!!deleteNoticeId}
+                onOpenChange={(open) => !open && setDeleteNoticeId(null)}
+            >
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>Delete Notice?</AlertDialogTitle>
@@ -308,8 +395,12 @@ function NoticeForm({
 }) {
     const [title, setTitle] = useState(initialData?.title || '');
     const [content, setContent] = useState(initialData?.content || '');
-    const [priority, setPriority] = useState<NoticePriority>(initialData?.priority || 'medium');
-    const [category, setCategory] = useState<NoticeCategory>(initialData?.category || 'general');
+    const [priority, setPriority] = useState<NoticePriority>(
+        initialData?.priority || 'medium',
+    );
+    const [category, setCategory] = useState<NoticeCategory>(
+        initialData?.category || 'general',
+    );
     const [isPinned, setIsPinned] = useState(initialData?.isPinned || false);
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -332,28 +423,42 @@ function NoticeForm({
             <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                     <Label>Category</Label>
-                    <Select value={category} onValueChange={(v) => setCategory(v as NoticeCategory)}>
+                    <Select
+                        value={category}
+                        onValueChange={(v) => setCategory(v as NoticeCategory)}
+                    >
                         <SelectTrigger>
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                            {Object.entries(NOTICE_CATEGORY_LABELS).map(([key, label]) => (
-                                <SelectItem key={key} value={key}>{label}</SelectItem>
-                            ))}
+                            {Object.entries(NOTICE_CATEGORY_LABELS).map(
+                                ([key, label]) => (
+                                    <SelectItem key={key} value={key}>
+                                        {label}
+                                    </SelectItem>
+                                ),
+                            )}
                         </SelectContent>
                     </Select>
                 </div>
 
                 <div className="space-y-2">
                     <Label>Priority</Label>
-                    <Select value={priority} onValueChange={(v) => setPriority(v as NoticePriority)}>
+                    <Select
+                        value={priority}
+                        onValueChange={(v) => setPriority(v as NoticePriority)}
+                    >
                         <SelectTrigger>
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                            {Object.entries(NOTICE_PRIORITY_LABELS).map(([key, label]) => (
-                                <SelectItem key={key} value={key}>{label}</SelectItem>
-                            ))}
+                            {Object.entries(NOTICE_PRIORITY_LABELS).map(
+                                ([key, label]) => (
+                                    <SelectItem key={key} value={key}>
+                                        {label}
+                                    </SelectItem>
+                                ),
+                            )}
                         </SelectContent>
                     </Select>
                 </div>
@@ -371,19 +476,33 @@ function NoticeForm({
             </div>
 
             <div className="flex items-center space-x-2">
-                <Switch id="pinned" checked={isPinned} onCheckedChange={setIsPinned} />
+                <Switch
+                    id="pinned"
+                    checked={isPinned}
+                    onCheckedChange={setIsPinned}
+                />
                 <Label htmlFor="pinned">Pin this notice (stays at top)</Label>
             </div>
 
             <Button type="submit" disabled={isLoading} className="w-full">
-                {isLoading ? 'Saving...' : initialData ? 'Update Notice' : 'Create Notice'}
+                {isLoading
+                    ? 'Saving...'
+                    : initialData
+                      ? 'Update Notice'
+                      : 'Create Notice'}
             </Button>
         </form>
     );
 }
 
 // Stats Dialog Component
-function NoticeStatsDialog({ noticeId, onClose }: { noticeId: string; onClose: () => void }) {
+function NoticeStatsDialog({
+    noticeId,
+    onClose,
+}: {
+    noticeId: string;
+    onClose: () => void;
+}) {
     const { data, isLoading } = useGetNoticeStatsQuery(noticeId);
 
     return (
@@ -397,21 +516,34 @@ function NoticeStatsDialog({ noticeId, onClose }: { noticeId: string; onClose: (
                 ) : (
                     <div className="space-y-4">
                         <div className="text-center p-4 bg-muted rounded-lg">
-                            <p className="text-3xl font-bold">{data?.data.totalViews || 0}</p>
-                            <p className="text-muted-foreground text-sm">Total Views</p>
+                            <p className="text-3xl font-bold">
+                                {data?.data.totalViews || 0}
+                            </p>
+                            <p className="text-muted-foreground text-sm">
+                                Total Views
+                            </p>
                         </div>
-                        {data?.data.viewedBy && data.data.viewedBy.length > 0 && (
-                            <div>
-                                <h4 className="font-medium mb-2">Viewed By</h4>
-                                <div className="max-h-48 overflow-y-auto space-y-1">
-                                    {data.data.viewedBy.map((user) => (
-                                        <div key={user._id} className="text-sm p-2 bg-muted/50 rounded">
-                                            {user.name} <span className="text-muted-foreground">({user.email})</span>
-                                        </div>
-                                    ))}
+                        {data?.data.viewedBy &&
+                            data.data.viewedBy.length > 0 && (
+                                <div>
+                                    <h4 className="font-medium mb-2">
+                                        Viewed By
+                                    </h4>
+                                    <div className="max-h-48 overflow-y-auto space-y-1">
+                                        {data.data.viewedBy.map((user) => (
+                                            <div
+                                                key={user._id}
+                                                className="text-sm p-2 bg-muted/50 rounded"
+                                            >
+                                                {user.name}{' '}
+                                                <span className="text-muted-foreground">
+                                                    ({user.email})
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
-                            </div>
-                        )}
+                            )}
                     </div>
                 )}
             </DialogContent>

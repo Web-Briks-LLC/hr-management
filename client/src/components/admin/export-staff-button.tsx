@@ -31,7 +31,7 @@ export default function ExportStaffButton() {
 
     return (
         <Button onClick={handleExport} variant="outline">
-            <Download className="mr-2 h-4 w-4" />
+            <Download className=" h-4 w-4" />
             Export to CSV
         </Button>
     );

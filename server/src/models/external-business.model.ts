@@ -7,7 +7,7 @@ const externalBusinessSchema = new Schema<IExternalBusiness>(
             type: String,
             required: true,
             trim: true,
-            index: true,
+            unique: true,
         },
         description: {
             type: String,
@@ -37,14 +37,13 @@ const externalBusinessSchema = new Schema<IExternalBusiness>(
             required: true,
         },
     },
-    { timestamps: true }
+    { timestamps: true },
 );
 
 // Compound index for name uniqueness
-externalBusinessSchema.index({ name: 1 }, { unique: true });
 
 const ExternalBusinessModel = model<IExternalBusiness>(
     'ExternalBusiness',
-    externalBusinessSchema
+    externalBusinessSchema,
 );
 export default ExternalBusinessModel;

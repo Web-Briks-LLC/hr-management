@@ -29,7 +29,7 @@ export default function ShiftDeleteAlert({ shiftId }: { shiftId: string }) {
             setOpenDelete(false);
         } catch (err: any) {
             toast.error(
-                err?.data?.message || err?.message || 'Something went wrong.'
+                err?.data?.message || err?.message || 'Something went wrong.',
             );
         }
     };
@@ -43,7 +43,7 @@ export default function ShiftDeleteAlert({ shiftId }: { shiftId: string }) {
                     setOpenDelete(true);
                 }}
             >
-                <Trash2 className="mr-2 h-4 w-4" />
+                <Trash2 className=" h-4 w-4" />
                 Delete
             </DropdownMenuItem>
 

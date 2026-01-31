@@ -1,21 +1,46 @@
 'use client';
 
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { useGetOrdersQuery, useGetOrderYearsQuery } from '@/redux/features/order/orderApi';
+import {
+    useGetOrdersQuery,
+    useGetOrderYearsQuery,
+} from '@/redux/features/order/orderApi';
 import { useLazyGetNextInvoiceNumberQuery } from '@/redux/features/invoice/invoiceApi';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, FileText } from 'lucide-react';
+import { ArrowLeft, FileText, Mail, Loader } from 'lucide-react';
 import { format } from 'date-fns';
 import Link from 'next/link';
 import type { IOrder, OrderStatus } from '@/types/order.type';
 import type { Client } from '@/types/client.type';
 import dynamic from 'next/dynamic';
+import { pdf } from '@react-pdf/renderer';
+import { InvoiceDocument } from '@/components/invoice/InvoicePDF';
+import { toast } from 'sonner';
 
 // Dynamically import the PDF component to avoid SSR issues
 const InvoicePDF = dynamic(() => import('@/components/invoice/InvoicePDF'), {
@@ -51,19 +76,26 @@ const months = [
 export default function InvoicePage() {
     const currentDate = new Date();
     const [selectedYear, setSelectedYear] = useState<string>('');
-    const [selectedMonth, setSelectedMonth] = useState<string>(String(currentDate.getMonth() + 1));
+    const [selectedMonth, setSelectedMonth] = useState<string>(
+        String(currentDate.getMonth() + 1),
+    );
     const [selectedClientId, setSelectedClientId] = useState<string>('');
-    const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
+    const [selectedOrders, setSelectedOrders] = useState<Set<string>>(
+        new Set(),
+    );
     const [invoiceNumber, setInvoiceNumber] = useState<string>('');
     const [showPDF, setShowPDF] = useState(false);
+    const [isSending, setIsSending] = useState(false);
 
     // Ref for PDF section scroll
     const pdfSectionRef = useRef<HTMLDivElement>(null);
 
-    const [getNextInvoiceNumber, { isLoading: isGeneratingInvoice }] = useLazyGetNextInvoiceNumberQuery();
+    const [getNextInvoiceNumber, { isLoading: isGeneratingInvoice }] =
+        useLazyGetNextInvoiceNumberQuery();
 
     // Fetch available years from database
-    const { data: yearsData, isLoading: isLoadingYears } = useGetOrderYearsQuery();
+    const { data: yearsData, isLoading: isLoadingYears } =
+        useGetOrderYearsQuery();
     const years = yearsData?.data?.map(String) || [];
 
     // Auto-select first year when years load
@@ -74,20 +106,34 @@ export default function InvoicePage() {
     }, [years, selectedYear]);
 
     // Fetch all orders for selected year/month (to get unique clients)
-    const { data: allOrdersData, isLoading: isLoadingAllOrders } = useGetOrdersQuery(
-        selectedYear ? {
-            month: parseInt(selectedMonth),
-            year: parseInt(selectedYear),
-            limit: 1000,
-        } : undefined,
-        { skip: !selectedYear }
-    );
+    const { data: allOrdersData, isLoading: isLoadingAllOrders } =
+        useGetOrdersQuery(
+            selectedYear
+                ? {
+                      month: parseInt(selectedMonth),
+                      year: parseInt(selectedYear),
+                      limit: 1000,
+                  }
+                : undefined,
+            { skip: !selectedYear },
+        );
 
     const allOrders = allOrdersData?.data || [];
 
     // Extract unique clients from orders
     const availableClients = useMemo(() => {
-        const clientMap = new Map<string, { _id: string; name: string; clientId: string; currency?: string; address?: string; officeAddress?: string }>();
+        const clientMap = new Map<
+            string,
+            {
+                _id: string;
+                name: string;
+                clientId: string;
+                currency?: string;
+                address?: string;
+                officeAddress?: string;
+                email?: string;
+            }
+        >();
         allOrders.forEach((order: IOrder) => {
             if (order.clientId && !clientMap.has(order.clientId._id)) {
                 clientMap.set(order.clientId._id, {
@@ -97,16 +143,21 @@ export default function InvoicePage() {
                     currency: (order.clientId as any).currency,
                     address: (order.clientId as any).address,
                     officeAddress: (order.clientId as any).officeAddress,
+                    email: (order.clientId as any).email,
                 });
             }
         });
-        return Array.from(clientMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+        return Array.from(clientMap.values()).sort((a, b) =>
+            a.name.localeCompare(b.name),
+        );
     }, [allOrders]);
 
     // Filter orders for selected client
     const orders = useMemo(() => {
         if (!selectedClientId) return [];
-        return allOrders.filter((order: IOrder) => order.clientId?._id === selectedClientId);
+        return allOrders.filter(
+            (order: IOrder) => order.clientId?._id === selectedClientId,
+        );
     }, [allOrders, selectedClientId]);
 
     // Get selected client details
@@ -158,11 +209,86 @@ export default function InvoicePage() {
                 setShowPDF(true);
                 // Smooth scroll to PDF section
                 setTimeout(() => {
-                    pdfSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    pdfSectionRef.current?.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start',
+                    });
                 }, 100);
             }
         } catch (error) {
             console.error('Failed to generate invoice number:', error);
+        }
+    };
+
+    const handleSendDirectly = async () => {
+        if (selectedOrders.size === 0 || !selectedClient) return;
+
+        // Check email first
+        const clientEmail = (selectedClient as any).email;
+        if (!clientEmail) {
+            toast.error('Client email is missing.');
+            return;
+        }
+
+        setIsSending(true);
+        try {
+            // Get invoice number if not exists
+            let currentInvoiceNumber = invoiceNumber;
+            if (!currentInvoiceNumber) {
+                const result = await getNextInvoiceNumber().unwrap();
+                if (result.success) {
+                    currentInvoiceNumber = result.formattedInvoiceNumber;
+                    setInvoiceNumber(currentInvoiceNumber);
+                } else {
+                    throw new Error('Failed to generate invoice number');
+                }
+            }
+
+            const fileName = `Invoice_${selectedClient.clientId}_${selectedMonth}_${selectedYear}.pdf`;
+            const blob = await pdf(
+                <InvoiceDocument
+                    client={selectedClient as Client}
+                    orders={selectedOrdersList}
+                    month={
+                        months.find((m) => m.value === selectedMonth)?.label ||
+                        ''
+                    }
+                    year={selectedYear}
+                    invoiceNumber={currentInvoiceNumber}
+                    totals={totals}
+                />,
+            ).toBlob();
+
+            const formData = new FormData();
+            formData.append('file', blob, fileName);
+            formData.append('to', clientEmail);
+            formData.append('clientName', selectedClient.name);
+            formData.append(
+                'month',
+                months.find((m) => m.value === selectedMonth)?.label || '',
+            );
+            formData.append('year', selectedYear);
+
+            const response = await fetch(
+                'http://localhost:5000/api/invoices/send-email',
+                {
+                    method: 'POST',
+                    body: formData,
+                    credentials: 'include',
+                },
+            );
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Failed to send email');
+            }
+
+            toast.success('Invoice sent successfully to ' + clientEmail);
+        } catch (error: any) {
+            console.error('Error sending email:', error);
+            toast.error(error.message || 'Failed to send email');
+        } finally {
+            setIsSending(false);
         }
     };
 
@@ -194,7 +320,9 @@ export default function InvoicePage() {
             <Card>
                 <CardHeader>
                     <CardTitle>Select Orders</CardTitle>
-                    <CardDescription>Choose a year, month, and client to view orders</CardDescription>
+                    <CardDescription>
+                        Choose a year, month, and client to view orders
+                    </CardDescription>
                 </CardHeader>
                 <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -213,12 +341,14 @@ export default function InvoicePage() {
                                         setShowPDF(false);
                                     }}
                                 >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder={
-                                            years.length === 0
-                                                ? "No orders found"
-                                                : "Select year"
-                                        } />
+                                    <SelectTrigger className="w-full">
+                                        <SelectValue
+                                            placeholder={
+                                                years.length === 0
+                                                    ? 'No orders found'
+                                                    : 'Select year'
+                                            }
+                                        />
                                     </SelectTrigger>
                                     <SelectContent>
                                         {years.map((year) => (
@@ -243,12 +373,15 @@ export default function InvoicePage() {
                                     setShowPDF(false);
                                 }}
                             >
-                                <SelectTrigger>
+                                <SelectTrigger className="w-full">
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {months.map((month) => (
-                                        <SelectItem key={month.value} value={month.value}>
+                                        <SelectItem
+                                            key={month.value}
+                                            value={month.value}
+                                        >
                                             {month.label}
                                         </SelectItem>
                                     ))}
@@ -258,7 +391,9 @@ export default function InvoicePage() {
 
                         {/* Client Select - Dynamic based on Year/Month */}
                         <div className="space-y-2">
-                            <label className="text-sm font-medium">Client</label>
+                            <label className="text-sm font-medium">
+                                Client
+                            </label>
                             {isLoadingAllOrders ? (
                                 <Skeleton className="h-10 w-full" />
                             ) : (
@@ -270,38 +405,71 @@ export default function InvoicePage() {
                                         setShowPDF(false);
                                     }}
                                 >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder={
-                                            availableClients.length === 0
-                                                ? "No clients found"
-                                                : "Select a client"
-                                        } />
+                                    <SelectTrigger className="w-full">
+                                        <SelectValue
+                                            placeholder={
+                                                availableClients.length === 0
+                                                    ? 'No clients found'
+                                                    : 'Select a client'
+                                            }
+                                        />
                                     </SelectTrigger>
                                     <SelectContent>
                                         {availableClients.map((client) => (
-                                            <SelectItem key={client._id} value={client._id}>
-                                                {client.name} ({client.clientId})
+                                            <SelectItem
+                                                key={client._id}
+                                                value={client._id}
+                                            >
+                                                {client.name} ({client.clientId}
+                                                )
                                             </SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
                             )}
-                            {!isLoadingAllOrders && availableClients.length === 0 && (
-                                <p className="text-xs text-muted-foreground">
-                                    No orders found for this period
-                                </p>
-                            )}
+                            {!isLoadingAllOrders &&
+                                availableClients.length === 0 && (
+                                    <p className="text-xs text-muted-foreground">
+                                        No orders found for this period
+                                    </p>
+                                )}
                         </div>
 
-                        {/* Generate Button */}
-                        <div className="flex items-end">
+                        {/* Buttons */}
+                        <div className="flex items-end gap-2 flex-wrap">
+                            <Button
+                                onClick={handleSendDirectly}
+                                disabled={
+                                    selectedOrders.size === 0 ||
+                                    isGeneratingInvoice ||
+                                    isSending
+                                }
+                                className="flex-1 bg-orange-500 hover:bg-orange-600"
+                            >
+                                {isSending ? (
+                                    <Loader className="h-4 w-4  animate-spin" />
+                                ) : (
+                                    <Mail className="h-4 w-4 " />
+                                )}
+                                {isSending ? 'Sending...' : 'Send'}
+                            </Button>
                             <Button
                                 onClick={handleGenerateInvoice}
-                                disabled={selectedOrders.size === 0 || isGeneratingInvoice}
-                                className="w-full bg-teal-500 hover:bg-teal-600"
+                                disabled={
+                                    selectedOrders.size === 0 ||
+                                    isGeneratingInvoice ||
+                                    isSending
+                                }
+                                className="flex-1 bg-teal-500 hover:bg-teal-600"
                             >
-                                <FileText className="h-4 w-4 mr-2" />
-                                {isGeneratingInvoice ? 'Generating...' : `Generate Invoice (${selectedOrders.size})`}
+                                {isGeneratingInvoice ? (
+                                    <Loader className="h-4 w-4  animate-spin" />
+                                ) : (
+                                    <FileText className="h-4 w-4 " />
+                                )}
+                                {isGeneratingInvoice
+                                    ? 'Generating...'
+                                    : `Generate Invoice (${selectedOrders.size})`}
                             </Button>
                         </div>
                     </div>
@@ -316,7 +484,12 @@ export default function InvoicePage() {
                             <div>
                                 <CardTitle>Orders</CardTitle>
                                 <CardDescription>
-                                    {selectedClient?.name} - {months.find((m) => m.value === selectedMonth)?.label}{' '}
+                                    {selectedClient?.name} -{' '}
+                                    {
+                                        months.find(
+                                            (m) => m.value === selectedMonth,
+                                        )?.label
+                                    }{' '}
                                     {selectedYear}
                                 </CardDescription>
                             </div>
@@ -326,7 +499,8 @@ export default function InvoicePage() {
                                         Selected: {selectedOrders.size} orders
                                     </p>
                                     <p className="font-semibold">
-                                        Total: {formatCurrency(totals.totalAmount)}
+                                        Total:{' '}
+                                        {formatCurrency(totals.totalAmount)}
                                     </p>
                                 </div>
                             )}
@@ -336,7 +510,8 @@ export default function InvoicePage() {
                         <div className="border">
                             {orders.length === 0 ? (
                                 <div className="p-8 text-center text-muted-foreground">
-                                    No orders found for this client in this period
+                                    No orders found for this client in this
+                                    period
                                 </div>
                             ) : (
                                 <Table>
@@ -346,17 +521,32 @@ export default function InvoicePage() {
                                                 <Checkbox
                                                     checked={
                                                         orders.length > 0 &&
-                                                        selectedOrders.size === orders.length
+                                                        selectedOrders.size ===
+                                                            orders.length
                                                     }
-                                                    onCheckedChange={handleSelectAll}
+                                                    onCheckedChange={
+                                                        handleSelectAll
+                                                    }
                                                 />
                                             </TableHead>
-                                            <TableHead className="border">Order Name</TableHead>
-                                            <TableHead className="border">Order Date</TableHead>
-                                            <TableHead className="border">Images</TableHead>
-                                            <TableHead className="border">Per Image</TableHead>
-                                            <TableHead className="border">Total</TableHead>
-                                            <TableHead className="border">Status</TableHead>
+                                            <TableHead className="border">
+                                                Order Name
+                                            </TableHead>
+                                            <TableHead className="border">
+                                                Order Date
+                                            </TableHead>
+                                            <TableHead className="border">
+                                                Images
+                                            </TableHead>
+                                            <TableHead className="border">
+                                                Per Image
+                                            </TableHead>
+                                            <TableHead className="border">
+                                                Total
+                                            </TableHead>
+                                            <TableHead className="border">
+                                                Status
+                                            </TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -364,18 +554,24 @@ export default function InvoicePage() {
                                             <TableRow
                                                 key={order._id}
                                                 className={
-                                                    selectedOrders.has(order._id)
+                                                    selectedOrders.has(
+                                                        order._id,
+                                                    )
                                                         ? 'bg-muted/50'
                                                         : ''
                                                 }
                                             >
                                                 <TableCell className="border">
                                                     <Checkbox
-                                                        checked={selectedOrders.has(order._id)}
-                                                        onCheckedChange={(checked) =>
+                                                        checked={selectedOrders.has(
+                                                            order._id,
+                                                        )}
+                                                        onCheckedChange={(
+                                                            checked,
+                                                        ) =>
                                                             handleSelectOrder(
                                                                 order._id,
-                                                                checked as boolean
+                                                                checked as boolean,
                                                             )
                                                         }
                                                     />
@@ -384,18 +580,33 @@ export default function InvoicePage() {
                                                     {order.orderName}
                                                 </TableCell>
                                                 <TableCell className="border">
-                                                    {format(new Date(order.orderDate), 'MMM dd, yyyy')}
+                                                    {format(
+                                                        new Date(
+                                                            order.orderDate,
+                                                        ),
+                                                        'MMM dd, yyyy',
+                                                    )}
                                                 </TableCell>
-                                                <TableCell className="border">{order.imageQuantity}</TableCell>
                                                 <TableCell className="border">
-                                                    {formatCurrency(order.perImagePrice)}
+                                                    {order.imageQuantity}
+                                                </TableCell>
+                                                <TableCell className="border">
+                                                    {formatCurrency(
+                                                        order.perImagePrice,
+                                                    )}
                                                 </TableCell>
                                                 <TableCell className="font-medium border">
-                                                    {formatCurrency(order.totalPrice)}
+                                                    {formatCurrency(
+                                                        order.totalPrice,
+                                                    )}
                                                 </TableCell>
                                                 <TableCell className="border">
                                                     <Badge variant="outline">
-                                                        {statusLabels[order.status]}
+                                                        {
+                                                            statusLabels[
+                                                                order.status
+                                                            ]
+                                                        }
                                                     </Badge>
                                                 </TableCell>
                                             </TableRow>
@@ -414,7 +625,10 @@ export default function InvoicePage() {
                     <InvoicePDF
                         client={selectedClient as Client}
                         orders={selectedOrdersList}
-                        month={months.find((m) => m.value === selectedMonth)?.label || ''}
+                        month={
+                            months.find((m) => m.value === selectedMonth)
+                                ?.label || ''
+                        }
                         year={selectedYear}
                         invoiceNumber={invoiceNumber}
                         totals={totals}

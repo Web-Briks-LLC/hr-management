@@ -11,7 +11,7 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
-import { Loader2, ArrowLeft } from 'lucide-react';
+import { Loader, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { requestPasswordReset } from '@/lib/auth-client';
 import Link from 'next/link';
@@ -112,7 +112,7 @@ export default function ForgetPasswordPage() {
                         >
                             {isLoading ? (
                                 <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    <Loader className=" h-4 w-4 animate-spin" />
                                     Sending Link...
                                 </>
                             ) : (

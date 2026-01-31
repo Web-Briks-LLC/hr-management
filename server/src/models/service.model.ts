@@ -8,7 +8,6 @@ const serviceSchema = new Schema<IService>(
             required: true,
             unique: true,
             trim: true,
-            index: true,
         },
         description: {
             type: String,
@@ -25,7 +24,7 @@ const serviceSchema = new Schema<IService>(
             required: true,
         },
     },
-    { timestamps: true }
+    { timestamps: true },
 );
 
 const ServiceModel = model<IService>('Service', serviceSchema);

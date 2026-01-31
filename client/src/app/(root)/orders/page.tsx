@@ -68,7 +68,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
-    Loader2,
+    Loader,
     ChevronLeft,
     ChevronRight,
     Plus,
@@ -616,7 +616,7 @@ export default function OrdersPage() {
                     <div className="relative">
                         <div className="flex items-center justify-between mb-3">
                             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/10 text-blue-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-blue-500/20">
-                                <Loader2 className="h-5 w-5" />
+                                <Loader className="h-5 w-5" />
                             </div>
                         </div>
                         <h3 className="text-3xl font-bold tracking-tight text-blue-600 dark:text-blue-400">
@@ -741,7 +741,7 @@ export default function OrdersPage() {
                                     variant="outline"
                                     onClick={() => setIsSelectionMode(true)}
                                 >
-                                    <CheckSquare className="mr-2 h-4 w-4" />
+                                    <CheckSquare className=" h-4 w-4" />
                                     Select
                                 </Button>
                             ) : (
@@ -749,13 +749,13 @@ export default function OrdersPage() {
                                     variant="outline"
                                     onClick={clearSelection}
                                 >
-                                    <X className="mr-2 h-4 w-4" />
+                                    <X className=" h-4 w-4" />
                                     Cancel
                                 </Button>
                             )}
                             <Button variant="outline" asChild>
                                 <Link href="/orders/invoice">
-                                    <FileText className="mr-2 h-4 w-4" />
+                                    <FileText className=" h-4 w-4" />
                                     Generate Invoice
                                 </Link>
                             </Button>
@@ -1043,7 +1043,7 @@ export default function OrdersPage() {
                                 >
                                     {isLoadingAll ? (
                                         <>
-                                            <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                                            <Loader className=" h-3 w-3 animate-spin" />
                                             Selecting all {meta.total} orders...
                                         </>
                                     ) : (
@@ -1578,7 +1578,7 @@ export default function OrdersPage() {
                                     }
                                     disabled={page === 1 || isFetching}
                                 >
-                                    <ChevronLeft className="h-4 w-4 mr-2" />
+                                    <ChevronLeft className="h-4 w-4 " />
                                     Previous
                                 </Button>
                                 <Button
@@ -1853,7 +1853,7 @@ export default function OrdersPage() {
                             disabled={!newDeadline || isExtending}
                         >
                             {isExtending && (
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                <Loader className="h-4 w-4  animate-spin" />
                             )}
                             Extend Deadline
                         </Button>
@@ -1903,7 +1903,7 @@ export default function OrdersPage() {
                             }
                         >
                             {isAddingRevision && (
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                <Loader className="h-4 w-4  animate-spin" />
                             )}
                             Add Revision
                         </Button>
@@ -1972,7 +1972,7 @@ export default function OrdersPage() {
                             disabled={isUpdatingStatus}
                         >
                             {isUpdatingStatus && (
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                <Loader className="h-4 w-4  animate-spin" />
                             )}
                             Set to Revision
                         </Button>
@@ -2011,7 +2011,7 @@ export default function OrdersPage() {
                             disabled={isDeleting}
                         >
                             {isDeleting && (
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                <Loader className="h-4 w-4  animate-spin" />
                             )}
                             Delete
                         </AlertDialogAction>
@@ -2048,7 +2048,7 @@ export default function OrdersPage() {
                             disabled={isBulkDeleting}
                         >
                             {isBulkDeleting && (
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                <Loader className="h-4 w-4  animate-spin" />
                             )}
                             Delete {selectedOrderIds.size} Order
                             {selectedOrderIds.size !== 1 ? 's' : ''}

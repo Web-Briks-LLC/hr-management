@@ -51,7 +51,7 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import {
-    Loader2,
+    Loader,
     ChevronLeft,
     ChevronRight,
     ChevronsLeft,
@@ -727,7 +727,7 @@ export default function ClientsPage() {
                             disabled={isDeleting}
                         >
                             {isDeleting && (
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                <Loader className="h-4 w-4  animate-spin" />
                             )}
                             Delete
                         </AlertDialogAction>

@@ -26,7 +26,7 @@ import {
     type IShareholder,
 } from '@/redux/features/profitShare/profitShareApi';
 import { useGetStaffsQuery } from '@/redux/features/staff/staffApi';
-import { Loader2, UserPlus } from 'lucide-react';
+import { Loader, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface AddShareholderDialogProps {
@@ -47,9 +47,13 @@ export default function AddShareholderDialog({
     onClose,
     remainingPercentage,
 }: AddShareholderDialogProps) {
-    const [createShareholder, { isLoading: isCreating }] = useCreateShareholderMutation();
-    const [updateShareholder, { isLoading: isUpdating }] = useUpdateShareholderMutation();
-    const { data: staffData, isLoading: isLoadingStaff } = useGetStaffsQuery({});
+    const [createShareholder, { isLoading: isCreating }] =
+        useCreateShareholderMutation();
+    const [updateShareholder, { isLoading: isUpdating }] =
+        useUpdateShareholderMutation();
+    const { data: staffData, isLoading: isLoadingStaff } = useGetStaffsQuery(
+        {},
+    );
 
     const [selectedAdmin, setSelectedAdmin] = useState<string>('');
     const [formData, setFormData] = useState({
@@ -65,7 +69,7 @@ export default function AddShareholderDialog({
     // Memoize admins to prevent infinite loop - filter admins from staffData
     const admins = useMemo(() => {
         return (staffData?.staffs || []).filter((staff: any) =>
-            ADMIN_ROLES.includes(staff.user?.role)
+            ADMIN_ROLES.includes(staff.user?.role),
         );
     }, [staffData?.staffs]);
 
@@ -119,7 +123,9 @@ export default function AddShareholderDialog({
         }
 
         if (percentage > maxPercentage) {
-            toast.error(`Maximum allowed percentage is ${maxPercentage.toFixed(2)}%`);
+            toast.error(
+                `Maximum allowed percentage is ${maxPercentage.toFixed(2)}%`,
+            );
             return;
         }
 
@@ -146,7 +152,10 @@ export default function AddShareholderDialog({
 
             onClose();
         } catch (err: any) {
-            toast.error(err?.data?.message || `Failed to ${isEditing ? 'update' : 'add'} shareholder`);
+            toast.error(
+                err?.data?.message ||
+                    `Failed to ${isEditing ? 'update' : 'add'} shareholder`,
+            );
         }
     };
 
@@ -169,7 +178,9 @@ export default function AddShareholderDialog({
             )}
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>{isEditing ? 'Edit Shareholder' : 'Add Shareholder'}</DialogTitle>
+                    <DialogTitle>
+                        {isEditing ? 'Edit Shareholder' : 'Add Shareholder'}
+                    </DialogTitle>
                     <DialogDescription>
                         {isEditing
                             ? 'Update shareholder details and percentage allocation'
@@ -186,10 +197,17 @@ export default function AddShareholderDialog({
                                 value={selectedAdmin}
                                 onValueChange={setSelectedAdmin}
                             >
-                                <SelectTrigger id="admin-select"
-                                    className='w-full'
+                                <SelectTrigger
+                                    id="admin-select"
+                                    className="w-full"
                                 >
-                                    <SelectValue placeholder={isLoadingStaff ? "Loading admins..." : "Select an admin"} />
+                                    <SelectValue
+                                        placeholder={
+                                            isLoadingStaff
+                                                ? 'Loading admins...'
+                                                : 'Select an admin'
+                                        }
+                                    />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {admins.length === 0 ? (
@@ -198,11 +216,21 @@ export default function AddShareholderDialog({
                                         </div>
                                     ) : (
                                         admins.map((admin: any) => (
-                                            <SelectItem key={admin._id} value={admin._id}>
+                                            <SelectItem
+                                                key={admin._id}
+                                                value={admin._id}
+                                            >
                                                 <div className="flex flex-col items-start">
-                                                    <span className="font-medium">{admin.user?.name || 'Unknown'}</span>
+                                                    <span className="font-medium">
+                                                        {admin.user?.name ||
+                                                            'Unknown'}
+                                                    </span>
                                                     <span className="text-xs text-muted-foreground">
-                                                        {admin.user?.email} • {(admin.user?.role || '').replace('_', ' ')}
+                                                        {admin.user?.email} •{' '}
+                                                        {(
+                                                            admin.user?.role ||
+                                                            ''
+                                                        ).replace('_', ' ')}
                                                     </span>
                                                 </div>
                                             </SelectItem>
@@ -221,10 +249,19 @@ export default function AddShareholderDialog({
                                 <Input
                                     id="name"
                                     value={formData.name}
-                                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                    onChange={(e) =>
+                                        setFormData({
+                                            ...formData,
+                                            name: e.target.value,
+                                        })
+                                    }
                                     placeholder="Name"
                                     readOnly={!isEditing && !!selectedAdmin}
-                                    className={!isEditing && selectedAdmin ? 'bg-muted' : ''}
+                                    className={
+                                        !isEditing && selectedAdmin
+                                            ? 'bg-muted'
+                                            : ''
+                                    }
                                 />
                             </div>
 
@@ -234,10 +271,19 @@ export default function AddShareholderDialog({
                                     id="email"
                                     type="email"
                                     value={formData.email}
-                                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                    onChange={(e) =>
+                                        setFormData({
+                                            ...formData,
+                                            email: e.target.value,
+                                        })
+                                    }
                                     placeholder="Email"
                                     readOnly={!isEditing && !!selectedAdmin}
-                                    className={!isEditing && selectedAdmin ? 'bg-muted' : ''}
+                                    className={
+                                        !isEditing && selectedAdmin
+                                            ? 'bg-muted'
+                                            : ''
+                                    }
                                 />
                             </div>
                         </>
@@ -245,7 +291,8 @@ export default function AddShareholderDialog({
 
                     <div className="space-y-2">
                         <Label htmlFor="percentage">
-                            Share Percentage * (Max: {maxPercentage.toFixed(2)}%)
+                            Share Percentage * (Max: {maxPercentage.toFixed(2)}
+                            %)
                         </Label>
                         <div className="relative">
                             <Input
@@ -255,7 +302,12 @@ export default function AddShareholderDialog({
                                 min="0.01"
                                 max={maxPercentage}
                                 value={formData.percentage}
-                                onChange={(e) => setFormData({ ...formData, percentage: e.target.value })}
+                                onChange={(e) =>
+                                    setFormData({
+                                        ...formData,
+                                        percentage: e.target.value,
+                                    })
+                                }
                                 placeholder="25.00"
                                 className="pr-8"
                                 required
@@ -271,31 +323,41 @@ export default function AddShareholderDialog({
                             <div className="space-y-0.5">
                                 <Label htmlFor="isActive">Active Status</Label>
                                 <p className="text-sm text-muted-foreground">
-                                    Inactive shareholders don&apos;t receive distributions
+                                    Inactive shareholders don&apos;t receive
+                                    distributions
                                 </p>
                             </div>
                             <Switch
                                 id="isActive"
                                 checked={formData.isActive}
                                 onCheckedChange={(checked) =>
-                                    setFormData({ ...formData, isActive: checked })
+                                    setFormData({
+                                        ...formData,
+                                        isActive: checked,
+                                    })
                                 }
                             />
                         </div>
                     )}
 
                     <div className="flex justify-end gap-2 pt-4">
-                        <Button type="button" variant="outline" onClick={onClose}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={onClose}
+                        >
                             Cancel
                         </Button>
                         <Button
                             type="submit"
-                            disabled={isLoading || (!isEditing && !selectedAdmin)}
+                            disabled={
+                                isLoading || (!isEditing && !selectedAdmin)
+                            }
                             className="gap-2"
                         >
                             {isLoading ? (
                                 <>
-                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    <Loader className="h-4 w-4 animate-spin" />
                                     {isEditing ? 'Updating...' : 'Adding...'}
                                 </>
                             ) : isEditing ? (

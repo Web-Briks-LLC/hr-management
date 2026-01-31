@@ -45,4 +45,5 @@ export interface IFinanceAnalytics {
 export interface AnalyticsQueryParams {
     year?: number;
     months?: number;
+    month?: number;
 }

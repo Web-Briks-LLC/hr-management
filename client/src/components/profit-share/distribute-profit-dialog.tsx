@@ -24,7 +24,7 @@ import {
     useDistributeProfitMutation,
     type IShareholder,
 } from '@/redux/features/profitShare/profitShareApi';
-import { Loader2, DollarSign, AlertCircle } from 'lucide-react';
+import { Loader, DollarSign, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
@@ -62,12 +62,18 @@ export default function DistributeProfitDialog({
     const [distributeProfit, { isLoading }] = useDistributeProfitMutation();
 
     const [periodType, setPeriodType] = useState<'month' | 'year'>('month');
-    const [selectedMonth, setSelectedMonth] = useState(String(new Date().getMonth() + 1));
+    const [selectedMonth, setSelectedMonth] = useState(
+        String(new Date().getMonth() + 1),
+    );
     const [selectedYear, setSelectedYear] = useState(String(currentYear));
-    const [selectedShareholders, setSelectedShareholders] = useState<string[]>([]);
+    const [selectedShareholders, setSelectedShareholders] = useState<string[]>(
+        [],
+    );
     const [notes, setNotes] = useState('');
 
-    const isAllSelected = selectedShareholders.length === shareholders.length && shareholders.length > 0;
+    const isAllSelected =
+        selectedShareholders.length === shareholders.length &&
+        shareholders.length > 0;
 
     const handleSelectAll = () => {
         if (isAllSelected) {
@@ -81,7 +87,9 @@ export default function DistributeProfitDialog({
         if (checked) {
             setSelectedShareholders([...selectedShareholders, id]);
         } else {
-            setSelectedShareholders(selectedShareholders.filter((sid) => sid !== id));
+            setSelectedShareholders(
+                selectedShareholders.filter((sid) => sid !== id),
+            );
         }
     };
 
@@ -110,7 +118,10 @@ export default function DistributeProfitDialog({
             await distributeProfit({
                 shareholderIds: isAllSelected ? ['all'] : selectedShareholders,
                 periodType,
-                month: periodType === 'month' ? parseInt(selectedMonth) : undefined,
+                month:
+                    periodType === 'month'
+                        ? parseInt(selectedMonth)
+                        : undefined,
                 year: parseInt(selectedYear),
                 notes: notes || undefined,
             }).unwrap();
@@ -129,9 +140,13 @@ export default function DistributeProfitDialog({
 
     const handleDisabledClick = () => {
         if (shareholders.length === 0) {
-            toast.warning('No shareholders added. Please add shareholders first.');
+            toast.warning(
+                'No shareholders added. Please add shareholders first.',
+            );
         } else if (netProfit <= 0) {
-            toast.warning(`Cannot distribute - no profit to share. Current net profit: ${formatCurrency(netProfit)}`);
+            toast.warning(
+                `Cannot distribute - no profit to share. Current net profit: ${formatCurrency(netProfit)}`,
+            );
         }
     };
 
@@ -158,7 +173,8 @@ export default function DistributeProfitDialog({
                         <Alert variant="destructive">
                             <AlertCircle className="h-4 w-4" />
                             <AlertDescription>
-                                There is no profit to distribute. Net profit: {formatCurrency(netProfit)}
+                                There is no profit to distribute. Net profit:{' '}
+                                {formatCurrency(netProfit)}
                             </AlertDescription>
                         </Alert>
                     )}
@@ -169,27 +185,39 @@ export default function DistributeProfitDialog({
                             <Label>Period Type</Label>
                             <Select
                                 value={periodType}
-                                onValueChange={(value: 'month' | 'year') => setPeriodType(value)}
+                                onValueChange={(value: 'month' | 'year') =>
+                                    setPeriodType(value)
+                                }
                             >
                                 <SelectTrigger>
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="month">Single Month</SelectItem>
-                                    <SelectItem value="year">Full Year</SelectItem>
+                                    <SelectItem value="month">
+                                        Single Month
+                                    </SelectItem>
+                                    <SelectItem value="year">
+                                        Full Year
+                                    </SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
 
                         <div className="space-y-2">
                             <Label>Year</Label>
-                            <Select value={selectedYear} onValueChange={setSelectedYear}>
+                            <Select
+                                value={selectedYear}
+                                onValueChange={setSelectedYear}
+                            >
                                 <SelectTrigger>
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {years.map((year) => (
-                                        <SelectItem key={year.value} value={year.value}>
+                                        <SelectItem
+                                            key={year.value}
+                                            value={year.value}
+                                        >
                                             {year.label}
                                         </SelectItem>
                                     ))}
@@ -201,13 +229,19 @@ export default function DistributeProfitDialog({
                     {periodType === 'month' && (
                         <div className="space-y-2">
                             <Label>Month</Label>
-                            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                            <Select
+                                value={selectedMonth}
+                                onValueChange={setSelectedMonth}
+                            >
                                 <SelectTrigger>
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {months.map((month) => (
-                                        <SelectItem key={month.value} value={month.value}>
+                                        <SelectItem
+                                            key={month.value}
+                                            value={month.value}
+                                        >
                                             {month.label}
                                         </SelectItem>
                                     ))}
@@ -239,20 +273,34 @@ export default function DistributeProfitDialog({
                                     <div className="flex items-center gap-3">
                                         <Checkbox
                                             id={shareholder._id}
-                                            checked={selectedShareholders.includes(shareholder._id)}
+                                            checked={selectedShareholders.includes(
+                                                shareholder._id,
+                                            )}
                                             onCheckedChange={(checked) =>
-                                                handleSelectShareholder(shareholder._id, !!checked)
+                                                handleSelectShareholder(
+                                                    shareholder._id,
+                                                    !!checked,
+                                                )
                                             }
                                         />
-                                        <label htmlFor={shareholder._id} className="cursor-pointer">
-                                            <div className="font-medium">{shareholder.name}</div>
+                                        <label
+                                            htmlFor={shareholder._id}
+                                            className="cursor-pointer"
+                                        >
+                                            <div className="font-medium">
+                                                {shareholder.name}
+                                            </div>
                                             <div className="text-sm text-muted-foreground">
                                                 {shareholder.percentage}% share
                                             </div>
                                         </label>
                                     </div>
                                     <div className="text-sm font-mono text-muted-foreground">
-                                        {formatCurrency((netProfit * shareholder.percentage) / 100)}
+                                        {formatCurrency(
+                                            (netProfit *
+                                                shareholder.percentage) /
+                                                100,
+                                        )}
                                     </div>
                                 </div>
                             ))}
@@ -264,16 +312,24 @@ export default function DistributeProfitDialog({
                         <div className="rounded-lg bg-muted/50 p-4 space-y-2">
                             <div className="flex justify-between text-sm">
                                 <span>Selected shareholders:</span>
-                                <span className="font-medium">{selectedShareholders.length}</span>
+                                <span className="font-medium">
+                                    {selectedShareholders.length}
+                                </span>
                             </div>
                             <div className="flex justify-between text-sm">
                                 <span>Total percentage:</span>
-                                <span className="font-medium">{getSelectedTotalPercentage().toFixed(2)}%</span>
+                                <span className="font-medium">
+                                    {getSelectedTotalPercentage().toFixed(2)}%
+                                </span>
                             </div>
                             <div className="flex justify-between font-medium border-t pt-2">
                                 <span>Total to distribute:</span>
                                 <span className="text-primary">
-                                    {formatCurrency((netProfit * getSelectedTotalPercentage()) / 100)}
+                                    {formatCurrency(
+                                        (netProfit *
+                                            getSelectedTotalPercentage()) /
+                                            100,
+                                    )}
                                 </span>
                             </div>
                         </div>
@@ -292,17 +348,23 @@ export default function DistributeProfitDialog({
                     </div>
 
                     <div className="flex justify-end gap-2 pt-4">
-                        <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setOpen(false)}
+                        >
                             Cancel
                         </Button>
                         <Button
                             onClick={handleSubmit}
-                            disabled={isLoading || selectedShareholders.length === 0}
+                            disabled={
+                                isLoading || selectedShareholders.length === 0
+                            }
                             className="gap-2"
                         >
                             {isLoading ? (
                                 <>
-                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    <Loader className="h-4 w-4 animate-spin" />
                                     Distributing...
                                 </>
                             ) : (

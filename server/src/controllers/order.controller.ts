@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import orderService from '../services/order.service.js';
 import type { OrderStatus, OrderPriority } from '../types/order.type.js';
+import mongoose from 'mongoose';
 
 async function createOrder(req: Request, res: Response) {
     try {
@@ -218,9 +219,26 @@ async function updateOrder(req: Request, res: Response) {
 async function deleteOrder(req: Request, res: Response) {
     try {
         const id = req.params.id;
+        const userId = req.user?.id;
 
         if (!id) {
             return res.status(400).json({ message: 'Order ID is required' });
+        }
+
+        if (!userId) {
+            return res.status(401).json({ message: 'Unauthorized' });
+        }
+
+        // Check if user is admin
+        const { default: UserModel } = await import('../models/user.model.js');
+        const user = await UserModel.findOne({
+            _id: new mongoose.Types.ObjectId(userId),
+        });
+
+        if (!user || !['admin', 'super_admin'].includes(user.role)) {
+            return res.status(403).json({
+                message: 'Forbidden. Only admins can delete orders.',
+            });
         }
 
         const order = await orderService.deleteOrderFromDB(id);
