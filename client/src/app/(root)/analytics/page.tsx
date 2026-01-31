@@ -51,12 +51,6 @@ import {
 } from 'lucide-react';
 
 const formatCurrency = (amount: number) => {
-    if (amount >= 1000000) {
-        return `৳${(amount / 1000000).toFixed(1)}M`;
-    }
-    if (amount >= 1000) {
-        return `৳${(amount / 1000).toFixed(1)}K`;
-    }
     return `৳${amount.toLocaleString('en-BD', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 };
 
