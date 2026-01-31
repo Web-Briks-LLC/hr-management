@@ -51,7 +51,7 @@ import {
 } from 'lucide-react';
 
 const formatCurrency = (amount: number) => {
-    return `৳${amount.toLocaleString('en-BD', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+    return `৳${amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
 const COLORS = [
