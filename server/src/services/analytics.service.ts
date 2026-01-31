@@ -83,15 +83,6 @@ async function getFinanceAnalytics(
         status: 'delivered',
         createdAt: { $gte: startDate, $lte: endDate },
     };
-    const unpaidOrderFilter: any = {
-        status: { $in: ['completed', 'delivered'] },
-        createdAt: { $gte: startDate, $lte: endDate },
-    };
-
-    // Get paid order IDs for unpaid calculation
-    const paidOrderIds = await EarningModel.distinct('orderId', {
-        status: 'paid',
-    });
 
     // Parallel fetch all data
     const [
@@ -101,6 +92,7 @@ async function getFinanceAnalytics(
         totalOrdersResult,
         deliveredOrdersResult,
         unpaidOrdersResult,
+        unpaidByCurrencyResult,
         // Monthly trends
         monthlyEarnings,
         monthlyExpenses,
@@ -136,15 +128,30 @@ async function getFinanceAnalytics(
                 },
             },
         ]),
-        // Unpaid orders revenue
-        OrderModel.aggregate([
+        // Unpaid earnings (from Earnings table directly)
+        EarningModel.aggregate([
             {
                 $match: {
-                    ...unpaidOrderFilter,
-                    _id: { $nin: paidOrderIds },
+                    status: 'unpaid',
+                    orderDate: { $gte: startDate, $lte: endDate },
                 },
             },
-            { $group: { _id: null, total: { $sum: '$totalPrice' } } },
+            { $group: { _id: null, total: { $sum: '$orderAmount' } } },
+        ]),
+        // Unpaid earnings by currency
+        EarningModel.aggregate([
+            {
+                $match: {
+                    status: 'unpaid',
+                    orderDate: { $gte: startDate, $lte: endDate },
+                },
+            },
+            {
+                $group: {
+                    _id: '$currency',
+                    amount: { $sum: '$orderAmount' },
+                },
+            },
         ]),
         // Monthly earnings (Full Year for Trends)
         EarningModel.aggregate([
@@ -277,10 +284,26 @@ async function getFinanceAnalytics(
     const deliveredData = deliveredOrdersResult[0] || { count: 0, revenue: 0 };
     const unpaidRevenue = unpaidOrdersResult[0]?.total || 0;
 
+    // Process unpaid by currency with approximate BDT rates
+    const APPROX_RATES: Record<string, number> = {
+        USD: 117,
+        EUR: 127,
+        GBP: 148,
+    };
+    const unpaidByCurrency = (unpaidByCurrencyResult || []).map((item: any) => {
+        const currency = item._id || 'USD';
+        const rate = APPROX_RATES[currency] || 117;
+        return {
+            currency,
+            amount: item.amount || 0,
+            amountBDT: Math.round((item.amount || 0) * rate),
+        };
+    });
+
     // Get total profit transfers (shared amount) - Filtered?
     // Profit transfers usually have a date.
     const profitTransferResult = await ProfitTransferModel.aggregate([
-        { $match: { date: { $gte: startDate, $lte: endDate } } },
+        { $match: { transferDate: { $gte: startDate, $lte: endDate } } },
         { $group: { _id: null, total: { $sum: '$amount' } } },
     ]);
     const totalShared = profitTransferResult[0]?.total || 0;
@@ -319,6 +342,7 @@ async function getFinanceAnalytics(
         totalProfit: totalEarnings - totalExpenses,
         totalRevenue: deliveredData.revenue,
         unpaidRevenue,
+        unpaidByCurrency,
         totalShared,
         totalDebit,
         finalAmount,

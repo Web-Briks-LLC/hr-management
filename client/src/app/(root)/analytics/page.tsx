@@ -275,9 +275,30 @@ export default function FinanceAnalyticsPage() {
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold text-orange-600">
-                            {formatCurrency(summary.unpaidRevenue)}
+                            $
+                            {summary.unpaidRevenue.toLocaleString('en-US', {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                            })}
                         </div>
-                        <p className="text-xs text-muted-foreground">
+                        {summary.unpaidByCurrency &&
+                            summary.unpaidByCurrency.length > 0 && (
+                                <div className="mt-1 space-y-0.5">
+                                    {summary.unpaidByCurrency.map((item) => (
+                                        <p
+                                            key={item.currency}
+                                            className="text-xs text-muted-foreground"
+                                        >
+                                            {item.currency}: $
+                                            {item.amount.toFixed(2)} ≈ ৳
+                                            {item.amountBDT.toLocaleString(
+                                                'en-IN',
+                                            )}
+                                        </p>
+                                    ))}
+                                </div>
+                            )}
+                        <p className="text-xs text-muted-foreground mt-1">
                             Not yet withdrawn
                         </p>
                     </CardContent>

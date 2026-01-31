@@ -31,6 +31,11 @@ export interface IFinanceAnalytics {
         totalProfit: number;
         totalRevenue: number;
         unpaidRevenue: number;
+        unpaidByCurrency?: {
+            currency: string;
+            amount: number;
+            amountBDT: number;
+        }[];
         totalShared: number;
         totalDebit: number;
         finalAmount: number;
