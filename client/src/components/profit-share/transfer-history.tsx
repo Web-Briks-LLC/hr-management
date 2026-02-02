@@ -69,21 +69,21 @@ export function TransferHistory() {
         businessId?: string;
         year?: number;
         month?: number;
-    }>({
-        year: currentYear,
-    });
+    }>({});
 
     const [deletingTransfer, setDeletingTransfer] =
         useState<IProfitTransfer | null>(null);
 
     const { data: businessesData } = useGetBusinessesQuery();
     const { data: transfersData, isLoading } = useGetTransfersQuery(
-        filters.businessId || filters.year || filters.month ? filters : undefined
+        filters.businessId || filters.year || filters.month
+            ? filters
+            : undefined,
     );
     const { data: statsData } = useGetTransferStatsQuery(
         filters.year || filters.month
             ? { year: filters.year, month: filters.month }
-            : undefined
+            : undefined,
     );
     const [deleteTransfer, { isLoading: isDeleting }] =
         useDeleteTransferMutation();
@@ -91,7 +91,9 @@ export function TransferHistory() {
     const handleDelete = async () => {
         if (!deletingTransfer) return;
         try {
-            const response = await deleteTransfer(deletingTransfer._id).unwrap();
+            const response = await deleteTransfer(
+                deletingTransfer._id,
+            ).unwrap();
             toast.success(response.message);
             setDeletingTransfer(null);
         } catch (error: unknown) {
@@ -230,9 +232,7 @@ export function TransferHistory() {
                 {(filters.businessId || filters.year || filters.month) && (
                     <Button
                         variant="ghost"
-                        onClick={() =>
-                            setFilters({ year: currentYear })
-                        }
+                        onClick={() => setFilters({ year: currentYear })}
                     >
                         Clear Filters
                     </Button>
@@ -251,7 +251,8 @@ export function TransferHistory() {
                     <IconArrowRight className="size-12 text-muted-foreground mb-4" />
                     <h3 className="text-lg font-semibold">No transfers yet</h3>
                     <p className="text-muted-foreground">
-                        Transfer profit to external businesses to see history here.
+                        Transfer profit to external businesses to see history
+                        here.
                     </p>
                 </div>
             ) : (
@@ -293,7 +294,7 @@ export function TransferHistory() {
                                     <TableCell className="text-sm text-muted-foreground">
                                         {format(
                                             new Date(transfer.transferDate),
-                                            'MMM dd, yyyy'
+                                            'MMM dd, yyyy',
                                         )}
                                     </TableCell>
                                     <TableCell className="text-sm">

@@ -305,13 +305,28 @@ async function getFinanceAnalytics(
         };
     });
 
-    // Get total profit transfers (shared amount) - Filtered?
-    // Profit transfers usually have a date.
+    // Get total profit transfers (External Business)
     const profitTransferResult = await ProfitTransferModel.aggregate([
         { $match: { transferDate: { $gte: startDate, $lte: endDate } } },
         { $group: { _id: null, total: { $sum: '$amount' } } },
     ]);
-    const totalShared = profitTransferResult[0]?.total || 0;
+    const totalTransferred = profitTransferResult[0]?.total || 0;
+
+    // Get total profit distributions (Shareholders)
+    const profitDistributionResult =
+        await import('../models/profit-distribution.model.js').then((m) =>
+            m.default.aggregate([
+                {
+                    $match: {
+                        distributedAt: { $gte: startDate, $lte: endDate },
+                    },
+                },
+                { $group: { _id: null, total: { $sum: '$shareAmount' } } },
+            ]),
+        );
+    const totalDistributed = profitDistributionResult[0]?.total || 0;
+
+    const totalShared = totalTransferred + totalDistributed;
 
     // Get debit balance - Filtered?
     // Debits have dates.
