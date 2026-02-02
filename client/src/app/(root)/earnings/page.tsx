@@ -85,7 +85,6 @@ import {
     useGetEarningStatsQuery,
     useWithdrawEarningMutation,
     useToggleEarningStatusMutation,
-    useBulkWithdrawEarningsMutation,
     useLazyGetClientOrdersForWithdrawQuery,
     useDeleteEarningMutation,
     useLazyGetClientsWithEarningsQuery,
@@ -97,25 +96,12 @@ import type {
     EarningFilters,
     EarningStatus,
 } from '@/types/earning.type';
-import { CURRENCY_SYMBOLS } from '@/types/earning.type';
+import { CURRENCY_SYMBOLS, MONTHS } from '@/types/earning.type';
 import { cn } from '@/lib/utils';
 
 type FilterType = 'all' | 'today' | 'week' | 'month' | 'year' | 'range';
 
-const MONTHS = [
-    { value: 1, label: 'January' },
-    { value: 2, label: 'February' },
-    { value: 3, label: 'March' },
-    { value: 4, label: 'April' },
-    { value: 5, label: 'May' },
-    { value: 6, label: 'June' },
-    { value: 7, label: 'July' },
-    { value: 8, label: 'August' },
-    { value: 9, label: 'September' },
-    { value: 10, label: 'October' },
-    { value: 11, label: 'November' },
-    { value: 12, label: 'December' },
-];
+// MONTHS moved to types file
 
 const currentYear = new Date().getFullYear();
 const YEARS = Array.from({ length: 5 }, (_, i) => currentYear - i);
@@ -260,8 +246,6 @@ export default function EarningsPage() {
         useWithdrawEarningMutation();
     const [toggleStatus, { isLoading: isToggling }] =
         useToggleEarningStatusMutation();
-    const [bulkWithdraw, { isLoading: isBulkWithdrawing }] =
-        useBulkWithdrawEarningsMutation();
     const [deleteEarning, { isLoading: isDeleting }] =
         useDeleteEarningMutation();
 
@@ -283,7 +267,7 @@ export default function EarningsPage() {
     const withdrawTaxNum = parseFloat(withdrawTax) || 0;
     const withdrawRateNum = parseFloat(withdrawRate) || 1;
     const withdrawNetAmount =
-        (selectedEarning?.orderAmount || 0) - withdrawFeesNum - withdrawTaxNum;
+        (selectedEarning?.totalAmount || 0) - withdrawFeesNum - withdrawTaxNum;
     const withdrawBDT = withdrawNetAmount * withdrawRateNum;
 
     // Bulk withdraw calculations
@@ -383,28 +367,28 @@ export default function EarningsPage() {
     };
 
     const handleConfirmBulkWithdraw = async () => {
-        if (!bulkOrdersData || bulkOrdersData.orders.length === 0) {
-            toast.error('No orders to withdraw');
+        if (!bulkOrdersData) {
+            toast.error('No earning to withdraw');
             return;
         }
 
         try {
-            await bulkWithdraw({
-                earningIds: bulkOrdersData.orders.map((o) => o.earningId),
-                totalFees: bulkFeesNum,
-                totalTax: bulkTaxNum,
-                conversionRate: bulkRateNum,
-                notes: bulkNotes || undefined,
+            await withdrawEarning({
+                id: bulkOrdersData.earningId,
+                data: {
+                    fees: bulkFeesNum,
+                    tax: bulkTaxNum,
+                    conversionRate: bulkRateNum,
+                    notes: bulkNotes || undefined,
+                },
             }).unwrap();
 
-            toast.success(
-                `${bulkOrdersData.orders.length} earnings withdrawn successfully`,
-            );
+            toast.success('Monthly earning withdrawn successfully');
             setIsBulkWithdrawDialogOpen(false);
             setBulkClientId('');
         } catch (error) {
-            console.error('Error bulk withdrawing:', error);
-            toast.error('Failed to bulk withdraw');
+            console.error('Error withdrawing:', error);
+            toast.error('Failed to withdraw');
         }
     };
 
@@ -767,10 +751,10 @@ export default function EarningsPage() {
                             <TableHeader className="bg-muted/40">
                                 <TableRow className="hover:bg-muted/40 border-b-border/60">
                                     <TableHead className="font-semibold">
-                                        Date
+                                        Period
                                     </TableHead>
                                     <TableHead className="font-semibold">
-                                        Order
+                                        Orders
                                     </TableHead>
                                     <TableHead className="font-semibold">
                                         Client
@@ -843,23 +827,39 @@ export default function EarningsPage() {
                                             className="hover:bg-muted/20 transition-colors"
                                         >
                                             <TableCell className="whitespace-nowrap text-muted-foreground">
-                                                {format(
-                                                    new Date(earning.orderDate),
-                                                    'MMM dd, yyyy',
+                                                {
+                                                    MONTHS.find(
+                                                        (m) =>
+                                                            m.value ===
+                                                            earning.month,
+                                                    )?.label
+                                                }{' '}
+                                                {earning.year}
+                                            </TableCell>
+                                            <TableCell className="font-medium">
+                                                {earning.isLegacy ? (
+                                                    <Badge
+                                                        variant="secondary"
+                                                        className="text-xs"
+                                                    >
+                                                        Legacy
+                                                    </Badge>
+                                                ) : (
+                                                    <span>
+                                                        {earning.orderIds
+                                                            ?.length || 0}{' '}
+                                                        orders
+                                                    </span>
                                                 )}
                                             </TableCell>
-                                            <TableCell
-                                                className="font-medium max-w-[200px] truncate"
-                                                title={earning.orderName}
-                                            >
-                                                {earning.orderName}
-                                            </TableCell>
                                             <TableCell className="max-w-[150px] truncate text-muted-foreground">
-                                                {earning.clientId?.name || '-'}
+                                                {earning.clientId?.name ||
+                                                    earning.legacyClientCode ||
+                                                    '-'}
                                             </TableCell>
                                             <TableCell className="text-right font-medium">
                                                 {formatCurrency(
-                                                    earning.orderAmount,
+                                                    earning.totalAmount,
                                                     earning.currency,
                                                 )}
                                             </TableCell>
@@ -1159,11 +1159,11 @@ export default function EarningsPage() {
                             <div className="p-4 bg-muted/40 rounded-lg space-y-3">
                                 <div className="flex justify-between text-sm">
                                     <span className="text-muted-foreground">
-                                        Order Amount
+                                        Total Amount
                                     </span>
                                     <span className="font-semibold">
                                         {formatCurrency(
-                                            selectedEarning.orderAmount,
+                                            selectedEarning.totalAmount,
                                             selectedEarning.currency,
                                         )}
                                     </span>
@@ -1306,13 +1306,17 @@ export default function EarningsPage() {
                                 <div className="grid grid-cols-2 gap-4 text-sm">
                                     <div>
                                         <div className="text-muted-foreground text-xs mb-1">
-                                            Order
+                                            Period
                                         </div>
-                                        <div
-                                            className="font-medium truncate"
-                                            title={selectedEarning.orderName}
-                                        >
-                                            {selectedEarning.orderName}
+                                        <div className="font-medium">
+                                            {
+                                                MONTHS.find(
+                                                    (m) =>
+                                                        m.value ===
+                                                        selectedEarning.month,
+                                                )?.label
+                                            }{' '}
+                                            {selectedEarning.year}
                                         </div>
                                     </div>
                                     <div>
@@ -1321,20 +1325,18 @@ export default function EarningsPage() {
                                         </div>
                                         <div className="font-medium truncate">
                                             {selectedEarning.clientId?.name ||
+                                                selectedEarning.legacyClientCode ||
                                                 'N/A'}
                                         </div>
                                     </div>
                                     <div>
                                         <div className="text-muted-foreground text-xs mb-1">
-                                            Date
+                                            Orders
                                         </div>
                                         <div className="font-medium">
-                                            {format(
-                                                new Date(
-                                                    selectedEarning.orderDate,
-                                                ),
-                                                'MMM dd, yyyy',
-                                            )}
+                                            {selectedEarning.isLegacy
+                                                ? 'Legacy'
+                                                : `${selectedEarning.orderIds?.length || 0} orders`}
                                         </div>
                                     </div>
                                     <div>
@@ -1343,7 +1345,7 @@ export default function EarningsPage() {
                                         </div>
                                         <div className="font-medium">
                                             {formatCurrency(
-                                                selectedEarning.orderAmount,
+                                                selectedEarning.totalAmount,
                                                 selectedEarning.currency,
                                             )}
                                         </div>
@@ -1802,10 +1804,10 @@ export default function EarningsPage() {
                             </Button>
                             <Button
                                 onClick={handleConfirmBulkWithdraw}
-                                disabled={!bulkOrdersData || isBulkWithdrawing}
+                                disabled={!bulkOrdersData || isWithdrawing}
                                 className="bg-green-600 hover:bg-green-700 text-white min-w-[140px]"
                             >
-                                {isBulkWithdrawing ? (
+                                {isWithdrawing ? (
                                     <>
                                         <Loader className=" h-4 w-4 animate-spin" />{' '}
                                         Processing...

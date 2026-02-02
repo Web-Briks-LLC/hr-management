@@ -5,7 +5,6 @@ import {
     getEarningStats,
     withdrawEarning,
     toggleEarningStatus,
-    bulkWithdrawEarnings,
     getClientOrdersForWithdraw,
     deleteEarning,
     getEarningYears,
@@ -25,7 +24,6 @@ router.get('/:id', getEarningById);
 // Action routes
 router.put('/:id/withdraw', withdrawEarning);
 router.put('/:id/toggle-status', toggleEarningStatus);
-router.post('/bulk-withdraw', bulkWithdrawEarnings);
 
 // Delete route
 router.delete('/:id', deleteEarning);

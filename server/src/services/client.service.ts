@@ -278,8 +278,6 @@ const getClientStatsFromDB = async (
     filters?: ClientStatsFilters,
 ) => {
     const { default: OrderModel } = await import('../models/order.model.js');
-    const { default: EarningModel } =
-        await import('../models/earning.model.js');
 
     const clientObjectId = new Types.ObjectId(clientId);
 
@@ -317,54 +315,73 @@ const getClientStatsFromDB = async (
         orderMatch.orderName = { $regex: filters.search, $options: 'i' };
     }
 
-    // Get total orders count, total amount, and total images from orders
-    const orderStats = await OrderModel.aggregate([
+    // Aggregation pipeline to calculate stats
+    const stats = await OrderModel.aggregate([
         { $match: orderMatch },
+        {
+            $lookup: {
+                from: 'earnings',
+                localField: '_id',
+                foreignField: 'orderIds',
+                as: 'earning',
+            },
+        },
+        {
+            $unwind: {
+                path: '$earning',
+                preserveNullAndEmptyArrays: true,
+            },
+        },
         {
             $group: {
                 _id: null,
                 totalOrders: { $sum: 1 },
                 totalAmount: { $sum: '$totalPrice' },
                 totalImages: { $sum: '$imageQuantity' },
+                paidAmount: {
+                    $sum: {
+                        $cond: [
+                            { $eq: ['$earning.status', 'paid'] },
+                            '$totalPrice',
+                            0,
+                        ],
+                    },
+                },
+                totalBDT: {
+                    $sum: {
+                        $cond: [
+                            { $eq: ['$earning.status', 'paid'] },
+                            {
+                                $multiply: [
+                                    '$totalPrice',
+                                    { $ifNull: ['$earning.conversionRate', 0] },
+                                ],
+                            },
+                            0,
+                        ],
+                    },
+                },
             },
         },
     ]);
 
-    // Get order IDs that match the filters for earning lookup
-    const matchingOrderIds = await OrderModel.find(orderMatch).select('_id');
-    const orderIdList = matchingOrderIds.map((o) => o._id);
-
-    // Get total paid amount and total BDT from earnings for matching orders
-    const earningMatch: Record<string, unknown> = {
-        clientId: clientObjectId,
-        orderId: { $in: orderIdList },
+    const result = stats[0] || {
+        totalOrders: 0,
+        totalAmount: 0,
+        totalImages: 0,
+        paidAmount: 0,
+        totalBDT: 0,
     };
 
-    const earningStats = await EarningModel.aggregate([
-        { $match: earningMatch },
-        {
-            $group: {
-                _id: null,
-                paidAmount: { $sum: '$amount' },
-                totalBDT: { $sum: '$amountInBDT' },
-            },
-        },
-    ]);
-
-    const totalOrders = orderStats[0]?.totalOrders || 0;
-    const totalAmount = orderStats[0]?.totalAmount || 0;
-    const totalImages = orderStats[0]?.totalImages || 0;
-    const paidAmount = earningStats[0]?.paidAmount || 0;
-    const totalBDT = earningStats[0]?.totalBDT || 0;
-    const dueAmount = totalAmount - paidAmount;
+    const dueAmount = result.totalAmount - result.paidAmount;
 
     return {
-        totalOrders,
-        totalAmount,
-        totalImages,
-        paidAmount,
-        totalBDT,
-        dueAmount: Math.max(0, dueAmount), // Ensure due is not negative
+        totalOrders: result.totalOrders,
+        totalAmount: result.totalAmount,
+        totalImages: result.totalImages,
+        paidAmount: result.paidAmount,
+        totalBDT: result.totalBDT,
+        dueAmount: Math.max(0, dueAmount),
     };
 };
 

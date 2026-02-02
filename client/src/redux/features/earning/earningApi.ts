@@ -6,8 +6,6 @@ import type {
     EarningFilters,
     WithdrawEarningInput,
     ToggleStatusInput,
-    BulkWithdrawInput,
-    BulkWithdrawResponse,
     ClientOrdersResponse,
     YearsResponse,
 } from '@/types/earning.type';
@@ -55,7 +53,7 @@ const earningApi = apiSlice.injectEndpoints({
             query: () => '/earnings/years',
         }),
 
-        // Get client orders for bulk withdraw
+        // Get client monthly earning for withdraw
         getClientOrdersForWithdraw: builder.query<
             ClientOrdersResponse,
             { clientId: string; month: number; year: number }
@@ -119,22 +117,6 @@ const earningApi = apiSlice.injectEndpoints({
             ],
         }),
 
-        // Bulk withdraw earnings
-        bulkWithdrawEarnings: builder.mutation<
-            BulkWithdrawResponse,
-            BulkWithdrawInput
-        >({
-            query: (data) => ({
-                url: '/earnings/bulk-withdraw',
-                method: 'POST',
-                body: data,
-            }),
-            invalidatesTags: [
-                { type: 'Earning', id: 'LIST' },
-                { type: 'Earning', id: 'STATS' },
-            ],
-        }),
-
         // Delete earning
         deleteEarning: builder.mutation<{ message: string }, string>({
             query: (id) => ({
@@ -159,8 +141,6 @@ export const {
     useLazyGetClientOrdersForWithdrawQuery,
     useWithdrawEarningMutation,
     useToggleEarningStatusMutation,
-    useBulkWithdrawEarningsMutation,
-
     useDeleteEarningMutation,
     useLazyGetClientsWithEarningsQuery,
 } = earningApi;

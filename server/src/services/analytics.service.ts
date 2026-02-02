@@ -28,7 +28,7 @@ const MONTH_NAMES = [
 
 async function getAvailableAnalyticsYears(): Promise<number[]> {
     const earningYears = await EarningModel.aggregate([
-        { $project: { year: { $year: '$orderDate' } } },
+        { $project: { year: '$year' } },
         { $group: { _id: null, years: { $addToSet: '$year' } } },
     ]);
     const expenseYears = await ExpenseModel.aggregate([
@@ -72,10 +72,16 @@ async function getFinanceAnalytics(
     }
 
     // Common Date Filters
-    const earningFilter: any = {
-        status: 'paid', // Use 'paid' NOT 'completed'
-        orderDate: { $gte: startDate, $lte: endDate },
+    // Earnings use 'year' and 'month' fields
+    const earningMatch: any = {
+        status: 'paid',
+        year: year,
     };
+    if (month) {
+        earningMatch.month = month;
+    }
+
+    // Others use Date objects
     const expenseFilter: any = {
         date: { $gte: startDate, $lte: endDate },
     };
@@ -105,7 +111,7 @@ async function getFinanceAnalytics(
     ] = await Promise.all([
         // Total earnings
         EarningModel.aggregate([
-            { $match: earningFilter },
+            { $match: earningMatch },
             { $group: { _id: null, total: { $sum: '$amountInBDT' } } },
         ]),
         // Total expenses
@@ -133,23 +139,25 @@ async function getFinanceAnalytics(
             {
                 $match: {
                     status: 'unpaid',
-                    orderDate: { $gte: startDate, $lte: endDate },
+                    year: year,
+                    ...(month && { month }),
                 },
             },
-            { $group: { _id: null, total: { $sum: '$orderAmount' } } },
+            { $group: { _id: null, total: { $sum: '$totalAmount' } } },
         ]),
         // Unpaid earnings by currency
         EarningModel.aggregate([
             {
                 $match: {
                     status: 'unpaid',
-                    orderDate: { $gte: startDate, $lte: endDate },
+                    year: year,
+                    ...(month && { month }),
                 },
             },
             {
                 $group: {
                     _id: '$currency',
-                    amount: { $sum: '$orderAmount' },
+                    amount: { $sum: '$totalAmount' },
                 },
             },
         ]),
@@ -158,17 +166,14 @@ async function getFinanceAnalytics(
             {
                 $match: {
                     status: 'paid',
-                    orderDate: {
-                        $gte: new Date(year, 0, 1),
-                        $lte: new Date(year, 11, 31),
-                    },
+                    year: year,
                 },
             },
             {
                 $group: {
                     _id: {
-                        month: { $month: '$orderDate' },
-                        year: { $year: '$orderDate' },
+                        month: '$month',
+                        year: '$year',
                     },
                     total: { $sum: '$amountInBDT' },
                 },
@@ -221,7 +226,7 @@ async function getFinanceAnalytics(
         ]),
         // Client earnings (Filtered by selected period)
         EarningModel.aggregate([
-            { $match: earningFilter },
+            { $match: earningMatch },
             {
                 $group: {
                     _id: '$clientId',

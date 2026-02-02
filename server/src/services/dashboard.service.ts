@@ -272,14 +272,14 @@ const getFinancialStats = async (): Promise<IFinancialStats> => {
     ] = await Promise.all([
         // Total earnings (all time, BDT)
         EarningModel.aggregate([
-            { $match: { status: 'completed' } },
+            { $match: { status: 'paid' } },
             { $group: { _id: null, total: { $sum: '$amountInBDT' } } },
         ]),
         // This month earnings (BDT)
         EarningModel.aggregate([
             {
                 $match: {
-                    status: 'completed',
+                    status: 'paid',
                     month: currentMonth,
                     year: currentYear,
                 },

@@ -3,13 +3,16 @@ import { Document, Types } from 'mongoose';
 export type EarningStatus = 'unpaid' | 'paid';
 
 export interface IEarning extends Document {
-    orderId: Types.ObjectId;
     clientId: Types.ObjectId;
+    month: number;
+    year: number;
 
-    // Order info (denormalized for performance)
-    orderName: string;
-    orderDate: Date;
-    orderAmount: number;
+    // Linked orders
+    orderIds: Types.ObjectId[];
+
+    // Aggregated data
+    imageQty: number;
+    totalAmount: number;
     currency: string;
 
     // Withdrawal info (filled when status = paid)
@@ -24,6 +27,10 @@ export interface IEarning extends Document {
     paidAt?: Date;
     paidBy?: Types.ObjectId;
 
+    // Legacy support
+    isLegacy: boolean;
+    legacyClientCode?: string;
+
     notes?: string;
     createdBy: Types.ObjectId;
     createdAt: Date;
@@ -32,12 +39,6 @@ export interface IEarning extends Document {
 
 export interface IEarningPopulated {
     _id: string;
-    orderId: {
-        _id: string;
-        orderName: string;
-        totalPrice: number;
-        status: string;
-    };
     clientId: {
         _id: string;
         clientId: string;
@@ -45,9 +46,11 @@ export interface IEarningPopulated {
         email: string;
         currency?: string;
     };
-    orderName: string;
-    orderDate: string;
-    orderAmount: number;
+    month: number;
+    year: number;
+    orderIds: string[];
+    imageQty: number;
+    totalAmount: number;
     currency: string;
     fees: number;
     tax: number;
@@ -57,6 +60,8 @@ export interface IEarningPopulated {
     status: EarningStatus;
     paidAt?: string;
     paidBy?: string;
+    isLegacy: boolean;
+    legacyClientCode?: string;
     notes?: string;
     createdBy: string;
     createdAt: string;
@@ -66,9 +71,9 @@ export interface IEarningPopulated {
 export interface CreateEarningForOrderData {
     orderId: string;
     clientId: string;
-    orderName: string;
     orderDate: Date;
     orderAmount: number;
+    imageQty: number;
     currency: string;
     createdBy: string;
 }
@@ -121,13 +126,24 @@ export interface ClientOrdersForWithdraw {
     clientName: string;
     clientCode: string;
     currency: string;
-    orders: {
-        earningId: string;
-        orderId: string;
-        orderName: string;
-        orderDate: Date;
-        orderAmount: number;
-    }[];
-    totalAmount: number;
+    earningId: string;
+    month: number;
+    year: number;
     orderCount: number;
+    imageQty: number;
+    totalAmount: number;
+}
+
+export interface ImportLegacyEarningData {
+    clientId: string;
+    legacyClientCode: string;
+    month: number;
+    year: number;
+    imageQty: number;
+    totalAmount: number;
+    currency: string;
+    conversionRate: number;
+    amountInBDT: number;
+    status: EarningStatus;
+    createdBy: string;
 }

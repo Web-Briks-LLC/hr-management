@@ -2,12 +2,6 @@ export type EarningStatus = 'unpaid' | 'paid';
 
 export interface IEarning {
     _id: string;
-    orderId: {
-        _id: string;
-        orderName: string;
-        totalPrice: number;
-        status: string;
-    };
     clientId: {
         _id: string;
         clientId: string;
@@ -15,9 +9,11 @@ export interface IEarning {
         email: string;
         currency?: string;
     };
-    orderName: string;
-    orderDate: string;
-    orderAmount: number;
+    month: number;
+    year: number;
+    orderIds: string[];
+    imageQty: number;
+    totalAmount: number;
     currency: string;
     fees: number;
     tax: number;
@@ -27,6 +23,8 @@ export interface IEarning {
     status: EarningStatus;
     paidAt?: string;
     paidBy?: string;
+    isLegacy: boolean;
+    legacyClientCode?: string;
     notes?: string;
     createdBy: string;
     createdAt: string;
@@ -45,14 +43,6 @@ export interface ToggleStatusInput {
     fees?: number;
     tax?: number;
     conversionRate?: number;
-    notes?: string;
-}
-
-export interface BulkWithdrawInput {
-    earningIds: string[];
-    totalFees: number;
-    totalTax: number;
-    conversionRate: number;
     notes?: string;
 }
 
@@ -106,15 +96,12 @@ export interface ClientOrdersForWithdraw {
     clientName: string;
     clientCode: string;
     currency: string;
-    orders: {
-        earningId: string;
-        orderId: string;
-        orderName: string;
-        orderDate: string;
-        orderAmount: number;
-    }[];
-    totalAmount: number;
+    earningId: string;
+    month: number;
+    year: number;
     orderCount: number;
+    imageQty: number;
+    totalAmount: number;
 }
 
 export interface ClientOrdersResponse {
@@ -122,19 +109,26 @@ export interface ClientOrdersResponse {
     data: ClientOrdersForWithdraw | null;
 }
 
-export interface BulkWithdrawResponse {
-    message: string;
-    data: {
-        updatedCount: number;
-        totalAmount: number;
-        totalBDT: number;
-    };
-}
-
 export interface YearsResponse {
     message: string;
     data: number[];
 }
+
+// Month names for display
+export const MONTHS = [
+    { value: 1, label: 'January' },
+    { value: 2, label: 'February' },
+    { value: 3, label: 'March' },
+    { value: 4, label: 'April' },
+    { value: 5, label: 'May' },
+    { value: 6, label: 'June' },
+    { value: 7, label: 'July' },
+    { value: 8, label: 'August' },
+    { value: 9, label: 'September' },
+    { value: 10, label: 'October' },
+    { value: 11, label: 'November' },
+    { value: 12, label: 'December' },
+] as const;
 
 // Currency options
 export const CURRENCIES = [

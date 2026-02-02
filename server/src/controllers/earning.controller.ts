@@ -4,7 +4,6 @@ import earningService from '../services/earning.service.js';
 import type {
     EarningQueryParams,
     WithdrawEarningData,
-    BulkWithdrawData,
 } from '../types/earning.type.js';
 
 // Get all earnings with date filter
@@ -102,7 +101,7 @@ async function getEarningStats(req: Request, res: Response) {
     }
 }
 
-// Withdraw single earning (mark as paid)
+// Withdraw earning (mark as paid)
 async function withdrawEarning(req: Request, res: Response) {
     try {
         const userId = req.user?.id;
@@ -131,7 +130,7 @@ async function withdrawEarning(req: Request, res: Response) {
             paidBy: userId,
         };
 
-        const earning = await earningService.withdrawSingleEarning(id, data);
+        const earning = await earningService.withdrawEarning(id, data);
 
         if (!earning) {
             return res.status(404).json({ message: 'Earning not found' });
@@ -188,7 +187,7 @@ async function toggleEarningStatus(req: Request, res: Response) {
         const earning = await earningService.toggleEarningStatus(
             id,
             status,
-            withdrawData
+            withdrawData,
         );
 
         if (!earning) {
@@ -205,55 +204,7 @@ async function toggleEarningStatus(req: Request, res: Response) {
     }
 }
 
-// Bulk withdraw earnings
-async function bulkWithdrawEarnings(req: Request, res: Response) {
-    try {
-        const userId = req.user?.id;
-        if (!userId) {
-            return res.status(401).json({ message: 'Unauthorized' });
-        }
-
-        const { earningIds, totalFees, totalTax, conversionRate, notes } =
-            req.body;
-
-        if (
-            !earningIds ||
-            !Array.isArray(earningIds) ||
-            earningIds.length === 0
-        ) {
-            return res
-                .status(400)
-                .json({ message: 'Earning IDs array is required' });
-        }
-
-        if (conversionRate === undefined || conversionRate <= 0) {
-            return res
-                .status(400)
-                .json({ message: 'Valid conversion rate is required' });
-        }
-
-        const data: BulkWithdrawData = {
-            earningIds,
-            totalFees: totalFees ?? 0,
-            totalTax: totalTax ?? 0,
-            conversionRate,
-            notes,
-            paidBy: userId,
-        };
-
-        const result = await earningService.withdrawBulkEarnings(data);
-
-        return res.status(200).json({
-            message: `${result.updatedCount} earnings withdrawn successfully`,
-            data: result,
-        });
-    } catch (error) {
-        console.error('Error bulk withdrawing earnings:', error);
-        return res.status(500).json({ message: 'Internal server error' });
-    }
-}
-
-// Get client orders for bulk withdraw
+// Get client orders for bulk withdraw (now returns the monthly earning)
 async function getClientOrdersForWithdraw(req: Request, res: Response) {
     try {
         const { clientId, month, year } = req.query;
@@ -282,18 +233,18 @@ async function getClientOrdersForWithdraw(req: Request, res: Response) {
         const result = await earningService.getClientOrdersForBulkWithdraw(
             clientId as string,
             monthNum,
-            yearNum
+            yearNum,
         );
 
         if (!result) {
             return res.status(200).json({
-                message: 'No unpaid orders found for this client',
+                message: 'No unpaid earnings found for this client',
                 data: null,
             });
         }
 
         return res.status(200).json({
-            message: 'Client orders fetched successfully',
+            message: 'Client earning fetched successfully',
             data: result,
         });
     } catch (error) {
@@ -352,7 +303,7 @@ async function getClientsWithEarnings(req: Request, res: Response) {
 
         const clients = await earningService.getClientsWithUnpaidEarnings(
             parseInt(month as string),
-            parseInt(year as string)
+            parseInt(year as string),
         );
 
         return res.status(200).json({
@@ -371,7 +322,6 @@ export {
     getEarningStats,
     withdrawEarning,
     toggleEarningStatus,
-    bulkWithdrawEarnings,
     getClientOrdersForWithdraw,
     deleteEarning,
     getEarningYears,

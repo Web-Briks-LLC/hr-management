@@ -106,9 +106,6 @@ import { format } from 'date-fns';
 import { DateTimePicker } from '@/components/shared/DateTimePicker';
 import { cn } from '@/lib/utils';
 import { useSession } from '@/lib/auth-client';
-import { QuickWithdrawDialog } from '@/components/earning/QuickWithdrawDialog';
-import { MultiWithdrawDialog } from '@/components/earning/MultiWithdrawDialog';
-import { DollarSign } from 'lucide-react';
 
 const statusColors: Record<OrderStatus, string> = {
     pending: 'bg-yellow-500/20 text-yellow-700 dark:text-yellow-400',
@@ -173,10 +170,6 @@ export default function OrdersPage() {
     const [isRevisionDialogOpen, setIsRevisionDialogOpen] = useState(false);
     const [isTimelineDialogOpen, setIsTimelineDialogOpen] = useState(false);
     const [isStatusChangeDialogOpen, setIsStatusChangeDialogOpen] =
-        useState(false);
-    const [isQuickWithdrawDialogOpen, setIsQuickWithdrawDialogOpen] =
-        useState(false);
-    const [isMultiWithdrawDialogOpen, setIsMultiWithdrawDialogOpen] =
         useState(false);
     const [isBulkDeleteDialogOpen, setIsBulkDeleteDialogOpen] = useState(false);
     const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -563,11 +556,6 @@ export default function OrdersPage() {
     const openTimelineDialog = (order: IOrder) => {
         setSelectedOrder(order);
         setIsTimelineDialogOpen(true);
-    };
-
-    const openQuickWithdrawDialog = (order: IOrder) => {
-        setSelectedOrder(order);
-        setIsQuickWithdrawDialogOpen(true);
     };
 
     return (
@@ -1010,17 +998,6 @@ export default function OrdersPage() {
                                     <Trash2 className="h-4 w-4 mr-1" />
                                     Delete ({selectedOrderIds.size})
                                 </Button>
-                                <Button
-                                    size="sm"
-                                    onClick={() =>
-                                        setIsMultiWithdrawDialogOpen(true)
-                                    }
-                                    disabled={selectedOrderIds.size === 0}
-                                    className="bg-green-600 hover:bg-green-700 text-white"
-                                >
-                                    <DollarSign className="h-4 w-4 mr-1" />
-                                    Bulk Withdraw ({selectedOrderIds.size})
-                                </Button>
                             </div>
                         </div>
                     )}
@@ -1441,51 +1418,6 @@ export default function OrdersPage() {
                                                                     <p>
                                                                         View
                                                                         Timeline
-                                                                    </p>
-                                                                </TooltipContent>
-                                                            </Tooltip>
-                                                            <Tooltip>
-                                                                <TooltipTrigger
-                                                                    asChild
-                                                                >
-                                                                    <Button
-                                                                        variant="ghost"
-                                                                        size="icon"
-                                                                        onClick={() =>
-                                                                            order
-                                                                                .earning
-                                                                                ?.status !==
-                                                                                'paid' &&
-                                                                            openQuickWithdrawDialog(
-                                                                                order,
-                                                                            )
-                                                                        }
-                                                                        disabled={
-                                                                            order
-                                                                                .earning
-                                                                                ?.status ===
-                                                                            'paid'
-                                                                        }
-                                                                        className={cn(
-                                                                            'text-green-600 dark:text-green-400',
-                                                                            order
-                                                                                .earning
-                                                                                ?.status ===
-                                                                                'paid' &&
-                                                                                'opacity-50 cursor-not-allowed text-muted-foreground',
-                                                                        )}
-                                                                    >
-                                                                        <DollarSign className="h-4 w-4" />
-                                                                    </Button>
-                                                                </TooltipTrigger>
-                                                                <TooltipContent>
-                                                                    <p>
-                                                                        {order
-                                                                            .earning
-                                                                            ?.status ===
-                                                                        'paid'
-                                                                            ? 'Already Paid'
-                                                                            : 'Quick Withdraw'}
                                                                     </p>
                                                                 </TooltipContent>
                                                             </Tooltip>
@@ -1980,15 +1912,6 @@ export default function OrdersPage() {
                 </DialogContent>
             </Dialog>
 
-            {/* Quick Withdraw Dialog */}
-            {selectedOrder && (
-                <QuickWithdrawDialog
-                    isOpen={isQuickWithdrawDialogOpen}
-                    onClose={() => setIsQuickWithdrawDialogOpen(false)}
-                    order={selectedOrder}
-                />
-            )}
-
             {/* Delete Confirmation */}
             <AlertDialog
                 open={isDeleteDialogOpen}
@@ -2056,16 +1979,6 @@ export default function OrdersPage() {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
-
-            {/* Multi Withdraw Dialog */}
-            <MultiWithdrawDialog
-                isOpen={isMultiWithdrawDialogOpen}
-                onClose={() => setIsMultiWithdrawDialogOpen(false)}
-                orders={selectedOrders}
-                onSuccess={() => {
-                    clearSelection();
-                }}
-            />
         </div>
     );
 }

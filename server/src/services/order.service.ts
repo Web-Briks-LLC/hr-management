@@ -76,7 +76,7 @@ async function createOrderInDB(data: CreateOrderData): Promise<IOrder> {
 
     const order = await OrderModel.create(orderData as unknown as IOrder);
 
-    // Auto-create earning for this order
+    // Auto-create or update monthly earning for this order
     try {
         // Get client to fetch currency
         const client = await ClientModel.findById(data.clientId).lean();
@@ -86,9 +86,9 @@ async function createOrderInDB(data: CreateOrderData): Promise<IOrder> {
         await earningService.createEarningForOrder({
             orderId: (order._id as mongoose.Types.ObjectId).toString(),
             clientId: data.clientId,
-            orderName: data.orderName,
             orderDate: data.orderDate,
             orderAmount: data.totalPrice,
+            imageQty: data.imageQuantity,
             currency,
             createdBy: data.createdBy,
         });
@@ -142,12 +142,12 @@ async function getAllOrdersFromDB(filters: GetOrdersFilters): Promise<{
         query.orderDate = {};
         if (startDate) {
             (query.orderDate as Record<string, unknown>).$gte = new Date(
-                startDate
+                startDate,
             );
         }
         if (endDate) {
             (query.orderDate as Record<string, unknown>).$lte = new Date(
-                endDate
+                endDate,
             );
         }
     }
@@ -200,7 +200,7 @@ async function getAllOrdersFromDB(filters: GetOrdersFilters): Promise<{
         OrderModel.find(query)
             .populate(
                 'clientId',
-                'clientId name email currency officeAddress address'
+                'clientId name email currency officeAddress address',
             )
             .populate('services', 'name')
             .populate('returnFileFormat', 'name extension')
@@ -232,7 +232,7 @@ async function getOrderByIdFromDB(id: string): Promise<IOrder | null> {
     const order = await OrderModel.findById(id)
         .populate(
             'clientId',
-            'clientId name email phone currency officeAddress address'
+            'clientId name email phone currency officeAddress address',
         )
         .populate('services', 'name description')
         .populate('returnFileFormat', 'name extension')
@@ -252,7 +252,7 @@ async function getOrderByIdFromDB(id: string): Promise<IOrder | null> {
         const { default: UserModel } = await import('../models/user.model.js');
         const user = await UserModel.findOne(
             { _id: new mongoose.Types.ObjectId(order.createdBy.toString()) },
-            { projection: { name: 1, email: 1 } }
+            { projection: { name: 1, email: 1 } },
         );
         if (user) {
             // @ts-ignore
@@ -264,7 +264,7 @@ async function getOrderByIdFromDB(id: string): Promise<IOrder | null> {
 
 async function updateOrderInDB(
     id: string,
-    data: UpdateOrderData
+    data: UpdateOrderData,
 ): Promise<IOrder | null> {
     // Handle status changes
     if (data.status === 'completed' && !data.completedAt) {
@@ -280,7 +280,7 @@ async function updateOrderInDB(
     })
         .populate(
             'clientId',
-            'clientId name email currency officeAddress address'
+            'clientId name email currency officeAddress address',
         )
         .populate('services', 'name')
         .populate('returnFileFormat', 'name extension')
@@ -294,19 +294,41 @@ async function updateOrderInDB(
         })
         .lean();
 
-    // Update earning if order name, amount, or date changes
-    if (order && (data.orderName || data.totalPrice || data.orderDate)) {
+    // Update monthly earning if order amount, imageQty or date changes
+    if (
+        order &&
+        (data.totalPrice !== undefined ||
+            data.imageQuantity !== undefined ||
+            data.orderDate)
+    ) {
         try {
-            const earningUpdate: {
-                orderName?: string;
-                orderAmount?: number;
-                orderDate?: Date;
-            } = {};
-            if (data.orderName) earningUpdate.orderName = data.orderName;
-            if (data.totalPrice) earningUpdate.orderAmount = data.totalPrice;
-            if (data.orderDate) earningUpdate.orderDate = data.orderDate;
+            // Get the old order data to calculate differences
+            const oldOrder = await OrderModel.findById(id).lean();
+            if (oldOrder) {
+                const updateData: {
+                    orderAmount?: number;
+                    imageQty?: number;
+                    orderDate?: Date;
+                    oldOrderAmount?: number;
+                    oldImageQty?: number;
+                    oldOrderDate?: Date;
+                } = {};
 
-            await earningService.updateEarningForOrder(id, earningUpdate);
+                if (data.totalPrice !== undefined) {
+                    updateData.orderAmount = data.totalPrice;
+                    updateData.oldOrderAmount = oldOrder.totalPrice;
+                }
+                if (data.imageQuantity !== undefined) {
+                    updateData.imageQty = data.imageQuantity;
+                    updateData.oldImageQty = oldOrder.imageQuantity;
+                }
+                if (data.orderDate !== undefined) {
+                    updateData.orderDate = data.orderDate;
+                    updateData.oldOrderDate = oldOrder.orderDate;
+                }
+
+                await earningService.updateEarningForOrder(id, updateData);
+            }
         } catch (err) {
             console.error('Error updating earning for order:', err);
         }
@@ -316,11 +338,20 @@ async function updateOrderInDB(
 }
 
 async function deleteOrderFromDB(id: string): Promise<IOrder | null> {
-    // Delete associated earning first
-    try {
-        await earningService.deleteEarningForOrder(id);
-    } catch (err) {
-        console.error('Error deleting earning for order:', err);
+    // Get order data before deletion to update earning
+    const order = await OrderModel.findById(id).lean();
+
+    // Remove from monthly earning
+    if (order) {
+        try {
+            await earningService.deleteEarningForOrder(
+                id,
+                order.totalPrice,
+                order.imageQuantity,
+            );
+        } catch (err) {
+            console.error('Error removing order from earning:', err);
+        }
     }
 
     return OrderModel.findByIdAndDelete(id).lean();
@@ -331,7 +362,7 @@ async function updateOrderStatusWithTimeline(
     id: string,
     status: OrderStatus,
     changedBy: string,
-    note?: string
+    note?: string,
 ): Promise<IOrder | null> {
     const updateData: Record<string, unknown> = {
         status,
@@ -361,7 +392,7 @@ async function updateOrderStatusWithTimeline(
     })
         .populate(
             'clientId',
-            'clientId name email currency officeAddress address'
+            'clientId name email currency officeAddress address',
         )
         .populate('services', 'name')
         .populate('returnFileFormat', 'name extension')
@@ -381,7 +412,7 @@ async function extendDeadline(
     id: string,
     newDeadline: Date,
     reason: string,
-    changedBy: string
+    changedBy: string,
 ): Promise<IOrder | null> {
     // Get current order to preserve original deadline
     const order = await OrderModel.findById(id);
@@ -410,7 +441,7 @@ async function extendDeadline(
     })
         .populate(
             'clientId',
-            'clientId name email currency officeAddress address'
+            'clientId name email currency officeAddress address',
         )
         .populate('services', 'name')
         .populate('returnFileFormat', 'name extension')
@@ -421,7 +452,7 @@ async function extendDeadline(
 async function addRevision(
     id: string,
     instruction: string,
-    createdBy: string
+    createdBy: string,
 ): Promise<IOrder | null> {
     const updateData = {
         status: 'revision' as OrderStatus,
@@ -447,7 +478,7 @@ async function addRevision(
     })
         .populate(
             'clientId',
-            'clientId name email currency officeAddress address'
+            'clientId name email currency officeAddress address',
         )
         .populate('services', 'name')
         .populate('returnFileFormat', 'name extension')
@@ -502,7 +533,7 @@ async function getOrderStatsFromDB(): Promise<{
 
 async function getOrdersByClientFromDB(
     clientId: string,
-    limit: number = 10
+    limit: number = 10,
 ): Promise<IOrder[]> {
     return OrderModel.find({ clientId })
         .populate('services', 'name')

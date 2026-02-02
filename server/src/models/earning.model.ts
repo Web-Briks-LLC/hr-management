@@ -3,32 +3,39 @@ import type { IEarning } from '../types/earning.type.js';
 
 const EarningSchema = new Schema<IEarning>(
     {
-        orderId: {
-            type: Schema.Types.ObjectId,
-            ref: 'Order',
-            required: true,
-            unique: true,
-            index: true,
-        },
+        // Client and time period
         clientId: {
             type: Schema.Types.ObjectId,
             ref: 'Client',
             required: true,
             index: true,
         },
+        month: {
+            type: Number,
+            required: true,
+            min: 1,
+            max: 12,
+        },
+        year: {
+            type: Number,
+            required: true,
+        },
 
-        // Order info (denormalized)
-        orderName: {
-            type: String,
-            required: true,
-            trim: true,
+        // Linked orders (empty for legacy data)
+        orderIds: [
+            {
+                type: Schema.Types.ObjectId,
+                ref: 'Order',
+            },
+        ],
+
+        // Aggregated data
+        imageQty: {
+            type: Number,
+            default: 0,
+            min: 0,
         },
-        orderDate: {
-            type: Date,
-            required: true,
-            index: true,
-        },
-        orderAmount: {
+        totalAmount: {
             type: Number,
             required: true,
             min: 0,
@@ -80,6 +87,16 @@ const EarningSchema = new Schema<IEarning>(
             ref: 'User',
         },
 
+        // Legacy support
+        isLegacy: {
+            type: Boolean,
+            default: false,
+        },
+        legacyClientCode: {
+            type: String,
+            trim: true,
+        },
+
         notes: {
             type: String,
             trim: true,
@@ -92,13 +109,15 @@ const EarningSchema = new Schema<IEarning>(
     },
     {
         timestamps: true,
-    }
+    },
 );
 
-// Compound indexes for common queries
-EarningSchema.index({ clientId: 1, status: 1 });
-EarningSchema.index({ status: 1, orderDate: -1 });
-EarningSchema.index({ clientId: 1, orderDate: -1 });
+// Unique constraint: One earning per client per month/year
+EarningSchema.index({ clientId: 1, month: 1, year: 1 }, { unique: true });
+
+// Other indexes for common queries
+EarningSchema.index({ status: 1, year: -1, month: -1 });
+EarningSchema.index({ clientId: 1, year: -1, month: -1 });
 
 const EarningModel = model<IEarning>('Earning', EarningSchema);
 export default EarningModel;
