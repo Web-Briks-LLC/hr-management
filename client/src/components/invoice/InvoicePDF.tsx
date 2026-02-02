@@ -59,11 +59,12 @@ const styles = StyleSheet.create({
         height: 8,
         backgroundColor: colors.orange,
         width: '100%',
+        marginBottom: 20, // Adds gap on all pages (especially needed for page 2+)
     },
     // Header Section
     headerContainer: {
         marginHorizontal: 40,
-        marginTop: 30,
+        marginTop: 10, // Reduced from 30 to account for topBar.marginBottom
         flexDirection: 'row',
         justifyContent: 'space-between',
         height: 100, // Fixed height for header area
