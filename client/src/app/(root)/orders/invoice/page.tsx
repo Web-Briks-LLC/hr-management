@@ -5,7 +5,10 @@ import {
     useGetOrdersQuery,
     useGetOrderYearsQuery,
 } from '@/redux/features/order/orderApi';
-import { useLazyGetNextInvoiceNumberQuery } from '@/redux/features/invoice/invoiceApi';
+import {
+    useLazyGetNextInvoiceNumberQuery,
+    useSendInvoiceEmailMutation,
+} from '@/redux/features/invoice/invoiceApi';
 import {
     Card,
     CardContent,
@@ -85,7 +88,9 @@ export default function InvoicePage() {
     );
     const [invoiceNumber, setInvoiceNumber] = useState<string>('');
     const [showPDF, setShowPDF] = useState(false);
-    const [isSending, setIsSending] = useState(false);
+
+    const [sendInvoiceEmail, { isLoading: isSending }] =
+        useSendInvoiceEmailMutation();
 
     // Ref for PDF section scroll
     const pdfSectionRef = useRef<HTMLDivElement>(null);
@@ -230,7 +235,6 @@ export default function InvoicePage() {
             return;
         }
 
-        setIsSending(true);
         try {
             // Get invoice number if not exists
             let currentInvoiceNumber = invoiceNumber;
@@ -269,26 +273,18 @@ export default function InvoicePage() {
             );
             formData.append('year', selectedYear);
 
-            const response = await fetch(
-                'http://localhost:5000/api/invoices/send-email',
-                {
-                    method: 'POST',
-                    body: formData,
-                    credentials: 'include',
-                },
-            );
+            const result = await sendInvoiceEmail(formData).unwrap();
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.message || 'Failed to send email');
+            if (result.success) {
+                toast.success('Invoice sent successfully to ' + clientEmail);
+            } else {
+                throw new Error(result.message || 'Failed to send email');
             }
-
-            toast.success('Invoice sent successfully to ' + clientEmail);
         } catch (error: any) {
             console.error('Error sending email:', error);
-            toast.error(error.message || 'Failed to send email');
-        } finally {
-            setIsSending(false);
+            toast.error(
+                error.data?.message || error.message || 'Failed to send email',
+            );
         }
     };
 

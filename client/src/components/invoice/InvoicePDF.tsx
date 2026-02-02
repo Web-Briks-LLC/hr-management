@@ -17,8 +17,8 @@ import type { Client } from '@/types/client.type';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Download, Mail } from 'lucide-react';
-import { useState } from 'react';
 import { toast } from 'sonner';
+import { useSendInvoiceEmailMutation } from '@/redux/features/invoice/invoiceApi';
 
 // Register fonts if needed (optional)
 Font.register({
@@ -458,7 +458,8 @@ export const InvoiceDocument = ({
 
 export default function InvoicePDF(props: InvoicePDFProps) {
     const fileName = `Invoice_${props.client.clientId}_${props.month}_${props.year}.pdf`;
-    const [isSending, setIsSending] = useState(false);
+    const [sendInvoiceEmail, { isLoading: isSending }] =
+        useSendInvoiceEmailMutation();
 
     const handleSendEmail = async () => {
         if (!props.client.email && !props.client.officeAddress) {
@@ -474,7 +475,6 @@ export default function InvoicePDF(props: InvoicePDFProps) {
         }
 
         try {
-            setIsSending(true);
             const blob = await pdf(<InvoiceDocument {...props} />).toBlob();
 
             const formData = new FormData();
@@ -484,26 +484,18 @@ export default function InvoicePDF(props: InvoicePDFProps) {
             formData.append('month', props.month);
             formData.append('year', props.year);
 
-            const response = await fetch(
-                'http://localhost:5000/api/invoices/send-email',
-                {
-                    method: 'POST',
-                    body: formData,
-                    credentials: 'include',
-                },
-            );
+            const result = await sendInvoiceEmail(formData).unwrap();
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.message || 'Failed to send email');
+            if (result.success) {
+                toast.success('Invoice sent successfully to ' + clientEmail);
+            } else {
+                throw new Error(result.message || 'Failed to send email');
             }
-
-            toast.success('Invoice sent successfully to ' + clientEmail);
         } catch (error: any) {
             console.error('Error sending email:', error);
-            toast.error(error.message || 'Failed to send email');
-        } finally {
-            setIsSending(false);
+            toast.error(
+                error.data?.message || error.message || 'Failed to send email',
+            );
         }
     };
 
