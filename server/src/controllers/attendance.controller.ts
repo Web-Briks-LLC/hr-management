@@ -91,9 +91,8 @@ async function getTodayAttendance(req: Request, res: Response) {
             });
         }
 
-        const attendance = await AttendanceServices.getTodayAttendanceFromDB(
-            userId
-        );
+        const attendance =
+            await AttendanceServices.getTodayAttendanceFromDB(userId);
 
         return res.status(200).json({
             success: true,
@@ -135,7 +134,7 @@ const getMyAttendanceHistory = async (req: Request, res: Response) => {
         const days = parseInt(req.query.days as string) || 7;
         const result = await AttendanceServices.getMyAttendanceHistoryInDB(
             userId,
-            days
+            days,
         );
 
         return res.status(200).json({
@@ -180,6 +179,7 @@ const getAllAttendance = async (req: Request, res: Response) => {
             branchId: branchId as string,
             page: parseInt(page as string) || 1,
             limit: parseInt(limit as string) || 50,
+            search: req.query.search as string,
         });
 
         return res.status(200).json({

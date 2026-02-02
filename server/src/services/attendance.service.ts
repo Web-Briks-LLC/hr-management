@@ -478,6 +478,7 @@ async function getAllAttendanceFromDB({
     branchId,
     page = 1,
     limit = 50,
+    search,
 }: {
     startDate?: string;
     endDate?: string;
@@ -486,8 +487,39 @@ async function getAllAttendanceFromDB({
     branchId?: string;
     page?: number;
     limit?: number;
+    search?: string;
 }) {
     const query: any = {};
+    const { default: UserModel } = await import('../models/user.model.js');
+
+    // Search filter: Find users matching name, then find staff, then filter attendance
+    if (search) {
+        const matchingUsers = await UserModel.find({
+            name: { $regex: search, $options: 'i' },
+        })
+            .project({ _id: 1 })
+            .toArray();
+
+        const matchingUserIds = matchingUsers.map((u) => u._id);
+
+        const matchingStaff = await StaffModel.find({
+            userId: { $in: matchingUserIds },
+        }).select('_id');
+
+        const matchingStaffIds = matchingStaff.map((s) => s._id);
+
+        // If staffId is also provided, intersect the lists
+        if (staffId) {
+            query.staffId = {
+                $in: matchingStaffIds.filter((id) => id.toString() === staffId),
+            };
+        } else {
+            query.staffId = { $in: matchingStaffIds };
+        }
+    } else if (staffId) {
+        // Staff filter (if no search)
+        query.staffId = staffId;
+    }
 
     // Date filter
     if (startDate || endDate) {
@@ -501,18 +533,17 @@ async function getAllAttendanceFromDB({
         query.status = status;
     }
 
-    // Staff filter
-    if (staffId) {
-        query.staffId = staffId;
-    }
-
     const skip = (page - 1) * limit;
 
     // Get attendance records with populated staff and shift details
-    const attendanceRecords = await AttendanceDayModel.find(query)
+    let attendanceRecords = await AttendanceDayModel.find(query)
         .populate({
             path: 'staffId',
-            select: 'staffId designation department branchId',
+            select: 'staffId designation department branchId userId', // Include userId for manual population
+            populate: {
+                path: 'branchId',
+                select: 'name',
+            },
         })
         .populate('shiftId', 'name startTime endTime')
         .sort({ date: -1 })
@@ -521,17 +552,42 @@ async function getAllAttendanceFromDB({
         .lean();
 
     // Apply branch filter if needed (after population)
-    let filteredRecords = attendanceRecords;
     if (branchId) {
-        filteredRecords = attendanceRecords.filter(
+        attendanceRecords = attendanceRecords.filter(
             (record: any) => record.staffId?.branchId?.toString() === branchId,
         );
+    }
+
+    // Manual Population of User Names
+    const userIdsToFetch = attendanceRecords
+        .map((r: any) => r.staffId?.userId)
+        .filter((id) => id);
+
+    if (userIdsToFetch.length > 0) {
+        const users = await UserModel.find({
+            _id: { $in: userIdsToFetch },
+        })
+            .project({ _id: 1, name: 1, email: 1 })
+            .toArray();
+
+        const userMap = new Map(users.map((u) => [u._id.toString(), u]));
+
+        attendanceRecords = attendanceRecords.map((record: any) => {
+            if (record.staffId?.userId) {
+                const user = userMap.get(record.staffId.userId.toString());
+                if (user) {
+                    record.staffId.name = user.name;
+                    record.staffId.email = user.email;
+                }
+            }
+            return record;
+        });
     }
 
     const total = await AttendanceDayModel.countDocuments(query);
 
     return {
-        records: filteredRecords,
+        records: attendanceRecords,
         pagination: {
             page,
             limit,
