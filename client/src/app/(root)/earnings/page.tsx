@@ -279,16 +279,17 @@ export default function EarningsPage() {
         (bulkOrdersData?.totalAmount || 0) - bulkFeesNum - bulkTaxNum;
     const bulkBDT = bulkNetAmount * bulkRateNum;
 
-    const formatCurrency = (amount: number, curr: string = 'BDT') => {
+    const formatCurrency = (amount: number = 0, curr: string = 'BDT') => {
+        const safeAmount = Number(amount) || 0;
         if (curr === 'BDT') {
             return new Intl.NumberFormat('bn-BD', {
                 style: 'currency',
                 currency: 'BDT',
                 maximumFractionDigits: 0,
-            }).format(amount);
+            }).format(safeAmount);
         }
         const symbol = CURRENCY_SYMBOLS[curr] || '$';
-        return `${symbol}${amount.toFixed(2)}`;
+        return `${symbol}${safeAmount.toFixed(2)}`;
     };
 
     // Handlers

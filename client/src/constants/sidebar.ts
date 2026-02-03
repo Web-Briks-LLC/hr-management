@@ -16,6 +16,7 @@ import {
     IconUserCircle,
     IconSpeakerphone,
     IconBriefcase,
+    IconCash,
 } from '@tabler/icons-react';
 
 export interface SidebarItem {
@@ -177,6 +178,12 @@ export const sidebarGroups: SidebarGroup[] = [
                 url: '/debit',
                 icon: IconCreditCard,
                 access: [Role.SUPER_ADMIN, Role.ADMIN],
+            },
+            {
+                title: 'Payroll',
+                url: '/payroll',
+                icon: IconCash,
+                access: [Role.SUPER_ADMIN, Role.ADMIN, Role.HR_MANAGER],
             },
         ],
     },

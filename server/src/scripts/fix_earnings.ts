@@ -9,6 +9,7 @@ async function fixEarnings() {
     try {
         await mongoose.connect(uri!);
         const db = mongoose.connection.db;
+        if (!db) throw new Error('DB not connected');
 
         console.log('Fetching Earnings for 2025...');
         const earnings = await db
@@ -30,7 +31,7 @@ async function fixEarnings() {
 
             // Fetch referenced orders
             const orderObjectIds = earning.orderIds.map(
-                (id) => new mongoose.Types.ObjectId(id),
+                (id: any) => new mongoose.Types.ObjectId(id),
             );
             const orders = await db
                 .collection('orders')

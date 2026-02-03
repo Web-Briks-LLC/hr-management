@@ -138,7 +138,7 @@ async function verifyCrossDB() {
         let mismatchCount = 0;
 
         for (const mapItem of clientMappingRaw) {
-            const targetClientIdStr = mapItem.new; // Use new ID (Assuming old ID maps to it or is same)
+            // const targetClientIdStr = mapItem.new; // Unused
             // Wait, old collection uses 'clientID'. User supplied 'old' vs 'new' mapping.
             // We should use 'old' key to lookup in oldSums, and 'new' key to lookup in newSums.
 

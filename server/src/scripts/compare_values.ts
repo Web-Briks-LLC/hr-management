@@ -9,6 +9,7 @@ async function checkValues() {
     try {
         await mongoose.connect(uri!);
         const db = mongoose.connection.db;
+        if (!db) throw new Error('DB not connected');
 
         // Target: WB_1001_31, Earning ID: 69808499fb6fd56b487036ce (Month 9)
         // From previous output: Amount: 14266.95, Orders: 73
@@ -28,7 +29,7 @@ async function checkValues() {
         console.log(`Order Count: ${earning.orderIds.length}`);
 
         const orderIds = earning.orderIds.map(
-            (oid) => new mongoose.Types.ObjectId(oid),
+            (oid: any) => new mongoose.Types.ObjectId(oid),
         );
         const orders = await db
             .collection('orders')

@@ -25,6 +25,7 @@ import { noticeRoute } from './notice.route.js';
 import externalBusinessRoute from './external-business.routes.js';
 import { careerRoute } from './career.route.js';
 import { currencyRateRoute } from './currency-rate.route.js';
+import { payrollRoute } from './payroll.routes.js';
 
 const router: Router = Router();
 
@@ -132,6 +133,10 @@ const moduleRoutes = [
     {
         path: '/currency-rates',
         route: currencyRateRoute,
+    },
+    {
+        path: '/payroll',
+        route: payrollRoute,
     },
 ];
 

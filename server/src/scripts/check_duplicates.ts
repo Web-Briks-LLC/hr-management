@@ -9,6 +9,7 @@ async function checkDuplication() {
     try {
         await mongoose.connect(uri!);
         const db = mongoose.connection.db;
+        if (!db) throw new Error('DB not connected');
 
         // Target: WB_1001_31
         const targetClientId = '6952ba2237bc6e4512a02602'; // From previous output

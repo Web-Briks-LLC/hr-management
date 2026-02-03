@@ -9,6 +9,7 @@ async function findClient() {
     try {
         await mongoose.connect(uri!);
         const db = mongoose.connection.db;
+        if (!db) throw new Error('DB not connected');
         const clients = await db
             .collection('clients')
             .find({

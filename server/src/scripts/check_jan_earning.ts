@@ -9,6 +9,7 @@ async function checkJan() {
     try {
         await mongoose.connect(uri!);
         const db = mongoose.connection.db;
+        if (!db) throw new Error('DB not connected');
 
         console.log('Inspecting Jan 2025 Earnings...');
         const doc = await db.collection('earnings').findOne({

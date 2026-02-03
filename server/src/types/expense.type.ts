@@ -15,6 +15,7 @@ export interface IExpense extends Document {
     branchId: Types.ObjectId;
     amount: number;
     status: 'pending' | 'paid' | 'partial_paid';
+    paymentMethod?: string;
     note?: string;
     createdBy: Types.ObjectId;
     createdAt: Date;

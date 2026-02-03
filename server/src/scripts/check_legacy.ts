@@ -10,6 +10,7 @@ async function inspect() {
     try {
         await mongoose.connect(uri!);
         const db = mongoose.connection.db;
+        if (!db) throw new Error('DB not connected');
         const col = db.collection('earnings');
 
         const legacyCount = await col.countDocuments({ isLegacy: true });

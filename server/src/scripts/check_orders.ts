@@ -9,6 +9,7 @@ async function inspect() {
     try {
         await mongoose.connect(uri!);
         const db = mongoose.connection.db;
+        if (!db) throw new Error('DB not connected');
 
         console.log('--- Collections matching "order" ---');
         const collections = await db.listCollections().toArray();

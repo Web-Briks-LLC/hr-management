@@ -36,6 +36,10 @@ const expenseSchema = new Schema<IExpense>(
             default: 'pending',
             index: true,
         },
+        paymentMethod: {
+            type: String,
+            default: 'cash',
+        },
         note: {
             type: String,
             trim: true,
@@ -46,7 +50,7 @@ const expenseSchema = new Schema<IExpense>(
             required: true,
         },
     },
-    { timestamps: true }
+    { timestamps: true },
 );
 
 // Compound index for efficient date range queries

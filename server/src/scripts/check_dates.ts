@@ -10,6 +10,7 @@ async function checkDates() {
     try {
         await mongoose.connect(uri!);
         const db = mongoose.connection.db;
+        if (!db) throw new Error('DB not connected');
         const col = db.collection('earnings_backup');
 
         const minDate = await col
@@ -20,8 +21,8 @@ async function checkDates() {
             .toArray();
 
         console.log('Earnings Backup Date Range:');
-        if (minDate.length > 0) console.log('Min Date:', minDate[0].orderDate);
-        if (maxDate.length > 0) console.log('Max Date:', maxDate[0].orderDate);
+        if (minDate.length > 0) console.log('Min Date:', minDate[0]?.orderDate);
+        if (maxDate.length > 0) console.log('Max Date:', maxDate[0]?.orderDate);
 
         const count = await col.countDocuments();
         console.log('Total Docs:', count);

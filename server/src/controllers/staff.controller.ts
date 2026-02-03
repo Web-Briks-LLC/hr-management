@@ -1,11 +1,29 @@
 import type { Request, Response } from 'express';
 import StaffServices from '../services/staff.service.js';
 
-const getStaffs = async (_req: Request, res: Response) => {
+const getStaffs = async (req: Request, res: Response) => {
     try {
-        const staffs = await StaffServices.getAllStaffsFromDB();
+        const {
+            page,
+            limit,
+            search,
+            department,
+            designation,
+            shiftId,
+            status,
+        } = req.query;
 
-        return res.json({ success: true, staffs });
+        const result = await StaffServices.getAllStaffsFromDB({
+            page: page ? Number(page) : 1,
+            limit: limit ? Number(limit) : 10,
+            search: search as string,
+            department: department as string,
+            designation: designation as string,
+            shiftId: shiftId as string,
+            status: status as string,
+        });
+
+        return res.json({ success: true, ...result });
     } catch (err) {
         return res
             .status(500)
@@ -162,7 +180,8 @@ async function updateSalary(req: Request, res: Response) {
 
 async function exportStaffs(_req: Request, res: Response) {
     try {
-        const staffs = await StaffServices.getAllStaffsFromDB();
+        const result = await StaffServices.getAllStaffsFromDB({ limit: 0 });
+        const staffs = result.staffs;
 
         // Convert to CSV format
         const csvHeaders = [

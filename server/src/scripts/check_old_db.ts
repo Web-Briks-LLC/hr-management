@@ -11,6 +11,7 @@ async function checkOldDB() {
         // Force connection to 'hrManagement' database
         await mongoose.connect(uri!, { dbName: 'hrManagement' });
         const db = mongoose.connection.db;
+        if (!db) throw new Error('DB not connected');
 
         console.log('--- Collections in hrManagement ---');
         const collections = await db.listCollections().toArray();

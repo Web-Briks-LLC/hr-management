@@ -3,9 +3,10 @@ import { apiSlice } from '@/redux/api/apiSlice';
 export const staffApi = apiSlice.injectEndpoints({
     endpoints: (builder) => ({
         getStaffs: builder.query({
-            query: () => ({
+            query: (params) => ({
                 url: '/staffs/',
                 method: 'GET',
+                params,
             }),
             providesTags: ['Staff'],
         }),

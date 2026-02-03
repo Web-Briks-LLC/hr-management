@@ -9,6 +9,7 @@ async function checkOrderClient() {
     try {
         await mongoose.connect(uri!);
         const db = mongoose.connection.db;
+        if (!db) throw new Error('DB not connected');
 
         console.log('Checking Order Client ID...');
         const targetClientId = '6952ba2237bc6e4512a02602'; // From check_jan_earning.ts

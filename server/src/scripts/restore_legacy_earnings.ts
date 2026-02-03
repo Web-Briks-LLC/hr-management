@@ -27,6 +27,7 @@ async function restoreEarnings() {
     try {
         await mongoose.connect(uri!);
         const db = mongoose.connection.db;
+        if (!db) throw new Error('DB not connected');
 
         console.log(
             'Restoring Legacy Earnings (Aggregated) for Jan-Aug 2025...',

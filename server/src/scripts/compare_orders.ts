@@ -6,45 +6,13 @@ dotenv.config({ path: path.join(process.cwd(), '.env') });
 const uri = process.env.MONGO_URI;
 
 // User provided mapping: Old ID => New ID
-const clientMappingRaw = [
-    { old: 'WB Jamirul', new: 'WB Jamirul' },
-    { old: 'WB1031 Tanvir', new: 'WB1031 Tanvir' },
-    { old: 'WB1030-98', new: 'WB1030-98' },
-    { old: 'WB 1029-Valdes', new: 'WB 1029-Valdes' },
-    { old: 'WB-1029-Nadir', new: 'WB-1029-Nadir' },
-    { old: 'WB 1028-97', new: 'WB_1028_97' },
-    { old: 'WB 1027-94', new: 'WB 1027-94' },
-    { old: 'WB 1026 -93', new: 'WB_1026_93' },
-    { old: 'WB 1025-92', new: 'WB_1025_92' },
-    { old: 'WB-1024-91', new: 'WB_1024_91' },
-    { old: 'WB-1023-79', new: 'WB_1023_79' },
-    { old: 'WB-1022-90', new: 'WB_1022_90' },
-    { old: 'WB-1021-89', new: 'WB_1021_89' },
-    { old: 'WB-1020-88', new: 'WB_1020_88' },
-    { old: 'WB1019-87', new: 'WB_1019_87' },
-    { old: 'WB1018-84', new: 'WB_1018-84' },
-    { old: 'WB_1017-Lorenco', new: 'WB_1017_Lorenco' },
-    { old: 'WB_1015-195', new: 'WB_1015-195' },
-    { old: 'WB_1014-183', new: 'WB_1014-183' },
-    { old: 'WB_1013_James', new: 'WB_1013_James' },
-    { old: 'WB_1012_83', new: 'WB_1012_83' },
-    { old: 'WB_1011_80', new: 'WB_1011_80' },
-    { old: 'WB_1010_78', new: 'WB_1010_78' },
-    { old: 'WB_1009_74', new: 'WB_1009_74' },
-    { old: 'WB_1008_69', new: 'WB_1008_69' },
-    { old: 'WB_1007_61', new: 'WB_1007_61' },
-    { old: 'WB_1005_25', new: 'WB_1005_25' },
-    { old: 'WB_1005_04', new: 'WB_1005_04' },
-    { old: 'WB_1004_53', new: 'WB_1004_53' },
-    { old: 'WB_1003_50', new: 'WB_1003_50' },
-    { old: 'WB_1002_40', new: 'WB_1002_40' },
-    { old: 'WB_1001_31', new: 'WB_1001_31' },
-];
+// const clientMappingRaw = [ ... ]; // Removed unused mapping
 
 async function compare() {
     try {
         await mongoose.connect(uri!);
         const db = mongoose.connection.db;
+        if (!db) throw new Error('DB not connected');
 
         console.log('Fetching clients...');
         const clients = await db.collection('clients').find({}).toArray();

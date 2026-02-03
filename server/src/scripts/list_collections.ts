@@ -14,9 +14,9 @@ if (!uri) {
 async function listCollections() {
     try {
         await mongoose.connect(uri!);
-        const collections = await mongoose.connection.db
-            .listCollections()
-            .toArray();
+        const db = mongoose.connection.db;
+        if (!db) throw new Error('DB not connected');
+        const collections = await db.listCollections().toArray();
         console.log('Collections in database:');
         collections.forEach((c) => console.log(`- ${c.name}`));
     } catch (error) {

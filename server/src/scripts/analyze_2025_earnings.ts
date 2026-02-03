@@ -9,6 +9,9 @@ async function analyzeEarnings() {
     try {
         await mongoose.connect(uri!);
         const db = mongoose.connection.db;
+        if (!db) {
+            throw new Error('Database not connected');
+        }
 
         console.log('Analyzing 2025 Earnings...');
 

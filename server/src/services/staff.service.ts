@@ -3,13 +3,53 @@ import StaffModel from '../models/staff.model.js';
 import type IStaff from '../types/staff.type.js';
 import { startOfDay, endOfDay } from 'date-fns';
 
-async function getAllStaffsFromDB() {
+interface IStaffQueryParams {
+    page?: number;
+    limit?: number;
+    search?: string;
+    department?: string;
+    designation?: string;
+    shiftId?: string;
+    status?: string;
+}
+
+async function getAllStaffsFromDB(query: IStaffQueryParams) {
+    const {
+        page = 1,
+        limit = 10,
+        search,
+        department,
+        designation,
+        shiftId,
+        status,
+    } = query;
+
+    const skip = (page - 1) * limit;
     const now = new Date();
     const dayStart = startOfDay(now);
     const dayEnd = endOfDay(now);
 
-    const staffs = await StaffModel.aggregate([
-        // Lookup user info
+    const matchStage: any = {};
+
+    if (search) {
+        // We need to match on looked-up user fields, or basic fields
+        // Since user lookup happens later, we might need a preliminary match or match after lookup.
+        // For 'staffId', 'department', 'designation', we can match directly.
+        // For user name/email, we need to match after user lookup.
+        // To keep it simple and performant, let's match basic fields here, and complex search after lookup
+        // OR better: do lookups first then match.
+    }
+
+    if (department) matchStage.department = department;
+    if (designation) matchStage.designation = designation;
+    if (status) matchStage.status = status;
+    // branchId filtering if needed?
+
+    const pipeline: any[] = [
+        // 1. Initial Match (Basic fields)
+        { $match: matchStage },
+
+        // 2. Lookup User
         {
             $lookup: {
                 from: 'user',
@@ -27,25 +67,54 @@ async function getAllStaffsFromDB() {
                             _id: 1,
                             name: 1,
                             email: 1,
-                            emailVerified: 1,
                             image: 1,
                             role: 1,
-                            theme: 1,
-                            createdAt: 1,
-                            updatedAt: 1,
                         },
                     },
                 ],
                 as: 'user',
             },
         },
-        {
-            $unwind: {
-                path: '$user',
-                preserveNullAndEmptyArrays: true,
-            },
-        },
-        // Lookup branch info
+        { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+
+        // 3. Search Filter (if applicable)
+        ...(search
+            ? [
+                  {
+                      $match: {
+                          $or: [
+                              { staffId: { $regex: search, $options: 'i' } },
+                              {
+                                  'user.name': {
+                                      $regex: search,
+                                      $options: 'i',
+                                  },
+                              },
+                              {
+                                  'user.email': {
+                                      $regex: search,
+                                      $options: 'i',
+                                  },
+                              },
+                              {
+                                  department: {
+                                      $regex: search,
+                                      $options: 'i',
+                                  },
+                              },
+                              {
+                                  designation: {
+                                      $regex: search,
+                                      $options: 'i',
+                                  },
+                              },
+                          ],
+                      },
+                  },
+              ]
+            : []),
+
+        // 4. Lookup Branch
         {
             $lookup: {
                 from: 'branches',
@@ -54,13 +123,9 @@ async function getAllStaffsFromDB() {
                 as: 'branch',
             },
         },
-        {
-            $unwind: {
-                path: '$branch',
-                preserveNullAndEmptyArrays: true,
-            },
-        },
-        // Lookup today's attendance
+        { $unwind: { path: '$branch', preserveNullAndEmptyArrays: true } },
+
+        // 5. Lookup Today's Attendance
         {
             $lookup: {
                 from: 'attendancedays',
@@ -96,7 +161,8 @@ async function getAllStaffsFromDB() {
                 preserveNullAndEmptyArrays: true,
             },
         },
-        // Lookup current shift assignment
+
+        // 6. Lookup Current Shift
         {
             $lookup: {
                 from: 'shiftassignments',
@@ -135,9 +201,10 @@ async function getAllStaffsFromDB() {
                     },
                     {
                         $project: {
-                            'shift.name': 1,
-                            'shift.startTime': 1,
-                            'shift.endTime': 1,
+                            _id: '$shift._id',
+                            name: '$shift.name',
+                            startTime: '$shift.startTime',
+                            endTime: '$shift.endTime',
                         },
                     },
                 ],
@@ -150,24 +217,47 @@ async function getAllStaffsFromDB() {
                 preserveNullAndEmptyArrays: true,
             },
         },
-        // Add currentShift field
-        {
-            $addFields: {
-                currentShift: '$shiftAssignment.shift',
-            },
-        },
-        // Remove intermediate field
-        {
-            $project: {
-                shiftAssignment: 0,
-            },
-        },
-        {
-            $sort: { createdAt: -1 },
-        },
+        { $addFields: { currentShift: '$shiftAssignment' } },
+        { $project: { shiftAssignment: 0 } },
+
+        // 7. Shift Filter
+        ...(shiftId
+            ? [
+                  {
+                      $match: {
+                          'currentShift._id': new Types.ObjectId(shiftId),
+                      },
+                  },
+              ]
+            : []),
+
+        { $sort: { createdAt: -1 } },
+    ];
+
+    const countPipeline = [...pipeline, { $count: 'total' }];
+    const dataPipeline = [
+        ...pipeline,
+        { $skip: skip },
+        { $limit: Number(limit) },
+    ];
+
+    const [totalResult, dataResult] = await Promise.all([
+        StaffModel.aggregate(countPipeline),
+        StaffModel.aggregate(dataPipeline),
     ]);
 
-    return staffs;
+    const total = totalResult.length > 0 ? totalResult[0].total : 0;
+    const totalPage = Math.ceil(total / Number(limit));
+
+    return {
+        staffs: dataResult,
+        meta: {
+            total,
+            page: Number(page),
+            limit: Number(limit),
+            totalPage,
+        },
+    };
 }
 
 async function getStaffFromDB(userId: string) {
@@ -199,7 +289,7 @@ async function createStaffInDB(payload: { staff: Partial<IStaff> }) {
                     profileCompleted: false,
                 },
             ],
-            { session }
+            { session },
         );
 
         await session.commitTransaction();
@@ -224,15 +314,14 @@ async function completeProfileInDB(payload: {
     try {
         // First try to find staff by userId
         let existingStaff = await StaffModel.findOne({ userId }).session(
-            session
+            session,
         );
 
         if (!existingStaff) {
             // No staff record exists - create a new one
             // Generate a unique staffId
-            const staffCount = await StaffModel.countDocuments().session(
-                session
-            );
+            const staffCount =
+                await StaffModel.countDocuments().session(session);
             const staffId = `STF-${String(staffCount + 1).padStart(4, '0')}`;
 
             existingStaff = new StaffModel({
@@ -285,7 +374,7 @@ async function updateProfileInDB(payload: {
     const updated = await StaffModel.findOneAndUpdate(
         { userId },
         { $set: fields },
-        { new: true }
+        { new: true },
     );
 
     return updated;
@@ -331,7 +420,7 @@ async function viewSalaryWithPassword(payload: {
 
     if (!staff.salaryVisibleToEmployee) {
         throw new Error(
-            'Salary information is currently hidden by administrator'
+            'Salary information is currently hidden by administrator',
         );
     }
 
@@ -376,7 +465,7 @@ async function updateSalaryInDB(payload: {
     const updated = await StaffModel.findByIdAndUpdate(
         staffId,
         { $set: updateData },
-        { new: true }
+        { new: true },
     );
 
     return updated;

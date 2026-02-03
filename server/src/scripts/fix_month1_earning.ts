@@ -9,6 +9,7 @@ async function fixMonth1() {
     try {
         await mongoose.connect(uri!);
         const db = mongoose.connection.db;
+        if (!db) throw new Error('DB not connected');
 
         console.log('Fixing Month 1 Legacy Earning...');
 

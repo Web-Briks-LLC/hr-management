@@ -9,6 +9,7 @@ async function checkOrderTotal() {
     try {
         await mongoose.connect(uri!);
         const db = mongoose.connection.db;
+        if (!db) throw new Error('DB not connected');
 
         console.log('Calculating Total Order Value for 2025...');
 
