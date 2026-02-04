@@ -33,11 +33,4 @@ router.post('/', authorize(...allowedRoles), ClientController.createClient);
 // Update client
 router.patch('/:id', authorize(...allowedRoles), ClientController.updateClient);
 
-// Delete client
-router.delete(
-    '/:id',
-    authorize(...allowedRoles),
-    ClientController.deleteClient,
-);
-
 export const clientRoute = router;

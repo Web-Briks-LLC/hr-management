@@ -216,6 +216,26 @@ export default function FinanceAnalyticsPage() {
                         <div className="text-2xl font-bold text-green-600">
                             {formatCurrency(summary.totalEarnings)}
                         </div>
+                        {summary.earningsByCurrency &&
+                            summary.earningsByCurrency.length > 0 && (
+                                <div className="mt-1 space-y-0.5">
+                                    {summary.earningsByCurrency.map((item) => (
+                                        <p
+                                            key={item.currency}
+                                            className="text-xs text-muted-foreground"
+                                        >
+                                            {item.currency}:{' '}
+                                            {item.amount.toLocaleString(
+                                                'en-US',
+                                                {
+                                                    style: 'currency',
+                                                    currency: item.currency,
+                                                },
+                                            )}
+                                        </p>
+                                    ))}
+                                </div>
+                            )}
                         <p className="text-xs text-muted-foreground">
                             From {summary.deliveredOrders} orders
                         </p>
@@ -233,6 +253,26 @@ export default function FinanceAnalyticsPage() {
                         <div className="text-2xl font-bold text-red-600">
                             {formatCurrency(summary.totalExpenses)}
                         </div>
+                        {summary.expensesByCurrency &&
+                            summary.expensesByCurrency.length > 0 && (
+                                <div className="mt-1 space-y-0.5">
+                                    {summary.expensesByCurrency.map((item) => (
+                                        <p
+                                            key={item.currency}
+                                            className="text-xs text-muted-foreground"
+                                        >
+                                            {item.currency}:{' '}
+                                            {item.amount.toLocaleString(
+                                                'en-US',
+                                                {
+                                                    style: 'currency',
+                                                    currency: item.currency,
+                                                },
+                                            )}
+                                        </p>
+                                    ))}
+                                </div>
+                            )}
                         <p className="text-xs text-muted-foreground">
                             All categories
                         </p>
@@ -260,6 +300,26 @@ export default function FinanceAnalyticsPage() {
                         >
                             {formatCurrency(summary.totalProfit)}
                         </div>
+                        {summary.profitByCurrency &&
+                            summary.profitByCurrency.length > 0 && (
+                                <div className="mt-1 space-y-0.5">
+                                    {summary.profitByCurrency.map((item) => (
+                                        <p
+                                            key={item.currency}
+                                            className="text-xs text-muted-foreground"
+                                        >
+                                            {item.currency}:{' '}
+                                            {item.amount.toLocaleString(
+                                                'en-US',
+                                                {
+                                                    style: 'currency',
+                                                    currency: item.currency,
+                                                },
+                                            )}
+                                        </p>
+                                    ))}
+                                </div>
+                            )}
                         <p className="text-xs text-muted-foreground">
                             Earnings - Expenses
                         </p>
@@ -275,11 +335,7 @@ export default function FinanceAnalyticsPage() {
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold text-orange-600">
-                            $
-                            {summary.unpaidRevenue.toLocaleString('en-US', {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                            })}
+                            {formatCurrency(summary.unpaidRevenue)}
                         </div>
                         {summary.unpaidByCurrency &&
                             summary.unpaidByCurrency.length > 0 && (

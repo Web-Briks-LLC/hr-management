@@ -86,7 +86,7 @@ import {
     useWithdrawEarningMutation,
     useToggleEarningStatusMutation,
     useLazyGetClientOrdersForWithdrawQuery,
-    useDeleteEarningMutation,
+    useLazyGetClientOrdersForWithdrawQuery,
     useLazyGetClientsWithEarningsQuery,
     useUpdateEarningMutation,
 } from '@/redux/features/earning/earningApi';
@@ -125,7 +125,6 @@ export default function EarningsPage() {
     // Dialog states
     const [isWithdrawDialogOpen, setIsWithdrawDialogOpen] = useState(false);
     const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
-    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [isBulkWithdrawDialogOpen, setIsBulkWithdrawDialogOpen] =
         useState(false);
     const [selectedEarning, setSelectedEarning] = useState<IEarning | null>(
@@ -254,8 +253,6 @@ export default function EarningsPage() {
         useWithdrawEarningMutation();
     const [toggleStatus, { isLoading: isToggling }] =
         useToggleEarningStatusMutation();
-    const [deleteEarning, { isLoading: isDeleting }] =
-        useDeleteEarningMutation();
 
     const earnings = earningsData?.data || [];
     const meta = earningsData?.meta;
@@ -423,19 +420,6 @@ export default function EarningsPage() {
         } catch (error) {
             console.error('Error withdrawing:', error);
             toast.error('Failed to withdraw');
-        }
-    };
-
-    const handleDelete = async () => {
-        if (!selectedEarning) return;
-        try {
-            await deleteEarning(selectedEarning._id).unwrap();
-            toast.success('Earning deleted successfully');
-            setIsDeleteDialogOpen(false);
-            setSelectedEarning(null);
-        } catch (error) {
-            console.error('Error deleting:', error);
-            toast.error('Failed to delete earning');
         }
     };
 
@@ -1019,21 +1003,6 @@ export default function EarningsPage() {
                                                             <Wallet className="h-4 w-4" />
                                                         </Button>
                                                     )}
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-8 w-8 text-foreground/70 hover:text-destructive"
-                                                        onClick={() => {
-                                                            setSelectedEarning(
-                                                                earning,
-                                                            );
-                                                            setIsDeleteDialogOpen(
-                                                                true,
-                                                            );
-                                                        }}
-                                                    >
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
                                                 </div>
                                             </TableCell>
                                         </TableRow>
