@@ -510,6 +510,38 @@ async function importLegacyEarning(
     return earning.save();
 }
 
+// Update earning manually (e.g. changing client)
+async function updateEarning(
+    id: string,
+    updates: Partial<IEarning>,
+): Promise<IEarning | null> {
+    // If clientId is being updated, check for duplicates
+    if (updates.clientId) {
+        const earning = await EarningModel.findById(id);
+        if (!earning) return null;
+
+        // Check if clientId actually changed
+        if (earning.clientId.toString() !== updates.clientId.toString()) {
+            const duplicate = await EarningModel.findOne({
+                clientId: updates.clientId,
+                month: updates.month || earning.month,
+                year: updates.year || earning.year,
+                _id: { $ne: id },
+            });
+
+            if (duplicate) {
+                throw new Error(
+                    'An earning record already exists for this client in this month/year.',
+                );
+            }
+        }
+    }
+
+    return EarningModel.findByIdAndUpdate(id, { $set: updates }, { new: true })
+        .populate('clientId', 'clientId name email currency')
+        .lean() as Promise<IEarning | null>;
+}
+
 export default {
     createEarningForOrder,
     updateEarningForOrder,
@@ -524,4 +556,5 @@ export default {
     deleteEarningFromDB,
     getEarningYearsFromDB,
     importLegacyEarning,
+    updateEarning,
 };

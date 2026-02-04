@@ -9,6 +9,7 @@ import {
     deleteEarning,
     getEarningYears,
     getClientsWithEarnings,
+    updateEarning,
 } from '../controllers/earning.controller.js';
 
 const router = Router();
@@ -22,6 +23,7 @@ router.get('/client-orders', getClientOrdersForWithdraw);
 router.get('/:id', getEarningById);
 
 // Action routes
+router.patch('/:id', updateEarning); // General update
 router.put('/:id/withdraw', withdrawEarning);
 router.put('/:id/toggle-status', toggleEarningStatus);
 

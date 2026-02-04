@@ -316,6 +316,45 @@ async function getClientsWithEarnings(req: Request, res: Response) {
     }
 }
 
+// Update earning (e.g. update client)
+async function updateEarning(req: Request, res: Response) {
+    try {
+        const id = req.params.id;
+        if (!id) {
+            return res.status(400).json({ message: 'Earning ID is required' });
+        }
+
+        const { clientId } = req.body;
+        const updates: any = {};
+
+        if (clientId) {
+            if (!Types.ObjectId.isValid(clientId)) {
+                return res
+                    .status(400)
+                    .json({ message: 'Invalid Client ID format' });
+            }
+            updates.clientId = clientId;
+        }
+
+        const updatedEarning = await earningService.updateEarning(id, updates);
+
+        if (!updatedEarning) {
+            return res.status(404).json({ message: 'Earning not found' });
+        }
+
+        return res.status(200).json({
+            message: 'Earning updated successfully',
+            data: updatedEarning,
+        });
+    } catch (error: any) {
+        console.error('Error updating earning:', error);
+        return res.status(500).json({
+            message: error.message || 'Internal server error',
+            success: false,
+        });
+    }
+}
+
 export {
     getAllEarnings,
     getEarningById,
@@ -326,4 +365,5 @@ export {
     deleteEarning,
     getEarningYears,
     getClientsWithEarnings,
+    updateEarning,
 };
