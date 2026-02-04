@@ -13,6 +13,7 @@ export interface IExpense extends Document {
     title: string;
     categoryId: Types.ObjectId;
     branchId: Types.ObjectId;
+    staffId?: Types.ObjectId;
     amount: number;
     status: 'pending' | 'paid' | 'partial_paid';
     paymentMethod?: string;

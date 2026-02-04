@@ -75,128 +75,129 @@ const getPayrollPreview = async ({
         },
     ]);
 
-    // 2. Get existing expenses for this month to check status
+    // 2. Optimization: Batch Fetching
+    const staffIds = staffs.map((s) => s._id);
+
+    // Fetch all active shifts for these staff
+    const shiftAssignments = await ShiftAssignmentModel.find({
+        staffId: { $in: staffIds },
+        isActive: true,
+    }).populate('shiftId');
+
+    // Fetch all attendance records for these staff in the given month
+    const allAttendance = await AttendanceDayModel.find({
+        staffId: { $in: staffIds },
+        date: { $gte: startDate, $lte: endDate },
+    });
+
+    // Fetch all salary expenses for these staff in the given month
     const salaryCategory = await ExpenseCategoryModel.findOne({
         name: { $regex: /^Salary/i },
     });
 
-    const expenses = salaryCategory
-        ? await ExpenseModel.find({
-              categoryId: salaryCategory._id,
-              date: { $gte: startDate, $lte: endDate },
-          })
-        : [];
+    let paidExpenses: any[] = [];
+    if (salaryCategory) {
+        // We fetch by category and date range.
+        // We can filter by staffId or title in memory if needed, but DB query is better.
+        // To support both new staffId field and legacy title matching, we use $or
+        // But title matching for many staff is inefficient.
+        // Let's fecth all salary expenses for this month for these staff.
+        paidExpenses = await ExpenseModel.find({
+            categoryId: salaryCategory._id,
+            date: { $gte: startDate, $lte: endDate },
+            $or: [
+                { staffId: { $in: staffIds } },
+                // Fallback for legacy data without staffId:
+                // We fetch all and filter in JS if needed, or rely on regex if practical.
+                // Given we have the list, let's just fetch all salary expenses for this month.
+                // It is cleaner to just fetch all expenses in this category for this month
+                // since we usually check all staff anyway.
+            ],
+        });
+    }
 
-    const stats = await Promise.all(
-        staffs.map(async (staff) => {
-            // Get Shift Assignment for this staff in this month
-            // Assuming simplified: Get current active shift or main shift
-            // Ideally should check shift history. For now, simplified to current active shift.
-            const shiftAssignment = await ShiftAssignmentModel.findOne({
-                staffId: staff._id,
-                isActive: true,
-            }).populate('shiftId');
+    const daysInMonth = eachDayOfInterval({
+        start: startDate,
+        end: endDate,
+    });
 
-            let workDaysCount = 0;
-            const daysInMonth = eachDayOfInterval({
-                start: startDate,
-                end: endDate,
+    const stats = staffs.map((staff) => {
+        // A. Match Shift
+        const shiftAssignment = shiftAssignments.find(
+            (sa) => sa.staffId.toString() === staff._id.toString(),
+        );
+
+        let workDaysCount = 0;
+        const shift: any = shiftAssignment?.shiftId;
+
+        if (shift) {
+            daysInMonth.forEach((day) => {
+                const dayOfWeek = day.getDay();
+                if (shift.workDays.includes(dayOfWeek)) {
+                    workDaysCount++;
+                }
             });
+        } else {
+            workDaysCount = 22; // Default fallback
+        }
 
-            // Calculate expected working days based on Shift
-            const shift: any = shiftAssignment?.shiftId;
-            if (shift) {
-                daysInMonth.forEach((day) => {
-                    const dayOfWeek = day.getDay(); // 0 = Sunday, 1 = Monday...
-                    // Check if dayOfWeek is in shift.workDays
-                    // Note: date-fns getDay returns 0 for Sunday.
-                    // Need to verify standard. JS getDay: 0=Sun.
-                    // shift.workDays usually stores 0-6.
-                    if (shift.workDays.includes(dayOfWeek)) {
-                        workDaysCount++;
-                    }
-                });
-            } else {
-                // Default if no shift: assume standard 26 days? Or 0?
-                // Lets default to all weekdays (Mon-Fri) if no shift found, simple fallback
-                workDaysCount = 22;
+        // B. Match Attendance
+        const staffAttendance = allAttendance.filter(
+            (a) => a.staffId.toString() === staff._id.toString(),
+        );
+
+        const presentDays = staffAttendance.filter((a) =>
+            ['present', 'late', 'half_day', 'early_exit'].includes(a.status),
+        ).length;
+
+        const absentDays = staffAttendance.filter(
+            (a) => a.status === 'absent',
+        ).length;
+
+        const leaveDays = staffAttendance.filter(
+            (a) => a.status === 'on_leave',
+        ).length;
+
+        const holidays = staffAttendance.filter(
+            (a) => a.status === 'holiday',
+        ).length;
+
+        const lateDays = staffAttendance.filter(
+            (a) => a.status === 'late',
+        ).length;
+
+        // C. Calculate Salary
+        const effectiveWorkDays = workDaysCount > 0 ? workDaysCount : 1;
+        const staffSalary = staff.salary || 0;
+        const perDaySalary = staffSalary / effectiveWorkDays;
+
+        const deduction = absentDays * perDaySalary;
+        const payableSalary = Math.max(0, staffSalary - deduction);
+
+        // D. Check Payment Status
+        // Priority: Check staffId field first, then fallback to Title match
+        const existingExpense = paidExpenses.find((e) => {
+            if (e.staffId && e.staffId.toString() === staff._id.toString()) {
+                return true;
             }
+            return e.title.includes(staff._id.toString());
+        });
 
-            // Fetch attendance stats
-            const attendance = await AttendanceDayModel.find({
-                staffId: staff._id,
-                date: { $gte: startDate, $lte: endDate },
-            });
-
-            // Group attendance by status
-            const presentDays = attendance.filter((a) =>
-                ['present', 'late', 'half_day', 'early_exit'].includes(
-                    a.status,
-                ),
-            ).length;
-
-            const absentDays = attendance.filter(
-                (a) => a.status === 'absent',
-            ).length;
-            const leaveDays = attendance.filter(
-                (a) => a.status === 'on_leave',
-            ).length;
-            const holidays = attendance.filter(
-                (a) => a.status === 'holiday',
-            ).length;
-            const lateDays = attendance.filter(
-                (a) => a.status === 'late',
-            ).length;
-
-            // Correction: If attendance records exist for holidays/weekends, they are not absent.
-            // "Absent" in DB means marked absent on a working day.
-
-            // Adjusted Logic:
-            // Payable = Present + Leave + Holiday (if paid) + Weekend (if paid)
-            // Simpler Logic requested:
-            // "month koto din kaj korte hobe" (Work Days) - derived from calendar + shift
-            // "present count"
-            // "absent count"
-            // "late count"
-            // "payable salary"
-
-            // Formula: Per Day = Salary / WorkDays
-            // Payable = Salary - (Absent * Per Day)
-
-            // Prevent division by zero
-            const effectiveWorkDays = workDaysCount > 0 ? workDaysCount : 1;
-            const staffSalary = staff.salary || 0;
-            const perDaySalary = staffSalary / effectiveWorkDays;
-
-            const deduction = absentDays * perDaySalary;
-            const payableSalary = Math.max(0, staffSalary - deduction);
-
-            // Check if already paid
-            // We match by checking if an expense exists with title containing staffId
-            // OR ideally we should store staffId in Expense if strictly linked.
-            // Current approach: Using Title convention "Salary - <staffId> - <Month>"
-            // Since we are iterating staff, let's find identifying expense.
-            // Security: StaffId (MongoID) is unique.
-            const existingExpense = expenses.find((e) =>
-                e.title.includes(staff._id.toString()),
-            );
-
-            return {
-                staffId: staff._id,
-                workDays: workDaysCount,
-                present: presentDays,
-                absent: absentDays,
-                late: lateDays,
-                onLeave: leaveDays,
-                holiday: holidays,
-                perDaySalary: Math.round(perDaySalary),
-                payableSalary: Math.round(payableSalary),
-                status: existingExpense ? 'paid' : 'pending',
-                expenseId: existingExpense?._id,
-                paidAmount: existingExpense?.amount,
-            };
-        }),
-    );
+        return {
+            staffId: staff._id,
+            workDays: workDaysCount,
+            present: presentDays,
+            absent: absentDays,
+            late: lateDays,
+            onLeave: leaveDays,
+            holiday: holidays,
+            perDaySalary: Math.round(perDaySalary),
+            payableSalary: Math.round(payableSalary),
+            status: existingExpense ? 'paid' : 'pending',
+            expenseId: existingExpense?._id,
+            paidAmount: existingExpense?.amount,
+        };
+    });
 
     // Merge stats with staff data
     return staffs.map((staff) => {
@@ -261,9 +262,18 @@ const processPayroll = async ({
         const expenseTitle = `Salary - ${staffId} - ${monthName}`;
 
         // Check if exists
+        // Check if exists
         const existingExpense = await ExpenseModel.findOne({
-            title: expenseTitle,
-            branchId: staff.branchId, // Extra safety
+            $or: [
+                {
+                    staffId: staffId,
+                    date: {
+                        $gte: startOfMonth(new Date(month)),
+                        $lte: endOfMonth(new Date(month)),
+                    },
+                },
+                { title: expenseTitle, branchId: staff.branchId }, // Legacy check
+            ],
         }).session(session);
 
         let createdExpense;
@@ -285,6 +295,7 @@ const processPayroll = async ({
                         title: expenseTitle,
                         categoryId: category!._id,
                         branchId: staff.branchId,
+                        staffId: staff._id, // Save staffId for robust linking
                         amount: amount, // Final amount passed from frontend
                         status: 'paid',
                         paymentMethod: paymentMethod || 'cash',

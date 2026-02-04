@@ -25,6 +25,11 @@ const expenseSchema = new Schema<IExpense>(
             required: true,
             index: true,
         },
+        staffId: {
+            type: Schema.Types.ObjectId,
+            ref: 'Staff',
+            index: true,
+        },
         amount: {
             type: Number,
             required: true,

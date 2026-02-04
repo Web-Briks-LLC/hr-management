@@ -68,13 +68,6 @@ const getExpenseAggregationPipeline = (
             'createdBy.password': 0,
         },
     },
-    {
-        $project: {
-            categoryId: 0,
-            branchId: 0,
-            'createdBy.password': 0,
-        },
-    },
 ];
 
 // Build date filter based on filterType
@@ -147,19 +140,15 @@ const buildMatchStage = (params: ExpenseQueryParams): any => {
         match.title = { $regex: params.search, $options: 'i' };
     }
 
-    if (params.branchId) {
+    if (params.branchId && Types.ObjectId.isValid(params.branchId)) {
         match.branchId = new Types.ObjectId(params.branchId);
     }
 
-    if (params.categoryId) {
+    if (params.categoryId && Types.ObjectId.isValid(params.categoryId)) {
         match.categoryId = new Types.ObjectId(params.categoryId);
     }
 
-    if (params.status) {
-        match.status = params.status;
-    }
-
-    if (params.status) {
+    if (params.status && params.status !== 'all') {
         match.status = params.status;
     }
 
@@ -249,35 +238,41 @@ const getExpenseStatsFromDB = async (
         ? { branchId: new Types.ObjectId(branchId) }
         : {};
 
-    const [todayResult, monthResult, yearResult] = await Promise.all([
-        ExpenseModel.aggregate([
-            {
-                $match: {
-                    ...branchMatch,
-                    date: { $gte: startOfToday, $lte: endOfToday },
-                },
+    const [statsResult] = await ExpenseModel.aggregate([
+        { $match: { ...branchMatch } },
+        {
+            $facet: {
+                today: [
+                    {
+                        $match: {
+                            date: { $gte: startOfToday, $lte: endOfToday },
+                        },
+                    },
+                    { $group: { _id: null, total: { $sum: '$amount' } } },
+                ],
+                thisMonth: [
+                    {
+                        $match: {
+                            date: { $gte: startOfMonth, $lte: endOfMonth },
+                        },
+                    },
+                    { $group: { _id: null, total: { $sum: '$amount' } } },
+                ],
+                thisYear: [
+                    {
+                        $match: {
+                            date: { $gte: startOfYear, $lte: endOfYear },
+                        },
+                    },
+                    { $group: { _id: null, total: { $sum: '$amount' } } },
+                ],
             },
-            { $group: { _id: null, total: { $sum: '$amount' } } },
-        ]),
-        ExpenseModel.aggregate([
-            {
-                $match: {
-                    ...branchMatch,
-                    date: { $gte: startOfMonth, $lte: endOfMonth },
-                },
-            },
-            { $group: { _id: null, total: { $sum: '$amount' } } },
-        ]),
-        ExpenseModel.aggregate([
-            {
-                $match: {
-                    ...branchMatch,
-                    date: { $gte: startOfYear, $lte: endOfYear },
-                },
-            },
-            { $group: { _id: null, total: { $sum: '$amount' } } },
-        ]),
+        },
     ]);
+
+    const todayTotal = statsResult.today[0]?.total || 0;
+    const monthTotal = statsResult.thisMonth[0]?.total || 0;
+    const yearTotal = statsResult.thisYear[0]?.total || 0;
 
     // Calculate average monthly expense for the year
     let monthsPassed = 12;
@@ -287,12 +282,11 @@ const getExpenseStatsFromDB = async (
         monthsPassed = 0;
     }
 
-    const yearTotal = yearResult[0]?.total || 0;
     const avgMonthly = monthsPassed > 0 ? yearTotal / monthsPassed : 0;
 
     return {
-        today: todayResult[0]?.total || 0,
-        thisMonth: monthResult[0]?.total || 0,
+        today: todayTotal,
+        thisMonth: monthTotal,
         thisYear: yearTotal,
         avgMonthly: Math.round(avgMonthly * 100) / 100,
     };
