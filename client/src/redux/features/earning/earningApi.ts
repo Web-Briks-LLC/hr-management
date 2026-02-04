@@ -128,6 +128,23 @@ const earningApi = apiSlice.injectEndpoints({
                 { type: 'Earning', id: 'STATS' },
             ],
         }),
+
+        // Update earning
+        updateEarning: builder.mutation<
+            EarningResponse,
+            { id: string; data: Partial<{ clientId: string }> }
+        >({
+            query: ({ id, data }) => ({
+                url: `/earnings/${id}`,
+                method: 'PATCH',
+                body: data,
+            }),
+            invalidatesTags: (_result, _error, { id }) => [
+                { type: 'Earning', id },
+                { type: 'Earning', id: 'LIST' },
+                { type: 'Earning', id: 'STATS' },
+            ],
+        }),
     }),
     overrideExisting: false,
 });
@@ -142,5 +159,6 @@ export const {
     useWithdrawEarningMutation,
     useToggleEarningStatusMutation,
     useDeleteEarningMutation,
+    useUpdateEarningMutation,
     useLazyGetClientsWithEarningsQuery,
 } = earningApi;

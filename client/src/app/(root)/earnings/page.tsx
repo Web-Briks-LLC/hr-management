@@ -88,6 +88,7 @@ import {
     useLazyGetClientOrdersForWithdrawQuery,
     useDeleteEarningMutation,
     useLazyGetClientsWithEarningsQuery,
+    useUpdateEarningMutation,
 } from '@/redux/features/earning/earningApi';
 import { useGetClientsQuery } from '@/redux/features/client/clientApi';
 import { useGetCurrencyRatesQuery } from '@/redux/features/currencyRate/currencyRateApi';
@@ -130,8 +131,15 @@ export default function EarningsPage() {
     const [selectedEarning, setSelectedEarning] = useState<IEarning | null>(
         null,
     );
+    // Edit Client Dialog state
+    const [isEditClientDialogOpen, setIsEditClientDialogOpen] = useState(false);
+    const [editClientId, setEditClientId] = useState('');
+
+    const [updateEarning, { isLoading: isUpdating }] =
+        useUpdateEarningMutation();
 
     // Withdraw form state
+
     const [withdrawFees, setWithdrawFees] = useState('0');
     const [withdrawTax, setWithdrawTax] = useState('0');
     const [withdrawRate, setWithdrawRate] = useState('120');
@@ -293,6 +301,31 @@ export default function EarningsPage() {
     };
 
     // Handlers
+    const handleEditClient = (earning: IEarning) => {
+        setSelectedEarning(earning);
+        setEditClientId(earning.clientId?._id || '');
+        setIsEditClientDialogOpen(true);
+    };
+
+    const handleConfirmEditClient = async () => {
+        if (!selectedEarning || !editClientId) return;
+
+        try {
+            await updateEarning({
+                id: selectedEarning._id,
+                data: { clientId: editClientId },
+            }).unwrap();
+
+            toast.success('Client updated successfully');
+            setIsEditClientDialogOpen(false);
+            setSelectedEarning(null);
+        } catch (error: any) {
+            console.error('Error updating client:', error);
+            const message = error?.data?.message || 'Failed to update client';
+            toast.error(message);
+        }
+    };
+
     const handleWithdraw = (earning: IEarning) => {
         setSelectedEarning(earning);
         setWithdrawFees('0');
@@ -942,6 +975,35 @@ export default function EarningsPage() {
                                                     >
                                                         <Eye className="h-4 w-4" />
                                                     </Button>
+
+                                                    {/* Edit Client Button */}
+                                                    <TooltipProvider>
+                                                        <Tooltip>
+                                                            <TooltipTrigger
+                                                                asChild
+                                                            >
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    className="h-8 w-8 text-foreground/70 hover:text-blue-600"
+                                                                    onClick={() =>
+                                                                        handleEditClient(
+                                                                            earning,
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    <Settings2 className="h-4 w-4" />
+                                                                </Button>
+                                                            </TooltipTrigger>
+                                                            <TooltipContent>
+                                                                <p>
+                                                                    Change
+                                                                    Client
+                                                                </p>
+                                                            </TooltipContent>
+                                                        </Tooltip>
+                                                    </TooltipProvider>
+
                                                     {earning.status ===
                                                         'unpaid' && (
                                                         <Button
@@ -1821,6 +1883,81 @@ export default function EarningsPage() {
                                 )}
                             </Button>
                         </div>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Edit Client Dialog */}
+            <Dialog
+                open={isEditClientDialogOpen}
+                onOpenChange={setIsEditClientDialogOpen}
+            >
+                <DialogContent className="max-w-sm">
+                    <DialogHeader>
+                        <DialogTitle>Update Client</DialogTitle>
+                        <DialogDescription>
+                            Change the client associated with this earning
+                            record.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                            <Label>Select Client</Label>
+                            <Select
+                                value={editClientId}
+                                onValueChange={setEditClientId}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select a client" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {clients.map((client) => (
+                                        <SelectItem
+                                            key={client._id}
+                                            value={client._id}
+                                        >
+                                            {client.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        {selectedEarning && (
+                            <div className="text-sm rounded-md bg-muted p-3 text-muted-foreground">
+                                <p>
+                                    Moving this earning (
+                                    {formatCurrency(
+                                        selectedEarning.totalAmount,
+                                        selectedEarning.currency,
+                                    )}
+                                    ) from{' '}
+                                    <span className="font-medium text-foreground">
+                                        {selectedEarning.clientId?.name ||
+                                            'Unknown'}
+                                    </span>
+                                </p>
+                            </div>
+                        )}
+                    </div>
+
+                    <DialogFooter>
+                        <Button
+                            variant="ghost"
+                            onClick={() => setIsEditClientDialogOpen(false)}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={handleConfirmEditClient}
+                            disabled={isUpdating || !editClientId}
+                        >
+                            {isUpdating && (
+                                <Loader className="mr-2 h-4 w-4 animate-spin" />
+                            )}
+                            Update Client
+                        </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
