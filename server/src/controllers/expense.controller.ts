@@ -21,6 +21,9 @@ const getAllExpenses = async (req: Request, res: Response) => {
             branchId: req.query.branchId as string,
             categoryId: req.query.categoryId as string,
             status: req.query.status as string,
+            filterType: req.query.filterType as any,
+            startDate: req.query.startDate as string,
+            endDate: req.query.endDate as string,
         };
 
         const result = await ExpenseServices.getAllExpensesFromDB(params);
