@@ -50,8 +50,23 @@ import {
     Users,
 } from 'lucide-react';
 
-const formatCurrency = (amount: number) => {
-    return `৳${amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const formatCurrency = (amount: number, currency: string = 'BDT') => {
+    try {
+        if (currency === 'BDT') {
+            return `৳${amount.toLocaleString('en-IN', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+            })}`;
+        }
+        return amount.toLocaleString('en-US', {
+            style: 'currency',
+            currency: currency,
+        });
+    } catch (e) {
+        // Fallback for invalid currency codes
+        console.error('Invalid currency code:', currency);
+        return `${currency} ${amount.toFixed(2)}`;
+    }
 };
 
 const COLORS = [
@@ -216,26 +231,6 @@ export default function FinanceAnalyticsPage() {
                         <div className="text-2xl font-bold text-green-600">
                             {formatCurrency(summary.totalEarnings)}
                         </div>
-                        {summary.earningsByCurrency &&
-                            summary.earningsByCurrency.length > 0 && (
-                                <div className="mt-1 space-y-0.5">
-                                    {summary.earningsByCurrency.map((item) => (
-                                        <p
-                                            key={item.currency}
-                                            className="text-xs text-muted-foreground"
-                                        >
-                                            {item.currency}:{' '}
-                                            {item.amount.toLocaleString(
-                                                'en-US',
-                                                {
-                                                    style: 'currency',
-                                                    currency: item.currency,
-                                                },
-                                            )}
-                                        </p>
-                                    ))}
-                                </div>
-                            )}
                         <p className="text-xs text-muted-foreground">
                             From {summary.deliveredOrders} orders
                         </p>
@@ -253,26 +248,6 @@ export default function FinanceAnalyticsPage() {
                         <div className="text-2xl font-bold text-red-600">
                             {formatCurrency(summary.totalExpenses)}
                         </div>
-                        {summary.expensesByCurrency &&
-                            summary.expensesByCurrency.length > 0 && (
-                                <div className="mt-1 space-y-0.5">
-                                    {summary.expensesByCurrency.map((item) => (
-                                        <p
-                                            key={item.currency}
-                                            className="text-xs text-muted-foreground"
-                                        >
-                                            {item.currency}:{' '}
-                                            {item.amount.toLocaleString(
-                                                'en-US',
-                                                {
-                                                    style: 'currency',
-                                                    currency: item.currency,
-                                                },
-                                            )}
-                                        </p>
-                                    ))}
-                                </div>
-                            )}
                         <p className="text-xs text-muted-foreground">
                             All categories
                         </p>
@@ -300,26 +275,6 @@ export default function FinanceAnalyticsPage() {
                         >
                             {formatCurrency(summary.totalProfit)}
                         </div>
-                        {summary.profitByCurrency &&
-                            summary.profitByCurrency.length > 0 && (
-                                <div className="mt-1 space-y-0.5">
-                                    {summary.profitByCurrency.map((item) => (
-                                        <p
-                                            key={item.currency}
-                                            className="text-xs text-muted-foreground"
-                                        >
-                                            {item.currency}:{' '}
-                                            {item.amount.toLocaleString(
-                                                'en-US',
-                                                {
-                                                    style: 'currency',
-                                                    currency: item.currency,
-                                                },
-                                            )}
-                                        </p>
-                                    ))}
-                                </div>
-                            )}
                         <p className="text-xs text-muted-foreground">
                             Earnings - Expenses
                         </p>
@@ -337,23 +292,7 @@ export default function FinanceAnalyticsPage() {
                         <div className="text-2xl font-bold text-orange-600">
                             {formatCurrency(summary.unpaidRevenue)}
                         </div>
-                        {summary.unpaidByCurrency &&
-                            summary.unpaidByCurrency.length > 0 && (
-                                <div className="mt-1 space-y-0.5">
-                                    {summary.unpaidByCurrency.map((item) => (
-                                        <p
-                                            key={item.currency}
-                                            className="text-xs text-muted-foreground"
-                                        >
-                                            {item.currency}: $
-                                            {item.amount.toFixed(2)} ≈ ৳
-                                            {item.amountBDT.toLocaleString(
-                                                'en-IN',
-                                            )}
-                                        </p>
-                                    ))}
-                                </div>
-                            )}
+
                         <p className="text-xs text-muted-foreground mt-1">
                             Not yet withdrawn
                         </p>

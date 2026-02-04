@@ -86,9 +86,9 @@ import {
     useWithdrawEarningMutation,
     useToggleEarningStatusMutation,
     useLazyGetClientOrdersForWithdrawQuery,
-    useLazyGetClientOrdersForWithdrawQuery,
     useLazyGetClientsWithEarningsQuery,
     useUpdateEarningMutation,
+    useDeleteEarningMutation,
 } from '@/redux/features/earning/earningApi';
 import { useGetClientsQuery } from '@/redux/features/client/clientApi';
 import { useGetCurrencyRatesQuery } from '@/redux/features/currencyRate/currencyRateApi';
@@ -130,6 +130,7 @@ export default function EarningsPage() {
     const [selectedEarning, setSelectedEarning] = useState<IEarning | null>(
         null,
     );
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     // Edit Client Dialog state
     const [isEditClientDialogOpen, setIsEditClientDialogOpen] = useState(false);
     const [editClientId, setEditClientId] = useState('');
@@ -253,6 +254,8 @@ export default function EarningsPage() {
         useWithdrawEarningMutation();
     const [toggleStatus, { isLoading: isToggling }] =
         useToggleEarningStatusMutation();
+    const [deleteEarning, { isLoading: isDeleting }] =
+        useDeleteEarningMutation();
 
     const earnings = earningsData?.data || [];
     const meta = earningsData?.meta;
@@ -320,6 +323,20 @@ export default function EarningsPage() {
             console.error('Error updating client:', error);
             const message = error?.data?.message || 'Failed to update client';
             toast.error(message);
+        }
+    };
+
+    const handleDelete = async () => {
+        if (!selectedEarning) return;
+
+        try {
+            await deleteEarning(selectedEarning._id).unwrap();
+            toast.success('Earning record deleted successfully');
+            setIsDeleteDialogOpen(false);
+            setSelectedEarning(null);
+        } catch (error) {
+            console.error('Error deleting earning:', error);
+            toast.error('Failed to delete earning record');
         }
     };
 
@@ -1003,6 +1020,22 @@ export default function EarningsPage() {
                                                             <Wallet className="h-4 w-4" />
                                                         </Button>
                                                     )}
+
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-8 w-8 text-foreground/70 hover:text-destructive"
+                                                        onClick={() => {
+                                                            setSelectedEarning(
+                                                                earning,
+                                                            );
+                                                            setIsDeleteDialogOpen(
+                                                                true,
+                                                            );
+                                                        }}
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
                                                 </div>
                                             </TableCell>
                                         </TableRow>
