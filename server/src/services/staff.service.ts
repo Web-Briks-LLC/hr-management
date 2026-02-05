@@ -11,6 +11,8 @@ interface IStaffQueryParams {
     designation?: string;
     shiftId?: string;
     status?: string;
+    branchId?: string;
+    excludeAdmins?: boolean;
 }
 
 async function getAllStaffsFromDB(query: IStaffQueryParams) {
@@ -22,6 +24,8 @@ async function getAllStaffsFromDB(query: IStaffQueryParams) {
         designation,
         shiftId,
         status,
+        branchId,
+        excludeAdmins,
     } = query;
 
     const skip = (page - 1) * limit;
@@ -43,7 +47,7 @@ async function getAllStaffsFromDB(query: IStaffQueryParams) {
     if (department) matchStage.department = department;
     if (designation) matchStage.designation = designation;
     if (status) matchStage.status = status;
-    // branchId filtering if needed?
+    if (branchId) matchStage.branchId = new Types.ObjectId(branchId);
 
     const pipeline: any[] = [
         // 1. Initial Match (Basic fields)
@@ -76,6 +80,19 @@ async function getAllStaffsFromDB(query: IStaffQueryParams) {
             },
         },
         { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+
+        // 2.5 Exclude Admins (if requested)
+        ...(excludeAdmins
+            ? [
+                  {
+                      $match: {
+                          'user.role': {
+                              $nin: ['admin', 'branch_admin', 'super_admin'],
+                          },
+                      },
+                  },
+              ]
+            : []),
 
         // 3. Search Filter (if applicable)
         ...(search

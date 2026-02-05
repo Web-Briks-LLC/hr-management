@@ -11,6 +11,8 @@ const getStaffs = async (req: Request, res: Response) => {
             designation,
             shiftId,
             status,
+            branchId,
+            excludeAdmins,
         } = req.query;
 
         const result = await StaffServices.getAllStaffsFromDB({
@@ -21,6 +23,8 @@ const getStaffs = async (req: Request, res: Response) => {
             designation: designation as string,
             shiftId: shiftId as string,
             status: status as string,
+            branchId: branchId as string,
+            excludeAdmins: excludeAdmins === 'true',
         });
 
         return res.json({ success: true, ...result });
