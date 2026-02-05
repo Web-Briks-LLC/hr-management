@@ -86,9 +86,9 @@ import {
     useWithdrawEarningMutation,
     useToggleEarningStatusMutation,
     useLazyGetClientOrdersForWithdrawQuery,
-    useDeleteEarningMutation,
     useLazyGetClientsWithEarningsQuery,
     useUpdateEarningMutation,
+    useDeleteEarningMutation,
 } from '@/redux/features/earning/earningApi';
 import { useGetClientsQuery } from '@/redux/features/client/clientApi';
 import { useGetCurrencyRatesQuery } from '@/redux/features/currencyRate/currencyRateApi';
@@ -125,12 +125,12 @@ export default function EarningsPage() {
     // Dialog states
     const [isWithdrawDialogOpen, setIsWithdrawDialogOpen] = useState(false);
     const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
-    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [isBulkWithdrawDialogOpen, setIsBulkWithdrawDialogOpen] =
         useState(false);
     const [selectedEarning, setSelectedEarning] = useState<IEarning | null>(
         null,
     );
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     // Edit Client Dialog state
     const [isEditClientDialogOpen, setIsEditClientDialogOpen] = useState(false);
     const [editClientId, setEditClientId] = useState('');
@@ -326,6 +326,20 @@ export default function EarningsPage() {
         }
     };
 
+    const handleDelete = async () => {
+        if (!selectedEarning) return;
+
+        try {
+            await deleteEarning(selectedEarning._id).unwrap();
+            toast.success('Earning record deleted successfully');
+            setIsDeleteDialogOpen(false);
+            setSelectedEarning(null);
+        } catch (error) {
+            console.error('Error deleting earning:', error);
+            toast.error('Failed to delete earning record');
+        }
+    };
+
     const handleWithdraw = (earning: IEarning) => {
         setSelectedEarning(earning);
         setWithdrawFees('0');
@@ -423,19 +437,6 @@ export default function EarningsPage() {
         } catch (error) {
             console.error('Error withdrawing:', error);
             toast.error('Failed to withdraw');
-        }
-    };
-
-    const handleDelete = async () => {
-        if (!selectedEarning) return;
-        try {
-            await deleteEarning(selectedEarning._id).unwrap();
-            toast.success('Earning deleted successfully');
-            setIsDeleteDialogOpen(false);
-            setSelectedEarning(null);
-        } catch (error) {
-            console.error('Error deleting:', error);
-            toast.error('Failed to delete earning');
         }
     };
 
@@ -1019,6 +1020,7 @@ export default function EarningsPage() {
                                                             <Wallet className="h-4 w-4" />
                                                         </Button>
                                                     )}
+
                                                     <Button
                                                         variant="ghost"
                                                         size="icon"

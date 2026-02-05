@@ -5,7 +5,6 @@ import {
     useGetClientsQuery,
     useCreateClientMutation,
     useUpdateClientMutation,
-    useDeleteClientMutation,
 } from '@/redux/features/client/clientApi';
 import type { Client } from '@/types/client.type';
 import {
@@ -102,7 +101,7 @@ export default function ClientsPage() {
     });
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+
     const [selectedClient, setSelectedClient] = useState<Client | null>(null);
 
     // Server errors state for displaying in forms
@@ -131,7 +130,6 @@ export default function ClientsPage() {
     // Mutations
     const [createClient, { isLoading: isCreating }] = useCreateClientMutation();
     const [updateClient, { isLoading: isUpdating }] = useUpdateClientMutation();
-    const [deleteClient, { isLoading: isDeleting }] = useDeleteClientMutation();
 
     const clients = clientData?.clients || [];
     const pagination = clientData?.pagination;
@@ -204,19 +202,6 @@ export default function ClientsPage() {
             } else {
                 toast.error(err?.data?.message || 'Failed to update client');
             }
-        }
-    };
-
-    const handleDeleteClient = async () => {
-        if (!selectedClient) return;
-        try {
-            await deleteClient(selectedClient._id).unwrap();
-            toast.success('Client deleted successfully');
-            setIsDeleteDialogOpen(false);
-            setSelectedClient(null);
-        } catch (error: unknown) {
-            const err = error as ApiErrorResponse;
-            toast.error(err?.data?.message || 'Failed to delete client');
         }
     };
 
@@ -557,20 +542,6 @@ export default function ClientsPage() {
                                                             >
                                                                 <Edit2 />
                                                             </Button>
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                onClick={() => {
-                                                                    setSelectedClient(
-                                                                        client,
-                                                                    );
-                                                                    setIsDeleteDialogOpen(
-                                                                        true,
-                                                                    );
-                                                                }}
-                                                            >
-                                                                <Trash2 className="text-destructive" />
-                                                            </Button>
                                                         </div>
                                                     </TableCell>
                                                 </TableRow>
@@ -704,36 +675,6 @@ export default function ClientsPage() {
                     )}
                 </DialogContent>
             </Dialog>
-
-            {/* Delete Confirmation */}
-            <AlertDialog
-                open={isDeleteDialogOpen}
-                onOpenChange={setIsDeleteDialogOpen}
-            >
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Delete Client</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Are you sure you want to delete{' '}
-                            <strong>{selectedClient?.name}</strong>? This action
-                            cannot be undone.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                            onClick={handleDeleteClient}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                            disabled={isDeleting}
-                        >
-                            {isDeleting && (
-                                <Loader className="h-4 w-4  animate-spin" />
-                            )}
-                            Delete
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
         </div>
     );
 }

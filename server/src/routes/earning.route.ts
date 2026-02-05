@@ -6,7 +6,6 @@ import {
     withdrawEarning,
     toggleEarningStatus,
     getClientOrdersForWithdraw,
-    deleteEarning,
     getEarningYears,
     getClientsWithEarnings,
     updateEarning,
@@ -26,8 +25,5 @@ router.get('/:id', getEarningById);
 router.patch('/:id', updateEarning); // General update
 router.put('/:id/withdraw', withdrawEarning);
 router.put('/:id/toggle-status', toggleEarningStatus);
-
-// Delete route
-router.delete('/:id', deleteEarning);
 
 export { router as earningRoute };

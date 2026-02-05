@@ -253,29 +253,6 @@ async function getClientOrdersForWithdraw(req: Request, res: Response) {
     }
 }
 
-// Delete earning
-async function deleteEarning(req: Request, res: Response) {
-    try {
-        const id = req.params.id;
-        if (!id) {
-            return res.status(400).json({ message: 'Earning ID is required' });
-        }
-
-        const earning = await earningService.deleteEarningFromDB(id);
-
-        if (!earning) {
-            return res.status(404).json({ message: 'Earning not found' });
-        }
-
-        return res.status(200).json({
-            message: 'Earning deleted successfully',
-        });
-    } catch (error) {
-        console.error('Error deleting earning:', error);
-        return res.status(500).json({ message: 'Internal server error' });
-    }
-}
-
 // Get earning years
 async function getEarningYears(_req: Request, res: Response) {
     try {
@@ -362,7 +339,6 @@ export {
     withdrawEarning,
     toggleEarningStatus,
     getClientOrdersForWithdraw,
-    deleteEarning,
     getEarningYears,
     getClientsWithEarnings,
     updateEarning,

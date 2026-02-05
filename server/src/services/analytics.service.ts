@@ -108,6 +108,8 @@ async function getFinanceAnalytics(
         clientOrders,
         // Expense categories
         expensesByCategory,
+        // Earnings by currency result
+        earningsByCurrencyResult,
     ] = await Promise.all([
         // Total earnings
         EarningModel.aggregate([
@@ -143,7 +145,23 @@ async function getFinanceAnalytics(
                     ...(month && { month }),
                 },
             },
-            { $group: { _id: null, total: { $sum: '$totalAmount' } } },
+            { $group: { _id: null, total: { $sum: '$amountInBDT' } } },
+        ]),
+        // Earnings by currency (Paid)
+        EarningModel.aggregate([
+            {
+                $match: {
+                    status: 'paid',
+                    year: year,
+                    ...(month && { month }),
+                },
+            },
+            {
+                $group: {
+                    _id: '$currency',
+                    amount: { $sum: '$totalAmount' },
+                },
+            },
         ]),
         // Unpaid earnings by currency
         EarningModel.aggregate([
@@ -305,6 +323,35 @@ async function getFinanceAnalytics(
         };
     });
 
+    // Process earnings by currency
+    const earningsByCurrency = (earningsByCurrencyResult || []).map(
+        (item: any) => {
+            const currency = item._id || 'USD';
+            const rate = APPROX_RATES[currency] || 117;
+            return {
+                currency,
+                amount: item.amount || 0,
+                amountBDT: Math.round((item.amount || 0) * rate),
+            };
+        },
+    );
+
+    // Calculate approximate Expenses and Profit in USD/EUR
+    // Base totals are in BDT
+    const totalProfit = totalEarnings - totalExpenses;
+
+    const expensesByCurrency = Object.keys(APPROX_RATES).map((currency) => ({
+        currency,
+        amount: totalExpenses / (APPROX_RATES[currency] || 1),
+        amountBDT: totalExpenses,
+    }));
+
+    const profitByCurrency = Object.keys(APPROX_RATES).map((currency) => ({
+        currency,
+        amount: totalProfit / (APPROX_RATES[currency] || 1),
+        amountBDT: totalProfit,
+    }));
+
     // Get total profit transfers (External Business)
     const profitTransferResult = await ProfitTransferModel.aggregate([
         { $match: { transferDate: { $gte: startDate, $lte: endDate } } },
@@ -358,8 +405,11 @@ async function getFinanceAnalytics(
 
     const summary = {
         totalEarnings,
+        earningsByCurrency,
         totalExpenses,
-        totalProfit: totalEarnings - totalExpenses,
+        expensesByCurrency,
+        totalProfit,
+        profitByCurrency,
         totalRevenue: deliveredData.revenue,
         unpaidRevenue,
         unpaidByCurrency,

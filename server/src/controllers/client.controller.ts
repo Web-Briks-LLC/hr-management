@@ -171,33 +171,6 @@ const updateClient = async (req: Request, res: Response) => {
     }
 };
 
-const deleteClient = async (req: Request, res: Response) => {
-    try {
-        const { id } = req.params;
-        if (!id) throw new Error('ID is required');
-
-        const result = await ClientServices.deleteClientFromDB(id);
-        if (!result) {
-            res.status(404).json({
-                success: false,
-                message: 'Client not found',
-            });
-            return;
-        }
-
-        res.status(200).json({
-            success: true,
-            message: 'Client deleted successfully',
-        });
-    } catch (error: unknown) {
-        const err = error as Error;
-        res.status(500).json({
-            success: false,
-            message: err.message || 'Failed to delete client',
-        });
-    }
-};
-
 const checkClientId = async (req: Request, res: Response) => {
     try {
         const { clientId } = req.params;
@@ -260,7 +233,7 @@ export default {
     getClientById,
     createClient,
     updateClient,
-    deleteClient,
+
     checkClientId,
     getClientStats,
 };

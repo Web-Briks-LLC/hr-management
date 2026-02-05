@@ -50,8 +50,23 @@ import {
     Users,
 } from 'lucide-react';
 
-const formatCurrency = (amount: number) => {
-    return `৳${amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const formatCurrency = (amount: number, currency: string = 'BDT') => {
+    try {
+        if (currency === 'BDT') {
+            return `৳${amount.toLocaleString('en-IN', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+            })}`;
+        }
+        return amount.toLocaleString('en-US', {
+            style: 'currency',
+            currency: currency,
+        });
+    } catch (e) {
+        // Fallback for invalid currency codes
+        console.error('Invalid currency code:', currency);
+        return `${currency} ${amount.toFixed(2)}`;
+    }
 };
 
 const COLORS = [
@@ -275,29 +290,9 @@ export default function FinanceAnalyticsPage() {
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold text-orange-600">
-                            $
-                            {summary.unpaidRevenue.toLocaleString('en-US', {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                            })}
+                            {formatCurrency(summary.unpaidRevenue)}
                         </div>
-                        {summary.unpaidByCurrency &&
-                            summary.unpaidByCurrency.length > 0 && (
-                                <div className="mt-1 space-y-0.5">
-                                    {summary.unpaidByCurrency.map((item) => (
-                                        <p
-                                            key={item.currency}
-                                            className="text-xs text-muted-foreground"
-                                        >
-                                            {item.currency}: $
-                                            {item.amount.toFixed(2)} ≈ ৳
-                                            {item.amountBDT.toLocaleString(
-                                                'en-IN',
-                                            )}
-                                        </p>
-                                    ))}
-                                </div>
-                            )}
+
                         <p className="text-xs text-muted-foreground mt-1">
                             Not yet withdrawn
                         </p>

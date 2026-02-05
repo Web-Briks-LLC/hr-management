@@ -23,8 +23,23 @@ export interface IClientFinance {
 export interface IFinanceAnalytics {
     summary: {
         totalEarnings: number;
+        earningsByCurrency: {
+            currency: string;
+            amount: number;
+            amountBDT: number;
+        }[];
         totalExpenses: number;
+        expensesByCurrency: {
+            currency: string;
+            amount: number;
+            amountBDT: number;
+        }[];
         totalProfit: number;
+        profitByCurrency: {
+            currency: string;
+            amount: number;
+            amountBDT: number;
+        }[];
         totalRevenue: number;
         unpaidRevenue: number;
         unpaidByCurrency: {
