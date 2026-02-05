@@ -67,7 +67,7 @@ export default function AssignShift() {
         isLoading: isStaffsLoading,
         isFetching: isStaffsFetching,
     } = useGetStaffsQuery(
-        {},
+        { limit: 100000 },
         { skip: !session || session.user.role === Role.STAFF },
     );
 
