@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import {
     Dialog,
     DialogContent,
+    DialogDescription,
     DialogHeader,
     DialogTitle,
     DialogFooter,
@@ -38,6 +39,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import IStaff from '@/types/staff.type';
 import { IBranch } from '@/types/branch.type';
+import { useSession } from '@/lib/auth-client';
 
 const overtimeSchema = z.object({
     staffId: z.string().min(1, 'Staff ID is required'),
@@ -67,9 +69,13 @@ export function OvertimeDialog({
         useUpdateOvertimeMutation();
 
     // Get Current User info
+    const { data: session } = useSession();
     const { data: meData } = useGetMeQuery({});
     const currentUser = meData?.staff;
-    const userRole = currentUser?.user?.role;
+
+    // Use role from session (auth) or fallback to staff user role
+    const userRole = session?.user?.role || currentUser?.user?.role;
+
     const isBranchAdmin =
         userRole === 'branch_admin' ||
         userRole === 'admin' ||
@@ -198,6 +204,9 @@ export function OvertimeDialog({
                     </DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                    <DialogDescription className="hidden">
+                        Overtime details form
+                    </DialogDescription>
                     {/* Branch Selection for Admins */}
                     {isBranchAdmin && (
                         <div className="grid gap-2">
