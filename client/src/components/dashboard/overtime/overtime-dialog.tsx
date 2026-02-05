@@ -100,7 +100,7 @@ export function OvertimeDialog({
     // Explicitly ask for 0 limit (all) and filter by branch and exclude admins
     const { data: staffsData, isLoading: isStaffsLoading } = useGetStaffsQuery(
         {
-            limit: 0,
+            limit: 1000000000,
             status: 'active',
             branchId: selectedBranchId,
             excludeAdmins: true,
