@@ -1,163 +1,117 @@
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
-import path from 'path';
+import { Types } from 'mongoose';
 
-dotenv.config({ path: path.join(process.cwd(), '.env') });
-const uri = process.env.MONGO_URI;
+dotenv.config();
+const MONGO_URI = process.env.MONGO_URI || '';
 
-/**
- * REBUILD 2025 EARNINGS SCRIPT (MARK AND SWEEP)
- *
- * Strategy:
- * 1. Fetch ALL orders for 2025 from 'orders' collection (Source of Truth).
- * 2. Group orders by ClientID + Month.
- * 3. Track touched/created Earning IDs.
- * 4. Update/Create Earnings based on Orders.
- * 5. DELETE all 2025 Earnings that were NOT touched (Phantom/Legacy check).
- */
+const monthMap: { [key: string]: number } = {
+    january: 1,
+    february: 2,
+    march: 3,
+    april: 4,
+    may: 5,
+    june: 6,
+    july: 7,
+    august: 8,
+    september: 9,
+    october: 10,
+};
 
-async function rebuildEarnings() {
+async function rebuildAll() {
+    console.log(
+        'Starting COMPLETE Rebuild of Migrated Earnings Jan-Oct 2025...',
+    );
     try {
-        await mongoose.connect(uri!);
-        const db = mongoose.connection.db;
-        if (!db) throw new Error('DB not connected');
+        await mongoose.connect(MONGO_URI);
+        const client = mongoose.connection.getClient();
 
-        console.log('Fetching ALL Orders for 2025...');
+        // Target
+        const targetDb = mongoose.connection.db;
+        if (!targetDb) throw new Error('Target DB not found');
+        const targetColl = targetDb.collection('earnings');
 
-        const startDate = new Date('2025-01-01T00:00:00.000Z');
-        const endDate = new Date('2025-12-31T23:59:59.999Z');
+        // 1. DELETE ALL 2025 migrated records (Jan-Oct)
+        // Ideally we only delete 1-10 months, in case Nov/Dec has real data.
+        console.log('Deleting all earnings for Jan-Oct 2025...');
+        const deleteResult = await targetColl.deleteMany({
+            year: 2025,
+            month: { $in: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] },
+        });
+        console.log(`Deleted ${deleteResult.deletedCount} records.`);
 
-        const orders = await db
-            .collection('orders')
+        // 2. Fetch Source
+        const sourceDb = client.db('hrManagement');
+        const sourceColl = sourceDb.collection('earningsList');
+
+        console.log('Fetching legacy records...');
+        const legacyDocs = await sourceColl
             .find({
-                orderDate: { $gte: startDate, $lte: endDate },
+                date: { $regex: /2025/ },
             })
             .toArray();
 
-        console.log(`Found ${orders.length} orders.`);
+        // Case insensitve map
+        const mapLower: { [key: string]: number } = {};
+        for (const [k, v] of Object.entries(monthMap)) {
+            mapLower[k.toLowerCase()] = v;
+        }
 
-        // Group by Client + Month
-        const groups = new Map<string, any>();
+        const toInsert: any[] = [];
 
-        orders.forEach((order) => {
-            const d = new Date(order.orderDate);
-            const month = d.getMonth() + 1; // 1-12
-            const year = d.getFullYear(); // Should be 2025
+        for (const doc of legacyDocs) {
+            const m = (doc.month as string).toLowerCase().trim();
+            const monthNum = mapLower[m]; // Only matches Jan-Oct keys
 
-            if (year !== 2025) return;
-
-            const clientId = order.clientId?.toString();
-            if (!clientId) return;
-
-            const key = `${clientId}-${year}-${month}`;
-
-            if (!groups.has(key)) {
-                groups.set(key, {
-                    clientId,
-                    year,
-                    month,
-                    orders: [],
-                    totalAmount: 0,
-                });
+            if (!monthNum) {
+                // Could be Nov/Dec or invalid
+                // If it is Nov/Dec we skip as per instructions "october porjonto"
+                continue;
             }
 
-            const g = groups.get(key);
-            g.orders.push(order._id);
-            g.totalAmount += order.totalPrice || 0;
-        });
+            // Status handling: copy "Paid"/"Unpaid" -> "paid"/"unpaid"
+            let status = 'paid';
+            if (doc.status) {
+                status = doc.status.toLowerCase();
+            }
 
-        console.log(`Identified ${groups.size} Client-Month Earning Groups.`);
-
-        let updatedCount = 0;
-        let createdCount = 0;
-        const touchedIds: mongoose.Types.ObjectId[] = [];
-
-        for (const group of groups.values()) {
-            const existing = await db.collection('earnings').findOne({
-                clientId: new mongoose.Types.ObjectId(group.clientId),
-                year: group.year,
-                month: group.month,
-            });
-
-            // Round amount
-            const totalAmount = Math.round(group.totalAmount * 100) / 100;
-
-            // Conversion
-            const conversionRate = existing?.conversionRate || 118;
-            const amountInBDT =
-                Math.round(totalAmount * conversionRate * 100) / 100;
-
-            const fees = existing?.fees || 0;
-            const tax = existing?.tax || 0;
-            const netAmount =
-                Math.round((totalAmount - fees - tax) * 100) / 100;
-
-            const updateData = {
-                orderIds: group.orders,
-                totalAmount: totalAmount,
-                netAmount: netAmount,
-                amountInBDT: amountInBDT,
-                conversionRate: conversionRate,
-                imageQty: group.orders.length,
-                isLegacy: false,
-                isFixed: true,
-                status: existing?.status || 'paid',
-                currency: existing?.currency || 'USD',
+            const newDoc = {
+                clientId: new Types.ObjectId(),
+                month: monthNum,
+                year: 2025,
+                orderIds: [],
+                imageQty: doc.imageQty || 0,
+                totalAmount: doc.totalUsd || 0,
+                currency: 'USD',
+                fees: 0,
+                tax: 0,
+                conversionRate: doc.convertRate || 1,
+                netAmount: doc.totalUsd || 0,
+                amountInBDT: doc.convertedBdt || 0,
+                status: status, // Correctly mapped status
+                paidAt: status === 'paid' ? new Date() : undefined, // Check if paid
+                isLegacy: true,
+                legacyClientCode: doc.clientId,
+                notes: `Migrated from legacy (Full Rebuild): ${doc._id}`,
+                createdAt: new Date(),
                 updatedAt: new Date(),
+                createdBy: new Types.ObjectId('000000000000000000000000'),
             };
 
-            if (existing) {
-                await db
-                    .collection('earnings')
-                    .updateOne({ _id: existing._id }, { $set: updateData });
-                touchedIds.push(existing._id);
-                updatedCount++;
-            } else {
-                const res = await db.collection('earnings').insertOne({
-                    clientId: new mongoose.Types.ObjectId(group.clientId),
-                    year: group.year,
-                    month: group.month,
-                    createdAt: new Date(),
-                    ...updateData,
-                });
-                touchedIds.push(res.insertedId);
-                createdCount++;
-            }
+            toInsert.push(newDoc);
         }
 
-        // SWEEP: Delete earnings in 2025 that were NOT touched (Phantom Inflation)
-        const phantomEarnings = await db
-            .collection('earnings')
-            .find({
-                year: 2025,
-                _id: { $nin: touchedIds },
-            })
-            .toArray();
+        console.log(`Prepared ${toInsert.length} documents for insertion.`);
 
-        console.log(
-            `Found ${phantomEarnings.length} Phantom/Legacy Earnings (No Orders). Deleting...`,
-        );
-
-        if (phantomEarnings.length > 0) {
-            const deleteResult = await db.collection('earnings').deleteMany({
-                year: 2025,
-                _id: { $nin: touchedIds },
-            });
-            console.log(
-                `Deleted ${deleteResult.deletedCount} phantom documents.`,
-            );
+        if (toInsert.length > 0) {
+            const result = await targetColl.insertMany(toInsert);
+            console.log(`Inserted ${result.insertedCount} documents.`);
         }
 
-        console.log('------------------------------------------------');
-        console.log(`Rebuild Complete.`);
-        console.log(`Updated Documents: ${updatedCount}`);
-        console.log(`Created Documents: ${createdCount}`);
-        console.log(`Deleted Documents: ${phantomEarnings.length}`);
+        await mongoose.disconnect();
     } catch (e) {
         console.error(e);
-    } finally {
-        await mongoose.disconnect();
     }
 }
 
-rebuildEarnings();
+rebuildAll();

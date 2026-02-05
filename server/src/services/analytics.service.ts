@@ -403,9 +403,62 @@ async function getFinanceAnalytics(
     const totalReturn = debitReturnResult[0]?.total || 0;
     const totalDebit = totalBorrow - totalReturn; // Net amount owed to us (All Time)
 
-    // Final Amount = Earnings - Expenses - Shared + Debit
-    const finalAmount =
-        totalEarnings - totalExpenses - totalShared + totalDebit;
+    // --- CUMULATIVE STATS FOR FINAL AMOUNT ---
+    // We want Final Amount to be: (All Time Earnings up to endDate) - (All Time Expenses up to endDate) - (All Time Shared up to endDate) + All Time Debit
+
+    // Cumulative Filters
+    const cumulativeEarningMatch: any = { status: 'paid' };
+    if (month) {
+        // Up to specific month of year: (year < selectedYear) OR (year == selectedYear AND month <= selectedMonth)
+        cumulativeEarningMatch.$or = [
+            { year: { $lt: year } },
+            { year: year, month: { $lte: month } },
+        ];
+    } else {
+        // Up to end of selected year
+        cumulativeEarningMatch.year = { $lte: year };
+    }
+
+    const cumulativeDateFilter = { $lte: endDate };
+
+    const [
+        cumEarningsResult,
+        cumExpensesResult,
+        cumTransfersResult,
+        cumDistributionsResult,
+    ] = await Promise.all([
+        EarningModel.aggregate([
+            { $match: cumulativeEarningMatch },
+            { $group: { _id: null, total: { $sum: '$amountInBDT' } } },
+        ]),
+        ExpenseModel.aggregate([
+            { $match: { date: cumulativeDateFilter } },
+            { $group: { _id: null, total: { $sum: '$amount' } } },
+        ]),
+        ProfitTransferModel.aggregate([
+            { $match: { transferDate: cumulativeDateFilter } },
+            { $group: { _id: null, total: { $sum: '$amount' } } },
+        ]),
+        import('../models/profit-distribution.model.js').then((m) =>
+            m.default.aggregate([
+                { $match: { distributedAt: cumulativeDateFilter } },
+                { $group: { _id: null, total: { $sum: '$shareAmount' } } },
+            ]),
+        ),
+    ]);
+
+    const cumEarnings = cumEarningsResult[0]?.total || 0;
+    const cumExpenses = cumExpensesResult[0]?.total || 0;
+    const cumShared =
+        (cumTransfersResult[0]?.total || 0) +
+        (cumDistributionsResult[0]?.total || 0);
+
+    // Final Amount = Cumulative Profit + All Time Debit
+    // Logic update: Only add Debit if year >= 2025
+    let finalAmount = cumEarnings - cumExpenses - cumShared;
+    if (year >= 2025) {
+        finalAmount += totalDebit;
+    }
 
     const summary = {
         totalEarnings,
