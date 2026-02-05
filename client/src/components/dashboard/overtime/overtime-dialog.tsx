@@ -193,7 +193,7 @@ export function OvertimeDialog({
     };
 
     // Filter branches if needed or just show all
-    const branches = branchesData?.data || [];
+    const branches = branchesData?.branches || [];
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
