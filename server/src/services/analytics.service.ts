@@ -160,6 +160,7 @@ async function getFinanceAnalytics(
                 $group: {
                     _id: '$currency',
                     amount: { $sum: '$totalAmount' },
+                    totalBDT: { $sum: '$amountInBDT' },
                 },
             },
         ]),
@@ -327,11 +328,17 @@ async function getFinanceAnalytics(
     const earningsByCurrency = (earningsByCurrencyResult || []).map(
         (item: any) => {
             const currency = item._id || 'USD';
+            // Use stored aggregated BDT if available, otherwise fallback to rate calc
+            const storedBDT = item.totalBDT || 0;
             const rate = APPROX_RATES[currency] || 117;
+
             return {
                 currency,
                 amount: item.amount || 0,
-                amountBDT: Math.round((item.amount || 0) * rate),
+                amountBDT:
+                    storedBDT > 0
+                        ? storedBDT
+                        : Math.round((item.amount || 0) * rate),
             };
         },
     );
@@ -375,13 +382,11 @@ async function getFinanceAnalytics(
 
     const totalShared = totalTransferred + totalDistributed;
 
-    // Get debit balance - Filtered?
-    // Debits have dates.
+    // Get ALL TIME debit balance for Final Amount calculation
     const debitBorrowResult = await DebitModel.aggregate([
         {
             $match: {
                 type: DebitType.BORROW,
-                date: { $gte: startDate, $lte: endDate },
             },
         },
         { $group: { _id: null, total: { $sum: '$amount' } } },
@@ -390,14 +395,13 @@ async function getFinanceAnalytics(
         {
             $match: {
                 type: DebitType.RETURN,
-                date: { $gte: startDate, $lte: endDate },
             },
         },
         { $group: { _id: null, total: { $sum: '$amount' } } },
     ]);
     const totalBorrow = debitBorrowResult[0]?.total || 0;
     const totalReturn = debitReturnResult[0]?.total || 0;
-    const totalDebit = totalBorrow - totalReturn; // Net amount owed to us
+    const totalDebit = totalBorrow - totalReturn; // Net amount owed to us (All Time)
 
     // Final Amount = Earnings - Expenses - Shared + Debit
     const finalAmount =
