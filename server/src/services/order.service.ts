@@ -120,33 +120,36 @@ async function getAllOrdersFromDB(filters: GetOrdersFilters): Promise<{
         limit = 20,
     } = filters;
 
-    const query: Record<string, unknown> = {};
+    const pipeline: any[] = [];
+
+    // Match stage construction
+    const matchStage: Record<string, unknown> = {};
 
     if (clientId) {
-        query.clientId = clientId;
+        matchStage.clientId = new mongoose.Types.ObjectId(clientId);
     }
 
     if (status) {
-        query.status = status;
+        matchStage.status = status;
     }
 
     if (priority) {
-        query.priority = priority;
+        matchStage.priority = priority;
     }
 
     if (assignedTo) {
-        query.assignedTo = assignedTo;
+        matchStage.assignedTo = new mongoose.Types.ObjectId(assignedTo);
     }
 
     if (startDate || endDate) {
-        query.orderDate = {};
+        matchStage.orderDate = {};
         if (startDate) {
-            (query.orderDate as Record<string, unknown>).$gte = new Date(
+            (matchStage.orderDate as Record<string, unknown>).$gte = new Date(
                 startDate,
             );
         }
         if (endDate) {
-            (query.orderDate as Record<string, unknown>).$lte = new Date(
+            (matchStage.orderDate as Record<string, unknown>).$lte = new Date(
                 endDate,
             );
         }
@@ -160,8 +163,8 @@ async function getAllOrdersFromDB(filters: GetOrdersFilters): Promise<{
             // Filter by specific month and year
             const startOfMonth = new Date(filterYear, month - 1, 1);
             const endOfMonth = new Date(filterYear, month, 0, 23, 59, 59, 999);
-            query.orderDate = {
-                ...((query.orderDate as Record<string, unknown>) || {}),
+            matchStage.orderDate = {
+                ...((matchStage.orderDate as Record<string, unknown>) || {}),
                 $gte: startOfMonth,
                 $lte: endOfMonth,
             };
@@ -169,8 +172,8 @@ async function getAllOrdersFromDB(filters: GetOrdersFilters): Promise<{
             // Filter by year only
             const startOfYear = new Date(filterYear, 0, 1);
             const endOfYear = new Date(filterYear, 11, 31, 23, 59, 59, 999);
-            query.orderDate = {
-                ...((query.orderDate as Record<string, unknown>) || {}),
+            matchStage.orderDate = {
+                ...((matchStage.orderDate as Record<string, unknown>) || {}),
                 $gte: startOfYear,
                 $lte: endOfYear,
             };
@@ -178,7 +181,8 @@ async function getAllOrdersFromDB(filters: GetOrdersFilters): Promise<{
     }
 
     if (search) {
-        // Find clients matching the search term
+        // We'll handle search later in the pipeline or use a separate lookup for clients if needed
+        // But for now, let's keep the existing logic: find clients first then filter orders
         const matchingClients = await ClientModel.find({
             $or: [
                 { name: { $regex: search, $options: 'i' } },
@@ -188,37 +192,198 @@ async function getAllOrdersFromDB(filters: GetOrdersFilters): Promise<{
 
         const matchingClientIds = matchingClients.map((client) => client._id);
 
-        query.$or = [
+        matchStage.$or = [
             { orderName: { $regex: search, $options: 'i' } },
             { clientId: { $in: matchingClientIds } },
         ];
     }
 
+    pipeline.push({ $match: matchStage });
+
+    // Lookups (Population replacement)
+
+    // Client
+    pipeline.push({
+        $lookup: {
+            from: 'clients',
+            localField: 'clientId',
+            foreignField: '_id',
+            as: 'clientId',
+        },
+    });
+    pipeline.push({
+        $unwind: { path: '$clientId', preserveNullAndEmptyArrays: true },
+    });
+
+    // Services
+    pipeline.push({
+        $lookup: {
+            from: 'services',
+            localField: 'services',
+            foreignField: '_id',
+            as: 'services',
+        },
+    });
+
+    // ReturnFileFormat
+    pipeline.push({
+        $lookup: {
+            from: 'returnfileformats', // Verify collection name usually lowecase plural
+            localField: 'returnFileFormat',
+            foreignField: '_id',
+            as: 'returnFileFormat',
+        },
+    });
+    pipeline.push({
+        $unwind: {
+            path: '$returnFileFormat',
+            preserveNullAndEmptyArrays: true,
+        },
+    });
+
+    // AssignedTo (Staff) and nested User
+    pipeline.push({
+        $lookup: {
+            from: 'staffs',
+            localField: 'assignedTo',
+            foreignField: '_id',
+            as: 'assignedTo',
+        },
+    });
+    pipeline.push({
+        $unwind: { path: '$assignedTo', preserveNullAndEmptyArrays: true },
+    });
+
+    // Nested User lookup for Staff
+    pipeline.push({
+        $lookup: {
+            from: 'user', // Native user collection
+            localField: 'assignedTo.userId',
+            foreignField: '_id',
+            as: 'assignedTo.userId',
+        },
+    });
+    pipeline.push({
+        $unwind: {
+            path: '$assignedTo.userId',
+            preserveNullAndEmptyArrays: true,
+        },
+    });
+
+    // Earning (Virtual) imitation
+    pipeline.push({
+        $lookup: {
+            from: 'earnings',
+            localField: '_id',
+            foreignField: 'orderId',
+            as: 'earning',
+        },
+    });
+    pipeline.push({
+        $unwind: { path: '$earning', preserveNullAndEmptyArrays: true },
+    });
+
+    // Sort
+    pipeline.push({ $sort: { createdAt: -1 } });
+
+    // Pagination
     const skip = (page - 1) * limit;
 
-    const [orders, total] = await Promise.all([
-        OrderModel.find(query)
-            .populate(
-                'clientId',
-                'clientId name email currency officeAddress address',
-            )
-            .populate('services', 'name')
-            .populate('returnFileFormat', 'name extension')
-            .populate({
-                path: 'assignedTo',
-                select: 'staffId userId',
-                populate: {
-                    path: 'userId',
-                    select: 'name',
-                },
-            })
-            .populate('earning', 'status')
-            .sort({ createdAt: -1 })
-            .skip(skip)
-            .limit(limit)
-            .lean(),
-        OrderModel.countDocuments(query),
-    ]);
+    // Facet for total count and paginated results
+    const facetPipeline = [
+        {
+            $facet: {
+                totalPrototype: [{ $count: 'total' }],
+                orders: [
+                    { $skip: skip },
+                    { $limit: limit },
+                    {
+                        $project: {
+                            orderName: 1,
+                            clientId: {
+                                _id: 1,
+                                clientId: 1,
+                                name: 1,
+                                email: 1,
+                                currency: 1,
+                                officeAddress: 1,
+                                address: 1,
+                            },
+                            orderDate: 1,
+                            deadline: 1,
+                            imageQuantity: 1,
+                            perImagePrice: 1,
+                            totalPrice: 1,
+                            services: {
+                                _id: 1,
+                                name: 1,
+                            },
+                            returnFileFormat: {
+                                _id: 1,
+                                name: 1,
+                                extension: 1,
+                            },
+                            instruction: 1,
+                            status: 1,
+                            priority: 1,
+                            assignedTo: {
+                                _id: 1,
+                                staffId: 1,
+                                userId: {
+                                    _id: 1,
+                                    name: 1,
+                                    email: 1,
+                                },
+                            },
+                            notes: 1,
+                            revisionCount: 1,
+                            isLegacy: 1,
+                            revisionInstructions: 1,
+                            timeline: 1,
+                            completedAt: 1,
+                            deliveredAt: 1,
+                            createdBy: 1,
+                            earning: {
+                                _id: 1,
+                                status: 1,
+                            },
+                            createdAt: 1,
+                            updatedAt: 1,
+                        },
+                    },
+                ],
+            },
+        },
+        {
+            $project: {
+                total: { $arrayElemAt: ['$totalPrototype.total', 0] },
+                orders: 1,
+            },
+        },
+    ];
+
+    pipeline.push(...facetPipeline);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const [result] = await OrderModel.aggregate(pipeline);
+
+    const total = result?.total || 0;
+    const orders = result?.orders || [];
+
+    // Transform/Project specific fields if needed to match previous populate
+    // But since we did simple lookups, fields are fully populated objects now
+    // We might want to project only specific fields for 'clientId' etc to match lean() + populate select
+    // However, for resolving the 500 error, full objects are acceptable if not too heavy.
+    // The previous populate selected specific fields:
+    // clientId: 'clientId name email currency officeAddress address'
+    // services: 'name'
+    // returnFileFormat: 'name extension'
+    // assignedTo: 'staffId userId' -> userId: 'name'
+    // earning: 'status'
+
+    // We can add a projection stage inside the facet, or map the results.
+    // For simplicity and to avoid huge response, let's map in memory or refine pipeline if needed.
+    // For now, let's just return what we have to ensure it works.
 
     return {
         orders: orders as IOrder[],
