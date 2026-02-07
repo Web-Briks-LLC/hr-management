@@ -2,6 +2,7 @@ import { AppSidebar } from '@/components/sidebar/app-sidebar';
 import { SiteHeader } from '@/components/sidebar/site-header';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { FloatingNoticePopup } from '@/components/notice/FloatingNoticePopup';
+import { ProfileCompletionDialog } from '@/components/account/profile-completion-dialog';
 
 export default function Layout({ children }: { children: React.ReactNode }) {
     return (
@@ -23,7 +24,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 </div>
             </SidebarInset>
             <FloatingNoticePopup />
+            <ProfileCompletionDialog />
         </SidebarProvider>
     );
 }
-

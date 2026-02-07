@@ -31,28 +31,33 @@ export function ProfileCompletionDialog() {
     );
     const staff = staffData?.staff as IStaff | undefined;
 
+    const [isOpen, setIsOpen] = useState(false);
+
     // Check for missing bank details
-    const isMissingDetails =
-        !isStaffLoading && staff && isBankDetailsMissing(staff);
+    useEffect(() => {
+        if (!isStaffLoading && staff) {
+            if (isBankDetailsMissing(staff)) {
+                setIsOpen(true);
+            }
+        }
+    }, [staff, isStaffLoading]);
 
     const searchParams = useSearchParams();
     const isEditingProfile = searchParams.get('edit-profile') === 'true';
 
-    // Show dialog if details are missing AND we are not editing profile
-    const showDialog = isMissingDetails && !isEditingProfile;
+    // Show dialog if open AND we are not editing profile
+    const showDialog = isOpen && !isEditingProfile;
 
     if (!showDialog) return null;
 
     const handleGoToProfile = () => {
+        setIsOpen(false);
         router.push('/account?edit-profile=true');
     };
 
     return (
-        <Dialog open={true}>
-            <DialogContent
-                className="w-full max-w-lg"
-                onInteractOutside={(e) => e.preventDefault()}
-            >
+        <Dialog open={isOpen} onOpenChange={setIsOpen}>
+            <DialogContent className="w-full max-w-lg">
                 <DialogHeader className="text-center">
                     <div className="flex justify-center mb-4">
                         <div className="p-3 bg-primary/10 rounded-full">
