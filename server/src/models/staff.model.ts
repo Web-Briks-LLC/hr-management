@@ -112,6 +112,21 @@ const StaffSchema = new Schema<IStaff>(
             required: false,
         },
 
+        bankAccountNo: {
+            type: String,
+            required: false,
+        },
+
+        bankAccountName: {
+            type: String,
+            required: false,
+        },
+
+        bankName: {
+            type: String,
+            required: false,
+        },
+
         exitDate: {
             type: Date,
         },

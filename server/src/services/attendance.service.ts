@@ -4,6 +4,7 @@ import ShiftAssignmentModel from '../models/shift-assignment.model.js';
 import AttendanceDayModel from '../models/attendance-day.model.js';
 import type { IShift } from '../types/shift.type.js';
 import StaffModel from '../models/staff.model.js';
+import ShiftOffDateService from './shift-off-date.service.js';
 
 const checkInInDB = async ({
     userId,
@@ -67,6 +68,15 @@ const checkInInDB = async ({
             `[CheckIn] Not a working day. Today: ${todayDay}, WorkDays: ${shift.workDays}`,
         );
         throw new Error('Today is not a working day for your shift.');
+    }
+
+    // Check if today is a shift off date
+    const isOffDay = await ShiftOffDateService.isDateOff(shift._id, now);
+    if (isOffDay) {
+        console.error(
+            `[CheckIn] Today is a shift off date for shift ${shift._id}`,
+        );
+        throw new Error('আজ আপনার shift বন্ধ আছে। Check-in করা সম্ভব নয়।');
     }
 
     const shiftStart = new Date(now);

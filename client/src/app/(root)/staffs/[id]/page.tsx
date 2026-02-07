@@ -402,6 +402,46 @@ export default function StaffDetailsPage() {
                                         </CardContent>
                                     </Card>
                                 )}
+
+                                {/* Bank Account Card */}
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle className="text-lg flex items-center gap-2">
+                                            <Building className="h-5 w-5" />
+                                            Bank Account
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div className="grid grid-cols-1 gap-3 text-sm">
+                                            <div className="flex justify-between">
+                                                <span className="text-muted-foreground">
+                                                    Bank Name
+                                                </span>
+                                                <span className="font-medium">
+                                                    {staff.bankName || 'N/A'}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-muted-foreground">
+                                                    Account No
+                                                </span>
+                                                <span className="font-medium">
+                                                    {staff.bankAccountNo ||
+                                                        'N/A'}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-muted-foreground">
+                                                    Account Holder
+                                                </span>
+                                                <span className="font-medium">
+                                                    {staff.bankAccountName ||
+                                                        'N/A'}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </CardContent>
+                                </Card>
                             </div>
                         </div>
                     </TabsContent>

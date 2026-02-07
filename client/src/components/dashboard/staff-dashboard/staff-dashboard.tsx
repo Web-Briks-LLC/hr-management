@@ -35,7 +35,9 @@ import { useGetMeQuery } from '@/redux/features/staff/staffApi';
 import { Skeleton } from '@/components/ui/skeleton';
 import StaffAttendanceTable from './staff-attendance-table';
 import { SalaryPinDialog } from '@/components/staff/salary-pin-dialog';
+import { ProfileCompletionDialog } from '@/components/account/profile-completion-dialog';
 import { toast } from 'sonner';
+import ShiftOffNotice from '@/components/shifting/shift-off-notice';
 
 // Mock data - replace with real data from your API
 const mockUser = {
@@ -93,6 +95,8 @@ export default function StaffDashboard({ user }: { user: User }) {
 
     return (
         <div className="min-h-screen bg-background space-y-6">
+            <ProfileCompletionDialog />
+            <ShiftOffNotice />
             <StaffHeader />
 
             <StaffTracking />

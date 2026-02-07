@@ -26,6 +26,8 @@ import externalBusinessRoute from './external-business.routes.js';
 import { careerRoute } from './career.route.js';
 import { currencyRateRoute } from './currency-rate.route.js';
 import { payrollRoute } from './payroll.routes.js';
+import shiftOffDateRoute from './shift-off-date.route.js';
+import payrollBankSettingsRoute from './payroll-bank-settings.route.js';
 
 const router: Router = Router();
 
@@ -45,6 +47,14 @@ const moduleRoutes = [
     {
         path: '/shifts',
         route: shiftRoute,
+    },
+    {
+        path: '/shift-off-dates',
+        route: shiftOffDateRoute,
+    },
+    {
+        path: '/payroll-bank-settings',
+        route: payrollBankSettingsRoute,
     },
     {
         path: '/shift-assignments',

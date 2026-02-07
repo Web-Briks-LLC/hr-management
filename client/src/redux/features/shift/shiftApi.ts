@@ -43,6 +43,55 @@ export const shiftApi = apiSlice.injectEndpoints({
             }),
             invalidatesTags: ['Shift'],
         }),
+
+        // Shift Off Dates
+        getShiftOffDates: builder.query({
+            query: (shiftId: string) => ({
+                url: `/shift-off-dates/${shiftId}/off-dates`,
+                method: 'GET',
+            }),
+            providesTags: ['ShiftOffDates'],
+        }),
+
+        getMyShiftOffDates: builder.query({
+            query: () => ({
+                url: '/shift-off-dates/my-off-dates',
+                method: 'GET',
+            }),
+            providesTags: ['ShiftOffDates'],
+        }),
+
+        addShiftOffDates: builder.mutation({
+            query: ({
+                shiftId,
+                dates,
+                reason,
+            }: {
+                shiftId: string;
+                dates: string[];
+                reason?: string;
+            }) => ({
+                url: `/shift-off-dates/${shiftId}/off-dates`,
+                method: 'PUT',
+                body: { dates, reason },
+            }),
+            invalidatesTags: ['ShiftOffDates'],
+        }),
+
+        removeShiftOffDates: builder.mutation({
+            query: ({
+                shiftId,
+                dates,
+            }: {
+                shiftId: string;
+                dates: string[];
+            }) => ({
+                url: `/shift-off-dates/${shiftId}/off-dates`,
+                method: 'DELETE',
+                body: { dates },
+            }),
+            invalidatesTags: ['ShiftOffDates'],
+        }),
     }),
 });
 
@@ -52,4 +101,8 @@ export const {
     useGetAllShiftsQuery,
     useUpdateShiftMutation,
     useDeleteShiftMutation,
+    useGetShiftOffDatesQuery,
+    useGetMyShiftOffDatesQuery,
+    useAddShiftOffDatesMutation,
+    useRemoveShiftOffDatesMutation,
 } = shiftApi;

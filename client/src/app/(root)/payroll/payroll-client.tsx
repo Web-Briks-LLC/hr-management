@@ -37,9 +37,8 @@ import {
     FileText,
 } from 'lucide-react';
 import PayrollTable from '../../../components/payroll/payroll-table';
+import ExportPdfDialog from '../../../components/payroll/export-pdf-dialog';
 import * as XLSX from 'xlsx';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 
 const MONTHS = [
     { value: 1, label: 'January' },
@@ -67,6 +66,7 @@ export default function PayrollPage() {
     const [selectedYear, setSelectedYear] = useState(currentYear);
     const [branchId, setBranchId] = useState<string>('all');
     const [isSelectMode, setIsSelectMode] = useState(false);
+    const [showPdfDialog, setShowPdfDialog] = useState(false);
 
     // Derived Date for API
     const formattedMonth = `${selectedYear}-${selectedMonth.toString().padStart(2, '0')}`;
@@ -115,109 +115,50 @@ export default function PayrollPage() {
     const handleExportExcel = () => {
         if (!payrollData.length) return;
 
-        const dataToExport = payrollData.map((row: any) => ({
-            'Staff ID': row.staffId,
-            Name: row.name,
-            Designation: row.designation,
-            'Work Days': row.workDays,
-            Present: row.present,
-            Absent: row.absent,
-            Late: row.late,
-            'Base Salary': row.salary,
-            'Payable Salary': row.payableSalary,
-            'Paid Amount': row.paidAmount,
-            Status: row.status,
-            Month: formattedMonth,
-        }));
+        // Filter only staff with bank accounts
+        const staffWithBankAccount = payrollData.filter(
+            (row: any) => row.bankAccountNo && row.bankAccountNo.trim() !== '',
+        );
+
+        if (staffWithBankAccount.length === 0) {
+            return;
+        }
+
+        const [year, monthNum] = formattedMonth.split('-');
+        const monthName = format(
+            new Date(parseInt(year), parseInt(monthNum) - 1, 1),
+            'MMMM',
+        );
+
+        const dataToExport = staffWithBankAccount.map(
+            (row: any, index: number) => ({
+                'Sl No': index + 1,
+                Name: row.name || '',
+                Designation: row.designation || '',
+                'Account NO': row.bankAccountNo || '',
+                Amount: row.payableSalary || 0,
+            }),
+        );
 
         const worksheet = XLSX.utils.json_to_sheet(dataToExport);
         const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, 'Payroll');
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Salary');
 
         // Auto-width for columns
-        const max_width = dataToExport.reduce(
-            (w: number, r: any) => Math.max(w, r.Name.length),
-            10,
-        );
         worksheet['!cols'] = [
-            { wch: 10 },
-            { wch: max_width },
-            { wch: 15 },
-            { wch: 10 },
-            { wch: 10 },
-            { wch: 10 },
-            { wch: 10 },
-            { wch: 12 },
-            { wch: 12 },
-            { wch: 12 },
-            { wch: 10 },
-            { wch: 10 },
+            { wch: 8 }, // Sl No
+            { wch: 25 }, // Name
+            { wch: 20 }, // Designation
+            { wch: 25 }, // Account NO
+            { wch: 15 }, // Amount
         ];
 
-        XLSX.writeFile(workbook, `Payroll_${formattedMonth}.xlsx`);
+        XLSX.writeFile(workbook, `${monthName} ${year.slice(-2)} Salary.xlsx`);
     };
 
     const handleExportPDF = () => {
         if (!payrollData.length) return;
-
-        const doc = new jsPDF();
-
-        // Helper for PDF currency formatting (ASCII safe)
-        const formatPDFCurrency = (amount: number) => {
-            return `BDT ${amount.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
-        };
-
-        // Title
-        doc.setFontSize(18);
-        doc.text(`Payroll Report - ${formattedMonth}`, 14, 22);
-
-        doc.setFontSize(10);
-        // Adjusted coordinates to prevent overlap
-        doc.text(`Total Payable: ${formatPDFCurrency(totalSalary)}`, 14, 32);
-        doc.text(`Paid: ${formatPDFCurrency(paidAmount)}`, 85, 32);
-        doc.text(`Pending: ${formatPDFCurrency(pendingAmount)}`, 150, 32);
-
-        const tableColumn = [
-            'Staff ID',
-            'Name',
-            'Desig.',
-            'Days',
-            'Base',
-            'Payable',
-            'Paid',
-            'Status',
-        ];
-        const tableRows = payrollData.map((row: any) => [
-            row.staffId,
-            row.name,
-            row.designation,
-            row.workDays,
-            formatPDFCurrency(row.salary).replace('BDT ', ''), // Show just number for cleaner table
-            formatPDFCurrency(row.payableSalary).replace('BDT ', ''),
-            formatPDFCurrency(row.paidAmount).replace('BDT ', ''),
-            row.status.toUpperCase(),
-        ]);
-
-        autoTable(doc, {
-            startY: 40,
-            head: [tableColumn],
-            body: tableRows,
-            theme: 'grid',
-            headStyles: { fillColor: [41, 128, 185], textColor: 255 },
-            styles: { fontSize: 8, cellPadding: 2 },
-            columnStyles: {
-                0: { cellWidth: 20 }, // Staff ID
-                1: { cellWidth: 30 }, // Name
-                2: { cellWidth: 25 }, // Designation
-                3: { cellWidth: 15, halign: 'center' }, // Days
-                4: { cellWidth: 20, halign: 'right' }, // Base
-                5: { cellWidth: 20, halign: 'right' }, // Payable
-                6: { cellWidth: 20, halign: 'right' }, // Paid
-                7: { cellWidth: 20, halign: 'center' }, // Status
-            },
-        });
-
-        doc.save(`Payroll_${formattedMonth}.pdf`);
+        setShowPdfDialog(true);
     };
 
     return (
@@ -491,6 +432,14 @@ export default function PayrollPage() {
                     </div>
                 </CardContent>
             </Card>
+
+            {/* PDF Export Dialog */}
+            <ExportPdfDialog
+                open={showPdfDialog}
+                onOpenChange={setShowPdfDialog}
+                payrollData={payrollData}
+                month={formattedMonth}
+            />
         </div>
     );
 }

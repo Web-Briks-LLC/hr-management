@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { format, isToday, isFuture, startOfDay } from 'date-fns';
 import {
     Card,
     CardContent,
@@ -24,15 +25,20 @@ import {
     Clock,
     CalendarDays,
     Timer,
+    CalendarOff,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { useUpdateShiftMutation } from '@/redux/features/shift/shiftApi';
+import {
+    useUpdateShiftMutation,
+    useGetShiftOffDatesQuery,
+} from '@/redux/features/shift/shiftApi';
 import UpdateShift from './update-shift';
 import { IShift } from '@/types/shift.type';
 import { useSession } from '@/lib/auth-client';
 import { Role } from '@/constants/role';
 import ShiftDeleteAlert from './shift-delete-alert';
+import ShiftOffDialog from './shift-off-dialog';
 
 interface ShiftCardProps {
     shift: IShift;
@@ -53,7 +59,16 @@ export default function ShiftCard({ shift }: ShiftCardProps) {
     const [openEdit, setOpenEdit] = useState(false);
     const [updateShift, { isLoading: isUpdating }] = useUpdateShiftMutation();
 
+    // Fetch off dates for this shift
+    const { data: offDatesData } = useGetShiftOffDatesQuery(shift._id);
+
     const isLoading = isPending || isRefetching;
+
+    const offDates = offDatesData?.data?.dates || [];
+    const upcomingOffDates = offDates
+        .map((d: string) => new Date(d))
+        .filter((d: Date) => isToday(d) || isFuture(startOfDay(d)))
+        .slice(0, 5); // Show max 5 upcoming off dates
 
     const handleToggleStatus = async (value: boolean) => {
         try {
@@ -152,6 +167,37 @@ export default function ShiftCard({ shift }: ShiftCardProps) {
                         </div>
                     </div>
 
+                    {/* Scheduled Off Days */}
+                    {upcomingOffDates.length > 0 && (
+                        <div className="rounded-md border border-orange-500/30 bg-orange-500/5 p-3 space-y-2">
+                            <div className="flex items-center gap-2 text-xs text-orange-600 dark:text-orange-400">
+                                <CalendarOff className="h-4 w-4" />
+                                Scheduled Off Days
+                            </div>
+                            <div className="flex flex-wrap gap-1">
+                                {upcomingOffDates.map((d: Date) => (
+                                    <Badge
+                                        key={d.toISOString()}
+                                        variant="outline"
+                                        className={`text-xs ${isToday(d) ? 'border-red-500 text-red-500 bg-red-500/10' : 'border-orange-500/50 text-orange-600 dark:text-orange-400'}`}
+                                    >
+                                        {isToday(d)
+                                            ? 'Today'
+                                            : format(d, 'dd MMM')}
+                                    </Badge>
+                                ))}
+                                {offDates.length > 5 && (
+                                    <Badge
+                                        variant="outline"
+                                        className="text-xs"
+                                    >
+                                        +{offDates.length - 5} more
+                                    </Badge>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
                     <div className="grid grid-cols-3 gap-3">
                         <div className="rounded-md border p-3 text-center">
                             <p className="text-xs text-muted-foreground">
@@ -181,27 +227,39 @@ export default function ShiftCard({ shift }: ShiftCardProps) {
                         </div>
                     </div>
 
-                    {/* ✅ OT + STATUS */}
-                    <div className="flex items-center justify-between rounded-md border p-3">
-                        <div className="flex items-center gap-2">
-                            <Timer className="h-4 w-4 text-muted-foreground" />
-                            <span>OT</span>
-                        </div>
+                    <div className="flex items-center justify-beetween gap-2">
+                        {/* Set Off Days Button */}
+                        {session?.user.role !== Role.TEAM_LEADER && (
+                            <div className="flex justify-end">
+                                <ShiftOffDialog
+                                    shiftId={shift._id}
+                                    shiftName={shift.name}
+                                />
+                            </div>
+                        )}
 
-                        <div className="flex items-center gap-2">
-                            <Badge
-                                variant={
-                                    shift.isActive ? 'default' : 'secondary'
-                                }
-                            >
-                                {shift.isActive ? 'Active' : 'Inactive'}
-                            </Badge>
+                        {/* ✅ OT + STATUS */}
+                        <div className="flex items-center justify-between gap-2 rounded-md border p-[9px] w-full">
+                            <div className="flex items-center gap-2">
+                                <Timer className="h-4 w-4 text-muted-foreground" />
+                                <span>OT</span>
+                            </div>
 
-                            <Switch
-                                checked={shift.isActive}
-                                disabled={isUpdating}
-                                onCheckedChange={handleToggleStatus}
-                            />
+                            <div className="flex items-center gap-2">
+                                <Badge
+                                    variant={
+                                        shift.isActive ? 'default' : 'secondary'
+                                    }
+                                >
+                                    {shift.isActive ? 'Active' : 'Inactive'}
+                                </Badge>
+
+                                <Switch
+                                    checked={shift.isActive}
+                                    disabled={isUpdating}
+                                    onCheckedChange={handleToggleStatus}
+                                />
+                            </div>
                         </div>
                     </div>
                 </CardContent>

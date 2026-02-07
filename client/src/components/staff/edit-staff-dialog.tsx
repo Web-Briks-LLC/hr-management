@@ -35,18 +35,21 @@ const formSchema = z.object({
     branchId: z.string().optional(),
     department: z.string().min(1, 'Department is required'),
     designation: z.string().min(1, 'Designation is required'),
-    // shiftId removed from schema as we are not updating it here
     role: z.string().optional(),
     status: z.enum(['active', 'inactive', 'terminated']),
     salary: z.coerce.number().min(0, 'Salary must be positive'),
     salaryVisibleToEmployee: z.boolean().default(true),
+    // Bank Account Fields
+    bankName: z.string().optional(),
+    bankAccountNo: z.string().optional(),
+    bankAccountName: z.string().optional(),
 });
 
 type FormData = z.infer<typeof formSchema>;
 
 interface EditStaffDialogProps {
     staff: IStaff;
-    currentShiftId?: string; // Kept in props if needed later, but unused for now
+    currentShiftId?: string;
 }
 
 export function EditStaffDialog({ staff }: EditStaffDialogProps) {
@@ -65,6 +68,9 @@ export function EditStaffDialog({ staff }: EditStaffDialogProps) {
             status: staff.status || 'active',
             salary: staff.salary || 0,
             salaryVisibleToEmployee: staff.salaryVisibleToEmployee !== false,
+            bankName: staff.bankName || '',
+            bankAccountNo: staff.bankAccountNo || '',
+            bankAccountName: staff.bankAccountName || '',
         },
     });
 
@@ -79,16 +85,17 @@ export function EditStaffDialog({ staff }: EditStaffDialogProps) {
                 salary: staff.salary || 0,
                 salaryVisibleToEmployee:
                     staff.salaryVisibleToEmployee !== false,
+                bankName: staff.bankName || '',
+                bankAccountNo: staff.bankAccountNo || '',
+                bankAccountName: staff.bankAccountName || '',
             });
         }
     }, [open, staff, form]);
 
     async function onSubmit(values: FormData) {
         try {
-            // Only send fields relevant to updateStaff endpoint
             const payload = {
                 ...values,
-                // shiftId is not part of this update
             };
 
             await updateStaff({
@@ -115,7 +122,8 @@ export function EditStaffDialog({ staff }: EditStaffDialogProps) {
                 <DialogHeader>
                     <DialogTitle>Edit Staff Profile</DialogTitle>
                     <DialogDescription>
-                        Update employment details, role, and salary information.
+                        Update employment details, role, salary and bank
+                        information.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -243,7 +251,7 @@ export function EditStaffDialog({ staff }: EditStaffDialogProps) {
                                             <SelectItem
                                                 value={Role.TEAM_LEADER}
                                             >
-                                                Team Leadre
+                                                Team Leader
                                             </SelectItem>
                                             <SelectItem value={Role.HR_MANAGER}>
                                                 HR Manager
@@ -299,6 +307,45 @@ export function EditStaffDialog({ staff }: EditStaffDialogProps) {
                                             />
                                         </div>
                                     )}
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Bank Account Section */}
+                    <div className="border-t pt-4">
+                        <h4 className="text-sm font-medium mb-4">
+                            Bank Account Details
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="bankName">Bank Name</Label>
+                                <Input
+                                    id="bankName"
+                                    placeholder="e.g., Dutch Bangla Bank"
+                                    {...form.register('bankName')}
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="bankAccountNo">
+                                    Account Number
+                                </Label>
+                                <Input
+                                    id="bankAccountNo"
+                                    placeholder="e.g., 1234567890"
+                                    {...form.register('bankAccountNo')}
+                                />
+                            </div>
+
+                            <div className="space-y-2 md:col-span-2">
+                                <Label htmlFor="bankAccountName">
+                                    Account Holder Name
+                                </Label>
+                                <Input
+                                    id="bankAccountName"
+                                    placeholder="Name as per bank account"
+                                    {...form.register('bankAccountName')}
                                 />
                             </div>
                         </div>

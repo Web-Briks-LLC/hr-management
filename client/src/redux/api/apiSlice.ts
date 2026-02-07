@@ -13,6 +13,7 @@ export const apiSlice = createApi({
         'Branch',
         'Attendance',
         'ShiftAssignment',
+        'ShiftOffDates',
         'Overtime',
         'Notification',
         'Invitation',
@@ -38,6 +39,7 @@ export const apiSlice = createApi({
         'JobPosition',
         'JobApplication',
         'Payroll',
+        'PayrollBankSettings',
     ],
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     endpoints: (_builder) => ({}),

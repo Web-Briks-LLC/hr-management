@@ -27,6 +27,10 @@ export default interface IStaff {
     mothersName?: string;
     spouseName?: string;
 
+    bankAccountNo?: string;
+    bankAccountName?: string;
+    bankName?: string;
+
     salary: number;
     salaryVisibleToEmployee: boolean;
     salaryPin?: string;

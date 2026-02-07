@@ -43,7 +43,7 @@ export default function EditProfile() {
         {},
         {
             skip: !session?.user.id,
-        }
+        },
     );
     const [completeProfile] = useCompleteProfileMutation();
     const [updateProfile] = useUpdateProfileMutation();
@@ -65,6 +65,9 @@ export default function EditProfile() {
             fathersName: '',
             mothersName: '',
             spouseName: '',
+            bankName: '',
+            bankAccountNo: '',
+            bankAccountName: '',
             dateOfBirth: undefined,
             joinDate: undefined,
         },
@@ -90,14 +93,26 @@ export default function EditProfile() {
 
         // Handle emergency contact - check if it exists and has values
         if (data.staff.emergencyContact) {
-            form.setValue('emergencyContact.name', data.staff.emergencyContact.name || '');
-            form.setValue('emergencyContact.phone', data.staff.emergencyContact.phone || '');
-            form.setValue('emergencyContact.relation', data.staff.emergencyContact.relation || '');
+            form.setValue(
+                'emergencyContact.name',
+                data.staff.emergencyContact.name || '',
+            );
+            form.setValue(
+                'emergencyContact.phone',
+                data.staff.emergencyContact.phone || '',
+            );
+            form.setValue(
+                'emergencyContact.relation',
+                data.staff.emergencyContact.relation || '',
+            );
         }
 
         form.setValue('fathersName', data.staff.fathersName || '');
         form.setValue('mothersName', data.staff.mothersName || '');
         form.setValue('spouseName', data.staff.spouseName || '');
+        form.setValue('bankName', data.staff.bankName || '');
+        form.setValue('bankAccountNo', data.staff.bankAccountNo || '');
+        form.setValue('bankAccountName', data.staff.bankAccountName || '');
 
         // Convert joinDate string to Date object
         if (data.staff.joinDate) {
@@ -135,9 +150,10 @@ export default function EditProfile() {
 
             const staffPayload = {
                 phone: values.phone,
-                dateOfBirth: values.dateOfBirth instanceof Date
-                    ? values.dateOfBirth.toISOString()
-                    : new Date(values.dateOfBirth).toISOString(),
+                dateOfBirth:
+                    values.dateOfBirth instanceof Date
+                        ? values.dateOfBirth.toISOString()
+                        : new Date(values.dateOfBirth).toISOString(),
                 nationalId: values.nationalId,
                 bloodGroup: values.bloodGroup,
                 address: values.address,
@@ -152,11 +168,15 @@ export default function EditProfile() {
                 mothersName: values.mothersName,
                 spouseName: values.spouseName || undefined,
 
-                joinDate: values.joinDate instanceof Date
-                    ? values.joinDate.toISOString()
-                    : new Date(values.joinDate).toISOString(),
-            };
+                bankName: values.bankName,
+                bankAccountNo: values.bankAccountNo,
+                bankAccountName: values.bankAccountName,
 
+                joinDate:
+                    values.joinDate instanceof Date
+                        ? values.joinDate.toISOString()
+                        : new Date(values.joinDate).toISOString(),
+            };
 
             // Use updateProfile if profile is completed, otherwise completeProfile
             // completeProfile will create a new staff record if needed
@@ -169,23 +189,23 @@ export default function EditProfile() {
                     await completeProfile(staffPayload).unwrap();
                 }
             } catch (apiError: unknown) {
-                const errorMessage = (apiError as { data?: { message?: string } })?.data?.message
-                    || (apiError as Error)?.message
-                    || 'Failed to update profile';
+                const errorMessage =
+                    (apiError as { data?: { message?: string } })?.data
+                        ?.message ||
+                    (apiError as Error)?.message ||
+                    'Failed to update profile';
                 throw new Error(errorMessage);
             }
 
-
-
             if (nameChanged && emailChanged) {
                 toast.success(
-                    'Profile updated. Please verify your new email address.'
+                    'Profile updated. Please verify your new email address.',
                 );
             } else if (nameChanged) {
                 toast.success('Your name has been updated successfully.');
             } else if (emailChanged) {
                 toast.success(
-                    'Email change requested. Please verify the link sent to your new email.'
+                    'Email change requested. Please verify the link sent to your new email.',
                 );
             } else {
                 toast.success('Profile updated successfully.');
@@ -311,12 +331,12 @@ export default function EditProfile() {
 
                                 <Select
                                     value={form.watch(
-                                        'emergencyContact.relation'
+                                        'emergencyContact.relation',
                                     )}
                                     onValueChange={(v) =>
                                         form.setValue(
                                             'emergencyContact.relation',
-                                            v
+                                            v,
                                         )
                                     }
                                 >
@@ -376,6 +396,56 @@ export default function EditProfile() {
                             placeholder="Spouse Name (Optional)"
                             {...form.register('spouseName')}
                         />
+
+                        {/* Bank Account Section */}
+                        <div className="pt-4">
+                            <Label className="text-base font-semibold">
+                                Bank Account Information *
+                            </Label>
+                            <div className="grid grid-cols-3 gap-4 mt-3">
+                                <div className="grid gap-2">
+                                    <Label>Bank Name *</Label>
+                                    <Input
+                                        placeholder="e.g., Dutch Bangla Bank"
+                                        {...form.register('bankName')}
+                                    />
+                                    <p className="text-sm text-destructive">
+                                        {
+                                            form.formState.errors.bankName
+                                                ?.message
+                                        }
+                                    </p>
+                                </div>
+
+                                <div className="grid gap-2">
+                                    <Label>Account Number *</Label>
+                                    <Input
+                                        placeholder="Your account number"
+                                        {...form.register('bankAccountNo')}
+                                    />
+                                    <p className="text-sm text-destructive">
+                                        {
+                                            form.formState.errors.bankAccountNo
+                                                ?.message
+                                        }
+                                    </p>
+                                </div>
+
+                                <div className="grid gap-2">
+                                    <Label>Account Holder Name *</Label>
+                                    <Input
+                                        placeholder="Name on account"
+                                        {...form.register('bankAccountName')}
+                                    />
+                                    <p className="text-sm text-destructive">
+                                        {
+                                            form.formState.errors
+                                                .bankAccountName?.message
+                                        }
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
 
                         <DatePicker
                             label="Join Date *"

@@ -71,6 +71,10 @@ const getPayrollPreview = async ({
                 joinDate: 1,
                 branch: '$branch.name',
                 branchId: 1,
+                // Bank account fields for PDF export
+                bankAccountNo: 1,
+                bankAccountName: 1,
+                bankName: 1,
             },
         },
     ]);
