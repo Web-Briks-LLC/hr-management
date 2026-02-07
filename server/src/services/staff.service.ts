@@ -3,7 +3,7 @@ import StaffModel from '../models/staff.model.js';
 import type IStaff from '../types/staff.type.js';
 import { startOfDay, endOfDay } from 'date-fns';
 
-interface IStaffQueryParams {
+export type IStaffQueryParams = {
     page?: number;
     limit?: number;
     search?: string;
@@ -13,7 +13,7 @@ interface IStaffQueryParams {
     status?: string;
     branchId?: string;
     excludeAdmins?: boolean;
-}
+};
 
 async function getAllStaffsFromDB(query: IStaffQueryParams) {
     const {
@@ -277,8 +277,181 @@ async function getAllStaffsFromDB(query: IStaffQueryParams) {
     };
 }
 
+async function getStaffByIdFromDB(id: string) {
+    const pipeline: any[] = [
+        { $match: { _id: new Types.ObjectId(id) } },
+        // Lookup User
+        {
+            $lookup: {
+                from: 'user',
+                let: { userId: '$userId' },
+                pipeline: [
+                    {
+                        $match: {
+                            $expr: {
+                                $eq: ['$_id', { $toObjectId: '$$userId' }],
+                            },
+                        },
+                    },
+                    {
+                        $project: {
+                            _id: 1,
+                            name: 1,
+                            email: 1,
+                            image: 1,
+                            role: 1,
+                        },
+                    },
+                ],
+                as: 'user',
+            },
+        },
+        { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+
+        // Lookup Branch
+        {
+            $lookup: {
+                from: 'branches',
+                localField: 'branchId',
+                foreignField: '_id',
+                as: 'branch',
+            },
+        },
+        { $unwind: { path: '$branch', preserveNullAndEmptyArrays: true } },
+
+        // Lookup Current Shift (Optimized: Only active and current date)
+        {
+            $lookup: {
+                from: 'shiftassignments',
+                let: { staffId: '$_id' },
+                pipeline: [
+                    {
+                        $match: {
+                            $expr: {
+                                $and: [
+                                    { $eq: ['$staffId', '$$staffId'] },
+                                    { $lte: ['$startDate', new Date()] },
+                                    {
+                                        $or: [
+                                            { $eq: ['$endDate', null] },
+                                            { $gte: ['$endDate', new Date()] },
+                                        ],
+                                    },
+                                    { $eq: ['$isActive', true] },
+                                ],
+                            },
+                        },
+                    },
+                    {
+                        $lookup: {
+                            from: 'shifts',
+                            localField: 'shiftId',
+                            foreignField: '_id',
+                            as: 'shift',
+                        },
+                    },
+                    {
+                        $unwind: {
+                            path: '$shift',
+                            preserveNullAndEmptyArrays: true,
+                        },
+                    },
+                    {
+                        $project: {
+                            _id: '$shift._id',
+                            name: '$shift.name',
+                            startTime: '$shift.startTime',
+                            endTime: '$shift.endTime',
+                            workDays: '$shift.workDays',
+                        },
+                    },
+                ],
+                as: 'shiftAssignment',
+            },
+        },
+        {
+            $unwind: {
+                path: '$shiftAssignment',
+                preserveNullAndEmptyArrays: true,
+            },
+        },
+        { $addFields: { currentShift: '$shiftAssignment' } },
+        { $project: { shiftAssignment: 0 } },
+    ];
+
+    const result = await StaffModel.aggregate(pipeline);
+    return result[0];
+}
+
 async function getStaffFromDB(userId: string) {
-    return StaffModel.findOne({ userId }).lean();
+    const pipeline: any[] = [
+        {
+            $lookup: {
+                from: 'user',
+                let: { userId: '$userId' },
+                pipeline: [
+                    {
+                        $match: {
+                            $expr: {
+                                $eq: ['$_id', { $toObjectId: '$$userId' }],
+                            },
+                        },
+                    },
+                    {
+                        $project: {
+                            _id: 1,
+                            name: 1,
+                            email: 1,
+                            image: 1,
+                            role: 1,
+                        },
+                    },
+                ],
+                as: 'user',
+            },
+        },
+        { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+        {
+            $match: {
+                'user._id': new Types.ObjectId(userId),
+            },
+        },
+        {
+            $lookup: {
+                from: 'branches',
+                localField: 'branchId',
+                foreignField: '_id',
+                as: 'branch',
+            },
+        },
+        { $unwind: { path: '$branch', preserveNullAndEmptyArrays: true } },
+        {
+            $addFields: {
+                isSalaryPinSet: {
+                    $cond: {
+                        if: {
+                            $and: [
+                                { $ifNull: ['$salaryPin', false] },
+                                { $ne: ['$salaryPin', ''] },
+                            ],
+                        },
+                        then: true,
+                        else: false,
+                    },
+                },
+            },
+        },
+        {
+            $project: {
+                salaryPin: 0,
+                salaryPinResetToken: 0,
+                salaryPinResetExpires: 0,
+            },
+        },
+    ];
+
+    const result = await StaffModel.aggregate(pipeline);
+    return result[0];
 }
 
 async function createStaffInDB(payload: { staff: Partial<IStaff> }) {
@@ -497,8 +670,225 @@ async function getSalaryHistory(staffId: string) {
         .limit(50);
 }
 
+async function updateStaffInDB(payload: {
+    staffId: string;
+    staffData: Partial<IStaff>;
+    role?: string;
+    changedBy?: string;
+}) {
+    const { staffId, staffData, role, changedBy } = payload;
+
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+        const staff = await StaffModel.findOne({ staffId }).session(session);
+
+        if (!staff) {
+            throw new Error('Staff not found');
+        }
+
+        // If salary is being changed, we should probably log it (reusing logic or simplified)
+        if (
+            staffData.salary !== undefined &&
+            staffData.salary !== staff.salary &&
+            changedBy
+        ) {
+            const SalaryHistoryModel = (
+                await import('../models/salary-history.model.js')
+            ).default;
+            await (SalaryHistoryModel.create as any)(
+                [
+                    {
+                        staffId: staff._id,
+                        previousSalary: staff.salary,
+                        newSalary: staffData.salary,
+                        changedBy,
+                        reason: 'Administrative Update',
+                    },
+                ],
+                { session },
+            );
+        }
+
+        // Update Staff
+        const updatedStaff = await StaffModel.findOneAndUpdate(
+            { staffId },
+            { $set: staffData },
+            { new: true, session },
+        );
+
+        // Update User Role if provided
+        if (role && staff.userId) {
+            const UserModel = (await import('../models/user.model.js')).default;
+            await UserModel.updateOne(
+                { _id: staff.userId },
+                { $set: { role } },
+                { session },
+            );
+        }
+
+        await session.commitTransaction();
+        return updatedStaff;
+    } catch (err) {
+        await session.abortTransaction();
+        throw err;
+    } finally {
+        session.endSession();
+    }
+}
+
+async function setSalaryPin(staffId: string, pin: string, _changedBy: string) {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+        const staff = await StaffModel.findOne({ staffId }).session(session);
+
+        if (!staff) {
+            throw new Error('Staff not found');
+        }
+
+        const bcrypt = (await import('bcrypt')).default;
+        const hashedPin = await bcrypt.hash(
+            pin,
+            Number(process.env.BCRYPT_SALT_ROUNDS) || 10,
+        );
+
+        await StaffModel.updateOne(
+            { staffId },
+            { $set: { salaryPin: hashedPin } },
+            { session },
+        );
+
+        // Can log this action if needed
+        // await AuditLog.create(...)
+
+        await session.commitTransaction();
+        return { success: true, message: 'Salary PIN set successfully' };
+    } catch (err) {
+        await session.abortTransaction();
+        throw err;
+    } finally {
+        session.endSession();
+    }
+}
+
+async function verifySalaryPin(staffId: string, pin: string) {
+    const staff = await StaffModel.findOne({ staffId }).select('+salaryPin');
+
+    if (!staff) {
+        throw new Error('Staff not found');
+    }
+
+    if (!staff.salaryPin) {
+        throw new Error('Salary PIN not set');
+    }
+
+    const bcrypt = (await import('bcrypt')).default;
+    const isMatch = await bcrypt.compare(pin, staff.salaryPin);
+
+    if (!isMatch) {
+        throw new Error('Invalid PIN');
+    }
+
+    return { success: true, message: 'PIN verified successfully' };
+}
+
+async function forgotSalaryPin(staffId: string) {
+    const staff = await StaffModel.findOne({ staffId }).populate('userId');
+
+    if (!staff) {
+        throw new Error('Staff not found');
+    }
+
+    // @ts-ignore
+    const user = staff.userId;
+    // @ts-ignore
+    if (!user || !user.email) {
+        throw new Error('No email found for this staff member');
+    }
+
+    // Generate token
+    const crypto = await import('crypto');
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetTokenHash = crypto
+        .createHash('sha256')
+        .update(resetToken)
+        .digest('hex');
+
+    const resetExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    await StaffModel.updateOne(
+        { staffId },
+        {
+            $set: {
+                salaryPinResetToken: resetTokenHash,
+                salaryPinResetExpires: resetExpires,
+            },
+        },
+    );
+
+    // Send Email
+    const EmailService = (await import('./email.service.js')).default;
+    const resetUrl = `${process.env.CLIENT_URL}/staffs/reset-pin?token=${resetToken}`;
+
+    try {
+        // @ts-ignore
+        await EmailService.sendPinResetEmail({
+            // @ts-ignore
+            to: user.email,
+            // @ts-ignore
+            staffName: user.name || 'Staff Member',
+            resetUrl,
+        });
+    } catch (error) {
+        console.error('Failed to send reset email:', error);
+        throw new Error('Failed to send reset email');
+    }
+
+    return { success: true, message: 'Reset link sent to your email' };
+}
+
+async function resetSalaryPin(token: string, newPin: string) {
+    const crypto = await import('crypto');
+    const resetTokenHash = crypto
+        .createHash('sha256')
+        .update(token)
+        .digest('hex');
+
+    const staff = await StaffModel.findOne({
+        salaryPinResetToken: resetTokenHash,
+        salaryPinResetExpires: { $gt: new Date() },
+    });
+
+    if (!staff) {
+        throw new Error('Invalid or expired reset token');
+    }
+
+    const bcrypt = (await import('bcrypt')).default;
+    const hashedPin = await bcrypt.hash(
+        newPin,
+        Number(process.env.BCRYPT_SALT_ROUNDS) || 10,
+    );
+
+    await StaffModel.updateOne(
+        { _id: staff._id },
+        {
+            $set: {
+                salaryPin: hashedPin,
+                salaryPinResetToken: undefined,
+                salaryPinResetExpires: undefined,
+            },
+        },
+    );
+
+    return { success: true, message: 'PIN reset successfully' };
+}
+
 export default {
     getAllStaffsFromDB,
+    getStaffByIdFromDB,
     getStaffFromDB,
     createStaffInDB,
     completeProfileInDB,
@@ -506,4 +896,9 @@ export default {
     viewSalaryWithPassword,
     updateSalaryInDB,
     getSalaryHistory,
+    updateStaffInDB,
+    setSalaryPin,
+    verifySalaryPin,
+    forgotSalaryPin,
+    resetSalaryPin,
 };

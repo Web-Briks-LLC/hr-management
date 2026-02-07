@@ -29,6 +29,9 @@ export default interface IStaff {
 
     salary: number;
     salaryVisibleToEmployee: boolean;
+    salaryPin?: string;
+    salaryPinResetToken?: string;
+    salaryPinResetExpires?: Date;
 
     profileCompleted: boolean;
 

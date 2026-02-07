@@ -13,6 +13,7 @@
         "import-orders": "tsx src/scripts/import-orders.ts"
     },
     "devDependencies": {
+        "@types/bcrypt": "^6.0.0",
         "@types/cors": "^2.8.19",
         "@types/express": "^5.0.6",
         "@types/multer": "^2.0.0",
@@ -28,6 +29,7 @@
     "dependencies": {
         "@react-email/components": "^1.0.6",
         "@react-email/render": "^2.0.4",
+        "bcrypt": "^6.0.0",
         "better-auth": "^1.4.5",
         "cloudinary": "^2.8.0",
         "cors": "^2.8.5",

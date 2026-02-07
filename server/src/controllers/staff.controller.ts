@@ -35,6 +35,30 @@ const getStaffs = async (req: Request, res: Response) => {
     }
 };
 
+async function getStaffById(req: Request, res: Response) {
+    try {
+        const { id } = req.params;
+        if (!id) {
+            return res
+                .status(400)
+                .json({ success: false, message: 'ID is required' });
+        }
+        const staff = await StaffServices.getStaffByIdFromDB(id);
+
+        if (!staff) {
+            return res
+                .status(404)
+                .json({ success: false, message: 'Staff not found' });
+        }
+
+        return res.json({ success: true, staff });
+    } catch (err) {
+        return res
+            .status(500)
+            .json({ success: false, message: (err as Error).message });
+    }
+}
+
 async function getStaff(req: Request, res: Response) {
     try {
         const userId = req.user?.id;
@@ -235,8 +259,138 @@ async function exportStaffs(_req: Request, res: Response) {
     }
 }
 
+async function updateStaff(req: Request, res: Response) {
+    try {
+        const { staffId } = req.params;
+        if (!staffId) {
+            return res
+                .status(400)
+                .json({ success: false, message: 'Staff ID is required' });
+        }
+        const { role, salary, salaryVisibleToEmployee, ...staffData } =
+            req.body;
+        const changedBy = req.user?.id;
+
+        const result = await StaffServices.updateStaffInDB({
+            staffId,
+            staffData: {
+                ...staffData,
+                ...(salary !== undefined && { salary }),
+                ...(salaryVisibleToEmployee !== undefined && {
+                    salaryVisibleToEmployee,
+                }),
+            },
+            role,
+            changedBy: changedBy || 'system',
+        });
+
+        return res.status(200).json({ success: true, staff: result });
+    } catch (err) {
+        return res
+            .status(400)
+            .json({ success: false, message: (err as Error).message });
+    }
+}
+
+async function setSalaryPin(req: Request, res: Response) {
+    try {
+        const { staffId } = req.params;
+        if (!staffId) {
+            return res
+                .status(400)
+                .json({ success: false, message: 'Staff ID is required' });
+        }
+        const { pin } = req.body;
+        const changedBy = req.user?.id;
+
+        if (!pin || pin.length < 4) {
+            throw new Error('PIN must be at least 4 digits');
+        }
+
+        const result = await StaffServices.setSalaryPin(
+            staffId,
+            pin,
+            changedBy || 'system',
+        );
+
+        return res.status(200).json(result);
+    } catch (err) {
+        return res
+            .status(400)
+            .json({ success: false, message: (err as Error).message });
+    }
+}
+
+async function verifySalaryPin(req: Request, res: Response) {
+    try {
+        const { staffId } = req.params;
+        if (!staffId) {
+            return res
+                .status(400)
+                .json({ success: false, message: 'Staff ID is required' });
+        }
+        const { pin } = req.body;
+
+        const result = await StaffServices.verifySalaryPin(staffId, pin);
+        return res.status(200).json(result);
+    } catch (err) {
+        return res
+            .status(401)
+            .json({ success: false, message: (err as Error).message });
+    }
+}
+
+async function forgotSalaryPin(req: Request, res: Response) {
+    try {
+        const { staffId } = req.body; // Can be from body or params, let's say body for now or params?
+        // Route plan: POST /api/staffs/pin/forgot
+        // If from dashboard, maybe we pass staffId.
+
+        if (!staffId) {
+            return res
+                .status(400)
+                .json({ success: false, message: 'Staff ID is required' });
+        }
+
+        const result = await StaffServices.forgotSalaryPin(staffId);
+        return res.status(200).json(result);
+    } catch (err) {
+        return res
+            .status(400)
+            .json({ success: false, message: (err as Error).message });
+    }
+}
+
+async function resetSalaryPin(req: Request, res: Response) {
+    try {
+        const { token, pin } = req.body;
+
+        if (!token || !pin) {
+            return res.status(400).json({
+                success: false,
+                message: 'Token and new PIN are required',
+            });
+        }
+
+        if (pin.length < 4) {
+            return res.status(400).json({
+                success: false,
+                message: 'PIN must be at least 4 digits',
+            });
+        }
+
+        const result = await StaffServices.resetSalaryPin(token, pin);
+        return res.status(200).json(result);
+    } catch (err) {
+        return res
+            .status(400)
+            .json({ success: false, message: (err as Error).message });
+    }
+}
+
 export default {
     getStaffs,
+    getStaffById,
     getStaff,
     createStaff,
     completeProfile,
@@ -244,4 +398,9 @@ export default {
     viewSalary,
     updateSalary,
     exportStaffs,
+    updateStaff,
+    setSalaryPin,
+    verifySalaryPin,
+    forgotSalaryPin,
+    resetSalaryPin,
 };

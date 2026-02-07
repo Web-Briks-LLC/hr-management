@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { useGetStaffsQuery } from '@/redux/features/staff/staffApi';
 import { useGetAllShiftsQuery } from '@/redux/features/shift/shiftApi';
 import { useGetMetadataByTypeQuery } from '@/redux/features/metadata/metadataApi';
@@ -35,13 +36,7 @@ import {
     Filter,
     X,
 } from 'lucide-react';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
+
 import {
     Select,
     SelectContent,
@@ -123,9 +118,7 @@ export default function StaffsPage() {
     const [designationFilter, setDesignationFilter] = useState('');
     const [shiftFilter, setShiftFilter] = useState<string>('all');
     const [statusFilter, setStatusFilter] = useState<string>('all');
-
-    const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
-    const [isDetailOpen, setIsDetailOpen] = useState(false);
+    const router = useRouter();
 
     const queryParams: any = {
         page,
@@ -148,8 +141,7 @@ export default function StaffsPage() {
     const shifts = shiftsData?.shifts || [];
 
     const handleViewDetails = (staff: Staff) => {
-        setSelectedStaff(staff);
-        setIsDetailOpen(true);
+        router.push(`/staffs/${staff._id}`);
     };
 
     const getStatusBadge = (status?: string) => {
@@ -537,207 +529,6 @@ export default function StaffsPage() {
                     )}
                 </CardContent>
             </Card>
-
-            {/* Staff Details Dialog - Keeping existing structure but using selectedStaff */}
-            <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
-                <DialogContent className="max-w-2xl">
-                    <DialogHeader>
-                        <DialogTitle>Staff Details</DialogTitle>
-                        <DialogDescription>
-                            Complete information about the staff member
-                        </DialogDescription>
-                    </DialogHeader>
-                    {selectedStaff && (
-                        <div className="space-y-6">
-                            {/* Profile Section */}
-                            <div className="flex items-center gap-4">
-                                <Avatar className="h-20 w-20">
-                                    <AvatarImage
-                                        src={selectedStaff.user?.image || ''}
-                                    />
-                                    <AvatarFallback>
-                                        <User className="h-8 w-8" />
-                                    </AvatarFallback>
-                                </Avatar>
-                                <div>
-                                    <h3 className="text-xl font-semibold">
-                                        {selectedStaff.user?.name || 'N/A'}
-                                    </h3>
-                                    <p className="text-muted-foreground">
-                                        {selectedStaff.user?.email}
-                                    </p>
-                                    <Badge variant="outline" className="mt-1">
-                                        {selectedStaff.user?.role}
-                                    </Badge>
-                                </div>
-                            </div>
-
-                            {/* Info Grid */}
-                            <div className="grid grid-cols-2 gap-4 text-sm">
-                                <div>
-                                    <p className="text-muted-foreground">
-                                        Staff ID
-                                    </p>
-                                    <p className="font-medium">
-                                        {selectedStaff.staffId}
-                                    </p>
-                                </div>
-                                <div>
-                                    <p className="text-muted-foreground">
-                                        Phone
-                                    </p>
-                                    <p className="font-medium">
-                                        {selectedStaff.phone || 'N/A'}
-                                    </p>
-                                </div>
-                                <div>
-                                    <p className="text-muted-foreground">
-                                        Department
-                                    </p>
-                                    <p className="font-medium">
-                                        {selectedStaff.department || 'N/A'}
-                                    </p>
-                                </div>
-                                <div>
-                                    <p className="text-muted-foreground">
-                                        Designation
-                                    </p>
-                                    <p className="font-medium">
-                                        {selectedStaff.designation || 'N/A'}
-                                    </p>
-                                </div>
-                                <div>
-                                    <p className="text-muted-foreground">
-                                        Branch
-                                    </p>
-                                    <p className="font-medium">
-                                        {selectedStaff.branch?.name || 'N/A'}
-                                    </p>
-                                </div>
-                                <div>
-                                    <p className="text-muted-foreground">
-                                        Join Date
-                                    </p>
-                                    <p className="font-medium">
-                                        {selectedStaff.joinDate
-                                            ? format(
-                                                  new Date(
-                                                      selectedStaff.joinDate,
-                                                  ),
-                                                  'PPP',
-                                              )
-                                            : 'N/A'}
-                                    </p>
-                                </div>
-                                <div>
-                                    <p className="text-muted-foreground">
-                                        Status
-                                    </p>
-                                    <Badge
-                                        variant={
-                                            selectedStaff.status === 'active'
-                                                ? 'default'
-                                                : 'destructive'
-                                        }
-                                    >
-                                        {selectedStaff.status}
-                                    </Badge>
-                                </div>
-                                <div>
-                                    <p className="text-muted-foreground">
-                                        Profile Completed
-                                    </p>
-                                    <Badge variant="outline">
-                                        {selectedStaff.profileCompleted
-                                            ? 'Yes'
-                                            : 'No'}
-                                    </Badge>
-                                </div>
-                            </div>
-
-                            {/* Today's Attendance */}
-                            <div className="border-t pt-4">
-                                <h4 className="font-semibold mb-3">
-                                    Today&apos;s Attendance
-                                </h4>
-                                <div className="grid grid-cols-2 gap-4 text-sm">
-                                    <div>
-                                        <p className="text-muted-foreground">
-                                            Status
-                                        </p>
-                                        {getStatusBadge(
-                                            selectedStaff.todayAttendance
-                                                ?.status,
-                                        )}
-                                    </div>
-                                    <div>
-                                        <p className="text-muted-foreground">
-                                            Current Shift
-                                        </p>
-                                        <p className="font-medium">
-                                            {selectedStaff.currentShift
-                                                ? `${selectedStaff.currentShift.name} (${selectedStaff.currentShift.startTime} - ${selectedStaff.currentShift.endTime})`
-                                                : 'No Shift Assigned'}
-                                        </p>
-                                    </div>
-                                    {selectedStaff.todayAttendance
-                                        ?.checkInAt && (
-                                        <div>
-                                            <p className="text-muted-foreground">
-                                                Check In
-                                            </p>
-                                            <p className="font-medium">
-                                                {format(
-                                                    new Date(
-                                                        selectedStaff
-                                                            .todayAttendance
-                                                            .checkInAt,
-                                                    ),
-                                                    'hh:mm aa',
-                                                )}
-                                            </p>
-                                        </div>
-                                    )}
-                                    {selectedStaff.todayAttendance
-                                        ?.checkOutAt && (
-                                        <div>
-                                            <p className="text-muted-foreground">
-                                                Check Out
-                                            </p>
-                                            <p className="font-medium">
-                                                {format(
-                                                    new Date(
-                                                        selectedStaff
-                                                            .todayAttendance
-                                                            .checkOutAt,
-                                                    ),
-                                                    'hh:mm aa',
-                                                )}
-                                            </p>
-                                        </div>
-                                    )}
-                                    {(selectedStaff.todayAttendance
-                                        ?.lateMinutes ?? 0) > 0 && (
-                                        <div>
-                                            <p className="text-muted-foreground">
-                                                Late By
-                                            </p>
-                                            <p className="font-medium text-yellow-600">
-                                                {
-                                                    selectedStaff
-                                                        .todayAttendance
-                                                        ?.lateMinutes
-                                                }{' '}
-                                                minutes
-                                            </p>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </DialogContent>
-            </Dialog>
         </div>
     );
 }

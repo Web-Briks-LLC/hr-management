@@ -59,6 +59,38 @@ const sendInvoiceEmail = async (data: SendInvoiceData) => {
     }
 };
 
+interface SendPinResetData {
+    to: string;
+    staffName: string;
+    resetUrl: string;
+}
+
+const sendPinResetEmail = async (data: SendPinResetData) => {
+    try {
+        const { PinResetEmail } = await import('../templates/PinResetEmail.js');
+        const emailHtml = await render(
+            React.createElement(PinResetEmail, {
+                staffName: data.staffName,
+                resetUrl: data.resetUrl,
+            }),
+        );
+
+        const mailOptions = {
+            from: `"Web Briks" <${process.env.SMTP_USER}>`,
+            to: data.to,
+            subject: 'Reset your Salary PIN - Web Briks',
+            html: emailHtml,
+        };
+
+        const info = await transporter.sendMail(mailOptions);
+        return info;
+    } catch (error) {
+        console.error('Error sending PIN reset email:', error);
+        throw error;
+    }
+};
+
 export default {
     sendInvoiceEmail,
+    sendPinResetEmail,
 };

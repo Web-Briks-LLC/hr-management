@@ -134,10 +134,26 @@ const StaffSchema = new Schema<IStaff>(
             default: false,
             index: true,
         },
+
+        salaryPin: {
+            type: String,
+            required: false,
+            select: false, // Do not return by default
+        },
+
+        salaryPinResetToken: {
+            type: String,
+            select: false,
+        },
+
+        salaryPinResetExpires: {
+            type: Date,
+            select: false,
+        },
     },
     {
         timestamps: true,
-    }
+    },
 );
 
 const StaffModel = model<IStaff>('Staff', StaffSchema);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
     Card,
     CardContent,
@@ -31,8 +31,11 @@ import StaffHeader from './staff-header';
 import StaffTracking from './staff-tracking';
 
 import { useGetMonthlyStatsQuery } from '@/redux/features/attendance/attendanceApi';
+import { useGetMeQuery } from '@/redux/features/staff/staffApi';
 import { Skeleton } from '@/components/ui/skeleton';
 import StaffAttendanceTable from './staff-attendance-table';
+import { SalaryPinDialog } from '@/components/staff/salary-pin-dialog';
+import { toast } from 'sonner';
 
 // Mock data - replace with real data from your API
 const mockUser = {
@@ -48,16 +51,6 @@ const mockUser = {
     employeeId: 'EMP001',
 };
 
-// Removed mockAttendance.thisMonth usage
-
-const mockSalary = {
-    monthly: '••••',
-    pfStatus: 'de-active',
-    pfPercentage: 5,
-    totalPfBalance: 0,
-    isUnlocked: false,
-};
-
 const formatDuration = (minutes: number) => {
     const h = Math.floor(minutes / 60);
     const m = minutes % 60;
@@ -66,6 +59,37 @@ const formatDuration = (minutes: number) => {
 
 export default function StaffDashboard({ user }: { user: User }) {
     const { data: monthlyStats, isLoading } = useGetMonthlyStatsQuery({});
+    const { data: meData, isLoading: isStaffLoading } = useGetMeQuery({});
+    const staff = meData?.staff;
+
+    const [isSalaryUnlocked, setIsSalaryUnlocked] = useState(false);
+    const [showPinDialog, setShowPinDialog] = useState(false);
+    const [autoLockTimer, setAutoLockTimer] = useState<NodeJS.Timeout | null>(
+        null,
+    );
+
+    // Auto-lock after 1 minute
+    useEffect(() => {
+        if (isSalaryUnlocked) {
+            const timer = setTimeout(() => {
+                setIsSalaryUnlocked(false);
+                toast.info('Salary view auto-locked');
+            }, 60000);
+            setAutoLockTimer(timer);
+
+            return () => clearTimeout(timer);
+        }
+    }, [isSalaryUnlocked]);
+
+    const handleUnlockSuccess = () => {
+        setIsSalaryUnlocked(true);
+        setShowPinDialog(false);
+    };
+
+    const handleLock = () => {
+        setIsSalaryUnlocked(false);
+        if (autoLockTimer) clearTimeout(autoLockTimer);
+    };
 
     return (
         <div className="min-h-screen bg-background space-y-6">
@@ -144,8 +168,19 @@ export default function StaffDashboard({ user }: { user: User }) {
 
                 {/* Salary & PF */}
                 <Card>
-                    <CardHeader>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle>Salary & PF</CardTitle>
+                        {isSalaryUnlocked && (
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={handleLock}
+                                className="h-8 w-8 p-0"
+                            >
+                                <LogOut className="h-4 w-4" />
+                                <span className="sr-only">Lock</span>
+                            </Button>
+                        )}
                     </CardHeader>
                     <CardContent>
                         <div className="grid grid-cols-2 gap-4">
@@ -155,16 +190,30 @@ export default function StaffDashboard({ user }: { user: User }) {
                                         Monthly Salary
                                     </div>
                                     <div className="text-3xl font-bold mb-2">
-                                        {mockSalary.monthly}
+                                        {isSalaryUnlocked ? (
+                                            `৳ ${staff?.salary?.toLocaleString() || 0}`
+                                        ) : (
+                                            <span className="text-muted-foreground tracking-widest">
+                                                ••••
+                                            </span>
+                                        )}
                                     </div>
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        className="w-full"
-                                    >
-                                        <AlertCircle className=" h-4 w-4" />
-                                        Unlock
-                                    </Button>
+                                    {!isSalaryUnlocked && (
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="w-full"
+                                            onClick={() =>
+                                                setShowPinDialog(true)
+                                            }
+                                            disabled={isStaffLoading}
+                                        >
+                                            <AlertCircle className="mr-2 h-4 w-4" />
+                                            {staff?.isSalaryPinSet
+                                                ? 'Unlock'
+                                                : 'Set PIN'}
+                                        </Button>
+                                    )}
                                 </CardContent>
                             </Card>
                             <Card>
@@ -172,48 +221,48 @@ export default function StaffDashboard({ user }: { user: User }) {
                                     <div className="text-sm text-muted-foreground mb-2">
                                         PF Status
                                     </div>
-                                    <Badge
-                                        variant="destructive"
-                                        className="mb-4"
-                                    >
-                                        {mockSalary.pfStatus}
+                                    <Badge variant="outline" className="mb-4">
+                                        N/A
                                     </Badge>
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        className="w-full"
-                                    >
-                                        <FileText className=" h-4 w-4" />
-                                        PIN
-                                    </Button>
+                                    {/* Placeholder for future PF logic */}
                                 </CardContent>
                             </Card>
-                            <Card className="col-span-2">
-                                <CardContent className="p-4">
-                                    <div className="flex justify-between items-center mb-2">
-                                        <span className="text-sm text-muted-foreground">
-                                            Monthly PF (
-                                            {mockSalary.pfPercentage}%)
-                                        </span>
-                                        <span className="font-bold">
-                                            {mockSalary.monthly}
-                                        </span>
-                                    </div>
-                                    <Separator className="my-2" />
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-sm text-muted-foreground">
-                                            Total PF Balance
-                                        </span>
-                                        <span className="font-bold">
-                                            {mockSalary.totalPfBalance}
-                                        </span>
-                                    </div>
-                                </CardContent>
-                            </Card>
+                            {isSalaryUnlocked && (
+                                <Card className="col-span-2">
+                                    <CardContent className="p-4">
+                                        <div className="flex justify-between items-center mb-2">
+                                            <span className="text-sm text-muted-foreground">
+                                                Monthly PF (0%)
+                                            </span>
+                                            <span className="font-bold">
+                                                ৳ 0
+                                            </span>
+                                        </div>
+                                        <Separator className="my-2" />
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-sm text-muted-foreground">
+                                                Total PF Balance
+                                            </span>
+                                            <span className="font-bold">
+                                                ৳ 0
+                                            </span>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            )}
                         </div>
                     </CardContent>
                 </Card>
             </div>
+
+            <SalaryPinDialog
+                open={showPinDialog}
+                onOpenChange={setShowPinDialog}
+                staffId={staff?.staffId || ''}
+                isPinSet={!!staff?.isSalaryPinSet}
+                onSuccess={handleUnlockSuccess}
+            />
+
             <StaffAttendanceTable />
 
             {/* Notifications */}

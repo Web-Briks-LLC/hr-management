@@ -36,6 +36,10 @@ export default interface IStaff {
 
     exitDate?: Date;
 
+    salary: number;
+    salaryVisibleToEmployee: boolean;
+    isSalaryPinSet?: boolean;
+
     createdAt: Date;
     updatedAt: Date;
 }
