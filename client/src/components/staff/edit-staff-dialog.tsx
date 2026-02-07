@@ -167,7 +167,7 @@ export function EditStaffDialog({ staff }: EditStaffDialogProps) {
                                             <SelectValue placeholder="Select branch" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            {branchesData?.data?.map(
+                                            {branchesData?.branches?.map(
                                                 (branch: any) => (
                                                     <SelectItem
                                                         key={branch._id}
@@ -239,6 +239,11 @@ export function EditStaffDialog({ staff }: EditStaffDialogProps) {
                                         <SelectContent>
                                             <SelectItem value={Role.STAFF}>
                                                 Staff
+                                            </SelectItem>
+                                            <SelectItem
+                                                value={Role.TEAM_LEADER}
+                                            >
+                                                Team Leadre
                                             </SelectItem>
                                             <SelectItem value={Role.HR_MANAGER}>
                                                 HR Manager
