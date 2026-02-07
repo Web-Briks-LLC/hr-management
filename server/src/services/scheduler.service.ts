@@ -90,7 +90,52 @@ async function processAttendanceCheck() {
                 });
 
                 if (existingAttendance) {
-                    continue; // Already has attendance record, skip
+                    // Check if we need to upgrade 'late' to 'absent'
+                    if (
+                        existingAttendance.status === 'late' &&
+                        !existingAttendance.checkInAt
+                    ) {
+                        const halfDayMinutes =
+                            assignment.halfDayAfterMinutes || 240;
+                        const [shiftHour, shiftMinute] = assignment.startTime
+                            .split(':')
+                            .map(Number);
+                        const shiftStartTime = new Date(now);
+                        shiftStartTime.setHours(shiftHour, shiftMinute, 0, 0);
+
+                        const absentThreshold = new Date(
+                            shiftStartTime.getTime() +
+                                halfDayMinutes * 60 * 1000,
+                        );
+
+                        if (now >= absentThreshold) {
+                            // Upgrade to absent
+                            existingAttendance.status = 'absent';
+                            existingAttendance.isAutoAbsent = true;
+                            existingAttendance.notes =
+                                (existingAttendance.notes || '') +
+                                ' | Auto-upgraded to Absent by system';
+                            existingAttendance.processedAt = now;
+                            await existingAttendance.save();
+                            absentCount++;
+
+                            // Send notification
+                            if (assignment.userId) {
+                                await notificationService.createNotification({
+                                    userId: assignment.userId,
+                                    title: 'Marked Absent',
+                                    message: `You have been marked absent for today (No check-in). Shift: ${assignment.shiftName}`,
+                                    type: 'attendance',
+                                    priority: 'high',
+                                    resourceType: 'attendance',
+                                });
+                            }
+                            console.log(
+                                `[Scheduler] Upgraded staff ${assignment.staffId} from Late to Absent`,
+                            );
+                        }
+                    }
+                    continue;
                 }
 
                 // Parse shift start time (format: "HH:mm")
@@ -103,11 +148,11 @@ async function processAttendanceCheck() {
                 // Calculate thresholds
                 const graceMinutes = assignment.gracePeriodMinutes || 10;
                 const lateThreshold = new Date(
-                    shiftStartTime.getTime() + graceMinutes * 60 * 1000
+                    shiftStartTime.getTime() + graceMinutes * 60 * 1000,
                 );
                 const halfDayMinutes = assignment.halfDayAfterMinutes || 240;
                 const absentThreshold = new Date(
-                    shiftStartTime.getTime() + halfDayMinutes * 60 * 1000
+                    shiftStartTime.getTime() + halfDayMinutes * 60 * 1000,
                 );
 
                 // Determine status based on current time
@@ -154,14 +199,14 @@ async function processAttendanceCheck() {
             } catch (staffError) {
                 console.error(
                     `[Scheduler] Error processing attendance for staff ${assignment.staffId}:`,
-                    staffError
+                    staffError,
                 );
             }
         }
 
         if (lateCount > 0 || absentCount > 0) {
             console.log(
-                `[Scheduler] Attendance check: ${lateCount} staff marked late, ${absentCount} marked absent`
+                `[Scheduler] Attendance check: ${lateCount} staff marked late, ${absentCount} marked absent`,
             );
         }
 
@@ -214,7 +259,7 @@ async function processOvertimeAutoClose() {
             try {
                 const durationMinutes = Math.floor(
                     (now.getTime() - new Date(ot.actualStartTime).getTime()) /
-                        (1000 * 60)
+                        (1000 * 60),
                 );
 
                 await OvertimeModel.findByIdAndUpdate(ot._id, {
@@ -233,7 +278,7 @@ async function processOvertimeAutoClose() {
                         userId: ot.userId,
                         title: 'Overtime Auto-Closed',
                         message: `Your overtime was automatically closed after 12 hours. Duration: ${Math.floor(
-                            durationMinutes / 60
+                            durationMinutes / 60,
                         )}h ${durationMinutes % 60}m`,
                         type: 'overtime',
                         priority: 'medium',
@@ -244,14 +289,14 @@ async function processOvertimeAutoClose() {
             } catch (otError) {
                 console.error(
                     `[Scheduler] Error closing overtime ${ot._id}:`,
-                    otError
+                    otError,
                 );
             }
         }
 
         if (closedCount > 0) {
             console.log(
-                `[Scheduler] Overtime auto-close: ${closedCount} overtime entries closed`
+                `[Scheduler] Overtime auto-close: ${closedCount} overtime entries closed`,
             );
         }
 
@@ -347,10 +392,10 @@ async function processLeaveExpiry() {
                 expiredCount++;
 
                 const startDateStr = new Date(
-                    leave.startDate
+                    leave.startDate,
                 ).toLocaleDateString('en-GB');
                 const endDateStr = new Date(leave.endDate).toLocaleDateString(
-                    'en-GB'
+                    'en-GB',
                 );
 
                 // Notify the staff member
@@ -385,14 +430,14 @@ async function processLeaveExpiry() {
             } catch (leaveError) {
                 console.error(
                     `[Scheduler] Error expiring leave ${leave._id}:`,
-                    leaveError
+                    leaveError,
                 );
             }
         }
 
         if (expiredCount > 0) {
             console.log(
-                `[Scheduler] Leave expiry: ${expiredCount} applications expired, ${notificationCount} notifications sent`
+                `[Scheduler] Leave expiry: ${expiredCount} applications expired, ${notificationCount} notifications sent`,
             );
         }
 
