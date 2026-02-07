@@ -205,6 +205,7 @@ export default function ExportPdfDialog({
 
         // Date
         doc.setFontSize(11);
+        doc.setTextColor(0, 0, 0);
         doc.text(`Date: ${currentDate}`, 14, y);
         y += 15;
 
@@ -226,11 +227,13 @@ export default function ExportPdfDialog({
 
         // Subject
         doc.setFontSize(11);
+        doc.setFont('helvetica', 'bold');
         const subjectText = `Subject: Request for fund transfer from account no. ${selectedBank.bankAccountNo} named: ${selectedBank.companyName}`;
         doc.text(subjectText, 14, y, { maxWidth: 180 });
         y += 15;
 
         // Body
+        doc.setFont('helvetica', 'normal');
         doc.text('Dear Sir,', 14, y);
         y += 8;
 
@@ -273,21 +276,36 @@ export default function ExportPdfDialog({
 
         autoTable(doc, {
             startY: y,
-            head: [['Sl No.', 'Name', 'Designation', 'Account NO.', 'Amount']],
+            head: [
+                ['Sl.', 'Name', 'Designation', 'Account No.', 'Amount (BDT)'],
+            ],
             body: tableData,
-            theme: 'grid',
+            theme: 'striped',
             headStyles: {
-                fillColor: [60, 60, 60],
+                fillColor: [33, 33, 33],
                 textColor: 255,
-                fontSize: 10,
+                fontSize: 9,
+                fontStyle: 'bold',
+                halign: 'center',
             },
-            styles: { fontSize: 9, cellPadding: 3 },
+            bodyStyles: {
+                textColor: [50, 50, 50],
+            },
+            alternateRowStyles: {
+                fillColor: [245, 245, 245],
+            },
+            styles: {
+                fontSize: 9,
+                cellPadding: 4,
+                lineColor: [200, 200, 200],
+                lineWidth: 0.1,
+            },
             columnStyles: {
-                0: { cellWidth: 15, halign: 'center' },
-                1: { cellWidth: 45 },
-                2: { cellWidth: 40 },
-                3: { cellWidth: 45 },
-                4: { cellWidth: 30, halign: 'right' },
+                0: { cellWidth: 12, halign: 'center' },
+                1: { cellWidth: 50 },
+                2: { cellWidth: 35 },
+                3: { cellWidth: 50 },
+                4: { cellWidth: 28, halign: 'right' },
             },
         });
 

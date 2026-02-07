@@ -39,6 +39,7 @@ import {
 import PayrollTable from '../../../components/payroll/payroll-table';
 import ExportPdfDialog from '../../../components/payroll/export-pdf-dialog';
 import * as XLSX from 'xlsx';
+import { toast } from 'sonner';
 
 const MONTHS = [
     { value: 1, label: 'January' },
@@ -121,6 +122,7 @@ export default function PayrollPage() {
         );
 
         if (staffWithBankAccount.length === 0) {
+            toast.error('No staff members with bank accounts found');
             return;
         }
 
@@ -291,7 +293,7 @@ export default function PayrollPage() {
                                     className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
                                     variant="default"
                                 >
-                                    <Download className="mr-2 h-4 w-4" />
+                                    <Download className="h-4 w-4" />
                                     Export Report
                                 </Button>
                             </DropdownMenuTrigger>
