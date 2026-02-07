@@ -8,6 +8,14 @@ const addOffDates = async (
 ): Promise<void> => {
     try {
         const { shiftId } = req.params;
+
+        if (!shiftId) {
+            res.status(400).json({
+                success: false,
+                message: 'Shift ID is required',
+            });
+            return;
+        }
         const { dates, reason } = req.body;
         const userId = req.user?.id as string;
 
@@ -43,6 +51,14 @@ const removeOffDates = async (
 ): Promise<void> => {
     try {
         const { shiftId } = req.params;
+
+        if (!shiftId) {
+            res.status(400).json({
+                success: false,
+                message: 'Shift ID is required',
+            });
+            return;
+        }
         const { dates } = req.body;
 
         if (!dates || !Array.isArray(dates) || dates.length === 0) {
@@ -72,6 +88,14 @@ const getOffDates = async (
 ): Promise<void> => {
     try {
         const { shiftId } = req.params;
+
+        if (!shiftId) {
+            res.status(400).json({
+                success: false,
+                message: 'Shift ID is required',
+            });
+            return;
+        }
 
         const result = await ShiftOffDateService.getOffDates(shiftId);
 
