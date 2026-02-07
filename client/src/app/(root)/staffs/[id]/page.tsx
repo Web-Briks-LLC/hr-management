@@ -13,20 +13,15 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Skeleton } from '@/components/ui/skeleton';
 import {
     Loader,
     ArrowLeft,
     Mail,
     Phone,
-    MapPin,
     Briefcase,
-    Calendar,
     Clock,
     Building,
     User,
-    CheckCircle2,
-    XCircle,
     AlertCircle,
     Banknote,
 } from 'lucide-react';
