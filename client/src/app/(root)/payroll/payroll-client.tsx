@@ -116,31 +116,20 @@ export default function PayrollPage() {
     const handleExportExcel = () => {
         if (!payrollData.length) return;
 
-        // Filter only staff with bank accounts
-        const staffWithBankAccount = payrollData.filter(
-            (row: any) => row.bankAccountNo && row.bankAccountNo.trim() !== '',
-        );
-
-        if (staffWithBankAccount.length === 0) {
-            toast.error('No staff members with bank accounts found');
-            return;
-        }
-
         const [year, monthNum] = formattedMonth.split('-');
         const monthName = format(
-            new Date(parseInt(year), parseInt(monthNum) - 1, 1),
+            new Date(parseInt(year!), parseInt(monthNum!) - 1, 1),
             'MMMM',
         );
 
-        const dataToExport = staffWithBankAccount.map(
-            (row: any, index: number) => ({
-                'Sl No': index + 1,
-                Name: row.name || '',
-                Designation: row.designation || '',
-                'Account NO': row.bankAccountNo || '',
-                Amount: row.payableSalary || 0,
-            }),
-        );
+        // Export ALL staff, not just those with bank accounts
+        const dataToExport = payrollData.map((row: any, index: number) => ({
+            'Sl No': index + 1,
+            Name: row.name || '',
+            Designation: row.designation || '',
+            'Account NO': row.bankAccountNo || 'N/A',
+            Amount: row.payableSalary || 0,
+        }));
 
         const worksheet = XLSX.utils.json_to_sheet(dataToExport);
         const workbook = XLSX.utils.book_new();

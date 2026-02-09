@@ -26,8 +26,13 @@ const getPayrollPreview = async ({
     month,
     branchId,
 }: IPayrollPreviewParams) => {
-    const startDate = startOfMonth(new Date(month));
-    const endDate = endOfMonth(new Date(month));
+    // Parse year and month from 'YYYY-MM' format
+    const parts = month.split('-');
+    const year = parseInt(parts[0]!, 10);
+    const monthNum = parseInt(parts[1]!, 10);
+    // Create UTC dates to avoid timezone issues
+    const startDate = new Date(Date.UTC(year, monthNum - 1, 1, 0, 0, 0, 0));
+    const endDate = new Date(Date.UTC(year, monthNum, 0, 23, 59, 59, 999)); // Day 0 of next month = last day of current month
 
     const matchStage: any = {
         status: 'active', // Only active staff
@@ -171,9 +176,10 @@ const getPayrollPreview = async ({
         ).length;
 
         // C. Calculate Salary
-        const effectiveWorkDays = workDaysCount > 0 ? workDaysCount : 1;
+        // Per day salary = Salary / 30 (fixed)
+        // Payable = Salary - (Absent × Per day)
         const staffSalary = staff.salary || 0;
-        const perDaySalary = staffSalary / effectiveWorkDays;
+        const perDaySalary = staffSalary / 30;
 
         const deduction = absentDays * perDaySalary;
         const payableSalary = Math.max(0, staffSalary - deduction);

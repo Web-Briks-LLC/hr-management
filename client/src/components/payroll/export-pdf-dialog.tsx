@@ -178,24 +178,15 @@ export default function ExportPdfDialog({
             return;
         }
 
-        // Filter only staff with bank account
-        const staffWithBankAccount = payrollData.filter(
-            (row) => row.bankAccountNo && row.bankAccountNo.trim() !== '',
-        );
-
-        if (staffWithBankAccount.length === 0) {
-            toast.error('No staff members with bank accounts found');
-            return;
-        }
-
-        const totalAmount = staffWithBankAccount.reduce(
+        // Export ALL staff, not just those with bank accounts
+        const totalAmount = payrollData.reduce(
             (acc, curr) => acc + (curr.payableSalary || 0),
             0,
         );
 
         const [year, monthNum] = month.split('-');
         const monthName = format(
-            new Date(parseInt(year), parseInt(monthNum) - 1, 1),
+            new Date(parseInt(year!), parseInt(monthNum!) - 1, 1),
             'MMMM',
         );
         const currentDate = format(new Date(), 'dd/MM/yyyy');
@@ -250,12 +241,12 @@ export default function ExportPdfDialog({
         doc.text('List of Accounts and amount to be credited:', 14, y);
         y += 8;
 
-        // Table
-        const tableData = staffWithBankAccount.map((row, index) => [
+        // Table - use all payrollData
+        const tableData = payrollData.map((row, index) => [
             index + 1,
             row.name || '',
             row.designation || '',
-            row.bankAccountNo || '',
+            row.bankAccountNo || 'N/A',
             row.payableSalary?.toLocaleString() || '0',
         ]);
 
