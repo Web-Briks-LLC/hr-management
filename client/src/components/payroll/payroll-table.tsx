@@ -11,15 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import {
-    Ban,
-    Banknote,
-    Loader2,
-    User,
-    Edit,
-    CheckCheck,
-    Pencil,
-} from 'lucide-react';
+import { Ban, Banknote, Loader2, User, CheckCheck, Pencil } from 'lucide-react';
 import GraceDialog from './grace-dialog';
 import EditSalaryDialog from './edit-salary-dialog';
 import BulkReviewDialog from './bulk-review-dialog';
@@ -372,26 +364,13 @@ export default function PayrollTable({
                                                 </Button>
 
                                                 {isPaid ? (
-                                                    <Button
-                                                        size="sm"
+                                                    <Badge
                                                         variant="outline"
-                                                        className="h-8 px-3 text-xs gap-1.5 border-green-200 text-green-700 hover:bg-green-50 hover:text-green-800"
-                                                        onClick={() =>
-                                                            setEditParams({
-                                                                open: true,
-                                                                staffId:
-                                                                    row._id,
-                                                                staffName:
-                                                                    row.name,
-                                                                baseAmount:
-                                                                    row.paidAmount,
-                                                                mode: 'edit',
-                                                            })
-                                                        }
+                                                        className="h-8 px-3 text-xs gap-1.5 border-green-200 bg-green-50 text-green-700"
                                                     >
-                                                        <Edit className="h-3.5 w-3.5" />
-                                                        Edit
-                                                    </Button>
+                                                        <CheckCheck className="h-3.5 w-3.5" />
+                                                        Paid
+                                                    </Badge>
                                                 ) : (
                                                     <Button
                                                         size="sm"
