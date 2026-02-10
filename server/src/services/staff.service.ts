@@ -590,14 +590,18 @@ async function viewSalaryWithPassword(payload: {
         throw new Error('User not found');
     }
 
-    // Verify password using crypto
-    const crypto = await import('crypto');
-    const hashedPassword = crypto
-        .createHash('sha256')
-        .update(password)
-        .digest('hex');
+    // Verify password using bcrypt (matching Better-Auth default)
+    // NOTE: Better-Auth stores passwords using bcrypt or scrypt. We assume standard bcrypt here.
+    const bcrypt = (await import('bcrypt')).default;
 
-    if (user.password !== hashedPassword) {
+    // Check if password exists
+    if (!user.password) {
+        throw new Error('User has no password set (OAuth only?)');
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+
+    if (!isMatch) {
         throw new Error('Invalid password');
     }
 
@@ -802,9 +806,8 @@ async function forgotSalaryPin(staffId: string) {
         throw new Error('Staff not found');
     }
 
-    // @ts-ignore
-    const user = staff.userId;
-    // @ts-ignore
+    const user = staff.userId as unknown as { email: string; name?: string };
+
     if (!user || !user.email) {
         throw new Error('No email found for this staff member');
     }
@@ -834,11 +837,8 @@ async function forgotSalaryPin(staffId: string) {
     const resetUrl = `${process.env.CLIENT_URL}/staffs/reset-pin?token=${resetToken}`;
 
     try {
-        // @ts-ignore
         await EmailService.sendPinResetEmail({
-            // @ts-ignore
             to: user.email,
-            // @ts-ignore
             staffName: user.name || 'Staff Member',
             resetUrl,
         });

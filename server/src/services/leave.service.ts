@@ -81,7 +81,7 @@ function getEndOfDay(date: Date): Date {
 async function calculateWorkingDays(
     staffId: string,
     startDate: Date,
-    endDate: Date
+    endDate: Date,
 ): Promise<Date[]> {
     // Get staff's current shift assignment
     const shiftAssignment = await ShiftAssignmentModel.findOne({
@@ -152,11 +152,29 @@ async function applyForLeave(input: ApplyLeaveInput) {
     const requestedDates = await calculateWorkingDays(
         staffId,
         startDate,
-        endDate
+        endDate,
     );
 
     if (requestedDates.length === 0) {
         throw new Error('No working days in the selected date range');
+    }
+
+    // Check for overlapping applications
+    const overlapping = await LeaveApplicationModel.findOne({
+        staffId,
+        status: { $in: ['pending', 'approved', 'partially_approved'] },
+        $or: [
+            {
+                startDate: { $lte: endDate },
+                endDate: { $gte: startDate },
+            },
+        ],
+    });
+
+    if (overlapping) {
+        throw new Error(
+            `You already have a ${overlapping.status} leave application for this period (${format(overlapping.startDate, 'MMM dd')} - ${format(overlapping.endDate, 'MMM dd')})`,
+        );
     }
 
     // Check leave balance
@@ -168,7 +186,7 @@ async function applyForLeave(input: ApplyLeaveInput) {
         requestedDates.length > balance.annualLeaveRemaining
     ) {
         throw new Error(
-            `Insufficient annual leave. Remaining: ${balance.annualLeaveRemaining}, Requested: ${requestedDates.length}`
+            `Insufficient annual leave. Remaining: ${balance.annualLeaveRemaining}, Requested: ${requestedDates.length}`,
         );
     }
 
@@ -177,7 +195,7 @@ async function applyForLeave(input: ApplyLeaveInput) {
         requestedDates.length > balance.sickLeaveRemaining
     ) {
         throw new Error(
-            `Insufficient sick leave. Remaining: ${balance.sickLeaveRemaining}, Requested: ${requestedDates.length}`
+            `Insufficient sick leave. Remaining: ${balance.sickLeaveRemaining}, Requested: ${requestedDates.length}`,
         );
     }
 
@@ -205,6 +223,7 @@ async function applyForLeave(input: ApplyLeaveInput) {
 
         // Get user info from native MongoDB collection (better-auth manages User)
         const UserModel = (await import('../models/user.model.js')).default;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const staffRecord = staff?.staffId as any;
         let staffName = 'Staff Member';
         let staffUserId = staffRecord?.userId;
@@ -258,7 +277,7 @@ async function approveLeave(input: ApproveLeaveInput) {
 
     if (application.status !== 'pending') {
         throw new Error(
-            `Cannot approve: Application is already ${application.status}`
+            `Cannot approve: Application is already ${application.status}`,
         );
     }
 
@@ -270,17 +289,17 @@ async function approveLeave(input: ApproveLeaveInput) {
     }
 
     const requestedDateStrings = application.requestedDates.map(
-        (d) => d.toISOString().split('T')[0]
+        (d) => d.toISOString().split('T')[0],
     );
     const finalApprovedDates = approvedDates || application.requestedDates;
     const finalPaidLeaveDates = paidLeaveDates || [];
 
     // Validate dates
     const approvedDateStrings = finalApprovedDates.map(
-        (d) => new Date(d).toISOString().split('T')[0]
+        (d) => new Date(d).toISOString().split('T')[0],
     );
     const paidDateStrings = finalPaidLeaveDates.map(
-        (d) => new Date(d).toISOString().split('T')[0]
+        (d) => new Date(d).toISOString().split('T')[0],
     );
 
     for (const dateStr of approvedDateStrings) {
@@ -298,24 +317,52 @@ async function approveLeave(input: ApproveLeaveInput) {
         );
     });
 
-    // Update leave balance
+    // Update leave balance atomically
     const year = new Date(application.startDate).getFullYear();
-    const balance = await getOrCreateLeaveBalance(
-        application.staffId.toString(),
-        year
-    );
-
     const leaveDaysCount = finalApprovedDates.length;
+    let updateQuery: any = {};
 
     if (application.leaveType === 'annual') {
-        balance.annualLeaveUsed += leaveDaysCount;
-        balance.annualLeaveRemaining -= leaveDaysCount;
+        updateQuery = {
+            $inc: {
+                annualLeaveUsed: leaveDaysCount,
+                annualLeaveRemaining: -leaveDaysCount,
+            },
+        };
     } else if (application.leaveType === 'sick') {
-        balance.sickLeaveUsed += leaveDaysCount;
-        balance.sickLeaveRemaining -= leaveDaysCount;
+        updateQuery = {
+            $inc: {
+                sickLeaveUsed: leaveDaysCount,
+                sickLeaveRemaining: -leaveDaysCount,
+            },
+        };
     }
 
-    await balance.save();
+    // Perform atomic update
+    const balance = await LeaveBalanceModel.findOneAndUpdate(
+        { staffId: application.staffId, year },
+        updateQuery,
+        { new: true },
+    );
+
+    // If balance doesn't exist, Create it (though it should exist from application time)
+    // Note: If findOneAndUpdate returns null (no doc), we might need to handle it.
+    // Ideally getOrCreate should have ensured it, but let's be safe.
+    if (!balance) {
+        // Fallback: create and apply manually if not found (rare race condition edge case)
+        const newBalance = await getOrCreateLeaveBalance(
+            application.staffId.toString(),
+            year,
+        );
+        if (application.leaveType === 'annual') {
+            newBalance.annualLeaveUsed += leaveDaysCount;
+            newBalance.annualLeaveRemaining -= leaveDaysCount;
+        } else if (application.leaveType === 'sick') {
+            newBalance.sickLeaveUsed += leaveDaysCount;
+            newBalance.sickLeaveRemaining -= leaveDaysCount;
+        }
+        await newBalance.save();
+    }
 
     // Determine status
     let status: LeaveStatus = 'approved';
@@ -339,6 +386,7 @@ async function approveLeave(input: ApproveLeaveInput) {
     // Send notification to staff
     try {
         const populatedApp = await application.populate('staffId');
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const staffUserId = (populatedApp.staffId as any)?.userId;
         if (staffUserId) {
             await notificationService.notifyLeaveStatus({
@@ -364,7 +412,7 @@ async function approveLeave(input: ApproveLeaveInput) {
 async function rejectLeave(
     applicationId: string,
     rejectedBy: string,
-    comment?: string
+    comment?: string,
 ) {
     const application = await LeaveApplicationModel.findById(applicationId);
     if (!application) {
@@ -373,7 +421,7 @@ async function rejectLeave(
 
     if (application.status !== 'pending') {
         throw new Error(
-            `Cannot reject: Application is already ${application.status}`
+            `Cannot reject: Application is already ${application.status}`,
         );
     }
 
@@ -390,6 +438,7 @@ async function rejectLeave(
     // Send notification to staff
     try {
         const populatedApp = await application.populate('staffId');
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const staffUserId = (populatedApp.staffId as any)?.userId;
         if (staffUserId) {
             await notificationService.notifyLeaveStatus({
@@ -415,7 +464,7 @@ async function revokeLeave(
     applicationId: string,
     revokedBy: string,
     reason?: string,
-    datesToRevoke?: Date[] // Optional: if provided, partial revoke; if not, full revoke
+    datesToRevoke?: Date[], // Optional: if provided, partial revoke; if not, full revoke
 ) {
     const application = await LeaveApplicationModel.findById(applicationId);
     if (!application) {
@@ -424,23 +473,16 @@ async function revokeLeave(
 
     if (!['approved', 'partially_approved'].includes(application.status)) {
         throw new Error(
-            'Can only revoke approved or partially approved leaves'
+            'Can only revoke approved or partially approved leaves',
         );
     }
-
-    // Restore leave balance
-    const year = new Date(application.startDate).getFullYear();
-    const balance = await getOrCreateLeaveBalance(
-        application.staffId.toString(),
-        year
-    );
 
     let restoredDays: number;
 
     if (datesToRevoke && datesToRevoke.length > 0) {
         // Partial revoke - only revoke specified dates
         const datesToRevokeStrings = datesToRevoke.map(
-            (d) => new Date(d).toISOString().split('T')[0]
+            (d) => new Date(d).toISOString().split('T')[0],
         );
 
         // Filter approved dates to remove revoked ones
@@ -480,16 +522,33 @@ async function revokeLeave(
         application.revokedBy = revokedBy as unknown as Types.ObjectId;
     }
 
-    // Restore balance
+    // Restore balance atomically
+    const year = new Date(application.startDate).getFullYear();
+    let updateQuery: any = {};
+
     if (restoredDays > 0) {
         if (application.leaveType === 'annual') {
-            balance.annualLeaveUsed -= restoredDays;
-            balance.annualLeaveRemaining += restoredDays;
+            updateQuery = {
+                $inc: {
+                    annualLeaveUsed: -restoredDays,
+                    annualLeaveRemaining: restoredDays,
+                },
+            };
         } else if (application.leaveType === 'sick') {
-            balance.sickLeaveUsed -= restoredDays;
-            balance.sickLeaveRemaining += restoredDays;
+            updateQuery = {
+                $inc: {
+                    sickLeaveUsed: -restoredDays,
+                    sickLeaveRemaining: restoredDays,
+                },
+            };
         }
-        await balance.save();
+
+        if (Object.keys(updateQuery).length > 0) {
+            await LeaveBalanceModel.findOneAndUpdate(
+                { staffId: application.staffId, year },
+                updateQuery,
+            );
+        }
     }
 
     if (reason) {
@@ -501,6 +560,7 @@ async function revokeLeave(
     // Send notification to staff
     try {
         const populatedApp = await application.populate('staffId');
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const staffUserId = (populatedApp.staffId as any)?.userId;
         if (staffUserId) {
             await notificationService.notifyLeaveStatus({
@@ -572,7 +632,7 @@ async function getLeaveApplications(filters: GetLeavesFilters) {
         query.startDate = {};
         if (startDate)
             (query.startDate as Record<string, Date>).$gte = new Date(
-                startDate
+                startDate,
             );
         if (endDate)
             (query.startDate as Record<string, Date>).$lte = new Date(endDate);
@@ -619,7 +679,7 @@ async function expireStaleApplications() {
         },
         {
             status: 'expired',
-        }
+        },
     );
 
     return result.modifiedCount;
@@ -673,7 +733,7 @@ async function cancelLeaveApplication(applicationId: string, userId: string) {
 async function uploadMedicalDocument(
     applicationId: string,
     userId: string,
-    file: Express.Multer.File
+    file: Express.Multer.File,
 ) {
     // Dynamic imports for cloudinary
     const cloudinaryModule = await import('../lib/cloudinary.js');
@@ -689,14 +749,14 @@ async function uploadMedicalDocument(
     // Verify ownership
     if (application.appliedBy.toString() !== userId) {
         throw new Error(
-            'You can only upload documents to your own applications'
+            'You can only upload documents to your own applications',
         );
     }
 
     // Only allow for sick leave
     if (application.leaveType !== 'sick') {
         throw new Error(
-            'Medical documents can only be uploaded for sick leave'
+            'Medical documents can only be uploaded for sick leave',
         );
     }
 
@@ -717,12 +777,12 @@ async function uploadMedicalDocument(
             },
             (
                 err: Error | undefined,
-                result: { secure_url: string; public_id: string } | undefined
+                result: { secure_url: string; public_id: string } | undefined,
             ) => {
                 if (err) reject(err);
                 else if (result) resolve(result);
                 else reject(new Error('Upload failed'));
-            }
+            },
         );
         uploadStream.end(file.buffer);
     });

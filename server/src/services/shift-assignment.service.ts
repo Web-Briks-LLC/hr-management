@@ -14,27 +14,44 @@ const assignShift = async ({
     startDate: string;
     assignedBy: string;
 }) => {
-    const staffs = await StaffModel.find({ _id: { $in: staffIds } }).lean();
-    if (staffs.length !== staffIds.length) {
-        throw new Error('One or more staff IDs are invalid');
-    }
+    const mongoose = (await import('mongoose')).default;
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
-    const shift = await ShiftModel.findById(shiftId).lean();
-    if (!shift || !shift.isActive) {
-        throw new Error('Invalid or inactive Shift');
-    }
+    try {
+        const staffs = await StaffModel.find({ _id: { $in: staffIds } })
+            .session(session)
+            .lean();
 
-    const results: any[] = [];
-    const errors: any[] = [];
+        if (staffs.length !== staffIds.length) {
+            throw new Error('One or more staff IDs are invalid');
+        }
 
-    for (const staffId of staffIds) {
-        try {
+        const shift = await ShiftModel.findById(shiftId)
+            .session(session)
+            .lean();
+
+        if (!shift || !shift.isActive) {
+            throw new Error('Invalid or inactive Shift');
+        }
+
+        const results: {
+            staffId: string;
+            assignmentId: Types.ObjectId;
+            success: boolean;
+        }[] = [];
+
+        // We throw on error to abort transaction, so "errors" array isn't needed for partial success anymore
+        // But if we want to support partial success, we can't use a transaction for ALL.
+        // Logic suggests "All or Nothing" is safer for bulk actions to avoid inconsistent states.
+
+        for (const staffId of staffIds) {
             const start = new Date(startDate);
 
             const existing = await ShiftAssignmentModel.findOne({
                 staffId: new Types.ObjectId(staffId),
                 isActive: true,
-            });
+            }).session(session);
 
             if (existing) {
                 const end = new Date(start);
@@ -42,38 +59,58 @@ const assignShift = async ({
 
                 existing.endDate = end;
                 existing.isActive = false;
-                await existing.save();
+                await existing.save({ session });
             }
 
-            const newAssignment = await ShiftAssignmentModel.create({
-                staffId: new Types.ObjectId(staffId),
-                shiftId: new Types.ObjectId(shiftId),
-                startDate: start,
-                endDate: null,
-                assignedBy: new Types.ObjectId(assignedBy),
-                isActive: true,
-            });
+            const newAssignment = await ShiftAssignmentModel.create(
+                [
+                    {
+                        staffId: new Types.ObjectId(staffId),
+                        shiftId: new Types.ObjectId(shiftId),
+                        startDate: start,
+                        endDate: null,
+                        assignedBy: new Types.ObjectId(assignedBy),
+                        isActive: true,
+                    },
+                ],
+                { session },
+            );
+
+            if (!newAssignment || !newAssignment[0]) {
+                throw new Error('Failed to create assignment');
+            }
 
             results.push({
                 staffId,
-                assignmentId: newAssignment._id,
+                assignmentId: newAssignment[0]._id as Types.ObjectId,
                 success: true,
             });
-        } catch (error: any) {
-            errors.push({
-                staffId,
-                error: error.message,
-                success: false,
-            });
         }
-    }
 
-    return {
-        successCount: results.length,
-        failureCount: errors.length,
-        results,
-        errors,
-    };
+        await session.commitTransaction();
+
+        return {
+            successCount: results.length,
+            failureCount: 0,
+            results,
+            errors: [],
+        };
+    } catch (error: any) {
+        await session.abortTransaction();
+        // Return failure for all since we aborted
+        return {
+            successCount: 0,
+            failureCount: staffIds.length,
+            results: [],
+            errors: staffIds.map((id) => ({
+                staffId: id,
+                error: error.message || 'Transaction aborted',
+                success: false,
+            })),
+        };
+    } finally {
+        session.endSession();
+    }
 };
 
 const shiftAssignmentService = {
