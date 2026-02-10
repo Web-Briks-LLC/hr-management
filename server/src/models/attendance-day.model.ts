@@ -74,11 +74,14 @@ const attendanceDaySchema = new Schema<IAttendanceDay>(
             type: Date,
         },
     },
-    { timestamps: true }
+    { timestamps: true },
 );
+
+// Unique compound index: one attendance record per staff per day
+attendanceDaySchema.index({ staffId: 1, date: 1 }, { unique: true });
 
 const AttendanceDayModel = model<IAttendanceDay>(
     'AttendanceDay',
-    attendanceDaySchema
+    attendanceDaySchema,
 );
 export default AttendanceDayModel;

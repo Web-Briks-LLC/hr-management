@@ -61,8 +61,12 @@ const overtimeSchema = new Schema<IOvertime>(
             ref: 'User',
         },
     },
-    { timestamps: true }
+    { timestamps: true },
 );
+
+// Compound indexes for common queries
+overtimeSchema.index({ staffId: 1, date: -1 });
+overtimeSchema.index({ staffId: 1, date: 1, type: 1 }, { unique: true });
 
 const OvertimeModel = model<IOvertime>('Overtime', overtimeSchema);
 export default OvertimeModel;

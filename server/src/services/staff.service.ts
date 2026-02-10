@@ -642,6 +642,7 @@ async function updateSalaryInDB(payload: {
         const SalaryHistoryModel = (
             await import('../models/salary-history.model.js')
         ).default;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await (SalaryHistoryModel.create as any)({
             staffId,
             previousSalary: staff.salary,
@@ -701,6 +702,7 @@ async function updateStaffInDB(payload: {
             const SalaryHistoryModel = (
                 await import('../models/salary-history.model.js')
             ).default;
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             await (SalaryHistoryModel.create as any)(
                 [
                     {
