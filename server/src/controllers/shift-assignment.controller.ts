@@ -27,6 +27,14 @@ const assignShift = async (req: Request, res: Response) => {
             assignedBy,
         });
 
+        if (result.failureCount > 0) {
+            return res.status(400).json({
+                success: false,
+                message: result.errors[0]?.error || 'Failed to assign shift',
+                errors: result.errors,
+            });
+        }
+
         return res.status(201).json({
             success: true,
             message: 'Shift assigned successfully',

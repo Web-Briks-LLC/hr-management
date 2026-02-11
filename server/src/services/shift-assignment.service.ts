@@ -57,9 +57,17 @@ const assignShift = async ({
                 const end = new Date(start);
                 end.setDate(end.getDate() - 1);
 
-                existing.endDate = end;
-                existing.isActive = false;
-                await existing.save({ session });
+                // Use updateOne to avoid validation errors on legacy data (missing assignedBy)
+                await ShiftAssignmentModel.updateOne(
+                    { _id: existing._id },
+                    {
+                        $set: {
+                            endDate: end,
+                            isActive: false,
+                        },
+                    },
+                    { session },
+                );
             }
 
             const newAssignment = await ShiftAssignmentModel.create(
