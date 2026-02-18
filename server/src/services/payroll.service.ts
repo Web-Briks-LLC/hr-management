@@ -4,6 +4,7 @@ import AttendanceDayModel from "../models/attendance-day.model.js";
 import ShiftAssignmentModel from "../models/shift-assignment.model.js";
 import ExpenseModel from "../models/expense.model.js";
 import ExpenseCategoryModel from "../models/expense-category.model.js";
+import OvertimeModel from "../models/overtime.model.js";
 import mongoose, { Types } from "mongoose";
 
 interface IPayrollPreviewParams {
@@ -97,6 +98,13 @@ const getPayrollPreview = async ({
     const allAttendance = await AttendanceDayModel.find({
         staffId: { $in: staffIds },
         date: { $gte: startDate, $lte: endDate },
+    });
+
+    // Fetch all approved overtime records for these staff in the given month
+    const approvedOvertime = await OvertimeModel.find({
+        staffId: { $in: staffIds },
+        date: { $gte: startDate, $lte: endDate },
+        status: "approved",
     });
 
     // Fetch all salary and overtime expenses for these staff in the given month
@@ -200,14 +208,32 @@ const getPayrollPreview = async ({
         const payableSalary = Math.max(0, staffSalary - deduction);
 
         // D. Overtime Calculation
-        const otMinutes = staffAttendance.reduce(
-            (sum, a) => sum + (a.otMinutes || 0),
+        // const attendanceOt = staffAttendance.reduce((sum, a) => sum + (a.otMinutes || 0), 0);
+
+        const staffApprovedOvertime = approvedOvertime.filter(
+            (ot) => ot.staffId.toString() === staff._id.toString(),
+        );
+        const approvedOt = staffApprovedOvertime.reduce(
+            (sum, ot) => sum + (ot.durationMinutes || 0),
             0,
         );
-        const otPayable = staffAttendance.reduce(
+
+        // Sum both sources?
+        // User requested strictly data from "Overtime Management".
+        // We use approvedOt as the source of truth for payment.
+        // We ignore attendanceOt (auto-calc) to prevent unapproved/duplicate payment.
+        const otMinutes = approvedOt;
+        let otPayable = staffAttendance.reduce(
             (sum, a) => sum + (a.otAmount || 0),
             0,
         );
+
+        // Fallback: Calculate OT amount if missing but minutes exist
+        if (otPayable === 0 && otMinutes > 0) {
+            // Standard calculation: (Salary / 30 days / 8 hours) * OT Hours
+            const hourlyRate = staffSalary / 30 / 8;
+            otPayable = (otMinutes / 60) * hourlyRate;
+        }
 
         // E. Check Payment Status (Salary)
         const salaryExpense = paidExpenses.find((e) => {
@@ -456,6 +482,7 @@ interface IBulkPayrollParams {
     }[];
     paymentMethod: string;
     createdBy: string;
+    paymentType?: "salary" | "overtime";
 }
 
 const bulkProcessPayment = async ({
@@ -463,6 +490,7 @@ const bulkProcessPayment = async ({
     payments,
     paymentMethod,
     createdBy,
+    paymentType = "salary",
 }: IBulkPayrollParams) => {
     const results = [];
     const errors = [];
@@ -483,6 +511,7 @@ const bulkProcessPayment = async ({
                 bonus: payment.bonus,
                 deduction: payment.deduction,
                 createdBy,
+                paymentType,
             });
             results.push({
                 staffId: payment.staffId,

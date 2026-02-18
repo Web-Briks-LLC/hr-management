@@ -50,7 +50,7 @@ const processPayment = async (req: Request, res: Response) => {
             note,
             bonus,
             deduction,
-            createdBy: (req as any).user.userId,
+            createdBy: (req as any).user.id || (req as any).user._id,
             paymentType,
         });
 
@@ -66,7 +66,7 @@ const processPayment = async (req: Request, res: Response) => {
 
 const bulkProcessPayment = async (req: Request, res: Response) => {
     try {
-        const { month, payments, paymentMethod } = req.body;
+        const { month, payments, paymentMethod, paymentType } = req.body;
         const userId = (req as any).user.id || (req as any).user._id;
 
         if (!payments || !Array.isArray(payments) || payments.length === 0) {
@@ -81,6 +81,7 @@ const bulkProcessPayment = async (req: Request, res: Response) => {
             payments,
             paymentMethod,
             createdBy: userId,
+            paymentType,
         });
 
         return res.status(200).json({

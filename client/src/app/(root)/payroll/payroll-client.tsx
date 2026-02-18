@@ -559,7 +559,7 @@ export default function PayrollPage() {
 
                         <TabsContent value="salary" className="mt-0">
                             <div className="rounded-md border border-border/60 overflow-hidden">
-                                {isLoading || isFetching ? (
+                                {isLoading ? (
                                     <TableSkeleton />
                                 ) : (
                                     <PayrollTable
@@ -573,7 +573,7 @@ export default function PayrollPage() {
 
                         <TabsContent value="overtime" className="mt-0">
                             <div className="rounded-md border border-border/60 overflow-hidden">
-                                {isLoading || isFetching ? (
+                                {isLoading ? (
                                     <TableSkeleton />
                                 ) : (
                                     <OvertimeTable
