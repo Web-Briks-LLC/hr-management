@@ -1,5 +1,5 @@
-import type { Request, Response } from 'express';
-import payrollService from '../services/payroll.service.js';
+import type { Request, Response } from "express";
+import payrollService from "../services/payroll.service.js";
 
 const getPayrollPreview = async (req: Request, res: Response) => {
     try {
@@ -8,7 +8,7 @@ const getPayrollPreview = async (req: Request, res: Response) => {
         if (!month) {
             return res
                 .status(400)
-                .json({ success: false, message: 'Month is required' });
+                .json({ success: false, message: "Month is required" });
         }
 
         const data = await payrollService.getPayrollPreview({
@@ -32,8 +32,15 @@ const processPayment = async (req: Request, res: Response) => {
             note,
             bonus,
             deduction,
+            paymentType,
         } = req.body;
-        const userId = (req as any).user.id || (req as any).user._id;
+
+        if (!staffId || !month || !amount) {
+            return res.status(400).json({
+                success: false,
+                message: "Missing required fields",
+            });
+        }
 
         const result = await payrollService.processPayroll({
             staffId,
@@ -43,12 +50,13 @@ const processPayment = async (req: Request, res: Response) => {
             note,
             bonus,
             deduction,
-            createdBy: userId,
+            createdBy: (req as any).user.userId,
+            paymentType,
         });
 
         return res.status(200).json({
             success: true,
-            message: 'Payment processed successfully',
+            message: "Payment processed successfully",
             data: result,
         });
     } catch (error: any) {
@@ -64,7 +72,7 @@ const bulkProcessPayment = async (req: Request, res: Response) => {
         if (!payments || !Array.isArray(payments) || payments.length === 0) {
             return res.status(400).json({
                 success: false,
-                message: 'Payments array is required',
+                message: "Payments array is required",
             });
         }
 
@@ -77,7 +85,7 @@ const bulkProcessPayment = async (req: Request, res: Response) => {
 
         return res.status(200).json({
             success: true,
-            message: 'Bulk processing completed',
+            message: "Bulk processing completed",
             data: result,
         });
     } catch (error: any) {
@@ -96,7 +104,7 @@ const graceAttendance = async (req: Request, res: Response) => {
         );
         return res.status(200).json({
             success: true,
-            message: 'Attendance processed as Grace',
+            message: "Attendance processed as Grace",
             data: result,
         });
     } catch (error: any) {
@@ -111,7 +119,7 @@ const getAbsentDates = async (req: Request, res: Response) => {
         if (!staffId || !month) {
             return res.status(400).json({
                 success: false,
-                message: 'Staff ID and Month are required',
+                message: "Staff ID and Month are required",
             });
         }
 
@@ -125,10 +133,37 @@ const getAbsentDates = async (req: Request, res: Response) => {
     }
 };
 
+const undoPayment = async (req: Request, res: Response) => {
+    try {
+        const { staffId, month, paymentType } = req.body;
+
+        if (!staffId || !month) {
+            return res.status(400).json({
+                success: false,
+                message: "Staff ID and Month are required",
+            });
+        }
+
+        const result = await payrollService.undoPayroll(
+            staffId,
+            month,
+            paymentType,
+        );
+        return res.status(200).json({
+            success: true,
+            message: "Payment undone successfully",
+            data: result,
+        });
+    } catch (error: any) {
+        return res.status(500).json({ success: false, message: error.message });
+    }
+};
+
 export default {
     getPayrollPreview,
     processPayment,
     bulkProcessPayment,
     graceAttendance,
     getAbsentDates,
+    undoPayment,
 };

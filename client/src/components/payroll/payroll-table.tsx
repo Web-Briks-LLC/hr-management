@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo } from "react";
 import {
     Table,
     TableBody,
@@ -6,21 +6,33 @@ import {
     TableHead,
     TableHeader,
     TableRow,
-} from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Ban, Banknote, Loader2, User, CheckCheck, Pencil } from 'lucide-react';
-import GraceDialog from './grace-dialog';
-import EditSalaryDialog from './edit-salary-dialog';
-import BulkReviewDialog from './bulk-review-dialog';
-import { useBulkProcessPaymentMutation } from '@/redux/features/payroll/payrollApi';
-import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
+} from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+    Ban,
+    Banknote,
+    Loader2,
+    User,
+    CheckCheck,
+    Pencil,
+    RefreshCcw,
+} from "lucide-react";
+import GraceDialog from "./grace-dialog";
+import EditSalaryDialog from "./edit-salary-dialog";
+import BulkReviewDialog from "./bulk-review-dialog";
+import {
+    useBulkProcessPaymentMutation,
+    useUndoPaymentMutation,
+} from "@/redux/features/payroll/payrollApi";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+import { IPayrollItem } from "@/types/payroll.type";
 
 interface PayrollTableProps {
-    data: any[];
+    data: IPayrollItem[];
     month: string;
     isSelectMode: boolean;
 }
@@ -49,23 +61,24 @@ export default function PayrollTable({
         open: boolean;
         staffId: string;
         staffName: string;
-    }>({ open: false, staffId: '', staffName: '' });
+    }>({ open: false, staffId: "", staffName: "" });
 
     const [editParams, setEditParams] = useState<{
         open: boolean;
         staffId: string;
         staffName: string;
         baseAmount: number;
-        mode: 'pay' | 'edit';
+        mode: "pay" | "edit";
     } | null>(null);
 
     const [bulkReviewOpen, setBulkReviewOpen] = useState(false);
 
     const [bulkPay, { isLoading: isBulkPaying }] =
         useBulkProcessPaymentMutation();
+    const [undoPayment, { isLoading: isUndoing }] = useUndoPaymentMutation();
 
     // Selection Logic
-    const allIds = useMemo(() => data.map((d) => d._id), [data]);
+
     const isAllSelected =
         data.length > 0 && selectedStaffIds.length === data.length;
 
@@ -75,7 +88,7 @@ export default function PayrollTable({
         } else {
             // Only select staff who are NOT paid
             const unpaidIds = data
-                .filter((d) => d.status !== 'paid')
+                .filter((d) => d.status !== "paid")
                 .map((d) => d._id);
             setSelectedStaffIds(unpaidIds);
         }
@@ -96,21 +109,36 @@ export default function PayrollTable({
         }));
     };
 
-    const getFinalAmount = (staff: any) => {
-        const adj = adjustments[staff._id] || { bonus: 0, deduction: 0 };
-        const base =
-            adj.baseAmount !== undefined
-                ? adj.baseAmount
-                : staff.payableSalary || 0;
-        return base + adj.bonus - adj.deduction;
+    const handleUndoPayment = async (staffId: string) => {
+        try {
+            await undoPayment({
+                staffId,
+                month,
+            }).unwrap();
+            toast.success("Payment undone successfully");
+        } catch (error) {
+            toast.error((error as Error)?.message || "Failed to undo payment");
+        }
     };
+
+    const getFinalAmount = useMemo(
+        () => (staff: IPayrollItem) => {
+            const adj = adjustments[staff._id] || { bonus: 0, deduction: 0 };
+            const base =
+                adj.baseAmount !== undefined
+                    ? adj.baseAmount
+                    : staff.payableSalary || 0;
+            return base + adj.bonus - adj.deduction;
+        },
+        [adjustments],
+    );
 
     // Bulk Pay Confirmation Handler from Dialog
     const handleBulkConfirm = async () => {
         const payments = selectedStaffIds.map((id) => {
             const staff = data.find((d) => d._id === id);
-            const adj = adjustments[id] || { bonus: 0, deduction: 0, note: '' };
-            const amount = getFinalAmount(staff);
+            const adj = adjustments[id] || { bonus: 0, deduction: 0, note: "" };
+            const amount = getFinalAmount(staff!);
 
             return {
                 staffId: id,
@@ -124,21 +152,22 @@ export default function PayrollTable({
         try {
             await bulkPay({
                 month,
-                paymentMethod: 'cash',
+                paymentMethod: "cash",
                 payments,
-                createdBy: 'admin', // Should be fetched from auth context
+                createdBy: "admin", // Should be fetched from auth context
             }).unwrap();
 
-            toast.success('Bulk Payment Successful', {
+            toast.success("Bulk Payment Successful", {
                 description: `Processed payments for ${payments.length} staff members.`,
             });
             setSelectedStaffIds([]);
             setBulkReviewOpen(false);
             setAdjustments({}); // Clear adjustments after success
-        } catch (error: any) {
-            toast.error('Bulk Payment Failed', {
+        } catch (error) {
+            toast.error("Bulk Payment Failed", {
                 description:
-                    error.data?.message || 'Failed to process payments',
+                    (error as { data?: { message?: string } })?.data?.message ||
+                    "Failed to process payments",
             });
         }
     };
@@ -147,7 +176,7 @@ export default function PayrollTable({
         return data
             .filter((d) => selectedStaffIds.includes(d._id))
             .reduce((sum, d) => sum + getFinalAmount(d), 0);
-    }, [data, selectedStaffIds, adjustments]);
+    }, [data, selectedStaffIds, getFinalAmount]);
 
     return (
         <div className="space-y-4">
@@ -157,7 +186,7 @@ export default function PayrollTable({
                     <div className="text-sm font-medium">
                         {selectedStaffIds.length} staff selected
                         <span className="mx-2 text-muted-foreground">•</span>
-                        Total Payable: ৳{' '}
+                        Total Payable: ৳{" "}
                         {totalPayableWithAdjustments.toLocaleString()}
                     </div>
                     <Button
@@ -217,7 +246,7 @@ export default function PayrollTable({
                             </TableRow>
                         ) : (
                             data.map((row) => {
-                                const isPaid = row.status === 'paid';
+                                const isPaid = row.status === "paid";
                                 const adj = adjustments[row._id];
                                 const hasAdjustment =
                                     adj &&
@@ -235,8 +264,8 @@ export default function PayrollTable({
                                         key={row._id}
                                         className={cn(
                                             selectedStaffIds.includes(row._id)
-                                                ? 'bg-muted/30'
-                                                : '',
+                                                ? "bg-muted/30"
+                                                : "",
                                         )}
                                     >
                                         {isSelectMode && (
@@ -268,10 +297,12 @@ export default function PayrollTable({
                                                         {row.name}
                                                     </div>
                                                     <div className="text-xs text-muted-foreground">
-                                                        {row.designation}
+                                                        {row.bankName || "N/A"}{" "}
+                                                        - {row.branch || "N/A"}
                                                     </div>
                                                     <div className="text-[10px] text-muted-foreground font-mono bg-muted/60 px-1.5 py-0.5 rounded w-fit mt-1">
-                                                        {row.staffId}
+                                                        {row.bankAccountNo ||
+                                                            "No Account"}
                                                     </div>
                                                 </div>
                                             </div>
@@ -311,7 +342,7 @@ export default function PayrollTable({
                                                                         ]
                                                                             ?.baseAmount ??
                                                                         row.payableSalary,
-                                                                    mode: 'pay', // Using 'pay' mode to show review dialog, but will have Save button
+                                                                    mode: "pay", // Using 'pay' mode to show review dialog, but will have Save button
                                                                 });
                                                             }}
                                                             className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-muted rounded text-muted-foreground hover:text-foreground"
@@ -322,10 +353,10 @@ export default function PayrollTable({
                                                     )}
                                                     <span
                                                         className={cn(
-                                                            'font-bold font-mono',
+                                                            "font-bold font-mono",
                                                             hasAdjustment
-                                                                ? 'text-blue-600'
-                                                                : '',
+                                                                ? "text-blue-600"
+                                                                : "",
                                                         )}
                                                     >
                                                         {finalAmount}
@@ -364,13 +395,33 @@ export default function PayrollTable({
                                                 </Button>
 
                                                 {isPaid ? (
-                                                    <Badge
-                                                        variant="outline"
-                                                        className="h-8 px-3 text-xs gap-1.5 border-green-200 bg-green-50 text-green-700"
-                                                    >
-                                                        <CheckCheck className="h-3.5 w-3.5" />
-                                                        Paid
-                                                    </Badge>
+                                                    <div className="flex items-center gap-2">
+                                                        <Badge
+                                                            variant="outline"
+                                                            className="h-8 px-3 text-xs gap-1.5 border-green-200 bg-green-50 text-green-700"
+                                                        >
+                                                            <CheckCheck className="h-3.5 w-3.5" />
+                                                            Paid
+                                                        </Badge>
+                                                        <Button
+                                                            size="sm"
+                                                            variant="ghost"
+                                                            className="h-8 w-8 p-0 text-muted-foreground hover:text-red-600"
+                                                            onClick={() =>
+                                                                handleUndoPayment(
+                                                                    row._id,
+                                                                )
+                                                            }
+                                                            disabled={isUndoing}
+                                                            title="Undo Payment"
+                                                        >
+                                                            {isUndoing ? (
+                                                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                            ) : (
+                                                                <RefreshCcw className="h-3.5 w-3.5" />
+                                                            )}
+                                                        </Button>
+                                                    </div>
                                                 ) : (
                                                     <Button
                                                         size="sm"
@@ -388,7 +439,7 @@ export default function PayrollTable({
                                                                     ]
                                                                         ?.baseAmount ??
                                                                     row.payableSalary,
-                                                                mode: 'pay',
+                                                                mode: "pay",
                                                             })
                                                         }
                                                     >
@@ -429,7 +480,7 @@ export default function PayrollTable({
                     }
                     initialNote={adjustments[editParams.staffId]?.note}
                     onSave={
-                        editParams.mode === 'pay'
+                        editParams.mode === "pay"
                             ? (data) =>
                                   handleSaveAdjustment(editParams.staffId, data)
                             : undefined

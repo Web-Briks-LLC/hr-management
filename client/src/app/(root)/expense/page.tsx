@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { useState, useMemo } from 'react';
-import { useGetFinanceAnalyticsQuery } from '@/redux/features/analytics/analyticsApi';
+import { useState, useMemo } from "react";
+import { useGetFinanceAnalyticsQuery } from "@/redux/features/analytics/analyticsApi";
 import {
     useGetExpensesQuery,
     useGetExpenseStatsQuery,
@@ -14,24 +14,24 @@ import {
     type Expense,
     type ExpenseCategory,
     type ExpenseQueryParams,
-} from '@/redux/features/expense/expenseApi';
-import { useGetAllBranchesQuery } from '@/redux/features/branch/branchApi';
+} from "@/redux/features/expense/expenseApi";
+import { useGetAllBranchesQuery } from "@/redux/features/branch/branchApi";
 import {
     Card,
     CardContent,
     CardDescription,
     CardHeader,
     CardTitle,
-} from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
     Select,
     SelectContent,
     SelectItem,
     SelectTrigger,
     SelectValue,
-} from '@/components/ui/select';
+} from "@/components/ui/select";
 import {
     Table,
     TableBody,
@@ -39,7 +39,7 @@ import {
     TableHead,
     TableHeader,
     TableRow,
-} from '@/components/ui/table';
+} from "@/components/ui/table";
 import {
     Dialog,
     DialogContent,
@@ -48,7 +48,7 @@ import {
     DialogHeader,
     DialogTitle,
     DialogTrigger,
-} from '@/components/ui/dialog';
+} from "@/components/ui/dialog";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -58,14 +58,14 @@ import {
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+} from "@/components/ui/alert-dialog";
 import {
     Popover,
     PopoverContent,
     PopoverTrigger,
-} from '@/components/ui/popover';
-import { Label } from '@/components/ui/label';
-import { Calendar } from '@/components/ui/calendar';
+} from "@/components/ui/popover";
+import { Label } from "@/components/ui/label";
+import { Calendar } from "@/components/ui/calendar";
 import {
     Loader,
     ChevronLeft,
@@ -81,46 +81,48 @@ import {
     Download,
     CheckCircle2,
     Clock,
-} from 'lucide-react';
-import { Skeleton } from '@/components/ui/skeleton';
-import { toast } from 'sonner';
-import { format } from 'date-fns';
-import { cn } from '@/lib/utils';
+    RefreshCcw,
+    Undo,
+} from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "sonner";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 import {
     ExpenseForm,
     type ExpenseFormData,
-} from '@/components/expense/ExpenseForm';
-import { ExportExpenseDialog } from '@/components/expense/ExportExpenseDialog';
+} from "@/components/expense/ExpenseForm";
+import { ExportExpenseDialog } from "@/components/expense/ExportExpenseDialog";
 
 const statusOptions = [
     {
-        value: 'pending',
-        label: 'Pending',
-        color: 'text-yellow-600 bg-yellow-100',
+        value: "pending",
+        label: "Pending",
+        color: "text-yellow-600 bg-yellow-100",
     },
-    { value: 'paid', label: 'Paid', color: 'text-green-600 bg-green-100' },
+    { value: "paid", label: "Paid", color: "text-green-600 bg-green-100" },
     {
-        value: 'partial_paid',
-        label: 'Partial Paid',
-        color: 'text-orange-600 bg-orange-100',
+        value: "partial_paid",
+        label: "Partial Paid",
+        color: "text-orange-600 bg-orange-100",
     },
 ];
 
-type FilterType = 'all' | 'today' | 'week' | 'month' | 'year' | 'range';
+type FilterType = "all" | "today" | "week" | "month" | "year" | "range";
 
 const MONTHS = [
-    { value: 1, label: 'January' },
-    { value: 2, label: 'February' },
-    { value: 3, label: 'March' },
-    { value: 4, label: 'April' },
-    { value: 5, label: 'May' },
-    { value: 6, label: 'June' },
-    { value: 7, label: 'July' },
-    { value: 8, label: 'August' },
-    { value: 9, label: 'September' },
-    { value: 10, label: 'October' },
-    { value: 11, label: 'November' },
-    { value: 12, label: 'December' },
+    { value: 1, label: "January" },
+    { value: 2, label: "February" },
+    { value: 3, label: "March" },
+    { value: 4, label: "April" },
+    { value: 5, label: "May" },
+    { value: 6, label: "June" },
+    { value: 7, label: "July" },
+    { value: 8, label: "August" },
+    { value: 9, label: "September" },
+    { value: 10, label: "October" },
+    { value: 11, label: "November" },
+    { value: 12, label: "December" },
 ];
 
 const currentYear = new Date().getFullYear();
@@ -134,10 +136,10 @@ export default function ExpensePage() {
     // Filter State
     const [page, setPage] = useState(1);
     const [limit, setLimit] = useState(10);
-    const [search, setSearch] = useState('');
-    const [filterType, setFilterType] = useState<FilterType>('all');
-    const [statusFilter, setStatusFilter] = useState<string>('all');
-    const [branchFilter, setBranchFilter] = useState<string>('all');
+    const [search, setSearch] = useState("");
+    const [filterType, setFilterType] = useState<FilterType>("all");
+    const [statusFilter, setStatusFilter] = useState<string>("all");
+    const [branchFilter, setBranchFilter] = useState<string>("all");
     const [selectedMonth, setSelectedMonth] = useState(
         new Date().getMonth() + 1,
     );
@@ -153,7 +155,7 @@ export default function ExpensePage() {
     );
     const [isAddCategoryDialogOpen, setIsAddCategoryDialogOpen] =
         useState(false);
-    const [newCategoryName, setNewCategoryName] = useState('');
+    const [newCategoryName, setNewCategoryName] = useState("");
     const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
 
     // Default form values for edit
@@ -166,35 +168,35 @@ export default function ExpensePage() {
         const params: ExpenseQueryParams = {
             page,
             limit,
-            sortOrder: 'desc', // Default sort
+            sortOrder: "desc", // Default sort
         };
 
         if (search) params.search = search;
-        if (statusFilter !== 'all') params.status = statusFilter;
-        if (branchFilter !== 'all') params.branchId = branchFilter;
+        if (statusFilter !== "all") params.status = statusFilter;
+        if (branchFilter !== "all") params.branchId = branchFilter;
 
         switch (filterType) {
-            case 'today':
-                params.filterType = 'today';
+            case "today":
+                params.filterType = "today";
                 break;
-            case 'week':
-                params.filterType = 'week';
+            case "week":
+                params.filterType = "week";
                 break;
-            case 'month':
-                params.filterType = 'month';
+            case "month":
+                params.filterType = "month";
                 params.month = selectedMonth;
                 params.year = selectedYear;
                 break;
-            case 'year':
-                params.filterType = 'year';
+            case "year":
+                params.filterType = "year";
                 params.year = selectedYear;
                 break;
-            case 'range':
+            case "range":
                 if (dateRange.from) {
-                    params.filterType = 'range';
-                    params.startDate = format(dateRange.from, 'yyyy-MM-dd');
+                    params.filterType = "range";
+                    params.startDate = format(dateRange.from, "yyyy-MM-dd");
                     if (dateRange.to) {
-                        params.endDate = format(dateRange.to, 'yyyy-MM-dd');
+                        params.endDate = format(dateRange.to, "yyyy-MM-dd");
                     }
                 }
                 break;
@@ -224,12 +226,12 @@ export default function ExpensePage() {
     const statsParams = useMemo(() => {
         const params: { branchId?: string; year?: number; month?: number } = {};
 
-        if (branchFilter !== 'all') params.branchId = branchFilter;
+        if (branchFilter !== "all") params.branchId = branchFilter;
 
-        if (filterType === 'month') {
+        if (filterType === "month") {
             params.month = selectedMonth;
             params.year = selectedYear;
-        } else if (filterType === 'year') {
+        } else if (filterType === "year") {
             params.year = selectedYear;
         }
 
@@ -267,7 +269,7 @@ export default function ExpensePage() {
     const handleCreateExpense = async (data: ExpenseFormData) => {
         if (finalAmount <= 0) {
             toast.error(
-                'Cannot add expense when Final Amount (Profit - Shared + Debit) is 0 or negative',
+                "Cannot add expense when Final Amount (Profit - Shared + Debit) is 0 or negative",
             );
             return;
         }
@@ -277,10 +279,10 @@ export default function ExpensePage() {
                 ...data,
                 amount: parseFloat(data.amount),
             }).unwrap();
-            toast.success('Expense created successfully');
+            toast.success("Expense created successfully");
             setIsAddDialogOpen(false);
-        } catch (error: any) {
-            toast.error(error?.data?.message || 'Failed to create expense');
+        } catch (error) {
+            toast.error((error as Error)?.message || "Failed to create expense");
         }
     };
 
@@ -292,11 +294,11 @@ export default function ExpensePage() {
                 ...data,
                 amount: parseFloat(data.amount),
             }).unwrap();
-            toast.success('Expense updated successfully');
+            toast.success("Expense updated successfully");
             setIsEditDialogOpen(false);
             setSelectedExpense(null);
-        } catch (error: any) {
-            toast.error(error?.data?.message || 'Failed to update expense');
+        } catch (error) {
+            toast.error((error as Error)?.message || "Failed to update expense");
         }
     };
 
@@ -304,26 +306,26 @@ export default function ExpensePage() {
         if (!selectedExpense) return;
         try {
             await deleteExpense(selectedExpense._id).unwrap();
-            toast.success('Expense deleted successfully');
+            toast.success("Expense deleted successfully");
             setIsDeleteDialogOpen(false);
             setSelectedExpense(null);
-        } catch (error: any) {
-            toast.error(error?.data?.message || 'Failed to delete expense');
+        } catch (error) {
+            toast.error((error as Error)?.message || "Failed to delete expense");
         }
     };
 
     const handleCreateCategory = async () => {
         if (!newCategoryName.trim()) {
-            toast.error('Category name is required');
+            toast.error("Category name is required");
             return;
         }
         try {
             await createCategory({ name: newCategoryName }).unwrap();
-            toast.success('Category created successfully');
+            toast.success("Category created successfully");
             setIsAddCategoryDialogOpen(false);
-            setNewCategoryName('');
-        } catch (error: any) {
-            toast.error(error?.data?.message || 'Failed to create category');
+            setNewCategoryName("");
+        } catch (error) {
+            toast.error((error as Error)?.message || "Failed to create category");
         }
     };
 
@@ -332,19 +334,19 @@ export default function ExpensePage() {
         setEditDefaultValues({
             date: new Date(expense.date),
             title: expense.title,
-            categoryId: expense.category?._id || '',
-            branchId: expense.branch?._id || '',
+            categoryId: expense.category?._id || "",
+            branchId: expense.branch?._id || "",
             amount: expense.amount.toString(),
             status: expense.status,
-            note: expense.note || '',
+            note: expense.note || "",
         });
         setIsEditDialogOpen(true);
     };
 
     const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat('en-IN', {
-            style: 'currency',
-            currency: 'BDT',
+        return new Intl.NumberFormat("en-IN", {
+            style: "currency",
+            currency: "BDT",
             minimumFractionDigits: 0,
         }).format(amount);
     };
@@ -545,7 +547,7 @@ export default function ExpensePage() {
                         </Select>
 
                         {/* Contextual Date Filters */}
-                        {filterType === 'month' && (
+                        {filterType === "month" && (
                             <div className="flex gap-2 animate-in fade-in slide-in-from-left-2 duration-300">
                                 <Select
                                     value={selectedMonth.toString()}
@@ -590,7 +592,7 @@ export default function ExpensePage() {
                             </div>
                         )}
 
-                        {filterType === 'year' && (
+                        {filterType === "year" && (
                             <Select
                                 value={selectedYear.toString()}
                                 onValueChange={(v) =>
@@ -613,7 +615,7 @@ export default function ExpensePage() {
                             </Select>
                         )}
 
-                        {filterType === 'range' && (
+                        {filterType === "range" && (
                             <Popover>
                                 <PopoverTrigger asChild>
                                     <Button
@@ -626,19 +628,19 @@ export default function ExpensePage() {
                                                 <>
                                                     {format(
                                                         dateRange.from,
-                                                        'MMM dd',
-                                                    )}{' '}
-                                                    -{' '}
+                                                        "MMM dd",
+                                                    )}{" "}
+                                                    -{" "}
                                                     {format(
                                                         dateRange.to,
-                                                        'MMM dd',
+                                                        "MMM dd",
                                                     )}
                                                 </>
                                             ) : (
-                                                format(dateRange.from, 'PPP')
+                                                format(dateRange.from, "PPP")
                                             )
                                         ) : (
-                                            'Pick a date range'
+                                            "Pick a date range"
                                         )}
                                     </Button>
                                 </PopoverTrigger>
@@ -664,7 +666,7 @@ export default function ExpensePage() {
                             </Popover>
                         )}
 
-                        <div className="w-[1px] h-6 bg-border mx-1" />
+                        <div className="w-px h-6 bg-border mx-1" />
 
                         {/* Status Filter */}
                         <Select
@@ -720,10 +722,10 @@ export default function ExpensePage() {
                             variant="ghost"
                             size="sm"
                             onClick={() => {
-                                setSearch('');
-                                setFilterType('all');
-                                setStatusFilter('all');
-                                setBranchFilter('all');
+                                setSearch("");
+                                setFilterType("all");
+                                setStatusFilter("all");
+                                setBranchFilter("all");
                                 setPage(1);
                                 setDateRange({});
                             }}
@@ -854,7 +856,7 @@ export default function ExpensePage() {
                                                             new Date(
                                                                 expense.date,
                                                             ),
-                                                            'PPP',
+                                                            "PPP",
                                                         )}
                                                     </TableCell>
                                                     <TableCell className="font-medium border-r">
@@ -862,11 +864,11 @@ export default function ExpensePage() {
                                                     </TableCell>
                                                     <TableCell className="border-r">
                                                         {expense.category
-                                                            ?.name || '-'}
+                                                            ?.name || "-"}
                                                     </TableCell>
                                                     <TableCell className="border-r">
                                                         {expense.branch?.name ||
-                                                            '-'}
+                                                            "-"}
                                                     </TableCell>
                                                     <TableCell className="font-medium border-r text-right">
                                                         {formatCurrency(
@@ -881,10 +883,45 @@ export default function ExpensePage() {
                                                         </span>
                                                     </TableCell>
                                                     <TableCell className="max-w-[150px] truncate border-r">
-                                                        {expense.note || '-'}
+                                                        {expense.note || "-"}
                                                     </TableCell>
                                                     <TableCell className="text-right">
-                                                        <div className="flex items-center justify-center gap-2">
+                                                        <div className="flex items-center justify-end gap-2">
+                                                            {expense.status ===
+                                                                "paid" && (
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    onClick={() => {
+                                                                        setSelectedExpense(
+                                                                            expense,
+                                                                        );
+                                                                        handleUpdateExpense(
+                                                                            {
+                                                                                ...expense,
+                                                                                amount: expense.amount.toString(),
+                                                                                categoryId:
+                                                                                    expense
+                                                                                        .category
+                                                                                        ?._id ||
+                                                                                    "",
+                                                                                branchId:
+                                                                                    expense
+                                                                                        .branch
+                                                                                        ?._id ||
+                                                                                    "",
+                                                                                date: new Date(
+                                                                                    expense.date,
+                                                                                ),
+                                                                                status: "pending",
+                                                                            },
+                                                                        );
+                                                                    }}
+                                                                    title="Mark as Pending"
+                                                                >
+                                                                    <RefreshCcw className="h-4 w-4 text-orange-500" />
+                                                                </Button>
+                                                            )}
                                                             <Button
                                                                 variant="ghost"
                                                                 size="icon"
@@ -926,7 +963,7 @@ export default function ExpensePage() {
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-6">
                                 <div className="text-sm text-muted-foreground">
-                                    Page {pagination.page} of{' '}
+                                    Page {pagination.page} of{" "}
                                     {Math.max(1, pagination.pages)} (
                                     {pagination.total} total)
                                 </div>
