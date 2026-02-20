@@ -1,9 +1,27 @@
-import path from 'path';
-import dotenv from 'dotenv';
+import path from "path";
+import dotenv from "dotenv";
 
 dotenv.config({
-    path: path.join(process.cwd(), '.env'),
+    path: path.join(process.cwd(), ".env"),
 });
+
+// Validate required environment variables at startup
+const requiredVars = [
+    "MONGO_URI",
+    "DB_NAME",
+    "BETTER_AUTH_SECRET",
+    "BETTER_AUTH_URL",
+    "TRUSTED_ORIGINS",
+    "PORT",
+] as const;
+
+const missing = requiredVars.filter((key) => !process.env[key]);
+if (missing.length > 0) {
+    throw new Error(
+        `Missing required environment variables: ${missing.join(", ")}. ` +
+            "Check your .env file.",
+    );
+}
 
 const envConfig = {
     node_env: process.env.NODE_ENV!,
@@ -16,9 +34,9 @@ const envConfig = {
     better_auth_secret: process.env.BETTER_AUTH_SECRET!,
     better_auth_url: process.env.BETTER_AUTH_URL!,
     trusted_origins: process.env.TRUSTED_ORIGINS!,
-    
+
     // client
-    client_url: process.env.CLIENT_URL || 'http://localhost:3000',
+    client_url: process.env.CLIENT_URL || "http://localhost:3000",
 
     // nodemailer
     smtp_user: process.env.SMTP_USER!,

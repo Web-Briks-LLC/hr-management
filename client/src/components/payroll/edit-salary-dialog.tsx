@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 import {
     Dialog,
     DialogContent,
@@ -6,13 +6,21 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { toast } from 'sonner';
-import { useProcessPaymentMutation } from '@/redux/features/payroll/payrollApi';
-import { Loader2, Save } from 'lucide-react';
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import { toast } from "sonner";
+import { useProcessPaymentMutation } from "@/redux/features/payroll/payrollApi";
+import { useSession } from "@/lib/auth-client";
+import { Loader2, Save } from "lucide-react";
 
 interface EditSalaryDialogProps {
     open: boolean;
@@ -21,7 +29,7 @@ interface EditSalaryDialogProps {
     staffName: string;
     month: string;
     baseAmount: number; // calculated payable amount
-    mode?: 'pay' | 'edit';
+    mode?: "pay" | "edit";
     initialBonus?: number;
     initialDeduction?: number;
     initialNote?: string;
@@ -40,15 +48,17 @@ export default function EditSalaryDialog({
     staffName,
     month,
     baseAmount,
-    mode = 'pay',
+    mode = "pay",
     initialBonus = 0,
     initialDeduction = 0,
-    initialNote = '',
+    initialNote = "",
     onSave,
 }: EditSalaryDialogProps) {
-    const [bonus, setBonus] = useState<string>('');
-    const [deduction, setDeduction] = useState<string>('');
-    const [note, setNote] = useState('');
+    const { data: session } = useSession();
+    const [bonus, setBonus] = useState<string>("");
+    const [deduction, setDeduction] = useState<string>("");
+    const [note, setNote] = useState("");
+    const [paymentMethod, setPaymentMethod] = useState("cash");
     const [localBaseAmount, setLocalBaseAmount] = useState<string>(
         (baseAmount || 0).toString(),
     );
@@ -59,11 +69,12 @@ export default function EditSalaryDialog({
 
     useEffect(() => {
         if (open) {
-            setBonus(initialBonus > 0 ? initialBonus.toString() : '');
+            setBonus(initialBonus > 0 ? initialBonus.toString() : "");
             setDeduction(
-                initialDeduction > 0 ? initialDeduction.toString() : '',
+                initialDeduction > 0 ? initialDeduction.toString() : "",
             );
-            setNote(initialNote || '');
+            setNote(initialNote || "");
+            setPaymentMethod("cash");
             setLocalBaseAmount((baseAmount || 0).toString());
             setFinalAmount(baseAmount || 0);
             setIsBaseEditable(false);
@@ -87,9 +98,9 @@ export default function EditSalaryDialog({
                 note: note.trim(),
             });
             onOpenChange(false);
-            toast.success('Changes Saved', {
+            toast.success("Changes Saved", {
                 description:
-                    'Salary adjustments have been saved for bulk payment.',
+                    "Salary adjustments have been saved for bulk payment.",
             });
         }
     };
@@ -100,19 +111,21 @@ export default function EditSalaryDialog({
                 staffId,
                 month,
                 amount: finalAmount,
-                paymentMethod: 'cash',
+                paymentMethod,
+                paymentType: "salary",
                 note,
                 bonus: parseFloat(bonus) || 0,
                 deduction: parseFloat(deduction) || 0,
+                createdBy: session?.user?.id || "",
             }).unwrap();
 
-            toast.success('Payment Successful', {
+            toast.success("Payment Successful", {
                 description: `Salary paid to ${staffName}`,
             });
             onOpenChange(false);
         } catch (error: any) {
-            toast.error('Payment Failed', {
-                description: error.data?.message || 'Could not process payment',
+            toast.error("Payment Failed", {
+                description: error.data?.message || "Could not process payment",
             });
         }
     };
@@ -122,12 +135,12 @@ export default function EditSalaryDialog({
             <DialogContent className="sm:max-w-[425px]">
                 <DialogHeader>
                     <DialogTitle>
-                        {mode === 'edit'
-                            ? 'Edit Payment'
-                            : 'Review & Process Payment'}
+                        {mode === "edit"
+                            ? "Edit Payment"
+                            : "Review & Process Payment"}
                     </DialogTitle>
                     <DialogDescription>
-                        Review and adjust salary for{' '}
+                        Review and adjust salary for{" "}
                         <span className="font-semibold">{staffName}</span>.
                     </DialogDescription>
                 </DialogHeader>
@@ -145,7 +158,7 @@ export default function EditSalaryDialog({
                                     setLocalBaseAmount(e.target.value)
                                 }
                                 disabled={!isBaseEditable}
-                                className={!isBaseEditable ? 'bg-muted' : ''}
+                                className={!isBaseEditable ? "bg-muted" : ""}
                             />
                             <Button
                                 type="button"
@@ -208,6 +221,28 @@ export default function EditSalaryDialog({
                         <div className="col-span-3 font-bold text-lg">
                             {(finalAmount || 0).toFixed(2)}
                         </div>
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="method" className="text-right">
+                            Method
+                        </Label>
+                        <Select
+                            value={paymentMethod}
+                            onValueChange={setPaymentMethod}
+                        >
+                            <SelectTrigger className="col-span-3">
+                                <SelectValue placeholder="Payment Method" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="cash">Cash</SelectItem>
+                                <SelectItem value="bank_transfer">
+                                    Bank Transfer
+                                </SelectItem>
+                                <SelectItem value="mobile_banking">
+                                    Mobile Banking
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
                     </div>
                     <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="note" className="text-right">

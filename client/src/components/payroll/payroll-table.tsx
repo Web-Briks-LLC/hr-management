@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Input } from "@/components/ui/input";
 import {
     Ban,
     Banknote,
@@ -19,6 +20,7 @@ import {
     CheckCheck,
     Pencil,
     RefreshCcw,
+    Search,
 } from "lucide-react";
 import GraceDialog from "./grace-dialog";
 import EditSalaryDialog from "./edit-salary-dialog";
@@ -27,6 +29,7 @@ import {
     useBulkProcessPaymentMutation,
     useUndoPaymentMutation,
 } from "@/redux/features/payroll/payrollApi";
+import { useSession } from "@/lib/auth-client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { IPayrollItem } from "@/types/payroll.type";
@@ -35,6 +38,7 @@ interface PayrollTableProps {
     data: IPayrollItem[];
     month: string;
     isSelectMode: boolean;
+    isLocked?: boolean;
 }
 
 type Adjustment = {
@@ -48,8 +52,12 @@ export default function PayrollTable({
     data,
     month,
     isSelectMode,
+    isLocked = false,
 }: PayrollTableProps) {
+    const { data: session } = useSession();
     const [selectedStaffIds, setSelectedStaffIds] = useState<string[]>([]);
+    const [searchQuery, setSearchQuery] = useState("");
+    const [processingId, setProcessingId] = useState<string | null>(null);
 
     // Local state to store adjustments before payment
     const [adjustments, setAdjustments] = useState<Record<string, Adjustment>>(
@@ -75,22 +83,31 @@ export default function PayrollTable({
 
     const [bulkPay, { isLoading: isBulkPaying }] =
         useBulkProcessPaymentMutation();
-    const [undoPayment, { isLoading: isUndoing }] = useUndoPaymentMutation();
+    const [undoPayment] = useUndoPaymentMutation();
+
+    // Filtered data by search
+    const filteredData = useMemo(() => {
+        if (!searchQuery.trim()) return data;
+        const q = searchQuery.toLowerCase();
+        return data.filter(
+            (d) =>
+                d.name?.toLowerCase().includes(q) ||
+                d.designation?.toLowerCase().includes(q) ||
+                d.staffId?.toLowerCase().includes(q),
+        );
+    }, [data, searchQuery]);
 
     // Selection Logic
-
+    const unpaidData = filteredData.filter((d) => d.status !== "paid");
     const isAllSelected =
-        data.length > 0 && selectedStaffIds.length === data.length;
+        unpaidData.length > 0 &&
+        unpaidData.every((d) => selectedStaffIds.includes(d._id));
 
     const toggleSelectAll = () => {
         if (isAllSelected) {
             setSelectedStaffIds([]);
         } else {
-            // Only select staff who are NOT paid
-            const unpaidIds = data
-                .filter((d) => d.status !== "paid")
-                .map((d) => d._id);
-            setSelectedStaffIds(unpaidIds);
+            setSelectedStaffIds(unpaidData.map((d) => d._id));
         }
     };
 
@@ -109,15 +126,20 @@ export default function PayrollTable({
         }));
     };
 
-    const handleUndoPayment = async (staffId: string) => {
+    const handleUndoPayment = async (staff: IPayrollItem) => {
+        setProcessingId(staff._id);
         try {
             await undoPayment({
-                staffId,
+                staffId: staff._id,
                 month,
+                paymentType: "salary",
+                branchId: staff.branchId,
             }).unwrap();
             toast.success("Payment undone successfully");
-        } catch (error) {
-            toast.error((error as Error)?.message || "Failed to undo payment");
+        } catch (error: any) {
+            toast.error(error?.data?.message || "Failed to undo payment");
+        } finally {
+            setProcessingId(null);
         }
     };
 
@@ -133,13 +155,12 @@ export default function PayrollTable({
         [adjustments],
     );
 
-    // Bulk Pay Confirmation Handler from Dialog
+    // Bulk Pay
     const handleBulkConfirm = async () => {
         const payments = selectedStaffIds.map((id) => {
             const staff = data.find((d) => d._id === id);
             const adj = adjustments[id] || { bonus: 0, deduction: 0, note: "" };
             const amount = getFinalAmount(staff!);
-
             return {
                 staffId: id,
                 amount,
@@ -149,12 +170,17 @@ export default function PayrollTable({
             };
         });
 
+        // Determine branchId from first staff for cache key
+        const firstStaff = data.find((d) => d._id === selectedStaffIds[0]);
+
         try {
             await bulkPay({
                 month,
                 paymentMethod: "cash",
                 payments,
-                createdBy: "admin", // Should be fetched from auth context
+                paymentType: "salary",
+                createdBy: session?.user?.id || "",
+                branchId: firstStaff?.branchId,
             }).unwrap();
 
             toast.success("Bulk Payment Successful", {
@@ -162,12 +188,11 @@ export default function PayrollTable({
             });
             setSelectedStaffIds([]);
             setBulkReviewOpen(false);
-            setAdjustments({}); // Clear adjustments after success
-        } catch (error) {
+            setAdjustments({});
+        } catch (error: any) {
             toast.error("Bulk Payment Failed", {
                 description:
-                    (error as { data?: { message?: string } })?.data?.message ||
-                    "Failed to process payments",
+                    error?.data?.message || "Failed to process payments",
             });
         }
     };
@@ -180,8 +205,19 @@ export default function PayrollTable({
 
     return (
         <div className="space-y-4">
+            {/* Search Bar */}
+            <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                    placeholder="Search by name, designation, or staff ID..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9 h-9"
+                />
+            </div>
+
             {/* Bulk Action Bar */}
-            {selectedStaffIds.length > 0 && isSelectMode && (
+            {selectedStaffIds.length > 0 && isSelectMode && !isLocked && (
                 <div className="bg-primary/10 border border-primary/20 rounded-md p-3 flex items-center justify-between animate-in fade-in slide-in-from-top-2">
                     <div className="text-sm font-medium">
                         {selectedStaffIds.length} staff selected
@@ -209,6 +245,7 @@ export default function PayrollTable({
                                         checked={isAllSelected}
                                         onCheckedChange={toggleSelectAll}
                                         aria-label="Select all"
+                                        disabled={isLocked}
                                     />
                                 </TableHead>
                             )}
@@ -235,17 +272,19 @@ export default function PayrollTable({
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {data.length === 0 ? (
+                        {filteredData.length === 0 ? (
                             <TableRow>
                                 <TableCell
                                     colSpan={isSelectMode ? 9 : 8}
                                     className="h-24 text-center"
                                 >
-                                    No payroll data found for this month.
+                                    {searchQuery
+                                        ? "No staff match your search."
+                                        : "No payroll data found for this month."}
                                 </TableCell>
                             </TableRow>
                         ) : (
-                            data.map((row) => {
+                            filteredData.map((row) => {
                                 const isPaid = row.status === "paid";
                                 const adj = adjustments[row._id];
                                 const hasAdjustment =
@@ -258,6 +297,7 @@ export default function PayrollTable({
                                 const finalAmount = isPaid
                                     ? row.paidAmount
                                     : getFinalAmount(row);
+                                const isProcessing = processingId === row._id;
 
                                 return (
                                     <TableRow
@@ -277,7 +317,9 @@ export default function PayrollTable({
                                                     onCheckedChange={() =>
                                                         toggleSelect(row._id)
                                                     }
-                                                    disabled={isPaid}
+                                                    disabled={
+                                                        isPaid || isLocked
+                                                    }
                                                 />
                                             </TableCell>
                                         )}
@@ -325,7 +367,7 @@ export default function PayrollTable({
                                         <TableCell className="text-right group relative">
                                             <div className="flex flex-col items-end">
                                                 <div className="flex items-center gap-2">
-                                                    {!isPaid && (
+                                                    {!isPaid && !isLocked && (
                                                         <button
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
@@ -342,7 +384,7 @@ export default function PayrollTable({
                                                                         ]
                                                                             ?.baseAmount ??
                                                                         row.payableSalary,
-                                                                    mode: "pay", // Using 'pay' mode to show review dialog, but will have Save button
+                                                                    mode: "pay",
                                                                 });
                                                             }}
                                                             className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-muted rounded text-muted-foreground hover:text-foreground"
@@ -389,7 +431,9 @@ export default function PayrollTable({
                                                         })
                                                     }
                                                     title="Grace"
-                                                    disabled={isPaid}
+                                                    disabled={
+                                                        isPaid || isLocked
+                                                    }
                                                 >
                                                     <Ban className="h-3.5 w-3.5 text-muted-foreground" />
                                                 </Button>
@@ -409,13 +453,16 @@ export default function PayrollTable({
                                                             className="h-8 w-8 p-0 text-muted-foreground hover:text-red-600"
                                                             onClick={() =>
                                                                 handleUndoPayment(
-                                                                    row._id,
+                                                                    row,
                                                                 )
                                                             }
-                                                            disabled={isUndoing}
+                                                            disabled={
+                                                                isProcessing ||
+                                                                isLocked
+                                                            }
                                                             title="Undo Payment"
                                                         >
-                                                            {isUndoing ? (
+                                                            {isProcessing ? (
                                                                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
                                                             ) : (
                                                                 <RefreshCcw className="h-3.5 w-3.5" />
@@ -426,6 +473,7 @@ export default function PayrollTable({
                                                     <Button
                                                         size="sm"
                                                         className="h-8 px-3 text-xs gap-1.5 bg-green-600 hover:bg-green-700"
+                                                        disabled={isLocked}
                                                         onClick={() =>
                                                             setEditParams({
                                                                 open: true,

@@ -33,6 +33,7 @@ import {
 interface OvertimeTableProps {
     data: IPayrollItem[];
     month: string;
+    isLocked?: boolean;
 }
 
 interface ApiError {
@@ -41,7 +42,11 @@ interface ApiError {
     };
 }
 
-export default function OvertimeTable({ data, month }: OvertimeTableProps) {
+export default function OvertimeTable({
+    data,
+    month,
+    isLocked = false,
+}: OvertimeTableProps) {
     const [processPayment, { isLoading: isProcessing }] =
         useProcessPaymentMutation();
     const [undoPayment, { isLoading: isUndoing }] = useUndoPaymentMutation();
@@ -192,7 +197,8 @@ export default function OvertimeTable({ data, month }: OvertimeTableProps) {
                         <Button
                             disabled={
                                 selectedStaffIds.length === 0 ||
-                                isBulkProcessing
+                                isBulkProcessing ||
+                                isLocked
                             }
                         >
                             Review & Pay
@@ -311,7 +317,8 @@ export default function OvertimeTable({ data, month }: OvertimeTableProps) {
                         ) : (
                             filteredData.map((row) => {
                                 const isPaid = row.otStatus === "paid";
-                                const isLoading = processingId === row._id;
+                                const isRowProcessing =
+                                    processingId === row._id;
                                 const isSelected = selectedStaffIds.includes(
                                     row._id,
                                 );
@@ -328,7 +335,7 @@ export default function OvertimeTable({ data, month }: OvertimeTableProps) {
                                                         checked as boolean,
                                                     )
                                                 }
-                                                disabled={!isPayable}
+                                                disabled={!isPayable || isLocked}
                                             />
                                         </TableCell>
                                         <TableCell>
@@ -395,12 +402,13 @@ export default function OvertimeTable({ data, month }: OvertimeTableProps) {
                                                             )
                                                         }
                                                         disabled={
-                                                            isLoading ||
-                                                            isUndoing
+                                                            isRowProcessing ||
+                                                            isUndoing ||
+                                                            isLocked
                                                         }
                                                         title="Undo Payment"
                                                     >
-                                                        {isLoading ? (
+                                                        {isRowProcessing ? (
                                                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
                                                         ) : (
                                                             <RefreshCcw className="h-3.5 w-3.5" />
@@ -416,12 +424,13 @@ export default function OvertimeTable({ data, month }: OvertimeTableProps) {
                                                             )
                                                         }
                                                         disabled={
-                                                            isLoading ||
+                                                            isRowProcessing ||
                                                             isProcessing ||
-                                                            row.otPayable <= 0
+                                                            row.otPayable <= 0 ||
+                                                            isLocked
                                                         }
                                                     >
-                                                        {isLoading ? (
+                                                        {isRowProcessing ? (
                                                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
                                                         ) : (
                                                             <Banknote className="h-3.5 w-3.5" />

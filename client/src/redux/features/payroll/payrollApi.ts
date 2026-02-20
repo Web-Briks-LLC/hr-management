@@ -2,37 +2,59 @@ import { apiSlice } from "@/redux/api/apiSlice";
 
 export const payrollApi = apiSlice.injectEndpoints({
     endpoints: (builder) => ({
-        getPayrollPreview: builder.query({
+        getPayrollPreview: builder.query<
+            any,
+            { month: string; branchId?: string }
+        >({
             query: ({ month, branchId }) => ({
                 url: `/payroll/preview`,
-                method: "GET",
-                params: { month, branchId },
+                params: { month, branchId: branchId || "all" },
             }),
-            providesTags: ["Payroll"],
+            providesTags: (_result, _error, { month, branchId }) => [
+                { type: "Payroll" as any, id: `${month}-${branchId || "all"}` },
+            ],
         }),
-        processPayment: builder.mutation({
+
+        processPayment: builder.mutation<
+            any,
+            {
+                staffId: string;
+                month: string;
+                amount: number;
+                paymentMethod: string;
+                paymentType: string;
+                branchId?: string;
+                note?: string;
+                bonus?: number;
+                deduction?: number;
+                createdBy: string;
+            }
+        >({
             query: (data) => ({
-                url: `/payroll/process`,
+                url: "/payroll/process",
                 method: "POST",
                 body: data,
             }),
-            invalidatesTags: ["Payroll", "Expense"],
             async onQueryStarted(arg, { dispatch, queryFulfilled }) {
                 const patchResult = dispatch(
                     payrollApi.util.updateQueryData(
                         "getPayrollPreview",
                         { month: arg.month, branchId: arg.branchId },
-                        (draft) => {
-                            const staff = draft.find(
-                                (d: any) => d._id === arg.staffId,
+                        (draft: any) => {
+                            const data = draft?.data || draft;
+                            if (!Array.isArray(data)) return;
+                            const item = data.find(
+                                (s: any) =>
+                                    (s._id || s.staffId)?.toString() ===
+                                    arg.staffId,
                             );
-                            if (staff) {
+                            if (item) {
                                 if (arg.paymentType === "overtime") {
-                                    staff.otStatus = "paid";
-                                    staff.otPaidAmount = arg.amount;
+                                    item.otStatus = "paid";
+                                    item.otPaidAmount = arg.amount;
                                 } else {
-                                    staff.status = "paid";
-                                    staff.paidAmount = arg.amount;
+                                    item.status = "paid";
+                                    item.paidAmount = arg.amount;
                                 }
                             }
                         },
@@ -45,52 +67,99 @@ export const payrollApi = apiSlice.injectEndpoints({
                 }
             },
         }),
-        graceAttendance: builder.mutation({
+
+        bulkProcessPayment: builder.mutation<
+            any,
+            {
+                month: string;
+                payments: {
+                    staffId: string;
+                    amount: number;
+                    bonus?: number;
+                    deduction?: number;
+                    note?: string;
+                }[];
+                paymentMethod: string;
+                paymentType: string;
+                createdBy: string;
+                branchId?: string;
+            }
+        >({
             query: (data) => ({
-                url: `/payroll/grace`,
+                url: "/payroll/bulk-process",
                 method: "POST",
                 body: data,
             }),
-            invalidatesTags: ["Payroll", "Attendance"],
+            async onQueryStarted(arg, { dispatch, queryFulfilled }) {
+                const patchResult = dispatch(
+                    payrollApi.util.updateQueryData(
+                        "getPayrollPreview",
+                        { month: arg.month, branchId: arg.branchId },
+                        (draft: any) => {
+                            const data = draft?.data || draft;
+                            if (!Array.isArray(data)) return;
+                            arg.payments.forEach((payment) => {
+                                const item = data.find(
+                                    (s: any) =>
+                                        (s._id || s.staffId)?.toString() ===
+                                        payment.staffId,
+                                );
+                                if (item) {
+                                    if (arg.paymentType === "overtime") {
+                                        item.otStatus = "paid";
+                                        item.otPaidAmount = payment.amount;
+                                    } else {
+                                        item.status = "paid";
+                                        item.paidAmount = payment.amount;
+                                    }
+                                }
+                            });
+                        },
+                    ),
+                );
+                try {
+                    await queryFulfilled;
+                } catch {
+                    patchResult.undo();
+                }
+            },
         }),
-        bulkProcessPayment: builder.mutation({
-            query: (data) => ({
-                url: `/payroll/bulk-process`,
-                method: "POST",
-                body: data,
-            }),
-            invalidatesTags: ["Payroll", "Expense"],
-        }),
-        getAbsentDates: builder.query({
-            query: ({ staffId, month }) => ({
-                url: `/payroll/absent-dates`,
-                method: "GET",
-                params: { staffId, month },
-            }),
-        }),
-        undoPayment: builder.mutation({
+
+        undoPayment: builder.mutation<
+            any,
+            {
+                staffId: string;
+                month: string;
+                paymentType: string;
+                branchId?: string;
+            }
+        >({
             query: (data) => ({
                 url: "/payroll/undo",
                 method: "POST",
                 body: data,
             }),
-            invalidatesTags: ["Payroll", "Expense"],
             async onQueryStarted(arg, { dispatch, queryFulfilled }) {
                 const patchResult = dispatch(
                     payrollApi.util.updateQueryData(
                         "getPayrollPreview",
                         { month: arg.month, branchId: arg.branchId },
-                        (draft) => {
-                            const staff = draft.find(
-                                (d: any) => d._id === arg.staffId,
+                        (draft: any) => {
+                            const data = draft?.data || draft;
+                            if (!Array.isArray(data)) return;
+                            const item = data.find(
+                                (s: any) =>
+                                    (s._id || s.staffId)?.toString() ===
+                                    arg.staffId,
                             );
-                            if (staff) {
+                            if (item) {
                                 if (arg.paymentType === "overtime") {
-                                    staff.otStatus = "pending";
-                                    staff.otPaidAmount = 0;
+                                    item.otStatus = "pending";
+                                    item.otPaidAmount = 0;
                                 } else {
-                                    staff.status = "pending";
-                                    staff.paidAmount = 0;
+                                    item.status = "pending";
+                                    item.paidAmount = 0;
+                                    item.expenseId = null;
                                 }
                             }
                         },
@@ -102,6 +171,66 @@ export const payrollApi = apiSlice.injectEndpoints({
                     patchResult.undo();
                 }
             },
+        }),
+
+        graceAttendance: builder.mutation<
+            any,
+            {
+                staffId: string;
+                date: string;
+                note?: string;
+            }
+        >({
+            query: (data) => ({
+                url: "/payroll/grace",
+                method: "POST",
+                body: data,
+            }),
+            invalidatesTags: ["Payroll" as any],
+        }),
+
+        getAbsentDates: builder.query<any, { staffId: string; month: string }>({
+            query: ({ staffId, month }) => ({
+                url: "/payroll/absent-dates",
+                params: { staffId, month },
+            }),
+        }),
+
+        // ─── Payroll Lock ────────────────────────────────────────────
+
+        getLockStatus: builder.query<
+            { success: boolean; data: { isLocked: boolean; lock: any } },
+            { month: string }
+        >({
+            query: ({ month }) => ({
+                url: "/payroll/lock-status",
+                params: { month },
+            }),
+            providesTags: (_result, _error, { month }) => [
+                { type: "PayrollLock" as any, id: month },
+            ],
+        }),
+
+        lockMonth: builder.mutation<any, { month: string }>({
+            query: (data) => ({
+                url: "/payroll/lock",
+                method: "POST",
+                body: data,
+            }),
+            invalidatesTags: (_result, _error, { month }) => [
+                { type: "PayrollLock" as any, id: month },
+            ],
+        }),
+
+        unlockMonth: builder.mutation<any, { month: string }>({
+            query: (data) => ({
+                url: "/payroll/unlock",
+                method: "POST",
+                body: data,
+            }),
+            invalidatesTags: (_result, _error, { month }) => [
+                { type: "PayrollLock" as any, id: month },
+            ],
         }),
     }),
 });
@@ -109,8 +238,11 @@ export const payrollApi = apiSlice.injectEndpoints({
 export const {
     useGetPayrollPreviewQuery,
     useProcessPaymentMutation,
-    useGraceAttendanceMutation,
     useBulkProcessPaymentMutation,
-    useGetAbsentDatesQuery,
     useUndoPaymentMutation,
+    useGraceAttendanceMutation,
+    useGetAbsentDatesQuery,
+    useGetLockStatusQuery,
+    useLockMonthMutation,
+    useUnlockMonthMutation,
 } = payrollApi;

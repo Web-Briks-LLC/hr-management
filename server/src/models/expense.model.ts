@@ -1,5 +1,5 @@
-import { model, Schema } from 'mongoose';
-import type { IExpense } from '../types/expense.type.js';
+import { model, Schema } from "mongoose";
+import type { IExpense } from "../types/expense.type.js";
 
 const expenseSchema = new Schema<IExpense>(
     {
@@ -15,19 +15,19 @@ const expenseSchema = new Schema<IExpense>(
         },
         categoryId: {
             type: Schema.Types.ObjectId,
-            ref: 'ExpenseCategory',
+            ref: "ExpenseCategory",
             required: true,
             index: true,
         },
         branchId: {
             type: Schema.Types.ObjectId,
-            ref: 'Branch',
+            ref: "Branch",
             required: true,
             index: true,
         },
         staffId: {
             type: Schema.Types.ObjectId,
-            ref: 'Staff',
+            ref: "Staff",
             index: true,
         },
         amount: {
@@ -37,13 +37,13 @@ const expenseSchema = new Schema<IExpense>(
         },
         status: {
             type: String,
-            enum: ['pending', 'paid', 'partial_paid'],
-            default: 'pending',
+            enum: ["pending", "paid", "partial_paid"],
+            default: "pending",
             index: true,
         },
         paymentMethod: {
             type: String,
-            default: 'cash',
+            default: "cash",
         },
         note: {
             type: String,
@@ -51,7 +51,7 @@ const expenseSchema = new Schema<IExpense>(
         },
         createdBy: {
             type: Schema.Types.ObjectId,
-            ref: 'User',
+            ref: "User",
             required: true,
         },
     },
@@ -61,5 +61,8 @@ const expenseSchema = new Schema<IExpense>(
 // Compound index for efficient date range queries
 expenseSchema.index({ date: -1, branchId: 1 });
 
-const ExpenseModel = model<IExpense>('Expense', expenseSchema);
+// Prevent duplicate payroll payments for same staff + category + month
+expenseSchema.index({ staffId: 1, categoryId: 1, date: 1 }, { sparse: true });
+
+const ExpenseModel = model<IExpense>("Expense", expenseSchema);
 export default ExpenseModel;

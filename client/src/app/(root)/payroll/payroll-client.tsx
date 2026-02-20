@@ -1,7 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { useGetPayrollPreviewQuery } from "@/redux/features/payroll/payrollApi";
+import {
+    useGetPayrollPreviewQuery,
+    useGetLockStatusQuery,
+    useLockMonthMutation,
+    useUnlockMonthMutation,
+} from "@/redux/features/payroll/payrollApi";
 import { useGetAllBranchesQuery } from "@/redux/features/branch/branchApi";
 import { format } from "date-fns";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
@@ -33,6 +38,8 @@ import {
     Clock,
     Building2,
     Calendar as CalendarIcon,
+    Lock,
+    Unlock,
     FileSpreadsheet,
     FileText,
 } from "lucide-react";
@@ -44,6 +51,7 @@ import * as XLSX from "xlsx";
 import { IPayrollItem } from "@/types/payroll.type";
 import { IBranch } from "@/types/branch.type";
 import { toast } from "sonner";
+import { useSession } from "@/lib/auth-client";
 
 const MONTHS = [
     { value: 1, label: "January" },
@@ -104,6 +112,12 @@ export default function PayrollPage() {
     const [isSelectMode, setIsSelectMode] = useState(false);
     const [showPdfDialog, setShowPdfDialog] = useState(false);
 
+    const { data: session } = useSession();
+    const userRole = (session?.user as any)?.role;
+    const canWrite = ["super_admin", "admin", "hr_manager"].includes(
+        userRole || "",
+    );
+
     // Update URL Helper
     const updateUrl = (key: string, value: string) => {
         const params = new URLSearchParams(searchParams.toString());
@@ -124,6 +138,28 @@ export default function PayrollPage() {
     });
 
     const payrollData = (data?.data || []) as IPayrollItem[];
+
+    // Lock status
+    const { data: lockData } = useGetLockStatusQuery({
+        month: formattedMonth,
+    });
+    const [lockMonth, { isLoading: isLocking }] = useLockMonthMutation();
+    const [unlockMonth, { isLoading: isUnlocking }] = useUnlockMonthMutation();
+    const isLocked = lockData?.data?.isLocked ?? false;
+
+    const handleToggleLock = async () => {
+        try {
+            if (isLocked) {
+                await unlockMonth({ month: formattedMonth }).unwrap();
+                toast.success("Payroll unlocked");
+            } else {
+                await lockMonth({ month: formattedMonth }).unwrap();
+                toast.success("Payroll locked — no further changes allowed");
+            }
+        } catch (error: any) {
+            toast.error(error?.data?.message || "Failed to update lock status");
+        }
+    };
 
     // --- Stats Calculation (Context Aware) ---
     // Salary Stats
@@ -380,6 +416,28 @@ export default function PayrollPage() {
 
             {/* Main Content Area */}
             <Card className="border-border/60 shadow-md">
+                {/* Lock Banner */}
+                {isLocked && (
+                    <div className="flex items-center gap-3 px-5 py-3 bg-amber-50 dark:bg-amber-950/30 border-b border-amber-200 dark:border-amber-800">
+                        <Lock className="h-4 w-4 text-amber-600" />
+                        <span className="text-sm font-medium text-amber-700 dark:text-amber-400">
+                            This month&apos;s payroll is locked. No payments can
+                            be processed or undone.
+                        </span>
+                        {canWrite && (
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                className="ml-auto h-7 text-xs border-amber-300 hover:bg-amber-100"
+                                onClick={handleToggleLock}
+                                disabled={isUnlocking}
+                            >
+                                <Unlock className="h-3 w-3 mr-1" />
+                                Unlock
+                            </Button>
+                        )}
+                    </div>
+                )}
                 <CardHeader className="pb-3">
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                         <CardTitle className="flex items-center gap-2 text-xl">
@@ -388,6 +446,18 @@ export default function PayrollPage() {
                         </CardTitle>
 
                         <div className="flex items-center gap-2">
+                            {canWrite && !isLocked && (
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="text-amber-600 border-amber-300 hover:bg-amber-50"
+                                    onClick={handleToggleLock}
+                                    disabled={isLocking}
+                                >
+                                    <Lock className="h-3.5 w-3.5 mr-1" />
+                                    Lock Month
+                                </Button>
+                            )}
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                     <Button
@@ -566,6 +636,7 @@ export default function PayrollPage() {
                                         data={payrollData}
                                         month={formattedMonth}
                                         isSelectMode={isSelectMode}
+                                        isLocked={isLocked}
                                     />
                                 )}
                             </div>
@@ -579,6 +650,7 @@ export default function PayrollPage() {
                                     <OvertimeTable
                                         data={payrollData}
                                         month={formattedMonth}
+                                        isLocked={isLocked}
                                     />
                                 )}
                             </div>

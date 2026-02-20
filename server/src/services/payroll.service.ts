@@ -1,44 +1,47 @@
-import { startOfMonth, endOfMonth, eachDayOfInterval } from "date-fns";
+import { eachDayOfInterval } from "date-fns";
 import StaffModel from "../models/staff.model.js";
 import AttendanceDayModel from "../models/attendance-day.model.js";
 import ShiftAssignmentModel from "../models/shift-assignment.model.js";
 import ExpenseModel from "../models/expense.model.js";
 import ExpenseCategoryModel from "../models/expense-category.model.js";
 import OvertimeModel from "../models/overtime.model.js";
+import { PayrollLockModel } from "../models/payroll-lock.model.js";
 import mongoose, { Types } from "mongoose";
+
+// ── Helpers ────────────────────────────────────────────────────────────
+
+/** Parse "YYYY-MM" into UTC start/end of month */
+function parseMonthRange(month: string) {
+    const [yearStr, monthStr] = month.split("-");
+    const year = parseInt(yearStr!, 10);
+    const monthNum = parseInt(monthStr!, 10);
+    const startDate = new Date(Date.UTC(year, monthNum - 1, 1, 0, 0, 0, 0));
+    const endDate = new Date(Date.UTC(year, monthNum, 0, 23, 59, 59, 999));
+    return { year, monthNum, startDate, endDate };
+}
+
+/** Get human-readable month name from YYYY-MM */
+function getMonthName(year: number, monthNum: number): string {
+    return new Date(Date.UTC(year, monthNum - 1, 1)).toLocaleString("default", {
+        month: "long",
+        year: "numeric",
+    });
+}
+
+// ── Payroll Preview ────────────────────────────────────────────────────
 
 interface IPayrollPreviewParams {
     month: string; // YYYY-MM
     branchId?: string;
 }
 
-interface IPayrollProcessParams {
-    staffId: string;
-    month: string;
-    amount: number;
-    paymentMethod: string;
-    note?: string | undefined;
-    bonus?: number | undefined;
-    deduction?: number | undefined;
-    createdBy: string;
-}
-
 const getPayrollPreview = async ({
     month,
     branchId,
 }: IPayrollPreviewParams) => {
-    // Parse year and month from 'YYYY-MM' format
-    const parts = month.split("-");
-    const year = parseInt(parts[0]!, 10);
-    const monthNum = parseInt(parts[1]!, 10);
-    // Create UTC dates to avoid timezone issues
-    const startDate = new Date(Date.UTC(year, monthNum - 1, 1, 0, 0, 0, 0));
-    const endDate = new Date(Date.UTC(year, monthNum, 0, 23, 59, 59, 999)); // Day 0 of next month = last day of current month
+    const { startDate, endDate } = parseMonthRange(month);
 
-    const matchStage: any = {
-        status: "active", // Only active staff
-    };
-
+    const matchStage: any = { status: "active" };
     if (branchId && branchId !== "all") {
         matchStage.branchId = new Types.ObjectId(branchId);
     }
@@ -77,7 +80,6 @@ const getPayrollPreview = async ({
                 joinDate: 1,
                 branch: "$branch.name",
                 branchId: 1,
-                // Bank account fields for PDF export
                 bankAccountNo: 1,
                 bankAccountName: 1,
                 bankName: 1,
@@ -85,32 +87,28 @@ const getPayrollPreview = async ({
         },
     ]);
 
-    // 2. Optimization: Batch Fetching
+    // 2. Batch fetch all related data
     const staffIds = staffs.map((s) => s._id);
 
-    // Fetch all active shifts for these staff
-    const shiftAssignments = await ShiftAssignmentModel.find({
-        staffId: { $in: staffIds },
-        isActive: true,
-    }).populate("shiftId");
-
-    // Fetch all attendance records for these staff in the given month
-    const allAttendance = await AttendanceDayModel.find({
-        staffId: { $in: staffIds },
-        date: { $gte: startDate, $lte: endDate },
-    });
-
-    // Fetch all approved overtime records for these staff in the given month
-    const approvedOvertime = await OvertimeModel.find({
-        staffId: { $in: staffIds },
-        date: { $gte: startDate, $lte: endDate },
-        status: "approved",
-    });
-
-    // Fetch all salary and overtime expenses for these staff in the given month
-    const expenseCategories = await ExpenseCategoryModel.find({
-        name: { $in: [/^Salary/i, /^Overtime/i] },
-    });
+    const [shiftAssignments, allAttendance, approvedOvertime, expenseCategories] =
+        await Promise.all([
+            ShiftAssignmentModel.find({
+                staffId: { $in: staffIds },
+                isActive: true,
+            }).populate("shiftId"),
+            AttendanceDayModel.find({
+                staffId: { $in: staffIds },
+                date: { $gte: startDate, $lte: endDate },
+            }),
+            OvertimeModel.find({
+                staffId: { $in: staffIds },
+                date: { $gte: startDate, $lte: endDate },
+                status: "approved",
+            }),
+            ExpenseCategoryModel.find({
+                name: { $in: [/^Salary/i, /^Overtime/i] },
+            }),
+        ]);
 
     const salaryCategory = expenseCategories.find((c) =>
         /^Salary/i.test(c.name),
@@ -123,38 +121,19 @@ const getPayrollPreview = async ({
 
     let paidExpenses: any[] = [];
     if (categoryIds.length > 0) {
-        // We fetch by category and date range.
-        const targetMonthName = new Date(
-            Date.UTC(year, monthNum - 1, 1),
-        ).toLocaleString("default", {
-            month: "long",
-            year: "numeric",
-        });
-
+        // Strict matching: by staffId + categoryId + date range
         paidExpenses = await ExpenseModel.find({
             categoryId: { $in: categoryIds },
-            $or: [
-                // 1. Standard: Match by Date (Correctly dated record)
-                {
-                    date: { $gte: startDate, $lte: endDate },
-                    staffId: { $in: staffIds },
-                },
-                // 2. Fallback: Match by Title containing "Month Year" (e.g. "January 2026")
-                {
-                    title: { $regex: targetMonthName, $options: "i" },
-                    staffId: { $in: staffIds },
-                },
-            ],
+            staffId: { $in: staffIds },
+            date: { $gte: startDate, $lte: endDate },
         });
     }
 
-    const daysInMonth = eachDayOfInterval({
-        start: startDate,
-        end: endDate,
-    });
+    const daysInMonth = eachDayOfInterval({ start: startDate, end: endDate });
 
+    // 3. Calculate stats for each staff
     const stats = staffs.map((staff) => {
-        // A. Match Shift
+        // A. Work days from shift
         const shiftAssignment = shiftAssignments.find(
             (sa) => sa.staffId.toString() === staff._id.toString(),
         );
@@ -164,16 +143,15 @@ const getPayrollPreview = async ({
 
         if (shift) {
             daysInMonth.forEach((day) => {
-                const dayOfWeek = day.getDay();
-                if (shift.workDays.includes(dayOfWeek)) {
+                if (shift.workDays.includes(day.getDay())) {
                     workDaysCount++;
                 }
             });
         } else {
-            workDaysCount = 22; // Default fallback
+            workDaysCount = 22;
         }
 
-        // B. Match Attendance
+        // B. Attendance breakdown
         const staffAttendance = allAttendance.filter(
             (a) => a.staffId.toString() === staff._id.toString(),
         );
@@ -198,80 +176,37 @@ const getPayrollPreview = async ({
             (a) => a.status === "late",
         ).length;
 
-        // C. Calculate Salary
-        // Per day salary = Salary / 30 (fixed)
-        // Payable = Salary - (Absent × Per day)
+        // C. Salary calculation (fixed /30 policy)
         const staffSalary = staff.salary || 0;
         const perDaySalary = staffSalary / 30;
-
         const deduction = absentDays * perDaySalary;
         const payableSalary = Math.max(0, staffSalary - deduction);
 
-        // D. Overtime Calculation
-        // const attendanceOt = staffAttendance.reduce((sum, a) => sum + (a.otMinutes || 0), 0);
-
+        // D. Overtime from approved records only
         const staffApprovedOvertime = approvedOvertime.filter(
             (ot) => ot.staffId.toString() === staff._id.toString(),
         );
-        const approvedOt = staffApprovedOvertime.reduce(
+        const otMinutes = staffApprovedOvertime.reduce(
             (sum, ot) => sum + (ot.durationMinutes || 0),
             0,
         );
+        const hourlyRate = staffSalary / 30 / 8;
+        const otPayable = otMinutes > 0 ? (otMinutes / 60) * hourlyRate : 0;
 
-        // Sum both sources?
-        // User requested strictly data from "Overtime Management".
-        // We use approvedOt as the source of truth for payment.
-        // We ignore attendanceOt (auto-calc) to prevent unapproved/duplicate payment.
-        const otMinutes = approvedOt;
-        let otPayable = staffAttendance.reduce(
-            (sum, a) => sum + (a.otAmount || 0),
-            0,
+        // E. Payment status — strict match by staffId + categoryId
+        const salaryExpense = paidExpenses.find(
+            (e) =>
+                e.staffId?.toString() === staff._id.toString() &&
+                salaryCategory &&
+                e.categoryId.toString() === salaryCategory._id.toString(),
         );
 
-        // Fallback: Calculate OT amount if missing but minutes exist
-        if (otPayable === 0 && otMinutes > 0) {
-            // Standard calculation: (Salary / 30 days / 8 hours) * OT Hours
-            const hourlyRate = staffSalary / 30 / 8;
-            otPayable = (otMinutes / 60) * hourlyRate;
-        }
-
-        // E. Check Payment Status (Salary)
-        const salaryExpense = paidExpenses.find((e) => {
-            // Robust check: Match Staff ID AND Category (if available) or Title
-            const isSalaryCategory =
-                salaryCategory &&
-                e.categoryId.toString() === salaryCategory._id.toString();
-            // Fallback for legacy data if categoryId is missing? (Unlikely with strict schema).
-            // But let's fallback to Title check if needed, though Category is safer.
-            // Title check:
-            const isSalaryTitle =
-                e.title.includes("Salary") || !e.title.includes("Overtime"); // Default to salary if not OT
-
-            if (e.staffId && e.staffId.toString() === staff._id.toString()) {
-                return isSalaryCategory || isSalaryTitle;
-            }
-            // Very legacy title match
-            return (
-                e.title.includes(staff._id.toString()) &&
-                (isSalaryCategory || isSalaryTitle)
-            );
-        });
-
-        // F. Check Payment Status (Overtime)
-        const otExpense = paidExpenses.find((e) => {
-            const isOtCategory =
+        const otExpense = paidExpenses.find(
+            (e) =>
+                e.staffId?.toString() === staff._id.toString() &&
                 overtimeCategory &&
-                e.categoryId.toString() === overtimeCategory._id.toString();
-            const isOtTitle = e.title.includes("Overtime");
-
-            if (e.staffId && e.staffId.toString() === staff._id.toString()) {
-                return isOtCategory || isOtTitle;
-            }
-            return (
-                e.title.includes(staff._id.toString()) &&
-                (isOtCategory || isOtTitle)
-            );
-        });
+                e.categoryId.toString() === overtimeCategory._id.toString(),
+        );
 
         return {
             staffId: staff._id,
@@ -286,7 +221,6 @@ const getPayrollPreview = async ({
             status: salaryExpense ? "paid" : "pending",
             expenseId: salaryExpense?._id,
             paidAmount: salaryExpense?.amount,
-            // Overtime Stats
             otMinutes,
             otPayable: Math.round(otPayable),
             otStatus: otExpense ? "paid" : "pending",
@@ -294,26 +228,24 @@ const getPayrollPreview = async ({
         };
     });
 
-    // Merge stats with staff data
     return staffs.map((staff) => {
         const stat = stats.find(
             (s) => s.staffId.toString() === staff._id.toString(),
         );
-        return {
-            ...staff,
-            ...stat,
-        };
+        return { ...staff, ...stat };
     });
 };
+
+// ── Process Single Payment ─────────────────────────────────────────────
 
 interface IPayrollProcessParams {
     staffId: string;
     month: string;
     amount: number;
     paymentMethod: string;
-    note?: string | undefined;
-    bonus?: number | undefined;
-    deduction?: number | undefined;
+    note?: string;
+    bonus?: number;
+    deduction?: number;
     createdBy: string;
     paymentType?: "salary" | "overtime";
 }
@@ -321,14 +253,23 @@ interface IPayrollProcessParams {
 const processPayroll = async ({
     staffId,
     month,
-    amount, // Base payable calculated in frontend + modifications
+    amount,
     paymentMethod,
     note,
-    bonus,
-    deduction,
+    bonus = 0,
+    deduction = 0,
     createdBy,
     paymentType = "salary",
 }: IPayrollProcessParams) => {
+    // Check if month is locked
+    const locked = await PayrollLockModel.findOne({ month });
+    if (locked) {
+        throw new Error(
+            `Payroll for ${month} is locked. Unlock it before making changes.`,
+        );
+    }
+
+    const { year, monthNum, startDate, endDate } = parseMonthRange(month);
     const session = await mongoose.startSession();
     session.startTransaction();
 
@@ -336,13 +277,36 @@ const processPayroll = async ({
         const staff = await StaffModel.findById(staffId).session(session);
         if (!staff) throw new Error("Staff not found");
 
-        // Determine Category Name based on Payment Type
+        // Server-side amount verification for salary payments
+        if (paymentType === "salary") {
+            const absentRecords = await AttendanceDayModel.countDocuments({
+                staffId,
+                date: { $gte: startDate, $lte: endDate },
+                status: "absent",
+            }).session(session);
+
+            const staffSalary = staff.salary || 0;
+            const perDaySalary = staffSalary / 30;
+            const serverDeduction = absentRecords * perDaySalary;
+            const serverPayable = Math.max(0, staffSalary - serverDeduction);
+            const expectedAmount = Math.round(serverPayable + bonus - deduction);
+            const receivedAmount = Math.round(amount);
+
+            // Allow ±2 tolerance for rounding differences
+            if (Math.abs(expectedAmount - receivedAmount) > 2) {
+                throw new Error(
+                    `Amount mismatch. Server calculated ৳${expectedAmount} but received ৳${receivedAmount}. ` +
+                        `(Base: ${Math.round(serverPayable)}, Bonus: ${bonus}, Deduction: ${deduction})`,
+                );
+            }
+        }
+
+        // Determine expense category
         const categoryName =
             paymentType === "overtime" ? "Overtime" : "Salary & Wages";
         const categoryRegex =
             paymentType === "overtime" ? /^Overtime/i : /^Salary/i;
 
-        // Check if category exists
         let category = await ExpenseCategoryModel.findOne({
             name: { $regex: categoryRegex },
         }).session(session);
@@ -360,12 +324,8 @@ const processPayroll = async ({
             );
         }
 
-        // Generate Expense Title
-        const monthName = new Date(month).toLocaleString("default", {
-            month: "long",
-            year: "numeric",
-        });
-        // NOTE: If we want detailed breakdown in note
+        // Build note
+        const monthName = getMonthName(year, monthNum);
         const details = [];
         if (bonus) details.push(`Bonus: ${bonus}`);
         if (deduction) details.push(`Deduction: ${deduction}`);
@@ -377,42 +337,32 @@ const processPayroll = async ({
             paymentType === "overtime" ? "Overtime" : "Salary"
         } - ${staffId} - ${monthName}`;
 
-        // Check if exists
+        // Check for existing expense — strict match only
         const existingExpense = await ExpenseModel.findOne({
-            categoryId: category!._id, // Ensure we check within same category
-            $or: [
-                {
-                    staffId: staffId,
-                    date: {
-                        $gte: startOfMonth(new Date(month)),
-                        $lte: endOfMonth(new Date(month)),
-                    },
-                },
-                { title: expenseTitle, branchId: staff.branchId }, // Legacy check
-            ],
+            categoryId: category!._id,
+            staffId: staffId,
+            date: { $gte: startDate, $lte: endDate },
         }).session(session);
 
         let createdExpense;
 
         if (existingExpense) {
-            // Update
             existingExpense.amount = amount;
             existingExpense.note = finalNote;
             existingExpense.paymentMethod = paymentMethod || "cash";
-            existingExpense.createdBy = new Types.ObjectId(createdBy); // Update who updated it
+            existingExpense.createdBy = new Types.ObjectId(createdBy);
             await existingExpense.save({ session });
             createdExpense = existingExpense;
         } else {
-            // Create Expense
             const expense = await ExpenseModel.create(
                 [
                     {
-                        date: endOfMonth(new Date(month)),
+                        date: endDate,
                         title: expenseTitle,
                         categoryId: category!._id,
                         branchId: staff.branchId,
-                        staffId: staff._id, // Save staffId for robust linking
-                        amount: amount, // Final amount passed from frontend
+                        staffId: staff._id,
+                        amount: amount,
                         status: "paid",
                         paymentMethod: paymentMethod || "cash",
                         note: finalNote,
@@ -423,29 +373,9 @@ const processPayroll = async ({
             );
             createdExpense = expense[0];
 
-            // ---------------------------------------------------------
-            // AUTO-UPDATE STAFF SALARY IF 0 OR MISSING (Only for Salary)
-            // ---------------------------------------------------------
-            // We interpret the 'amount' (base payment before bonus/deduction) as the salary
-            // But 'amount' here includes bonus/deduction if they were merged?
-            // Wait, processPayroll receives 'amount' as the FINAL amount in the current logic?
-            // Let's check the call site.
-            // In EditSalaryDialog: amount: finalAmount.
-            // We need the BASE amount to update Staff Salary, not the final amount with bonus/deduction.
-            // However, processPayroll param 'amount' seems to be used as the expense amount.
-            // If the user is setting a salary for the first time, presumably they are paying the base salary.
-            // If we can't reliably get base salary, we might accidentally set salary = base + bonus.
-            // BUT, usually "Salary" field implies the fixed monthly base.
-            // If the user manually edits the "Base" input in the dialog, that IS the new base salary.
-            // Let's assume the intention is: If I pay X as "Base" (before bonus/deduction), update Staff.salary to X.
-            // Problem: 'processPayroll' params don't split Base vs Final strictly in a way that preserves Base for this logic
-            // unless we reverse engineer it: Base = Amount - Bonus + Deduction.
-
+            // Auto-update staff salary if it changed (salary payments only)
             if (paymentType === "salary") {
-                const currentBaseSalary =
-                    amount - (bonus || 0) + (deduction || 0);
-
-                // Update staff salary if it has changed
+                const currentBaseSalary = amount - bonus + deduction;
                 if (staff.salary !== currentBaseSalary) {
                     await StaffModel.findByIdAndUpdate(
                         staffId,
@@ -454,7 +384,6 @@ const processPayroll = async ({
                     );
                 }
             }
-            // ---------------------------------------------------------
         }
 
         if (!createdExpense) {
@@ -470,6 +399,8 @@ const processPayroll = async ({
         session.endSession();
     }
 };
+
+// ── Bulk Process ───────────────────────────────────────────────────────
 
 interface IBulkPayrollParams {
     month: string;
@@ -492,13 +423,16 @@ const bulkProcessPayment = async ({
     createdBy,
     paymentType = "salary",
 }: IBulkPayrollParams) => {
+    // Check lock once at bulk level
+    const locked = await PayrollLockModel.findOne({ month });
+    if (locked) {
+        throw new Error(
+            `Payroll for ${month} is locked. Unlock it before making changes.`,
+        );
+    }
+
     const results = [];
     const errors = [];
-
-    // We process sequentially to ensure transaction safety per record or we could do one big transaction.
-    // For safety and partial success, let's do Promise.all but handle errors individually.
-    // However, if we want "All or Nothing", one transaction. User usually expects "All or Nothing" for bulk actions or "Best Effort".
-    // Let's go with Best Effort (process what can be processed).
 
     for (const payment of payments) {
         try {
@@ -507,9 +441,9 @@ const bulkProcessPayment = async ({
                 month,
                 amount: payment.amount,
                 paymentMethod,
-                note: payment.note,
-                bonus: payment.bonus,
-                deduction: payment.deduction,
+                note: payment.note || "",
+                bonus: payment.bonus ?? 0,
+                deduction: payment.deduction ?? 0,
                 createdBy,
                 paymentType,
             });
@@ -530,15 +464,19 @@ const bulkProcessPayment = async ({
     return { results, errors };
 };
 
+// ── Grace Attendance ───────────────────────────────────────────────────
+
 const graceAttendance = async (
     staffId: string,
     date: string,
     note?: string,
 ) => {
-    // Find absent record and update to present
     const targetDate = new Date(date);
-    const start = new Date(targetDate.setHours(0, 0, 0, 0));
-    const end = new Date(targetDate.setHours(23, 59, 59, 999));
+    const y = targetDate.getUTCFullYear();
+    const m = targetDate.getUTCMonth();
+    const d = targetDate.getUTCDate();
+    const start = new Date(Date.UTC(y, m, d, 0, 0, 0, 0));
+    const end = new Date(Date.UTC(y, m, d, 23, 59, 59, 999));
 
     const attendance = await AttendanceDayModel.findOne({
         staffId,
@@ -554,15 +492,16 @@ const graceAttendance = async (
     attendance.notes = note
         ? `${attendance.notes || ""} [Grace: ${note}]`
         : (attendance.notes ?? null);
-    attendance.isManual = true; // Mark as manually corrected
+    attendance.isManual = true;
     await attendance.save();
 
     return attendance;
 };
 
+// ── Absent Dates (UTC-safe) ────────────────────────────────────────────
+
 const getAbsentDates = async (staffId: string, month: string) => {
-    const startDate = startOfMonth(new Date(month));
-    const endDate = endOfMonth(new Date(month));
+    const { startDate, endDate } = parseMonthRange(month);
 
     return await AttendanceDayModel.find({
         staffId,
@@ -571,42 +510,41 @@ const getAbsentDates = async (staffId: string, month: string) => {
     }).select("date status");
 };
 
+// ── Undo Payment (UTC-safe) ────────────────────────────────────────────
+
 const undoPayroll = async (
     staffId: string,
     month: string,
     paymentType: "salary" | "overtime" = "salary",
 ) => {
-    const startDate = startOfMonth(new Date(month));
-    const endDate = endOfMonth(new Date(month));
+    // Check lock
+    const locked = await PayrollLockModel.findOne({ month });
+    if (locked) {
+        throw new Error(
+            `Payroll for ${month} is locked. Unlock it before making changes.`,
+        );
+    }
+
+    const { startDate, endDate } = parseMonthRange(month);
 
     const categoryRegex =
         paymentType === "overtime" ? /^Overtime/i : /^Salary/i;
 
-    // Find the expense category
     const category = await ExpenseCategoryModel.findOne({
         name: { $regex: categoryRegex },
     });
 
     if (!category) {
         throw new Error(
-            `${
-                paymentType === "overtime" ? "Overtime" : "Salary"
-            } category not found`,
+            `${paymentType === "overtime" ? "Overtime" : "Salary"} category not found`,
         );
     }
 
-    const targetMonthName = new Date(startDate).toLocaleString("default", {
-        month: "long",
-        year: "numeric",
-    });
-
+    // Strict match by staffId + categoryId + date range
     const expense = await ExpenseModel.findOneAndDelete({
         staffId,
         categoryId: category._id,
-        $or: [
-            { date: { $gte: startDate, $lte: endDate } },
-            { title: { $regex: targetMonthName, $options: "i" } },
-        ],
+        date: { $gte: startDate, $lte: endDate },
     });
 
     if (!expense) {
@@ -616,6 +554,32 @@ const undoPayroll = async (
     return { message: "Payroll payment undone successfully" };
 };
 
+// ── Payroll Lock Management ────────────────────────────────────────────
+
+const getLockStatus = async (month: string) => {
+    return await PayrollLockModel.findOne({ month });
+};
+
+const lockMonth = async (month: string, userId: string) => {
+    const existing = await PayrollLockModel.findOne({ month });
+    if (existing) {
+        throw new Error(`Payroll for ${month} is already locked`);
+    }
+
+    return await PayrollLockModel.create({
+        month,
+        lockedBy: new Types.ObjectId(userId),
+    });
+};
+
+const unlockMonth = async (month: string) => {
+    const result = await PayrollLockModel.findOneAndDelete({ month });
+    if (!result) {
+        throw new Error(`Payroll for ${month} is not locked`);
+    }
+    return result;
+};
+
 export default {
     getPayrollPreview,
     processPayroll,
@@ -623,4 +587,7 @@ export default {
     graceAttendance,
     getAbsentDates,
     undoPayroll,
+    getLockStatus,
+    lockMonth,
+    unlockMonth,
 };
