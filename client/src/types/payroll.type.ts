@@ -29,7 +29,12 @@ export interface IPayrollItem {
     // Bank Details
     bankName?: string;
     branch?: string;
-    bankAccountNo?: string;
-    bankAccountName?: string;
+    bank?: {
+        bankName?: string;
+        accountNumber?: string;
+        accountHolderName?: string;
+        branch?: string;
+        routingNumber?: string;
+    };
     branchId?: string;
 }

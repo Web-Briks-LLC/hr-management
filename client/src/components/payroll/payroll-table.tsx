@@ -343,8 +343,9 @@ export default function PayrollTable({
                                                         - {row.branch || "N/A"}
                                                     </div>
                                                     <div className="text-[10px] text-muted-foreground font-mono bg-muted/60 px-1.5 py-0.5 rounded w-fit mt-1">
-                                                        {row.bankAccountNo ||
-                                                            "No Account"}
+                                                        {row.bank
+                                                            ?.accountNumber ||
+                                                            "N/A"}
                                                     </div>
                                                 </div>
                                             </div>

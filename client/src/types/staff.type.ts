@@ -1,5 +1,5 @@
-import { IBranch } from './branch.type';
-import { IUser } from './user.type';
+import { IBranch } from "./branch.type";
+import { IUser } from "./user.type";
 
 export default interface IStaff {
     _id: string;
@@ -15,11 +15,11 @@ export default interface IStaff {
     department?: string;
     designation: string;
     joinDate: Date;
-    status: 'active' | 'inactive' | 'terminated';
+    status: "active" | "inactive" | "terminated";
 
     dateOfBirth?: Date;
     nationalId?: string;
-    bloodGroup?: 'A+' | 'A-' | 'B+' | 'B-' | 'AB+' | 'AB-' | 'O+' | 'O-';
+    bloodGroup?: "A+" | "A-" | "B+" | "B-" | "AB+" | "AB-" | "O+" | "O-";
     address?: string;
 
     emergencyContact?: {
@@ -32,9 +32,13 @@ export default interface IStaff {
     mothersName?: string;
     spouseName?: string;
 
-    bankAccountNo?: string;
-    bankAccountName?: string;
-    bankName?: string;
+    bank?: {
+        bankName?: string;
+        accountNumber?: string;
+        accountHolderName?: string;
+        branch?: string;
+        routingNumber?: string;
+    };
 
     profileCompleted: boolean;
 

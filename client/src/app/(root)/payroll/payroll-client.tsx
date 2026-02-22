@@ -113,7 +113,7 @@ export default function PayrollPage() {
     const [showPdfDialog, setShowPdfDialog] = useState(false);
 
     const { data: session } = useSession();
-    const userRole = (session?.user as any)?.role;
+    const userRole = session?.user?.role;
     const canWrite = ["super_admin", "admin", "hr_manager"].includes(
         userRole || "",
     );
@@ -132,7 +132,7 @@ export default function PayrollPage() {
     const { data: branchesData } = useGetAllBranchesQuery({});
     const branches: IBranch[] = branchesData?.branches || [];
 
-    const { data, isLoading, isFetching } = useGetPayrollPreviewQuery({
+    const { data, isLoading } = useGetPayrollPreviewQuery({
         month: formattedMonth,
         branchId,
     });
@@ -156,8 +156,10 @@ export default function PayrollPage() {
                 await lockMonth({ month: formattedMonth }).unwrap();
                 toast.success("Payroll locked — no further changes allowed");
             }
-        } catch (error: any) {
-            toast.error(error?.data?.message || "Failed to update lock status");
+        } catch (error) {
+            toast.error(
+                (error as Error)?.message || "Failed to update lock status",
+            );
         }
     };
 
@@ -235,6 +237,9 @@ export default function PayrollPage() {
                     "Sl No": index + 1,
                     Name: row.name || "",
                     Designation: row.designation || "",
+                    "Bank Name": row.bank?.bankName || "N/A",
+                    "Account NO": row.bank?.accountNumber || "N/A",
+                    "Routing NO": row.bank?.routingNumber || "N/A",
                     "OT Hours":
                         Math.floor(row.otMinutes / 60) +
                         "h " +
@@ -253,7 +258,9 @@ export default function PayrollPage() {
                 "Sl No": index + 1,
                 Name: row.name || "",
                 Designation: row.designation || "",
-                "Account NO": row.bankAccountNo || "N/A",
+                "Bank Name": row.bank?.bankName || "N/A",
+                "Account NO": row.bank?.accountNumber || "N/A",
+                "Routing NO": row.bank?.routingNumber || "N/A",
                 "Basic Salary": row.salary || 0,
                 "Payable Amount": row.payableSalary || 0,
                 Status: row.status === "paid" ? "Paid" : "Pending",

@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { format } from 'date-fns';
+import { useState, useEffect, useMemo } from "react";
+import { format } from "date-fns";
 import {
     Dialog,
     DialogContent,
@@ -9,91 +9,93 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
     Select,
     SelectContent,
     SelectItem,
     SelectTrigger,
     SelectValue,
-} from '@/components/ui/select';
-import { Separator } from '@/components/ui/separator';
-import { toast } from 'sonner';
-import { Plus, Building2, FileText, Loader2, CloudCog } from 'lucide-react';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+} from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import { toast } from "sonner";
+import { Plus, Building2, FileText, Loader2 } from "lucide-react";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import {
     useGetPayrollBankSettingsQuery,
     useCreatePayrollBankSettingMutation,
     PayrollBankSetting,
-} from '@/redux/features/payroll/payrollBankSettingsApi';
+} from "@/redux/features/payroll/payrollBankSettingsApi";
+
+import { IPayrollItem } from "@/types/payroll.type";
 
 interface ExportPdfDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    payrollData: any[];
+    payrollData: IPayrollItem[];
     month: string; // Format: YYYY-MM
 }
 
 // Simple number to words conversion for BDT
 function numberToWords(num: number): string {
     const ones = [
-        '',
-        'One',
-        'Two',
-        'Three',
-        'Four',
-        'Five',
-        'Six',
-        'Seven',
-        'Eight',
-        'Nine',
-        'Ten',
-        'Eleven',
-        'Twelve',
-        'Thirteen',
-        'Fourteen',
-        'Fifteen',
-        'Sixteen',
-        'Seventeen',
-        'Eighteen',
-        'Nineteen',
+        "",
+        "One",
+        "Two",
+        "Three",
+        "Four",
+        "Five",
+        "Six",
+        "Seven",
+        "Eight",
+        "Nine",
+        "Ten",
+        "Eleven",
+        "Twelve",
+        "Thirteen",
+        "Fourteen",
+        "Fifteen",
+        "Sixteen",
+        "Seventeen",
+        "Eighteen",
+        "Nineteen",
     ];
     const tens = [
-        '',
-        '',
-        'Twenty',
-        'Thirty',
-        'Forty',
-        'Fifty',
-        'Sixty',
-        'Seventy',
-        'Eighty',
-        'Ninety',
+        "",
+        "",
+        "Twenty",
+        "Thirty",
+        "Forty",
+        "Fifty",
+        "Sixty",
+        "Seventy",
+        "Eighty",
+        "Ninety",
     ];
 
-    if (num === 0) return 'Zero';
-    if (num < 0) return 'Minus ' + numberToWords(-num);
+    if (num === 0) return "Zero";
+    if (num < 0) return "Minus " + numberToWords(-num);
 
-    let words = '';
+    let words = "";
 
     if (Math.floor(num / 10000000) > 0) {
-        words += numberToWords(Math.floor(num / 10000000)) + ' Crore ';
+        words += numberToWords(Math.floor(num / 10000000)) + " Crore ";
         num %= 10000000;
     }
     if (Math.floor(num / 100000) > 0) {
-        words += numberToWords(Math.floor(num / 100000)) + ' Lac ';
+        words += numberToWords(Math.floor(num / 100000)) + " Lac ";
         num %= 100000;
     }
     if (Math.floor(num / 1000) > 0) {
-        words += numberToWords(Math.floor(num / 1000)) + ' Thousand ';
+        words += numberToWords(Math.floor(num / 1000)) + " Thousand ";
         num %= 1000;
     }
     if (Math.floor(num / 100) > 0) {
-        words += numberToWords(Math.floor(num / 100)) + ' Hundred ';
+        words += numberToWords(Math.floor(num / 100)) + " Hundred ";
         num %= 100;
     }
     if (num > 0) {
@@ -102,7 +104,7 @@ function numberToWords(num: number): string {
         } else {
             words += tens[Math.floor(num / 10)];
             if (num % 10 > 0) {
-                words += ' ' + ones[num % 10];
+                words += " " + ones[num % 10];
             }
         }
     }
@@ -116,28 +118,36 @@ export default function ExportPdfDialog({
     payrollData,
     month,
 }: ExportPdfDialogProps) {
-    const [selectedBankId, setSelectedBankId] = useState<string>('');
+    const [selectedBankId, setSelectedBankId] = useState<string>("");
     const [showAddForm, setShowAddForm] = useState(false);
 
     // New bank form fields
-    const [newBankName, setNewBankName] = useState('');
-    const [newAccountNo, setNewAccountNo] = useState('');
-    const [newCompanyName, setNewCompanyName] = useState('');
-    const [newBranchName, setNewBranchName] = useState('');
-    const [newBranchLocation, setNewBranchLocation] = useState('');
+    const [newBankName, setNewBankName] = useState("");
+    const [newAccountNo, setNewAccountNo] = useState("");
+    const [newCompanyName, setNewCompanyName] = useState("");
+    const [newBranchName, setNewBranchName] = useState("");
+    const [newBranchLocation, setNewBranchLocation] = useState("");
 
     const { data: bankSettingsData, isLoading: isLoadingSettings } =
         useGetPayrollBankSettingsQuery();
     const [createBankSetting, { isLoading: isCreating }] =
         useCreatePayrollBankSettingMutation();
 
-    const bankSettings = bankSettingsData?.data || [];
+    const bankSettings = useMemo(
+        () => bankSettingsData?.data || [],
+        [bankSettingsData],
+    );
 
     // Auto-select default or first bank setting
     useEffect(() => {
         if (bankSettings.length > 0 && !selectedBankId) {
             const defaultBank = bankSettings.find((b) => b.isDefault);
-            setSelectedBankId(defaultBank?._id || bankSettings[0]._id);
+            const timer = setTimeout(
+                () =>
+                    setSelectedBankId(defaultBank?._id || bankSettings[0]._id),
+                0,
+            );
+            return () => clearTimeout(timer);
         }
     }, [bankSettings, selectedBankId]);
 
@@ -145,7 +155,7 @@ export default function ExportPdfDialog({
 
     const handleAddBank = async () => {
         if (!newBankName || !newAccountNo || !newCompanyName) {
-            toast.error('Please fill all required fields');
+            toast.error("Please fill all required fields");
             return;
         }
 
@@ -161,20 +171,21 @@ export default function ExportPdfDialog({
 
             setSelectedBankId(result.data._id);
             setShowAddForm(false);
-            setNewBankName('');
-            setNewAccountNo('');
-            setNewCompanyName('');
-            setNewBranchName('');
-            setNewBranchLocation('');
-            toast.success('Bank account added successfully');
-        } catch (error: any) {
-            toast.error(error?.data?.message || 'Failed to add bank account');
+            setNewBankName("");
+            setNewAccountNo("");
+            setNewCompanyName("");
+            setNewBranchName("");
+            setNewBranchLocation("");
+            toast.success("Bank account added successfully");
+        } catch (error: unknown) {
+            const err = error as { data?: { message?: string } };
+            toast.error(err?.data?.message || "Failed to add bank account");
         }
     };
 
     const handleExport = () => {
         if (!selectedBank) {
-            toast.error('Please select a bank account');
+            toast.error("Please select a bank account");
             return;
         }
 
@@ -184,12 +195,12 @@ export default function ExportPdfDialog({
             0,
         );
 
-        const [year, monthNum] = month.split('-');
+        const [year, monthNum] = month.split("-");
         const monthName = format(
             new Date(parseInt(year!), parseInt(monthNum!) - 1, 1),
-            'MMMM',
+            "MMMM",
         );
-        const currentDate = format(new Date(), 'dd/MM/yyyy');
+        const currentDate = format(new Date(), "dd/MM/yyyy");
 
         const doc = new jsPDF();
         let y = 20;
@@ -202,7 +213,7 @@ export default function ExportPdfDialog({
 
         // Bank Address
         doc.setFontSize(11);
-        doc.text('The Manager', 14, y);
+        doc.text("The Manager", 14, y);
         y += 6;
         doc.text(selectedBank.bankName, 14, y);
         y += 6;
@@ -218,14 +229,14 @@ export default function ExportPdfDialog({
 
         // Subject
         doc.setFontSize(11);
-        doc.setFont('helvetica', 'bold');
+        doc.setFont("helvetica", "bold");
         const subjectText = `Subject: Request for fund transfer from account no. ${selectedBank.bankAccountNo} named: ${selectedBank.companyName}`;
         doc.text(subjectText, 14, y, { maxWidth: 180 });
         y += 15;
 
         // Body
-        doc.setFont('helvetica', 'normal');
-        doc.text('Dear Sir,', 14, y);
+        doc.setFont("helvetica", "normal");
+        doc.text("Dear Sir,", 14, y);
         y += 8;
 
         const amountInWords = numberToWords(Math.round(totalAmount));
@@ -237,47 +248,61 @@ export default function ExportPdfDialog({
 
         // Table Header
         doc.setFontSize(12);
-        doc.setFont('helvetica', 'bold');
-        doc.text('List of Accounts and amount to be credited:', 14, y);
+        doc.setFont("helvetica", "bold");
+        doc.text("List of Accounts and amount to be credited:", 14, y);
         y += 8;
 
         // Table - use all payrollData
-        const tableData = payrollData.map((row, index) => [
+        const tableData: Array<
+            Array<string | number | Record<string, unknown>>
+        > = payrollData.map((row, index) => [
             index + 1,
-            row.name || '',
-            row.designation || '',
-            row.bankAccountNo || 'N/A',
-            row.payableSalary?.toLocaleString() || '0',
+            row.name || "",
+            row.designation || "",
+            row.bank?.bankName || "N/A",
+            row.bank?.accountNumber || "N/A",
+            row.bank?.routingNumber || "N/A",
+            row.payableSalary?.toLocaleString() || "0",
         ]);
 
         // Add total row
         tableData.push([
-            '',
-            '',
-            '',
+            "",
+            "",
+            "",
+            "",
+            "",
             {
-                content: 'Total:',
-                styles: { fontStyle: 'bold', halign: 'right' },
+                content: "Total:",
+                styles: { fontStyle: "bold", halign: "right" },
             },
             {
                 content: totalAmount.toLocaleString(),
-                styles: { fontStyle: 'bold' },
+                styles: { fontStyle: "bold" },
             },
         ]);
 
         autoTable(doc, {
             startY: y,
             head: [
-                ['Sl.', 'Name', 'Designation', 'Account No.', 'Amount (BDT)'],
+                [
+                    "Sl.",
+                    "Name",
+                    "Designation",
+                    "Bank Name",
+                    "Account No.",
+                    "Routing",
+                    "Amount",
+                ],
             ],
             body: tableData,
-            theme: 'striped',
+            theme: "striped",
             headStyles: {
                 fillColor: [33, 33, 33],
                 textColor: 255,
-                fontSize: 9,
-                fontStyle: 'bold',
-                halign: 'center',
+                fontSize: 8,
+                fontStyle: "bold",
+                halign: "center",
             },
             bodyStyles: {
                 textColor: [50, 50, 50],
@@ -286,23 +311,25 @@ export default function ExportPdfDialog({
                 fillColor: [245, 245, 245],
             },
             styles: {
-                fontSize: 9,
+                fontSize: 8,
                 cellPadding: 4,
                 lineColor: [200, 200, 200],
                 lineWidth: 0.1,
             },
             columnStyles: {
-                0: { cellWidth: 12, halign: 'center' },
-                1: { cellWidth: 50 },
-                2: { cellWidth: 35 },
-                3: { cellWidth: 50 },
-                4: { cellWidth: 28, halign: 'right' },
+                0: { cellWidth: 10, halign: "center" },
+                1: { cellWidth: 35 },
+                2: { cellWidth: 28 },
+                3: { cellWidth: 32 },
+                4: { cellWidth: 28 },
+                5: { cellWidth: 22 },
+                6: { cellWidth: 25, halign: "right" },
             },
         });
 
         doc.save(`${monthName} ${year.slice(-2)} Salary.pdf`);
         onOpenChange(false);
-        toast.success('PDF exported successfully');
+        toast.success("PDF exported successfully");
     };
 
     return (
@@ -347,7 +374,7 @@ export default function ExportPdfDialog({
                                                             key={bank._id}
                                                             value={bank._id}
                                                         >
-                                                            {bank.companyName} -{' '}
+                                                            {bank.companyName} -{" "}
                                                             {bank.bankName}
                                                         </SelectItem>
                                                     ),
@@ -357,33 +384,63 @@ export default function ExportPdfDialog({
                                     </div>
 
                                     {selectedBank && (
-                                        <div className="rounded-lg border p-4 bg-muted/30 space-y-2 text-sm">
-                                            <p>
-                                                <strong>Bank:</strong>{' '}
-                                                {selectedBank.bankName}
-                                            </p>
-                                            <p>
-                                                <strong>Account No:</strong>{' '}
-                                                {selectedBank.bankAccountNo}
-                                            </p>
-                                            <p>
-                                                <strong>Company:</strong>{' '}
-                                                {selectedBank.companyName}
-                                            </p>
-                                            {selectedBank.branchName && (
-                                                <p>
-                                                    <strong>Branch:</strong>{' '}
-                                                    {selectedBank.branchName}
-                                                </p>
-                                            )}
-                                            {selectedBank.branchLocation && (
-                                                <p>
-                                                    <strong>Location:</strong>{' '}
-                                                    {
-                                                        selectedBank.branchLocation
-                                                    }
-                                                </p>
-                                            )}
+                                        <div className="rounded-xl border border-border/40 bg-linear-to-br from-background via-muted/30 to-muted/50 p-5 mt-4 shadow-sm relative overflow-hidden">
+                                            <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-bl-full -z-10" />
+                                            <div className="flex justify-between items-start mb-4">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="p-2.5 bg-primary/10 rounded-lg text-primary shadow-sm ring-1 ring-primary/20">
+                                                        <Building2 className="h-5 w-5" />
+                                                    </div>
+                                                    <div>
+                                                        <h4 className="font-semibold text-lg leading-none tracking-tight text-foreground">
+                                                            {
+                                                                selectedBank.companyName
+                                                            }
+                                                        </h4>
+                                                        <p className="text-sm font-medium text-muted-foreground mt-1.5">
+                                                            {
+                                                                selectedBank.bankName
+                                                            }
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-y-4 gap-x-6 text-sm mt-5 pt-5 border-t border-border/50">
+                                                <div className="space-y-1.5">
+                                                    <span className="text-muted-foreground block text-xs font-medium uppercase tracking-wider">
+                                                        Account Number
+                                                    </span>
+                                                    <span className="font-medium font-mono border bg-background/80 px-2 py-1 rounded text-sm shadow-sm">
+                                                        {
+                                                            selectedBank.bankAccountNo
+                                                        }
+                                                    </span>
+                                                </div>
+                                                {selectedBank.branchName && (
+                                                    <div className="space-y-1.5">
+                                                        <span className="text-muted-foreground block text-xs font-medium uppercase tracking-wider">
+                                                            Branch
+                                                        </span>
+                                                        <span className="font-medium text-foreground">
+                                                            {
+                                                                selectedBank.branchName
+                                                            }
+                                                        </span>
+                                                    </div>
+                                                )}
+                                                {selectedBank.branchLocation && (
+                                                    <div className="col-span-2 space-y-1.5 mt-2">
+                                                        <span className="text-muted-foreground block text-xs font-medium uppercase tracking-wider">
+                                                            Location
+                                                        </span>
+                                                        <span className="font-medium text-foreground">
+                                                            {
+                                                                selectedBank.branchLocation
+                                                            }
+                                                        </span>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     )}
 

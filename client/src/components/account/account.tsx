@@ -1,31 +1,31 @@
-'use client';
+"use client";
 
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import {
     Card,
     CardContent,
     CardDescription,
     CardHeader,
     CardTitle,
-} from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
-import { Skeleton } from '@/components/ui/skeleton';
-import { useSession } from '@/lib/auth-client';
+} from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useSession } from "@/lib/auth-client";
 import {
     LockIcon,
     SettingsIcon,
     SquarePenIcon,
     UserIcon,
     VerifiedIcon,
-} from 'lucide-react';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import ChangePassword from './change-password';
-import EditProfile from './edit-profile';
-import { ProfileImageUploadDialog } from './profile-image-upload-dialog';
-import { ProfileCompletionDialog } from './profile-completion-dialog';
-import { useGetMeQuery } from '@/redux/features/staff/staffApi';
-import { format } from 'date-fns';
+} from "lucide-react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import ChangePassword from "./change-password";
+import EditProfile from "./edit-profile";
+import { ProfileImageUploadDialog } from "./profile-image-upload-dialog";
+import { ProfileCompletionDialog } from "./profile-completion-dialog";
+import { useGetMeQuery } from "@/redux/features/staff/staffApi";
+import { format } from "date-fns";
 
 export default function RootAccount() {
     const { data, isPending, isRefetching } = useSession();
@@ -43,8 +43,8 @@ export default function RootAccount() {
     const pathname = usePathname();
     const router = useRouter();
 
-    const showChangePassword = searchParams.has('change-password');
-    const editProfile = searchParams.has('edit-profile');
+    const showChangePassword = searchParams.has("change-password");
+    const editProfile = searchParams.has("edit-profile");
     const showDefault = !showChangePassword && !editProfile;
 
     const staff = staffData?.staff;
@@ -58,8 +58,8 @@ export default function RootAccount() {
                         <div className="relative group/profile-image">
                             <Avatar className="mx-auto size-52 ring-2 ring-primary ring-offset-1">
                                 <AvatarImage
-                                    src={data?.user?.image || ''}
-                                    alt={`${data?.user?.name || 'User'}'s profile`}
+                                    src={data?.user?.image || ""}
+                                    alt={`${data?.user?.name || "User"}'s profile`}
                                 />
                                 <AvatarFallback>
                                     {isLoading ? (
@@ -98,12 +98,12 @@ export default function RootAccount() {
                             ) : (
                                 <div className="space-y-2">
                                     <p className="text-sm capitalize">
-                                        <b>Designation:</b>{' '}
-                                        {staff?.designation || 'N/A'}
+                                        <b>Designation:</b>{" "}
+                                        {staff?.designation || "N/A"}
                                     </p>
                                     <p className="text-sm capitalize">
-                                        <b>Department:</b>{' '}
-                                        {staff?.department || 'N/A'}
+                                        <b>Department:</b>{" "}
+                                        {staff?.department || "N/A"}
                                     </p>
                                 </div>
                             )}
@@ -192,15 +192,15 @@ export default function RootAccount() {
                                 </p>
 
                                 <p>
-                                    <b>Emergency Name:</b>{' '}
+                                    <b>Emergency Name:</b>{" "}
                                     {staff?.emergencyContact?.name}
                                 </p>
                                 <p>
-                                    <b>Relation:</b>{' '}
+                                    <b>Relation:</b>{" "}
                                     {staff?.emergencyContact?.relation}
                                 </p>
                                 <p>
-                                    <b>Phone:</b>{' '}
+                                    <b>Phone:</b>{" "}
                                     {staff?.emergencyContact?.phone}
                                 </p>
 
@@ -211,50 +211,80 @@ export default function RootAccount() {
                                     <b>Mother:</b> {staff?.mothersName}
                                 </p>
                                 <p>
-                                    <b>Spouse:</b> {staff?.spouseName || 'N/A'}
+                                    <b>Spouse:</b> {staff?.spouseName || "N/A"}
                                 </p>
 
-                                <p>
-                                    <b>Bank Name:</b> {staff?.bankName || 'N/A'}
-                                </p>
-                                <p>
-                                    <b>Account No:</b>{' '}
-                                    {staff?.bankAccountNo || 'N/A'}
-                                </p>
-                                <p>
-                                    <b>Account Holder:</b>{' '}
-                                    {staff?.bankAccountName || 'N/A'}
-                                </p>
+                                <div>
+                                    <p className="text-sm text-gray-500">
+                                        Account Number
+                                    </p>
+                                    <p className="font-medium">
+                                        {staff?.bank?.accountNumber || "N/A"}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="text-sm text-gray-500">
+                                        Account Name
+                                    </p>
+                                    <p className="font-medium">
+                                        {staff?.bank?.accountHolderName ||
+                                            "N/A"}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="text-sm text-gray-500">
+                                        Bank Name
+                                    </p>
+                                    <p className="font-medium">
+                                        {staff?.bank?.bankName || "N/A"}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="text-sm text-gray-500">
+                                        Branch Name
+                                    </p>
+                                    <p className="font-medium">
+                                        {staff?.bank?.branch || "N/A"}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="text-sm text-gray-500">
+                                        Routing Number
+                                    </p>
+                                    <p className="font-medium">
+                                        {staff?.bank?.routingNumber || "N/A"}
+                                    </p>
+                                </div>
 
                                 <p>
-                                    <b>Branch:</b>{' '}
-                                    {staff?.branch?.name || 'N/A'}
+                                    <b>Branch:</b>{" "}
+                                    {staff?.branch?.name || "N/A"}
                                 </p>
                                 <p>
                                     <b>Status:</b> {staff?.status}
                                 </p>
 
                                 <p>
-                                    <b>Join Date:</b>{' '}
+                                    <b>Join Date:</b>{" "}
                                     {staff?.joinDate &&
-                                        format(new Date(staff.joinDate), 'PPP')}
+                                        format(new Date(staff.joinDate), "PPP")}
                                 </p>
 
                                 <p>
-                                    <b>Date of Birth:</b>{' '}
+                                    <b>Date of Birth:</b>{" "}
                                     {staff?.dateOfBirth &&
                                         format(
                                             new Date(staff.dateOfBirth),
-                                            'PPP',
+                                            "PPP",
                                         )}
                                 </p>
 
                                 <p>
-                                    <b>Last Updated:</b>{' '}
+                                    <b>Last Updated:</b>{" "}
                                     {staff?.updatedAt &&
                                         format(
                                             new Date(staff.updatedAt),
-                                            'PPP',
+                                            "PPP",
                                         )}
                                 </p>
                             </div>

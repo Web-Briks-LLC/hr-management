@@ -80,9 +80,7 @@ const getPayrollPreview = async ({
                 joinDate: 1,
                 branch: "$branch.name",
                 branchId: 1,
-                bankAccountNo: 1,
-                bankAccountName: 1,
-                bankName: 1,
+                bank: 1,
             },
         },
     ]);
@@ -90,25 +88,29 @@ const getPayrollPreview = async ({
     // 2. Batch fetch all related data
     const staffIds = staffs.map((s) => s._id);
 
-    const [shiftAssignments, allAttendance, approvedOvertime, expenseCategories] =
-        await Promise.all([
-            ShiftAssignmentModel.find({
-                staffId: { $in: staffIds },
-                isActive: true,
-            }).populate("shiftId"),
-            AttendanceDayModel.find({
-                staffId: { $in: staffIds },
-                date: { $gte: startDate, $lte: endDate },
-            }),
-            OvertimeModel.find({
-                staffId: { $in: staffIds },
-                date: { $gte: startDate, $lte: endDate },
-                status: "approved",
-            }),
-            ExpenseCategoryModel.find({
-                name: { $in: [/^Salary/i, /^Overtime/i] },
-            }),
-        ]);
+    const [
+        shiftAssignments,
+        allAttendance,
+        approvedOvertime,
+        expenseCategories,
+    ] = await Promise.all([
+        ShiftAssignmentModel.find({
+            staffId: { $in: staffIds },
+            isActive: true,
+        }).populate("shiftId"),
+        AttendanceDayModel.find({
+            staffId: { $in: staffIds },
+            date: { $gte: startDate, $lte: endDate },
+        }),
+        OvertimeModel.find({
+            staffId: { $in: staffIds },
+            date: { $gte: startDate, $lte: endDate },
+            status: "approved",
+        }),
+        ExpenseCategoryModel.find({
+            name: { $in: [/^Salary/i, /^Overtime/i] },
+        }),
+    ]);
 
     const salaryCategory = expenseCategories.find((c) =>
         /^Salary/i.test(c.name),
@@ -289,7 +291,9 @@ const processPayroll = async ({
             const perDaySalary = staffSalary / 30;
             const serverDeduction = absentRecords * perDaySalary;
             const serverPayable = Math.max(0, staffSalary - serverDeduction);
-            const expectedAmount = Math.round(serverPayable + bonus - deduction);
+            const expectedAmount = Math.round(
+                serverPayable + bonus - deduction,
+            );
             const receivedAmount = Math.round(amount);
 
             // Allow ±2 tolerance for rounding differences

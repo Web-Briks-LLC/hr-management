@@ -1,18 +1,18 @@
-'use client';
+"use client";
 
-import { useParams, useRouter } from 'next/navigation';
-import { useGetStaffByIdQuery } from '@/redux/features/staff/staffApi';
+import { useParams, useRouter } from "next/navigation";
+import { useGetStaffByIdQuery } from "@/redux/features/staff/staffApi";
 import {
     Card,
     CardContent,
     CardDescription,
     CardHeader,
     CardTitle,
-} from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
     Loader,
     ArrowLeft,
@@ -24,15 +24,15 @@ import {
     User,
     AlertCircle,
     Banknote,
-} from 'lucide-react';
-import { format } from 'date-fns';
-import { Separator } from '@/components/ui/separator';
-import { StaffAttendanceTab } from '@/app/(root)/staffs/[id]/_components/attendance-tab';
-import { StaffLeaveTab } from '@/app/(root)/staffs/[id]/_components/staff-leave-tab';
-import { StaffOvertimeTab } from '@/app/(root)/staffs/[id]/_components/overtime-tab';
-import { useSession } from '@/lib/auth-client';
-import { Role } from '@/constants/role';
-import { EditStaffDialog } from '@/components/staff/edit-staff-dialog';
+} from "lucide-react";
+import { format } from "date-fns";
+import { Separator } from "@/components/ui/separator";
+import { StaffAttendanceTab } from "@/app/(root)/staffs/[id]/_components/attendance-tab";
+import { StaffLeaveTab } from "@/app/(root)/staffs/[id]/_components/staff-leave-tab";
+import { StaffOvertimeTab } from "@/app/(root)/staffs/[id]/_components/overtime-tab";
+import { useSession } from "@/lib/auth-client";
+import { Role } from "@/constants/role";
+import { EditStaffDialog } from "@/components/staff/edit-staff-dialog";
 
 export default function StaffDetailsPage() {
     const params = useParams();
@@ -74,9 +74,9 @@ export default function StaffDetailsPage() {
 
     const getInitials = (name: string) => {
         return name
-            .split(' ')
+            .split(" ")
             .map((n) => n[0])
-            .join('')
+            .join("")
             .toUpperCase()
             .slice(0, 2);
     };
@@ -102,7 +102,7 @@ export default function StaffDetailsPage() {
                         <Avatar className="h-24 w-24 border-2 border-primary/10">
                             <AvatarImage src={user?.image || undefined} />
                             <AvatarFallback className="text-2xl">
-                                {getInitials(user?.name || 'Staff User')}
+                                {getInitials(user?.name || "Staff User")}
                             </AvatarFallback>
                         </Avatar>
 
@@ -113,9 +113,9 @@ export default function StaffDetailsPage() {
                                         {user?.name}
                                         <Badge
                                             variant={
-                                                staff.status === 'active'
-                                                    ? 'default'
-                                                    : 'destructive'
+                                                staff.status === "active"
+                                                    ? "default"
+                                                    : "destructive"
                                             }
                                             className="ml-2"
                                         >
@@ -124,7 +124,7 @@ export default function StaffDetailsPage() {
                                     </h1>
                                     <p className="text-muted-foreground flex items-center gap-2 mt-1">
                                         <Briefcase className="h-4 w-4" />
-                                        {staff.designation} &bull;{' '}
+                                        {staff.designation} &bull;{" "}
                                         {staff.department}
                                     </p>
                                 </div>
@@ -143,11 +143,11 @@ export default function StaffDetailsPage() {
                                 </div>
                                 <div className="flex items-center gap-1">
                                     <Phone className="h-4 w-4" />
-                                    {staff.phone || 'N/A'}
+                                    {staff.phone || "N/A"}
                                 </div>
                                 <div className="flex items-center gap-1">
                                     <Building className="h-4 w-4" />
-                                    {branch?.name || 'No Branch'}
+                                    {branch?.name || "No Branch"}
                                 </div>
                                 <div className="flex items-center gap-1">
                                     <User className="h-4 w-4" />
@@ -189,9 +189,9 @@ export default function StaffDetailsPage() {
                                                           new Date(
                                                               staff.dateOfBirth,
                                                           ),
-                                                          'PPP',
+                                                          "PPP",
                                                       )
-                                                    : 'N/A'}
+                                                    : "N/A"}
                                             </p>
                                         </div>
                                         <div>
@@ -199,7 +199,7 @@ export default function StaffDetailsPage() {
                                                 Blood Group
                                             </p>
                                             <p className="font-medium">
-                                                {staff.bloodGroup || 'N/A'}
+                                                {staff.bloodGroup || "N/A"}
                                             </p>
                                         </div>
                                         <div>
@@ -207,7 +207,7 @@ export default function StaffDetailsPage() {
                                                 National ID
                                             </p>
                                             <p className="font-medium">
-                                                {staff.nationalId || 'N/A'}
+                                                {staff.nationalId || "N/A"}
                                             </p>
                                         </div>
                                         <div>
@@ -220,9 +220,9 @@ export default function StaffDetailsPage() {
                                                           new Date(
                                                               staff.joinDate,
                                                           ),
-                                                          'PPP',
+                                                          "PPP",
                                                       )
-                                                    : 'N/A'}
+                                                    : "N/A"}
                                             </p>
                                         </div>
                                         <div className="col-span-2">
@@ -230,7 +230,7 @@ export default function StaffDetailsPage() {
                                                 Address
                                             </p>
                                             <p className="font-medium">
-                                                {staff.address || 'N/A'}
+                                                {staff.address || "N/A"}
                                             </p>
                                         </div>
                                     </div>
@@ -248,7 +248,7 @@ export default function StaffDetailsPage() {
                                                 </p>
                                                 <p>
                                                     {staff.emergencyContact
-                                                        ?.name || 'N/A'}
+                                                        ?.name || "N/A"}
                                                 </p>
                                             </div>
                                             <div>
@@ -257,7 +257,7 @@ export default function StaffDetailsPage() {
                                                 </p>
                                                 <p>
                                                     {staff.emergencyContact
-                                                        ?.relation || 'N/A'}
+                                                        ?.relation || "N/A"}
                                                 </p>
                                             </div>
                                             <div>
@@ -266,7 +266,7 @@ export default function StaffDetailsPage() {
                                                 </p>
                                                 <p>
                                                     {staff.emergencyContact
-                                                        ?.phone || 'N/A'}
+                                                        ?.phone || "N/A"}
                                                 </p>
                                             </div>
                                         </div>
@@ -341,8 +341,8 @@ export default function StaffDetailsPage() {
                                                         <span className="font-medium">
                                                             {
                                                                 currentShift.startTime
-                                                            }{' '}
-                                                            -{' '}
+                                                            }{" "}
+                                                            -{" "}
                                                             {
                                                                 currentShift.endTime
                                                             }
@@ -356,7 +356,7 @@ export default function StaffDetailsPage() {
                                                             {currentShift
                                                                 .workDays
                                                                 ?.length ||
-                                                                0}{' '}
+                                                                0}{" "}
                                                             days/week
                                                         </span>
                                                     </div>
@@ -385,7 +385,7 @@ export default function StaffDetailsPage() {
                                                         Base Salary (Monthly)
                                                     </span>
                                                     <span className="font-bold text-lg">
-                                                        ৳{' '}
+                                                        ৳{" "}
                                                         {staff.salary?.toLocaleString() ||
                                                             0}
                                                     </span>
@@ -418,7 +418,7 @@ export default function StaffDetailsPage() {
                                                     Bank Name
                                                 </span>
                                                 <span className="font-medium">
-                                                    {staff.bankName || 'N/A'}
+                                                    {staff.bankName || "N/A"}
                                                 </span>
                                             </div>
                                             <div className="flex justify-between">
@@ -427,7 +427,7 @@ export default function StaffDetailsPage() {
                                                 </span>
                                                 <span className="font-medium">
                                                     {staff.bankAccountNo ||
-                                                        'N/A'}
+                                                        "N/A"}
                                                 </span>
                                             </div>
                                             <div className="flex justify-between">
@@ -436,7 +436,7 @@ export default function StaffDetailsPage() {
                                                 </span>
                                                 <span className="font-medium">
                                                     {staff.bankAccountName ||
-                                                        'N/A'}
+                                                        "N/A"}
                                                 </span>
                                             </div>
                                         </div>

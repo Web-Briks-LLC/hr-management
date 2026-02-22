@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { Button } from '@/components/ui/button';
+import { Button } from "@/components/ui/button";
 import {
     Card,
     CardContent,
@@ -8,30 +8,31 @@ import {
     CardFooter,
     CardHeader,
     CardTitle,
-} from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Loader } from 'lucide-react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { changeEmail, updateUser, useSession } from '@/lib/auth-client';
-import { toast } from 'sonner';
-import { useEffect } from 'react';
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Loader } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { changeEmail, updateUser, useSession } from "@/lib/auth-client";
+import { toast } from "sonner";
+import { useEffect } from "react";
 import {
     useGetMeQuery,
     useCompleteProfileMutation,
     useUpdateProfileMutation,
-} from '@/redux/features/staff/staffApi';
-import { ProfileFormValues, profileSchema } from '@/validators/profile.schema';
-import { DatePicker } from '../shared/DatePicker';
+} from "@/redux/features/staff/staffApi";
+import { ProfileFormValues, profileSchema } from "@/validators/profile.schema";
+import { BANGLADESH_BANKS } from "@/constants/banks";
+import { DatePicker } from "../shared/DatePicker";
 import {
     Select,
     SelectContent,
     SelectItem,
     SelectTrigger,
     SelectValue,
-} from '../ui/select';
-import { cn } from '@/lib/utils';
+} from "../ui/select";
+import { cn } from "@/lib/utils";
 
 export default function EditProfile() {
     const { data: session, isPending, isRefetching } = useSession();
@@ -51,72 +52,89 @@ export default function EditProfile() {
     const form = useForm<ProfileFormValues>({
         resolver: zodResolver(profileSchema),
         defaultValues: {
-            name: '',
-            email: '',
-            phone: '',
-            nationalId: '',
-            bloodGroup: '',
-            address: '',
+            name: "",
+            email: "",
+            phone: "",
+            nationalId: "",
+            bloodGroup: "",
+            address: "",
             emergencyContact: {
-                name: '',
-                relation: '',
-                phone: '',
+                name: "",
+                relation: "",
+                phone: "",
             },
-            fathersName: '',
-            mothersName: '',
-            spouseName: '',
-            bankName: '',
-            bankAccountNo: '',
-            bankAccountName: '',
+            fathersName: "",
+            mothersName: "",
+            spouseName: "",
+            bank: {
+                bankName: "",
+                accountNumber: "",
+                accountHolderName: "",
+                branch: "",
+                routingNumber: "",
+            },
             dateOfBirth: undefined,
             joinDate: undefined,
         },
     });
 
     useEffect(() => {
-        form.setValue('name', session?.user.name as string);
-        form.setValue('email', session?.user.email as string);
+        form.setValue("name", session?.user.name as string);
+        form.setValue("email", session?.user.email as string);
 
         // Check if staff exists and profile is completed
         if (!data?.staff?.profileCompleted) return;
 
-        form.setValue('phone', data.staff.phone || '');
+        form.setValue("phone", data.staff.phone || "");
 
         // Convert date strings to Date objects
         if (data.staff.dateOfBirth) {
-            form.setValue('dateOfBirth', new Date(data.staff.dateOfBirth));
+            form.setValue("dateOfBirth", new Date(data.staff.dateOfBirth));
         }
 
-        form.setValue('bloodGroup', data.staff.bloodGroup || '');
-        form.setValue('nationalId', data.staff.nationalId || '');
-        form.setValue('address', data.staff.address || '');
+        form.setValue("bloodGroup", data.staff.bloodGroup || "");
+        form.setValue("nationalId", data.staff.nationalId || "");
+        form.setValue("address", data.staff.address || "");
 
         // Handle emergency contact - check if it exists and has values
         if (data.staff.emergencyContact) {
             form.setValue(
-                'emergencyContact.name',
-                data.staff.emergencyContact.name || '',
+                "emergencyContact.name",
+                data.staff.emergencyContact.name || "",
             );
             form.setValue(
-                'emergencyContact.phone',
-                data.staff.emergencyContact.phone || '',
+                "emergencyContact.phone",
+                data.staff.emergencyContact.phone || "",
             );
             form.setValue(
-                'emergencyContact.relation',
-                data.staff.emergencyContact.relation || '',
+                "emergencyContact.relation",
+                data.staff.emergencyContact.relation || "",
             );
         }
 
-        form.setValue('fathersName', data.staff.fathersName || '');
-        form.setValue('mothersName', data.staff.mothersName || '');
-        form.setValue('spouseName', data.staff.spouseName || '');
-        form.setValue('bankName', data.staff.bankName || '');
-        form.setValue('bankAccountNo', data.staff.bankAccountNo || '');
-        form.setValue('bankAccountName', data.staff.bankAccountName || '');
+        form.setValue("fathersName", data.staff.fathersName || "");
+        form.setValue("mothersName", data.staff.mothersName || "");
+        form.setValue("spouseName", data.staff.spouseName || "");
+        if (data.staff.bank) {
+            form.setValue("bank.bankName", data.staff.bank.bankName || "");
+            form.setValue(
+                "bank.accountNumber",
+                data.staff.bank.accountNumber || "",
+            );
+            form.setValue(
+                "bank.accountHolderName",
+                data.staff.bank.accountHolderName || "",
+            );
+            form.setValue("bank.branch", data.staff.bank.branch || "");
+            form.setValue(
+                "bank.routingNumber",
+                data.staff.bank.routingNumber || "",
+            );
+        }
 
         // Convert joinDate string to Date object
         if (data.staff.joinDate) {
-            form.setValue('joinDate', new Date(data.staff.joinDate));
+            form.setValue("joinDate", new Date(data.staff.joinDate));
         }
     }, [session, form, isPending, isRefetching, data]);
 
@@ -168,9 +186,13 @@ export default function EditProfile() {
                 mothersName: values.mothersName,
                 spouseName: values.spouseName || undefined,
 
-                bankName: values.bankName,
-                bankAccountNo: values.bankAccountNo,
-                bankAccountName: values.bankAccountName,
+                bank: {
+                    bankName: values.bank?.bankName || "",
+                    accountNumber: values.bank?.accountNumber || "",
+                    accountHolderName: values.bank?.accountHolderName || "",
+                    branch: values.bank?.branch,
+                    routingNumber: values.bank?.routingNumber,
+                },
 
                 joinDate:
                     values.joinDate instanceof Date
@@ -193,28 +215,28 @@ export default function EditProfile() {
                     (apiError as { data?: { message?: string } })?.data
                         ?.message ||
                     (apiError as Error)?.message ||
-                    'Failed to update profile';
+                    "Failed to update profile";
                 throw new Error(errorMessage);
             }
 
             if (nameChanged && emailChanged) {
                 toast.success(
-                    'Profile updated. Please verify your new email address.',
+                    "Profile updated. Please verify your new email address.",
                 );
             } else if (nameChanged) {
-                toast.success('Your name has been updated successfully.');
+                toast.success("Your name has been updated successfully.");
             } else if (emailChanged) {
                 toast.success(
-                    'Email change requested. Please verify the link sent to your new email.',
+                    "Email change requested. Please verify the link sent to your new email.",
                 );
             } else {
-                toast.success('Profile updated successfully.');
+                toast.success("Profile updated successfully.");
             }
 
             form.reset(values);
         } catch (error) {
             console.log(error);
-            toast.error((error as Error)?.message || 'Something went wrong!');
+            toast.error((error as Error)?.message || "Something went wrong!");
         }
     };
 
@@ -233,7 +255,7 @@ export default function EditProfile() {
                         <div className="grid grid-cols-2 gap-4">
                             <div className="grid gap-2">
                                 <Label>Name *</Label>
-                                <Input {...form.register('name')} />
+                                <Input {...form.register("name")} />
                                 <p className="text-sm text-destructive">
                                     {form.formState.errors.name?.message}
                                 </p>
@@ -241,7 +263,7 @@ export default function EditProfile() {
 
                             <div className="grid gap-2">
                                 <Label>Email *</Label>
-                                <Input {...form.register('email')} />
+                                <Input {...form.register("email")} />
                                 <p className="text-sm text-destructive">
                                     {form.formState.errors.email?.message}
                                 </p>
@@ -252,7 +274,7 @@ export default function EditProfile() {
                             <div className="grid gap-2">
                                 <Label>Phone *</Label>
                                 <Input
-                                    {...form.register('phone')}
+                                    {...form.register("phone")}
                                     placeholder="Enter phone number"
                                 />
                                 <p className="text-sm text-destructive">
@@ -263,10 +285,10 @@ export default function EditProfile() {
                             <div>
                                 <DatePicker
                                     label="Date of Birth *"
-                                    value={form.watch('dateOfBirth')}
+                                    value={form.watch("dateOfBirth")}
                                     onChange={(date) => {
                                         if (date) {
-                                            form.setValue('dateOfBirth', date);
+                                            form.setValue("dateOfBirth", date);
                                         }
                                     }}
                                     placeholder="Pick date of birth"
@@ -281,7 +303,7 @@ export default function EditProfile() {
                         <div className="grid gap-4 grid-cols-2">
                             <div className="grid gap-2">
                                 <Label>National ID *</Label>
-                                <Input {...form.register('nationalId')} />
+                                <Input {...form.register("nationalId")} />
                                 <p className="text-sm text-destructive">
                                     {form.formState.errors.nationalId?.message}
                                 </p>
@@ -290,9 +312,9 @@ export default function EditProfile() {
                             <div className="grid gap-2">
                                 <Label>Blood Group *</Label>
                                 <Select
-                                    value={form.watch('bloodGroup')}
+                                    value={form.watch("bloodGroup")}
                                     onValueChange={(v) =>
-                                        form.setValue('bloodGroup', v)
+                                        form.setValue("bloodGroup", v)
                                     }
                                 >
                                     <SelectTrigger className="w-full">
@@ -300,14 +322,14 @@ export default function EditProfile() {
                                     </SelectTrigger>
                                     <SelectContent>
                                         {[
-                                            'A+',
-                                            'A-',
-                                            'B+',
-                                            'B-',
-                                            'AB+',
-                                            'AB-',
-                                            'O+',
-                                            'O-',
+                                            "A+",
+                                            "A-",
+                                            "B+",
+                                            "B-",
+                                            "AB+",
+                                            "AB-",
+                                            "O+",
+                                            "O-",
                                         ].map((bg) => (
                                             <SelectItem key={bg} value={bg}>
                                                 {bg}
@@ -326,16 +348,16 @@ export default function EditProfile() {
                             <div className="grid grid-cols-3 gap-4">
                                 <Input
                                     placeholder="Name"
-                                    {...form.register('emergencyContact.name')}
+                                    {...form.register("emergencyContact.name")}
                                 />
 
                                 <Select
                                     value={form.watch(
-                                        'emergencyContact.relation',
+                                        "emergencyContact.relation",
                                     )}
                                     onValueChange={(v) =>
                                         form.setValue(
-                                            'emergencyContact.relation',
+                                            "emergencyContact.relation",
                                             v,
                                         )
                                     }
@@ -345,16 +367,16 @@ export default function EditProfile() {
                                     </SelectTrigger>
                                     <SelectContent>
                                         {[
-                                            'Father',
-                                            'Mother',
-                                            'Brother',
-                                            'Sister',
-                                            'Spouse',
-                                            'Friend',
-                                            'Uncle',
-                                            'Auntie',
-                                            'Grandfather',
-                                            'Grandmother',
+                                            "Father",
+                                            "Mother",
+                                            "Brother",
+                                            "Sister",
+                                            "Spouse",
+                                            "Friend",
+                                            "Uncle",
+                                            "Auntie",
+                                            "Grandfather",
+                                            "Grandmother",
                                         ].map((r) => (
                                             <SelectItem key={r} value={r}>
                                                 {r}
@@ -365,7 +387,7 @@ export default function EditProfile() {
 
                                 <Input
                                     placeholder="Phone"
-                                    {...form.register('emergencyContact.phone')}
+                                    {...form.register("emergencyContact.phone")}
                                 />
                             </div>
                         </div>
@@ -374,7 +396,7 @@ export default function EditProfile() {
                             <div>
                                 <Input
                                     placeholder="Father's Name"
-                                    {...form.register('fathersName')}
+                                    {...form.register("fathersName")}
                                 />
                                 <p className="text-sm text-destructive">
                                     {form.formState.errors.fathersName?.message}
@@ -384,7 +406,7 @@ export default function EditProfile() {
                             <div>
                                 <Input
                                     placeholder="Mother's Name"
-                                    {...form.register('mothersName')}
+                                    {...form.register("mothersName")}
                                 />
                                 <p className="text-sm text-destructive">
                                     {form.formState.errors.mothersName?.message}
@@ -394,7 +416,7 @@ export default function EditProfile() {
 
                         <Input
                             placeholder="Spouse Name (Optional)"
-                            {...form.register('spouseName')}
+                            {...form.register("spouseName")}
                         />
 
                         {/* Bank Account Section */}
@@ -402,16 +424,29 @@ export default function EditProfile() {
                             <Label className="text-base font-semibold">
                                 Bank Account Information *
                             </Label>
-                            <div className="grid grid-cols-3 gap-4 mt-3">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
                                 <div className="grid gap-2">
                                     <Label>Bank Name *</Label>
-                                    <Input
-                                        placeholder="e.g., Dutch Bangla Bank"
-                                        {...form.register('bankName')}
-                                    />
+                                    <Select
+                                        value={form.watch("bank.bankName")}
+                                        onValueChange={(v) =>
+                                            form.setValue("bank.bankName", v)
+                                        }
+                                    >
+                                        <SelectTrigger className="w-full">
+                                            <SelectValue placeholder="Select bank" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {BANGLADESH_BANKS.map((b) => (
+                                                <SelectItem key={b} value={b}>
+                                                    {b}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
                                     <p className="text-sm text-destructive">
                                         {
-                                            form.formState.errors.bankName
+                                            form.formState.errors.bank?.bankName
                                                 ?.message
                                         }
                                     </p>
@@ -421,38 +456,56 @@ export default function EditProfile() {
                                     <Label>Account Number *</Label>
                                     <Input
                                         placeholder="Your account number"
-                                        {...form.register('bankAccountNo')}
+                                        {...form.register("bank.accountNumber")}
                                     />
                                     <p className="text-sm text-destructive">
                                         {
-                                            form.formState.errors.bankAccountNo
-                                                ?.message
+                                            form.formState.errors.bank
+                                                ?.accountNumber?.message
+                                        }
+                                    </p>
+                                </div>
+
+                                <div className="grid gap-2 md:col-span-2">
+                                    <Label>Account Holder Name *</Label>
+                                    <Input
+                                        placeholder="Name on account"
+                                        {...form.register(
+                                            "bank.accountHolderName",
+                                        )}
+                                    />
+                                    <p className="text-sm text-destructive">
+                                        {
+                                            form.formState.errors.bank
+                                                ?.accountHolderName?.message
                                         }
                                     </p>
                                 </div>
 
                                 <div className="grid gap-2">
-                                    <Label>Account Holder Name *</Label>
+                                    <Label>Branch</Label>
                                     <Input
-                                        placeholder="Name on account"
-                                        {...form.register('bankAccountName')}
+                                        placeholder="Branch Name"
+                                        {...form.register("bank.branch")}
                                     />
-                                    <p className="text-sm text-destructive">
-                                        {
-                                            form.formState.errors
-                                                .bankAccountName?.message
-                                        }
-                                    </p>
+                                </div>
+
+                                <div className="grid gap-2">
+                                    <Label>Routing Number</Label>
+                                    <Input
+                                        placeholder="Routing Number"
+                                        {...form.register("bank.routingNumber")}
+                                    />
                                 </div>
                             </div>
                         </div>
 
                         <DatePicker
                             label="Join Date *"
-                            value={form.watch('joinDate')}
+                            value={form.watch("joinDate")}
                             onChange={(date) => {
                                 if (date) {
-                                    form.setValue('joinDate', date);
+                                    form.setValue("joinDate", date);
                                 }
                             }}
                             placeholder="Pick join date"
@@ -464,7 +517,7 @@ export default function EditProfile() {
 
                     <div className="grid gap-2">
                         <Label>Address *</Label>
-                        <Input {...form.register('address')} />
+                        <Input {...form.register("address")} />
                         <p className="text-sm text-destructive">
                             {form.formState.errors.address?.message}
                         </p>
@@ -472,11 +525,11 @@ export default function EditProfile() {
                 </CardContent>
 
                 <CardFooter>
-                    <Button className={cn('w-full')} disabled={isLoading}>
+                    <Button className={cn("w-full")} disabled={isLoading}>
                         {isLoading ? (
                             <Loader className="animate-spin" />
                         ) : (
-                            'Update Profile'
+                            "Update Profile"
                         )}
                     </Button>
                 </CardFooter>

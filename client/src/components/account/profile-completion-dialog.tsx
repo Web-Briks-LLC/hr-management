@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
     Dialog,
     DialogContent,
@@ -9,17 +9,21 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { useGetMeQuery } from '@/redux/features/staff/staffApi';
-import { UserCircle } from 'lucide-react';
-import IStaff from '@/types/staff.type';
-import { useSession } from '@/lib/auth-client';
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { useGetMeQuery } from "@/redux/features/staff/staffApi";
+import { UserCircle } from "lucide-react";
+import IStaff from "@/types/staff.type";
+import { useSession } from "@/lib/auth-client";
 
 // Helper to check if bank fields are missing
 function isBankDetailsMissing(staff: Partial<IStaff> | undefined) {
     if (!staff) return true;
-    return !staff.bankAccountNo || !staff.bankAccountName || !staff.bankName;
+    return (
+        !staff.bank?.accountNumber ||
+        !staff.bank?.accountHolderName ||
+        !staff.bank?.bankName
+    );
 }
 
 export function ProfileCompletionDialog() {
@@ -35,15 +39,14 @@ export function ProfileCompletionDialog() {
 
     // Check for missing bank details
     useEffect(() => {
-        if (!isStaffLoading && staff) {
-            if (isBankDetailsMissing(staff)) {
-                setIsOpen(true);
-            }
+        if (!isStaffLoading && staff && isBankDetailsMissing(staff)) {
+            const timer = setTimeout(() => setIsOpen(true), 0);
+            return () => clearTimeout(timer);
         }
     }, [staff, isStaffLoading]);
 
     const searchParams = useSearchParams();
-    const isEditingProfile = searchParams.get('edit-profile') === 'true';
+    const isEditingProfile = searchParams.get("edit-profile") === "true";
 
     // Show dialog if open AND we are not editing profile
     const showDialog = isOpen && !isEditingProfile;
@@ -52,7 +55,7 @@ export function ProfileCompletionDialog() {
 
     const handleGoToProfile = () => {
         setIsOpen(false);
-        router.push('/account?edit-profile=true');
+        router.push("/account?edit-profile=true");
     };
 
     return (

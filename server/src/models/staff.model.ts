@@ -1,11 +1,11 @@
-import { model, Schema } from 'mongoose';
-import type IStaff from '../types/staff.type.js';
+import { model, Schema } from "mongoose";
+import type IStaff from "../types/staff.type.js";
 
 const StaffSchema = new Schema<IStaff>(
     {
         userId: {
             type: Schema.Types.ObjectId,
-            ref: 'User',
+            ref: "User",
             required: false,
             unique: true,
             sparse: true,
@@ -28,7 +28,7 @@ const StaffSchema = new Schema<IStaff>(
 
         branchId: {
             type: Schema.Types.ObjectId,
-            ref: 'Branch',
+            ref: "Branch",
             required: false, // Optional for admin roles
             index: true,
         },
@@ -53,8 +53,8 @@ const StaffSchema = new Schema<IStaff>(
 
         status: {
             type: String,
-            enum: ['active', 'inactive', 'terminated'],
-            default: 'active',
+            enum: ["active", "inactive", "terminated"],
+            default: "active",
             index: true,
         },
 
@@ -73,7 +73,7 @@ const StaffSchema = new Schema<IStaff>(
 
         bloodGroup: {
             type: String,
-            enum: ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'],
+            enum: ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"],
             required: false,
         },
 
@@ -112,19 +112,12 @@ const StaffSchema = new Schema<IStaff>(
             required: false,
         },
 
-        bankAccountNo: {
-            type: String,
-            required: false,
-        },
-
-        bankAccountName: {
-            type: String,
-            required: false,
-        },
-
-        bankName: {
-            type: String,
-            required: false,
+        bank: {
+            bankName: { type: String, required: false },
+            accountNumber: { type: String, required: false },
+            accountHolderName: { type: String, required: false },
+            branch: { type: String, required: false },
+            routingNumber: { type: String, required: false },
         },
 
         exitDate: {
@@ -171,5 +164,5 @@ const StaffSchema = new Schema<IStaff>(
     },
 );
 
-const StaffModel = model<IStaff>('Staff', StaffSchema);
+const StaffModel = model<IStaff>("Staff", StaffSchema);
 export default StaffModel;

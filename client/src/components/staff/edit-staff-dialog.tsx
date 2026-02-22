@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { Button } from '@/components/ui/button';
+import { Button } from "@/components/ui/button";
 import {
     Dialog,
     DialogContent,
@@ -9,40 +9,46 @@ import {
     DialogHeader,
     DialogTitle,
     DialogTrigger,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
     Select,
     SelectContent,
     SelectItem,
     SelectTrigger,
     SelectValue,
-} from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
-import { Role } from '@/constants/role';
-import { useGetAllBranchesQuery } from '@/redux/features/branch/branchApi';
-import { useUpdateStaffMutation } from '@/redux/features/staff/staffApi';
-import IStaff from '@/types/staff.type';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { Edit, Loader2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
-import { Controller, useForm } from 'react-hook-form';
-import { toast } from 'sonner';
-import { z } from 'zod';
+} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Role } from "@/constants/role";
+import { useGetAllBranchesQuery } from "@/redux/features/branch/branchApi";
+import { useUpdateStaffMutation } from "@/redux/features/staff/staffApi";
+import IStaff from "@/types/staff.type";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Edit, Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Controller, useForm } from "react-hook-form";
+import { toast } from "sonner";
+import { z } from "zod";
 
 const formSchema = z.object({
     branchId: z.string().optional(),
-    department: z.string().min(1, 'Department is required'),
-    designation: z.string().min(1, 'Designation is required'),
+    department: z.string().min(1, "Department is required"),
+    designation: z.string().min(1, "Designation is required"),
     role: z.string().optional(),
-    status: z.enum(['active', 'inactive', 'terminated']),
-    salary: z.coerce.number().min(0, 'Salary must be positive'),
+    status: z.enum(["active", "inactive", "terminated"]),
+    salary: z.coerce.number().min(0, "Salary must be positive"),
     salaryVisibleToEmployee: z.boolean().default(true),
     // Bank Account Fields
-    bankName: z.string().optional(),
-    bankAccountNo: z.string().optional(),
-    bankAccountName: z.string().optional(),
+    bank: z
+        .object({
+            bankName: z.string().optional(),
+            accountNumber: z.string().optional(),
+            accountHolderName: z.string().optional(),
+            branch: z.string().optional(),
+            routingNumber: z.string().optional(),
+        })
+        .optional(),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -61,33 +67,41 @@ export function EditStaffDialog({ staff }: EditStaffDialogProps) {
     const form = useForm<FormData>({
         resolver: zodResolver(formSchema) as any,
         defaultValues: {
-            branchId: staff.branchId || '',
-            department: staff.department || '',
-            designation: staff.designation || '',
+            branchId: staff.branchId || "",
+            department: staff.department || "",
+            designation: staff.designation || "",
             role: staff.user?.role || Role.STAFF,
-            status: staff.status || 'active',
+            status: staff.status || "active",
             salary: staff.salary || 0,
             salaryVisibleToEmployee: staff.salaryVisibleToEmployee !== false,
-            bankName: staff.bankName || '',
-            bankAccountNo: staff.bankAccountNo || '',
-            bankAccountName: staff.bankAccountName || '',
+            bank: {
+                bankName: staff.bank?.bankName || "",
+                accountNumber: staff.bank?.accountNumber || "",
+                accountHolderName: staff.bank?.accountHolderName || "",
+                branch: staff.bank?.branch || "",
+                routingNumber: staff.bank?.routingNumber || "",
+            },
         },
     });
 
     useEffect(() => {
         if (open) {
             form.reset({
-                branchId: staff.branchId || '',
-                department: staff.department || '',
-                designation: staff.designation || '',
+                branchId: staff.branchId || "",
+                department: staff.department || "",
+                designation: staff.designation || "",
                 role: staff.user?.role || Role.STAFF,
-                status: staff.status || 'active',
+                status: staff.status || "active",
                 salary: staff.salary || 0,
                 salaryVisibleToEmployee:
                     staff.salaryVisibleToEmployee !== false,
-                bankName: staff.bankName || '',
-                bankAccountNo: staff.bankAccountNo || '',
-                bankAccountName: staff.bankAccountName || '',
+                bank: {
+                    bankName: staff.bank?.bankName || "",
+                    accountNumber: staff.bank?.accountNumber || "",
+                    accountHolderName: staff.bank?.accountHolderName || "",
+                    branch: staff.bank?.branch || "",
+                    routingNumber: staff.bank?.routingNumber || "",
+                },
             });
         }
     }, [open, staff, form]);
@@ -103,10 +117,11 @@ export function EditStaffDialog({ staff }: EditStaffDialogProps) {
                 data: payload,
             }).unwrap();
 
-            toast.success('Staff profile updated successfully');
+            toast.success("Staff profile updated successfully");
             setOpen(false);
-        } catch (error: any) {
-            toast.error(error.data?.message || 'Failed to update profile');
+        } catch (error: unknown) {
+            const err = error as { data?: { message?: string } };
+            toast.error(err?.data?.message || "Failed to update profile");
         }
     }
 
@@ -137,7 +152,7 @@ export function EditStaffDialog({ staff }: EditStaffDialogProps) {
                             <Label htmlFor="department">Department</Label>
                             <Input
                                 id="department"
-                                {...form.register('department')}
+                                {...form.register("department")}
                             />
                             {form.formState.errors.department && (
                                 <p className="text-sm text-destructive">
@@ -151,7 +166,7 @@ export function EditStaffDialog({ staff }: EditStaffDialogProps) {
                             <Label htmlFor="designation">Designation</Label>
                             <Input
                                 id="designation"
-                                {...form.register('designation')}
+                                {...form.register("designation")}
                             />
                             {form.formState.errors.designation && (
                                 <p className="text-sm text-destructive">
@@ -176,7 +191,10 @@ export function EditStaffDialog({ staff }: EditStaffDialogProps) {
                                         </SelectTrigger>
                                         <SelectContent>
                                             {branchesData?.branches?.map(
-                                                (branch: any) => (
+                                                (branch: {
+                                                    _id: string;
+                                                    name: string;
+                                                }) => (
                                                     <SelectItem
                                                         key={branch._id}
                                                         value={branch._id}
@@ -278,7 +296,7 @@ export function EditStaffDialog({ staff }: EditStaffDialogProps) {
                                 <Input
                                     id="salary"
                                     type="number"
-                                    {...form.register('salary')}
+                                    {...form.register("salary")}
                                 />
                                 {form.formState.errors.salary && (
                                     <p className="text-sm text-destructive">
@@ -323,29 +341,49 @@ export function EditStaffDialog({ staff }: EditStaffDialogProps) {
                                 <Input
                                     id="bankName"
                                     placeholder="e.g., Dutch Bangla Bank"
-                                    {...form.register('bankName')}
+                                    {...form.register("bank.bankName")}
                                 />
                             </div>
 
                             <div className="space-y-2">
-                                <Label htmlFor="bankAccountNo">
+                                <Label htmlFor="accountNumber">
                                     Account Number
                                 </Label>
                                 <Input
-                                    id="bankAccountNo"
+                                    id="accountNumber"
                                     placeholder="e.g., 1234567890"
-                                    {...form.register('bankAccountNo')}
+                                    {...form.register("bank.accountNumber")}
                                 />
                             </div>
 
                             <div className="space-y-2 md:col-span-2">
-                                <Label htmlFor="bankAccountName">
+                                <Label htmlFor="accountHolderName">
                                     Account Holder Name
                                 </Label>
                                 <Input
-                                    id="bankAccountName"
+                                    id="accountHolderName"
                                     placeholder="Name as per bank account"
-                                    {...form.register('bankAccountName')}
+                                    {...form.register("bank.accountHolderName")}
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="branch">Branch</Label>
+                                <Input
+                                    id="branch"
+                                    placeholder="Branch Name"
+                                    {...form.register("bank.branch")}
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="routingNumber">
+                                    Routing Number
+                                </Label>
+                                <Input
+                                    id="routingNumber"
+                                    placeholder="Routing Number"
+                                    {...form.register("bank.routingNumber")}
                                 />
                             </div>
                         </div>

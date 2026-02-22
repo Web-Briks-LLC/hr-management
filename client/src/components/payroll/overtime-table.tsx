@@ -335,7 +335,9 @@ export default function OvertimeTable({
                                                         checked as boolean,
                                                     )
                                                 }
-                                                disabled={!isPayable || isLocked}
+                                                disabled={
+                                                    !isPayable || isLocked
+                                                }
                                             />
                                         </TableCell>
                                         <TableCell>
@@ -353,13 +355,28 @@ export default function OvertimeTable({
                                                     <div className="font-medium">
                                                         {row.name}
                                                     </div>
-                                                    <div className="text-xs text-muted-foreground">
-                                                        {row.bankName || "N/A"}{" "}
-                                                        - {row.branch || "N/A"}
+                                                    <div className="text-xs text-muted-foreground mt-1">
+                                                        <span className="font-medium text-foreground">
+                                                            {row.bank
+                                                                ?.bankName ||
+                                                                "No Bank"}
+                                                        </span>
+                                                        {row.bank?.branch &&
+                                                            ` - ${row.bank?.branch}`}
                                                     </div>
-                                                    <div className="text-[10px] text-muted-foreground font-mono bg-muted/60 px-1.5 py-0.5 rounded w-fit mt-1">
-                                                        {row.bankAccountNo ||
-                                                            "No Account"}
+                                                    <div className="flex items-center gap-2 mt-1 whitespace-nowrap">
+                                                        <div className="text-[10px] text-muted-foreground font-mono bg-muted/60 px-1.5 py-0.5 rounded w-fit border border-border/50">
+                                                            AC:{" "}
+                                                            {row.bank
+                                                                ?.accountNumber ||
+                                                                "N/A"}
+                                                        </div>
+                                                        <div className="text-[10px] text-muted-foreground font-mono bg-muted/60 px-1.5 py-0.5 rounded w-fit border border-border/50">
+                                                            RT:{" "}
+                                                            {row.bank
+                                                                ?.routingNumber ||
+                                                                "N/A"}
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -426,7 +443,8 @@ export default function OvertimeTable({
                                                         disabled={
                                                             isRowProcessing ||
                                                             isProcessing ||
-                                                            row.otPayable <= 0 ||
+                                                            row.otPayable <=
+                                                                0 ||
                                                             isLocked
                                                         }
                                                     >
