@@ -14,19 +14,24 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
-    Loader,
     ArrowLeft,
     Mail,
     Phone,
     Briefcase,
     Clock,
-    Building,
-    User,
     AlertCircle,
     Banknote,
+    Calendar,
+    CalendarDays,
+    CreditCard,
+    Droplet,
+    Fingerprint,
+    MapPin,
+    ShieldAlert,
+    UserCircle,
+    Building2,
 } from "lucide-react";
 import { format } from "date-fns";
-import { Separator } from "@/components/ui/separator";
 import { StaffAttendanceTab } from "@/app/(root)/staffs/[id]/_components/attendance-tab";
 import { StaffLeaveTab } from "@/app/(root)/staffs/[id]/_components/staff-leave-tab";
 import { StaffOvertimeTab } from "@/app/(root)/staffs/[id]/_components/overtime-tab";
@@ -34,6 +39,51 @@ import { PaymentHistoryTab } from "@/app/(root)/staffs/[id]/_components/payment-
 import { useSession } from "@/lib/auth-client";
 import { Role } from "@/constants/role";
 import { EditStaffDialog } from "@/components/staff/edit-staff-dialog";
+import { Skeleton } from "@/components/ui/skeleton";
+
+function StaffDetailsSkeleton() {
+    return (
+        <div className="p-6 space-y-6">
+            <div className="flex items-center gap-2">
+                <Skeleton className="h-9 w-32" />
+            </div>
+
+            <Card>
+                <CardContent className="p-6">
+                    <div className="flex flex-col md:flex-row gap-6 items-start">
+                        <Skeleton className="h-24 w-24 rounded-full" />
+                        <div className="flex-1 space-y-4 w-full">
+                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                <div className="space-y-2">
+                                    <Skeleton className="h-8 w-48" />
+                                    <Skeleton className="h-4 w-32" />
+                                </div>
+                            </div>
+                            <div className="flex flex-wrap gap-4 mt-4">
+                                <Skeleton className="h-5 w-32" />
+                                <Skeleton className="h-5 w-24" />
+                                <Skeleton className="h-5 w-32" />
+                                <Skeleton className="h-5 w-24" />
+                            </div>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+
+            <div className="space-y-6">
+                <Skeleton className="h-10 w-full lg:w-[400px]" />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <Skeleton className="h-[400px]" />
+                    <div className="space-y-6">
+                        <Skeleton className="h-[250px]" />
+                        <Skeleton className="h-[150px]" />
+                        <Skeleton className="h-[150px]" />
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
 
 export default function StaffDetailsPage() {
     const params = useParams();
@@ -54,11 +104,7 @@ export default function StaffDetailsPage() {
         canEdit || (isOwner && staff?.salaryVisibleToEmployee);
 
     if (isLoading) {
-        return (
-            <div className="flex items-center justify-center p-12">
-                <Loader className="h-8 w-8 animate-spin text-primary" />
-            </div>
-        );
+        return <StaffDetailsSkeleton />;
     }
 
     if (isError || !staff) {
@@ -97,20 +143,22 @@ export default function StaffDetailsPage() {
             </div>
 
             {/* Profile Header Card */}
-            <Card>
-                <CardContent className="p-6">
-                    <div className="flex flex-col md:flex-row gap-6 items-start">
-                        <Avatar className="h-24 w-24 border-2 border-primary/10">
+            {/* Profile Header Card */}
+            <Card className="overflow-hidden border border-muted/20 bg-card shadow-md pb-4 rounded-2xl">
+                <div className="h-32 bg-linear-to-r from-primary/20 via-primary/5 to-transparent w-full" />
+                <CardContent className="px-6 sm:px-10 -mt-16 relative">
+                    <div className="flex flex-col md:flex-row gap-6 md:gap-8 items-start">
+                        <Avatar className="h-32 w-32 border-[6px] border-background shadow-xs bg-muted">
                             <AvatarImage src={user?.image || undefined} />
-                            <AvatarFallback className="text-2xl">
+                            <AvatarFallback className="text-4xl bg-primary/10 text-primary font-medium">
                                 {getInitials(user?.name || "Staff User")}
                             </AvatarFallback>
                         </Avatar>
 
-                        <div className="flex-1 space-y-2">
-                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                                <div>
-                                    <h1 className="text-2xl font-bold flex items-center gap-2">
+                        <div className="flex-1 space-y-1 mt-2 md:mt-16 w-full">
+                            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                                <div className="space-y-1.5">
+                                    <h1 className="text-3xl font-bold flex flex-wrap items-center gap-3 tracking-tight">
                                         {user?.name}
                                         <Badge
                                             variant={
@@ -118,41 +166,55 @@ export default function StaffDetailsPage() {
                                                     ? "default"
                                                     : "destructive"
                                             }
-                                            className="ml-2"
+                                            className="px-2.5 py-0.5 rounded-md uppercase tracking-widest text-[10px] bg-primary/10 text-primary hover:bg-primary/20 border-0"
                                         >
                                             {staff.status}
                                         </Badge>
                                     </h1>
-                                    <p className="text-muted-foreground flex items-center gap-2 mt-1">
-                                        <Briefcase className="h-4 w-4" />
-                                        {staff.designation} &bull;{" "}
-                                        {staff.department}
+                                    <p className="text-muted-foreground flex items-center gap-2 text-sm">
+                                        <Briefcase className="h-4 w-4 text-muted-foreground/70" />
+                                        <span>{staff.designation}</span>
+                                        <span className="opacity-40">•</span>
+                                        <span>{staff.department}</span>
                                     </p>
                                 </div>
                                 {canEdit && (
-                                    <EditStaffDialog
-                                        staff={staff}
-                                        currentShiftId={currentShift?._id}
-                                    />
+                                    <div className="pt-1">
+                                        <EditStaffDialog
+                                            staff={staff}
+                                            currentShiftId={currentShift?._id}
+                                        />
+                                    </div>
                                 )}
                             </div>
 
-                            <div className="flex flex-wrap gap-4 mt-4 text-sm text-muted-foreground">
-                                <div className="flex items-center gap-1">
-                                    <Mail className="h-4 w-4" />
-                                    {user?.email}
+                            <div className="flex flex-wrap gap-x-8 gap-y-3 mt-8 pt-6 border-t border-border/40 text-sm text-muted-foreground/90">
+                                <div className="flex items-center gap-2.5">
+                                    <Mail className="h-4 w-4 text-muted-foreground/60" />
+                                    <span
+                                        className="truncate hover:text-foreground transition-colors"
+                                        title={user?.email}
+                                    >
+                                        {user?.email}
+                                    </span>
                                 </div>
-                                <div className="flex items-center gap-1">
-                                    <Phone className="h-4 w-4" />
-                                    {staff.phone || "N/A"}
+                                <div className="flex items-center gap-2.5">
+                                    <Phone className="h-4 w-4 text-muted-foreground/60" />
+                                    <span className="hover:text-foreground transition-colors">
+                                        {staff.phone || "N/A"}
+                                    </span>
                                 </div>
-                                <div className="flex items-center gap-1">
-                                    <Building className="h-4 w-4" />
-                                    {branch?.name || "No Branch"}
+                                <div className="flex items-center gap-2.5">
+                                    <Building2 className="h-4 w-4 text-muted-foreground/60" />
+                                    <span className="hover:text-foreground transition-colors">
+                                        {branch?.name || "No Branch"}
+                                    </span>
                                 </div>
-                                <div className="flex items-center gap-1">
-                                    <User className="h-4 w-4" />
-                                    ID: {staff.staffId}
+                                <div className="flex items-center gap-2.5">
+                                    <UserCircle className="h-4 w-4 text-muted-foreground/60" />
+                                    <span className="font-medium text-foreground tracking-wide text-xs bg-muted/50 px-2 py-1 rounded-md">
+                                        ID: {staff.staffId}
+                                    </span>
                                 </div>
                             </div>
                         </div>
@@ -162,7 +224,7 @@ export default function StaffDetailsPage() {
 
             {/* Tabs */}
             <Tabs defaultValue="overview" className="w-full">
-                <TabsList className="grid w-full grid-cols-4 lg:w-[400px]">
+                <TabsList className="flex flex-wrap h-auto w-full sm:w-auto justify-start gap-1 p-1">
                     <TabsTrigger value="overview">Overview</TabsTrigger>
                     <TabsTrigger value="attendance">Attendance</TabsTrigger>
                     <TabsTrigger value="leave">Leaves</TabsTrigger>
@@ -174,103 +236,140 @@ export default function StaffDetailsPage() {
 
                 <div className="mt-6">
                     <TabsContent value="overview">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="text-lg">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+                            <Card className="border border-muted/20 shadow-sm rounded-xl overflow-hidden bg-card">
+                                <CardHeader className="border-b border-border/40 bg-muted/10 pb-4 pt-5 px-6">
+                                    <CardTitle className="text-base font-semibold flex items-center gap-2.5 tracking-tight">
+                                        <UserCircle className="h-4 w-4 text-primary/80" />
                                         Personal Information
                                     </CardTitle>
                                 </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <div className="grid grid-cols-2 gap-4 text-sm">
-                                        <div>
-                                            <p className="text-muted-foreground">
+                                <CardContent className="space-y-8 p-6">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-8 gap-x-6">
+                                        <div className="space-y-1.5 flex flex-col">
+                                            <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold flex items-center gap-2">
+                                                <Calendar className="h-3 w-3 opacity-60" />{" "}
                                                 Date of Birth
-                                            </p>
-                                            <p className="font-medium">
-                                                {staff.dateOfBirth
-                                                    ? format(
-                                                          new Date(
-                                                              staff.dateOfBirth,
-                                                          ),
-                                                          "PPP",
-                                                      )
-                                                    : "N/A"}
-                                            </p>
+                                            </span>
+                                            <span className="text-sm font-medium">
+                                                {staff.dateOfBirth ? (
+                                                    format(
+                                                        new Date(
+                                                            staff.dateOfBirth,
+                                                        ),
+                                                        "MMM d, yyyy",
+                                                    )
+                                                ) : (
+                                                    <span className="text-muted-foreground/60 italic font-normal">
+                                                        Not specified
+                                                    </span>
+                                                )}
+                                            </span>
                                         </div>
-                                        <div>
-                                            <p className="text-muted-foreground">
+                                        <div className="space-y-1.5 flex flex-col">
+                                            <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold flex items-center gap-2">
+                                                <Droplet className="h-3 w-3 opacity-60" />{" "}
                                                 Blood Group
-                                            </p>
-                                            <p className="font-medium">
-                                                {staff.bloodGroup || "N/A"}
-                                            </p>
+                                            </span>
+                                            <span className="text-sm font-medium">
+                                                {staff.bloodGroup || (
+                                                    <span className="text-muted-foreground/60 italic font-normal">
+                                                        Not specified
+                                                    </span>
+                                                )}
+                                            </span>
                                         </div>
-                                        <div>
-                                            <p className="text-muted-foreground">
+                                        <div className="space-y-1.5 flex flex-col">
+                                            <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold flex items-center gap-2">
+                                                <Fingerprint className="h-3 w-3 opacity-60" />{" "}
                                                 National ID
-                                            </p>
-                                            <p className="font-medium">
-                                                {staff.nationalId || "N/A"}
-                                            </p>
+                                            </span>
+                                            <span className="text-sm font-medium">
+                                                {staff.nationalId || (
+                                                    <span className="text-muted-foreground/60 italic font-normal">
+                                                        Not specified
+                                                    </span>
+                                                )}
+                                            </span>
                                         </div>
-                                        <div>
-                                            <p className="text-muted-foreground">
+                                        <div className="space-y-1.5 flex flex-col">
+                                            <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold flex items-center gap-2">
+                                                <CalendarDays className="h-3 w-3 opacity-60" />{" "}
                                                 Join Date
-                                            </p>
-                                            <p className="font-medium">
-                                                {staff.joinDate
-                                                    ? format(
-                                                          new Date(
-                                                              staff.joinDate,
-                                                          ),
-                                                          "PPP",
-                                                      )
-                                                    : "N/A"}
-                                            </p>
+                                            </span>
+                                            <span className="text-sm font-medium">
+                                                {staff.joinDate ? (
+                                                    format(
+                                                        new Date(
+                                                            staff.joinDate,
+                                                        ),
+                                                        "MMM d, yyyy",
+                                                    )
+                                                ) : (
+                                                    <span className="text-muted-foreground/60 italic font-normal">
+                                                        Not specified
+                                                    </span>
+                                                )}
+                                            </span>
                                         </div>
-                                        <div className="col-span-2">
-                                            <p className="text-muted-foreground">
+                                        <div className="col-span-1 sm:col-span-2 space-y-1.5 flex flex-col">
+                                            <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold flex items-center gap-2">
+                                                <MapPin className="h-3 w-3 opacity-60" />{" "}
                                                 Address
-                                            </p>
-                                            <p className="font-medium">
-                                                {staff.address || "N/A"}
-                                            </p>
+                                            </span>
+                                            <span className="text-sm font-medium">
+                                                {staff.address || (
+                                                    <span className="text-muted-foreground/60 italic font-normal">
+                                                        Not specified
+                                                    </span>
+                                                )}
+                                            </span>
                                         </div>
                                     </div>
 
-                                    <Separator />
-
-                                    <div className="space-y-2">
-                                        <h4 className="font-medium text-sm">
+                                    <div className="space-y-5 pt-6 border-t border-border/40">
+                                        <h4 className="font-semibold text-sm flex items-center gap-2 tracking-tight">
+                                            <ShieldAlert className="h-4 w-4 text-primary/80" />
                                             Emergency Contact
                                         </h4>
-                                        <div className="grid grid-cols-2 gap-4 text-sm">
-                                            <div>
-                                                <p className="text-muted-foreground">
+                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                                            <div className="space-y-1.5">
+                                                <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold">
                                                     Name
-                                                </p>
-                                                <p>
+                                                </span>
+                                                <p className="text-sm font-medium truncate">
                                                     {staff.emergencyContact
-                                                        ?.name || "N/A"}
+                                                        ?.name || (
+                                                        <span className="text-muted-foreground/60 italic font-normal">
+                                                            N/A
+                                                        </span>
+                                                    )}
                                                 </p>
                                             </div>
-                                            <div>
-                                                <p className="text-muted-foreground">
+                                            <div className="space-y-1.5">
+                                                <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold">
                                                     Relation
-                                                </p>
-                                                <p>
+                                                </span>
+                                                <p className="text-sm font-medium">
                                                     {staff.emergencyContact
-                                                        ?.relation || "N/A"}
+                                                        ?.relation || (
+                                                        <span className="text-muted-foreground/60 italic font-normal">
+                                                            N/A
+                                                        </span>
+                                                    )}
                                                 </p>
                                             </div>
-                                            <div>
-                                                <p className="text-muted-foreground">
+                                            <div className="space-y-1.5">
+                                                <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold">
                                                     Phone
-                                                </p>
-                                                <p>
+                                                </span>
+                                                <p className="text-sm font-medium">
                                                     {staff.emergencyContact
-                                                        ?.phone || "N/A"}
+                                                        ?.phone || (
+                                                        <span className="text-muted-foreground/60 italic font-normal">
+                                                            N/A
+                                                        </span>
+                                                    )}
                                                 </p>
                                             </div>
                                         </div>
@@ -279,84 +378,83 @@ export default function StaffDetailsPage() {
                             </Card>
 
                             <div className="space-y-6">
-                                <Card>
-                                    <CardHeader>
-                                        <CardTitle className="text-lg">
+                                <Card className="border border-muted/20 shadow-sm rounded-xl overflow-hidden bg-card">
+                                    <CardHeader className="border-b border-border/40 bg-muted/10 pb-4 pt-5 px-6">
+                                        <CardTitle className="text-base font-semibold flex items-center gap-2.5 tracking-tight">
+                                            <Briefcase className="h-4 w-4 text-primary/80" />
                                             Job & Shift
                                         </CardTitle>
                                     </CardHeader>
-                                    <CardContent className="space-y-4">
-                                        <div className="grid grid-cols-2 gap-4 text-sm">
-                                            <div>
-                                                <p className="text-muted-foreground">
+                                    <CardContent className="space-y-8 p-6">
+                                        <div className="grid grid-cols-2 gap-y-6 gap-x-6">
+                                            <div className="space-y-1.5 flex flex-col">
+                                                <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold">
                                                     Department
-                                                </p>
-                                                <p className="font-medium">
+                                                </span>
+                                                <span className="text-sm font-medium truncate">
                                                     {staff.department}
-                                                </p>
+                                                </span>
                                             </div>
-                                            <div>
-                                                <p className="text-muted-foreground">
+                                            <div className="space-y-1.5 flex flex-col">
+                                                <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold">
                                                     Designation
-                                                </p>
-                                                <p className="font-medium">
+                                                </span>
+                                                <span className="text-sm font-medium truncate">
                                                     {staff.designation}
-                                                </p>
+                                                </span>
                                             </div>
-                                            <div>
-                                                <p className="text-muted-foreground">
+                                            <div className="space-y-1.5 flex flex-col">
+                                                <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold">
                                                     Branch
-                                                </p>
-                                                <p className="font-medium">
+                                                </span>
+                                                <span className="text-sm font-medium truncate">
                                                     {branch?.name}
-                                                </p>
+                                                </span>
                                             </div>
-                                            <div>
-                                                <p className="text-muted-foreground">
+                                            <div className="space-y-1.5 flex flex-col">
+                                                <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold">
                                                     Staff ID
-                                                </p>
-                                                <p className="font-medium">
+                                                </span>
+                                                <span className="text-sm font-medium text-primary">
                                                     {staff.staffId}
-                                                </p>
+                                                </span>
                                             </div>
                                         </div>
 
-                                        <Separator />
-
-                                        <div className="space-y-2">
-                                            <h4 className="font-medium text-sm flex items-center gap-2">
-                                                <Clock className="h-4 w-4" />
+                                        <div className="space-y-5 pt-6 border-t border-border/40">
+                                            <h4 className="font-semibold text-sm flex items-center gap-2 tracking-tight">
+                                                <Clock className="h-4 w-4 text-primary/80" />
                                                 Current Shift
                                             </h4>
                                             {currentShift ? (
-                                                <div className="bg-muted/50 p-3 rounded-md border text-sm grid gap-2">
-                                                    <div className="flex justify-between">
-                                                        <span className="text-muted-foreground">
+                                                <div className="rounded-lg border border-muted/50 overflow-hidden divide-y divide-border/30">
+                                                    <div className="flex justify-between items-center p-3 px-4 hover:bg-muted/10 transition-colors">
+                                                        <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold">
                                                             Shift Name
                                                         </span>
-                                                        <span className="font-medium">
+                                                        <span className="font-semibold text-sm text-primary">
                                                             {currentShift.name}
                                                         </span>
                                                     </div>
-                                                    <div className="flex justify-between">
-                                                        <span className="text-muted-foreground">
+                                                    <div className="flex justify-between items-center p-3 px-4 hover:bg-muted/10 transition-colors">
+                                                        <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold">
                                                             Time
                                                         </span>
-                                                        <span className="font-medium">
+                                                        <span className="font-medium text-sm">
                                                             {
                                                                 currentShift.startTime
                                                             }{" "}
-                                                            -{" "}
+                                                            —{" "}
                                                             {
                                                                 currentShift.endTime
                                                             }
                                                         </span>
                                                     </div>
-                                                    <div className="flex justify-between">
-                                                        <span className="text-muted-foreground">
+                                                    <div className="flex justify-between items-center p-3 px-4 hover:bg-muted/10 transition-colors">
+                                                        <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold">
                                                             Work Days
                                                         </span>
-                                                        <span className="font-medium">
+                                                        <span className="font-medium text-xs px-2 py-0.5 bg-muted rounded">
                                                             {currentShift
                                                                 .workDays
                                                                 ?.length ||
@@ -366,81 +464,88 @@ export default function StaffDetailsPage() {
                                                     </div>
                                                 </div>
                                             ) : (
-                                                <p className="text-sm text-muted-foreground italic">
-                                                    No active shift assigned.
-                                                </p>
+                                                <div className="px-4 py-6 rounded-lg border border-dashed text-center">
+                                                    <p className="text-sm text-muted-foreground/70">
+                                                        No active shift assigned
+                                                    </p>
+                                                </div>
                                             )}
                                         </div>
                                     </CardContent>
                                 </Card>
 
                                 {canViewSalary && (
-                                    <Card>
-                                        <CardHeader>
-                                            <CardTitle className="text-lg flex items-center gap-2">
-                                                <Banknote className="h-5 w-5" />
-                                                Compensation
-                                            </CardTitle>
-                                        </CardHeader>
-                                        <CardContent>
-                                            <div className="space-y-4">
-                                                <div className="flex justify-between items-center text-sm">
-                                                    <span className="text-muted-foreground">
+                                    <Card className="border border-primary/20 bg-primary/5 shadow-sm rounded-xl overflow-hidden">
+                                        <CardContent className="p-6">
+                                            <div className="flex items-center justify-between">
+                                                <div className="space-y-1">
+                                                    <h3 className="font-semibold text-sm flex items-center gap-2">
+                                                        <Banknote className="h-4 w-4 text-primary" />
                                                         Base Salary (Monthly)
-                                                    </span>
-                                                    <span className="font-bold text-lg">
-                                                        ৳{" "}
-                                                        {staff.salary?.toLocaleString() ||
-                                                            0}
-                                                    </span>
+                                                    </h3>
+                                                    {!staff.salaryVisibleToEmployee &&
+                                                        canEdit && (
+                                                            <p className="text-[10px] text-muted-foreground flex items-center gap-1 opacity-70">
+                                                                <AlertCircle className="h-2.5 w-2.5" />
+                                                                Hidden from
+                                                                employee
+                                                            </p>
+                                                        )}
                                                 </div>
-                                                {!staff.salaryVisibleToEmployee &&
-                                                    canEdit && (
-                                                        <div className="bg-yellow-500/10 text-yellow-600 text-xs px-2 py-1 rounded flex items-center gap-1">
-                                                            <AlertCircle className="h-3 w-3" />
-                                                            Hidden from staff
-                                                            member
-                                                        </div>
-                                                    )}
+                                                <span className="font-bold text-2xl tracking-tight text-primary">
+                                                    ৳{" "}
+                                                    {staff.salary?.toLocaleString() ||
+                                                        0}
+                                                </span>
                                             </div>
                                         </CardContent>
                                     </Card>
                                 )}
 
                                 {/* Bank Account Card */}
-                                <Card>
-                                    <CardHeader>
-                                        <CardTitle className="text-lg flex items-center gap-2">
-                                            <Building className="h-5 w-5" />
+                                <Card className="border border-muted/20 shadow-sm rounded-xl overflow-hidden bg-card">
+                                    <CardHeader className="border-b border-border/40 bg-muted/10 pb-4 pt-5 px-6">
+                                        <CardTitle className="text-base font-semibold flex items-center gap-2.5 tracking-tight">
+                                            <CreditCard className="h-4 w-4 text-primary/80" />
                                             Bank Account
                                         </CardTitle>
                                     </CardHeader>
-                                    <CardContent>
-                                        <div className="grid grid-cols-1 gap-3 text-sm">
-                                            <div className="flex justify-between">
-                                                <span className="text-muted-foreground">
+                                    <CardContent className="p-0">
+                                        <div className="divide-y divide-border/40">
+                                            <div className="flex justify-between items-center p-4 px-6 hover:bg-muted/10 transition-colors">
+                                                <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold">
                                                     Bank Name
                                                 </span>
-                                                <span className="font-medium">
-                                                    {staff.bankName || "N/A"}
+                                                <span className="font-medium text-sm">
+                                                    {staff.bankName || (
+                                                        <span className="text-muted-foreground/60 italic font-normal">
+                                                            N/A
+                                                        </span>
+                                                    )}
                                                 </span>
                                             </div>
-                                            <div className="flex justify-between">
-                                                <span className="text-muted-foreground">
+                                            <div className="flex justify-between items-center p-4 px-6 hover:bg-muted/10 transition-colors">
+                                                <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold">
                                                     Account No
                                                 </span>
-                                                <span className="font-medium">
-                                                    {staff.bankAccountNo ||
-                                                        "N/A"}
+                                                <span className="font-medium text-sm font-mono tracking-wider">
+                                                    {staff.bankAccountNo || (
+                                                        <span className="text-muted-foreground/60 italic font-normal tracking-normal">
+                                                            N/A
+                                                        </span>
+                                                    )}
                                                 </span>
                                             </div>
-                                            <div className="flex justify-between">
-                                                <span className="text-muted-foreground">
+                                            <div className="flex justify-between items-center p-4 px-6 hover:bg-muted/10 transition-colors">
+                                                <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold">
                                                     Account Holder
                                                 </span>
-                                                <span className="font-medium">
-                                                    {staff.bankAccountName ||
-                                                        "N/A"}
+                                                <span className="font-medium text-sm truncate max-w-[150px] text-right">
+                                                    {staff.bankAccountName || (
+                                                        <span className="text-muted-foreground/60 italic font-normal">
+                                                            N/A
+                                                        </span>
+                                                    )}
                                                 </span>
                                             </div>
                                         </div>
