@@ -1,4 +1,4 @@
-import { Document, Types } from 'mongoose';
+import { Document, Types } from "mongoose";
 
 export interface IExpenseCategory extends Document {
     name: string;
@@ -15,7 +15,7 @@ export interface IExpense extends Document {
     branchId: Types.ObjectId;
     staffId?: Types.ObjectId;
     amount: number;
-    status: 'pending' | 'paid' | 'partial_paid';
+    status: "pending" | "paid" | "partial_paid";
     paymentMethod?: string;
     note?: string;
     createdBy: Types.ObjectId;
@@ -28,21 +28,22 @@ export interface ExpenseQueryParams {
     limit?: number | undefined;
     search?: string | undefined;
     sortBy?: string | undefined;
-    sortOrder?: 'asc' | 'desc' | undefined;
+    sortOrder?: "asc" | "desc" | undefined;
     month?: number | undefined;
     year?: number | undefined;
     startDate?: string | undefined;
     endDate?: string | undefined;
     filterType?:
-        | 'all'
-        | 'today'
-        | 'week'
-        | 'month'
-        | 'year'
-        | 'range'
+        | "all"
+        | "today"
+        | "week"
+        | "month"
+        | "year"
+        | "range"
         | undefined;
     branchId?: string | undefined;
     categoryId?: string | undefined;
+    staffId?: string | undefined;
     status?: string | undefined;
 }
 

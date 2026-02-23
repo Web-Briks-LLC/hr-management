@@ -1,4 +1,4 @@
-import { apiSlice } from '@/redux/api/apiSlice';
+import { apiSlice } from "@/redux/api/apiSlice";
 
 export interface ExpenseCategory {
     _id: string;
@@ -14,7 +14,8 @@ export interface Expense {
     category: ExpenseCategory;
     branch: { _id: string; name: string };
     amount: number;
-    status: 'pending' | 'paid' | 'partial_paid';
+    status: "pending" | "paid" | "partial_paid";
+    paymentMethod?: string;
     note?: string;
     createdBy: { _id: string; name: string };
     createdAt: string;
@@ -33,14 +34,15 @@ export interface ExpenseQueryParams {
     limit?: number;
     search?: string;
     sortBy?: string;
-    sortOrder?: 'asc' | 'desc';
+    sortOrder?: "asc" | "desc";
     month?: number;
     year?: number;
     startDate?: string;
     endDate?: string;
-    filterType?: 'all' | 'today' | 'week' | 'month' | 'year' | 'range';
+    filterType?: "all" | "today" | "week" | "month" | "year" | "range";
     branchId?: string;
     categoryId?: string;
+    staffId?: string;
     status?: string;
 }
 
@@ -48,12 +50,22 @@ export const expenseApi = apiSlice.injectEndpoints({
     endpoints: (builder) => ({
         getExpenses: builder.query({
             query: (params: ExpenseQueryParams) => ({
-                url: '/expenses',
-                method: 'GET',
+                url: "/expenses",
+                method: "GET",
                 params,
             }),
-            transformResponse: (response: { data: any }) => response.data,
-            providesTags: ['Expense'],
+            transformResponse: (response: {
+                data: {
+                    expenses: Expense[];
+                    pagination: {
+                        page: number;
+                        limit: number;
+                        total: number;
+                        pages: number;
+                    };
+                };
+            }) => response.data,
+            providesTags: ["Expense"],
         }),
         getExpenseStats: builder.query({
             query: (params?: {
@@ -61,63 +73,63 @@ export const expenseApi = apiSlice.injectEndpoints({
                 year?: number;
                 month?: number;
             }) => ({
-                url: '/expenses/stats',
-                method: 'GET',
+                url: "/expenses/stats",
+                method: "GET",
                 params: params || {},
             }),
             transformResponse: (response: { data: ExpenseStats }) =>
                 response.data,
-            providesTags: ['Expense'],
+            providesTags: ["Expense"],
         }),
         createExpense: builder.mutation({
             query: (body) => ({
-                url: '/expenses',
-                method: 'POST',
+                url: "/expenses",
+                method: "POST",
                 body,
             }),
-            invalidatesTags: ['Expense'],
+            invalidatesTags: ["Expense"],
         }),
         updateExpense: builder.mutation({
             query: ({ id, ...body }) => ({
                 url: `/expenses/${id}`,
-                method: 'PATCH',
+                method: "PATCH",
                 body,
             }),
-            invalidatesTags: ['Expense'],
+            invalidatesTags: ["Expense"],
         }),
         deleteExpense: builder.mutation({
             query: (id: string) => ({
                 url: `/expenses/${id}`,
-                method: 'DELETE',
+                method: "DELETE",
             }),
-            invalidatesTags: ['Expense'],
+            invalidatesTags: ["Expense"],
         }),
         getExpenseCategories: builder.query({
             query: () => ({
-                url: '/expenses/categories',
-                method: 'GET',
+                url: "/expenses/categories",
+                method: "GET",
             }),
             transformResponse: (response: { data: ExpenseCategory[] }) =>
                 response.data,
-            providesTags: ['ExpenseCategory'],
+            providesTags: ["ExpenseCategory"],
         }),
         createExpenseCategory: builder.mutation({
             query: (body: { name: string; description?: string }) => ({
-                url: '/expenses/categories',
-                method: 'POST',
+                url: "/expenses/categories",
+                method: "POST",
                 body,
             }),
-            invalidatesTags: ['ExpenseCategory'],
+            invalidatesTags: ["ExpenseCategory"],
         }),
         getExpenseYears: builder.query({
             query: () => ({
-                url: '/expenses/years',
-                method: 'GET',
+                url: "/expenses/years",
+                method: "GET",
             }),
             transformResponse: (response: { data: number[] }) => response.data,
             // Don't provide specific tags, but maybe invalidate on expense creation?
             // For now, caching is fine as years don't change often.
-            providesTags: ['Expense'],
+            providesTags: ["Expense"],
         }),
     }),
 });

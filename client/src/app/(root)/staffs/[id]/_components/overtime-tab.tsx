@@ -1,7 +1,8 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useGetAllOvertimeQuery } from '@/redux/features/overtime/overtimeApi';
+import { useState } from "react";
+import { useGetAllOvertimeQuery } from "@/redux/features/overtime/overtimeApi";
+import type { IOvertime } from "@/types/overtime.type";
 import {
     Table,
     TableBody,
@@ -9,23 +10,30 @@ import {
     TableHead,
     TableHeader,
     TableRow,
-} from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Button } from '@/components/ui/button';
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 import {
     Select,
     SelectContent,
     SelectItem,
     SelectTrigger,
     SelectValue,
-} from '@/components/ui/select';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { format } from 'date-fns';
+} from "@/components/ui/select";
+import {
+    Clock,
+    ChevronLeft,
+    ChevronRight,
+    CheckCircle2,
+    XCircle,
+    TimerOff,
+} from "lucide-react";
+import { format } from "date-fns";
 
 export function StaffOvertimeTab({ staffId }: { staffId: string }) {
     const [page, setPage] = useState(1);
-    const [limit, setLimit] = useState(20);
+    const [limit, setLimit] = useState(10);
 
     const {
         data: response,
@@ -40,24 +48,45 @@ export function StaffOvertimeTab({ staffId }: { staffId: string }) {
     const overtimes = response?.data?.records || [];
     const pagination = response?.data?.pagination;
 
-    const getStatusVariant = (status: string) => {
+    const getStatusStyles = (status: string) => {
         switch (status) {
-            case 'approved':
-                return 'default';
-            case 'rejected':
-                return 'destructive';
-            case 'pending':
-                return 'secondary';
+            case "approved":
+                return {
+                    variant: "default" as const,
+                    icon: CheckCircle2,
+                    className:
+                        "bg-emerald-500/15 text-emerald-700 hover:bg-emerald-500/25 border-emerald-200",
+                };
+            case "rejected":
+                return {
+                    variant: "destructive" as const,
+                    icon: XCircle,
+                    className:
+                        "bg-red-500/15 text-red-700 hover:bg-red-500/25 border-red-200",
+                };
+            case "pending":
+                return {
+                    variant: "secondary" as const,
+                    icon: Clock,
+                    className:
+                        "bg-amber-500/15 text-amber-700 hover:bg-amber-500/25 border-amber-200",
+                };
             default:
-                return 'outline';
+                return {
+                    variant: "outline" as const,
+                    icon: Clock,
+                    className: "",
+                };
         }
     };
 
     if (isLoading) {
         return (
             <div className="space-y-4">
-                {[1, 2, 3].map((i) => (
-                    <Skeleton key={i} className="h-12 w-full" />
+                {Array.from({ length: 4 }).map((_, i) => (
+                    <div key={i} className="flex items-center space-x-4 w-full">
+                        <Skeleton className="h-10 w-full" />
+                    </div>
                 ))}
             </div>
         );
@@ -65,66 +94,112 @@ export function StaffOvertimeTab({ staffId }: { staffId: string }) {
 
     if (overtimes.length === 0) {
         return (
-            <div className="text-center py-8 text-muted-foreground">
-                No overtime records found.
+            <div className="flex flex-col items-center justify-center py-12 text-center bg-muted/30 rounded-lg border border-dashed mt-4">
+                <TimerOff className="h-10 w-10 text-muted-foreground mb-4 opacity-50" />
+                <h3 className="text-lg font-medium text-foreground">
+                    No Overtime Recorded
+                </h3>
+                <p className="text-sm text-muted-foreground max-w-sm mt-1">
+                    This staff member has not recorded any overtime hours.
+                </p>
             </div>
         );
     }
 
     return (
         <div className="space-y-4">
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Start Time</TableHead>
-                        <TableHead>End Time</TableHead>
-                        <TableHead>Duration</TableHead>
-                        <TableHead>Status</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {overtimes.map((ot: any) => (
-                        <TableRow key={ot._id}>
-                            <TableCell>
-                                {format(new Date(ot.date), 'PP')}
-                            </TableCell>
-                            <TableCell>
-                                {ot.startTime
-                                    ? format(new Date(ot.startTime), 'hh:mm aa')
-                                    : '-'}
-                            </TableCell>
-                            <TableCell>
-                                {ot.endTime
-                                    ? format(new Date(ot.endTime), 'hh:mm aa')
-                                    : '-'}
-                            </TableCell>
-                            <TableCell>
-                                {ot.durationMinutes
-                                    ? `${Math.floor(ot.durationMinutes / 60)}h ${ot.durationMinutes % 60}m`
-                                    : '-'}
-                            </TableCell>
-                            <TableCell>
-                                <Badge variant={getStatusVariant(ot.status)}>
-                                    {ot.status}
-                                </Badge>
-                            </TableCell>
+            <div className="rounded-md border bg-card">
+                <Table>
+                    <TableHeader className="bg-muted/50">
+                        <TableRow>
+                            <TableHead className="w-[150px]">Date</TableHead>
+                            <TableHead>Start Time</TableHead>
+                            <TableHead>End Time</TableHead>
+                            <TableHead>Duration</TableHead>
+                            <TableHead className="text-right">Status</TableHead>
                         </TableRow>
-                    ))}
-                </TableBody>
-            </Table>
+                    </TableHeader>
+                    <TableBody>
+                        {overtimes.map((ot: IOvertime) => {
+                            const {
+                                variant,
+                                icon: Icon,
+                                className,
+                            } = getStatusStyles(ot.status);
+                            return (
+                                <TableRow
+                                    key={ot._id}
+                                    className="hover:bg-muted/50 transition-colors"
+                                >
+                                    <TableCell className="font-medium whitespace-nowrap">
+                                        {format(
+                                            new Date(ot.date),
+                                            "MMM dd, yyyy",
+                                        )}
+                                    </TableCell>
+                                    <TableCell className="text-muted-foreground">
+                                        {ot.startTime
+                                            ? format(
+                                                  new Date(ot.startTime),
+                                                  "hh:mm aa",
+                                              )
+                                            : "-"}
+                                    </TableCell>
+                                    <TableCell className="text-muted-foreground">
+                                        {ot.endTime
+                                            ? format(
+                                                  new Date(ot.endTime),
+                                                  "hh:mm aa",
+                                              )
+                                            : "-"}
+                                    </TableCell>
+                                    <TableCell>
+                                        <Badge
+                                            variant="outline"
+                                            className="font-medium font-mono text-xs bg-muted/40"
+                                        >
+                                            {ot.durationMinutes
+                                                ? `${Math.floor(ot.durationMinutes / 60)}h ${ot.durationMinutes % 60}m`
+                                                : "-"}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        <Badge
+                                            variant={variant}
+                                            className={`ml-auto font-normal flex w-fit items-center gap-1 self-end ${className}`}
+                                        >
+                                            <Icon className="h-3.5 w-3.5" />
+                                            <span className="capitalize">
+                                                {ot.status}
+                                            </span>
+                                        </Badge>
+                                    </TableCell>
+                                </TableRow>
+                            );
+                        })}
+                    </TableBody>
+                </Table>
+            </div>
 
-            {/* Pagination */}
-            {pagination && (
-                <div className="flex items-center justify-between">
+            {/* Pagination Controls */}
+            {pagination && pagination.pages > 1 && (
+                <div className="flex items-center justify-between pt-2">
                     <div className="flex items-center gap-6">
                         <div className="text-sm text-muted-foreground">
-                            Page {pagination.page} of{' '}
-                            {Math.max(1, pagination.pages)} ({pagination.total}{' '}
-                            total)
+                            Page{" "}
+                            <span className="font-medium text-foreground">
+                                {pagination.page}
+                            </span>{" "}
+                            of{" "}
+                            <span className="font-medium text-foreground">
+                                {Math.max(1, pagination.pages)}
+                            </span>{" "}
+                            ({pagination.total} total)
                         </div>
                         <div className="flex items-center gap-2">
-                            <p className="text-sm font-medium">Rows per page</p>
+                            <p className="text-sm font-medium text-muted-foreground">
+                                Rows per page
+                            </p>
                             <Select
                                 value={`${limit}`}
                                 onValueChange={(value) => {
@@ -132,11 +207,11 @@ export function StaffOvertimeTab({ staffId }: { staffId: string }) {
                                     setPage(1);
                                 }}
                             >
-                                <SelectTrigger className="h-8 w-[70px]">
+                                <SelectTrigger className="h-8 w-[70px] bg-background">
                                     <SelectValue placeholder={limit} />
                                 </SelectTrigger>
                                 <SelectContent side="top">
-                                    {[10, 20, 30, 40, 50].map((pageSize) => (
+                                    {[5, 10, 20, 50].map((pageSize) => (
                                         <SelectItem
                                             key={pageSize}
                                             value={`${pageSize}`}
@@ -154,9 +229,10 @@ export function StaffOvertimeTab({ staffId }: { staffId: string }) {
                             size="sm"
                             onClick={() => setPage((p) => Math.max(1, p - 1))}
                             disabled={page === 1 || isFetching}
+                            className="bg-background"
                         >
-                            <ChevronLeft className="h-4 w-4" />
-                            Previous
+                            <ChevronLeft className="h-4 w-4 mr-1" />
+                            Prev
                         </Button>
                         <Button
                             variant="outline"
@@ -167,9 +243,10 @@ export function StaffOvertimeTab({ staffId }: { staffId: string }) {
                                 )
                             }
                             disabled={page >= pagination.pages || isFetching}
+                            className="bg-background"
                         >
                             Next
-                            <ChevronRight className="h-4 w-4 ml-2" />
+                            <ChevronRight className="h-4 w-4 ml-1" />
                         </Button>
                     </div>
                 </div>

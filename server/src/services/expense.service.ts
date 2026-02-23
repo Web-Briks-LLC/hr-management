@@ -1,5 +1,5 @@
-import { Types } from 'mongoose';
-import type { PipelineStage } from 'mongoose';
+import { Types } from "mongoose";
+import type { PipelineStage } from "mongoose";
 import {
     startOfDay,
     endOfDay,
@@ -9,15 +9,15 @@ import {
     endOfMonth,
     startOfYear,
     endOfYear,
-} from 'date-fns';
-import ExpenseModel from '../models/expense.model.js';
-import ExpenseCategoryModel from '../models/expense-category.model.js';
+} from "date-fns";
+import ExpenseModel from "../models/expense.model.js";
+import ExpenseCategoryModel from "../models/expense-category.model.js";
 import type {
     IExpense,
     IExpenseCategory,
     ExpenseQueryParams,
     ExpenseStats,
-} from '../types/expense.type.js';
+} from "../types/expense.type.js";
 
 // Aggregation pipeline for expenses with lookups
 const getExpenseAggregationPipeline = (
@@ -33,39 +33,39 @@ const getExpenseAggregationPipeline = (
     // Lookup Category
     {
         $lookup: {
-            from: 'expensecategories',
-            localField: 'categoryId',
-            foreignField: '_id',
-            as: 'category',
+            from: "expensecategories",
+            localField: "categoryId",
+            foreignField: "_id",
+            as: "category",
         },
     },
-    { $unwind: { path: '$category', preserveNullAndEmptyArrays: true } },
+    { $unwind: { path: "$category", preserveNullAndEmptyArrays: true } },
     // Lookup Branch
     {
         $lookup: {
-            from: 'branches',
-            localField: 'branchId',
-            foreignField: '_id',
-            as: 'branch',
+            from: "branches",
+            localField: "branchId",
+            foreignField: "_id",
+            as: "branch",
         },
     },
-    { $unwind: { path: '$branch', preserveNullAndEmptyArrays: true } },
+    { $unwind: { path: "$branch", preserveNullAndEmptyArrays: true } },
     // Lookup CreatedBy
     {
         $lookup: {
-            from: 'user',
-            localField: 'createdBy',
-            foreignField: '_id',
-            as: 'createdBy',
+            from: "user",
+            localField: "createdBy",
+            foreignField: "_id",
+            as: "createdBy",
         },
     },
-    { $unwind: { path: '$createdBy', preserveNullAndEmptyArrays: true } },
+    { $unwind: { path: "$createdBy", preserveNullAndEmptyArrays: true } },
     // Cleanup
     {
         $project: {
             categoryId: 0,
             branchId: 0,
-            'createdBy.password': 0,
+            "createdBy.password": 0,
         },
     },
 ];
@@ -76,19 +76,19 @@ const buildDateFilter = (params: ExpenseQueryParams): any => {
     const now = new Date();
 
     switch (params.filterType) {
-        case 'today':
+        case "today":
             filter.date = {
                 $gte: startOfDay(now),
                 $lte: endOfDay(now),
             };
             break;
-        case 'week':
+        case "week":
             filter.date = {
                 $gte: startOfWeek(now, { weekStartsOn: 0 }),
                 $lte: endOfWeek(now, { weekStartsOn: 0 }),
             };
             break;
-        case 'month':
+        case "month":
             if (params.month && params.year) {
                 const monthStart = new Date(params.year, params.month - 1, 1);
                 const monthEnd = endOfMonth(monthStart);
@@ -103,7 +103,7 @@ const buildDateFilter = (params: ExpenseQueryParams): any => {
                 };
             }
             break;
-        case 'year':
+        case "year":
             if (params.year) {
                 filter.date = {
                     $gte: new Date(params.year, 0, 1),
@@ -116,7 +116,7 @@ const buildDateFilter = (params: ExpenseQueryParams): any => {
                 };
             }
             break;
-        case 'range':
+        case "range":
             if (params.startDate || params.endDate) {
                 filter.date = {};
                 if (params.startDate) {
@@ -137,7 +137,7 @@ const buildMatchStage = (params: ExpenseQueryParams): any => {
     const match: any = {};
 
     if (params.search) {
-        match.title = { $regex: params.search, $options: 'i' };
+        match.title = { $regex: params.search, $options: "i" };
     }
 
     if (params.branchId && Types.ObjectId.isValid(params.branchId)) {
@@ -148,7 +148,11 @@ const buildMatchStage = (params: ExpenseQueryParams): any => {
         match.categoryId = new Types.ObjectId(params.categoryId);
     }
 
-    if (params.status && params.status !== 'all') {
+    if (params.staffId && Types.ObjectId.isValid(params.staffId)) {
+        match.staffId = new Types.ObjectId(params.staffId);
+    }
+
+    if (params.status && params.status !== "all") {
         match.status = params.status;
     }
 
@@ -165,8 +169,8 @@ const getAllExpensesFromDB = async (params: ExpenseQueryParams) => {
     const limit = params.limit || 10;
     const skip = (page - 1) * limit;
 
-    const sortField = params.sortBy || 'date';
-    const sortOrder = params.sortOrder === 'asc' ? 1 : -1;
+    const sortField = params.sortBy || "date";
+    const sortOrder = params.sortOrder === "asc" ? 1 : -1;
     const sortStage: any = { [sortField]: sortOrder };
 
     const matchStage = buildMatchStage(params);
@@ -248,7 +252,7 @@ const getExpenseStatsFromDB = async (
                             date: { $gte: startOfToday, $lte: endOfToday },
                         },
                     },
-                    { $group: { _id: null, total: { $sum: '$amount' } } },
+                    { $group: { _id: null, total: { $sum: "$amount" } } },
                 ],
                 thisMonth: [
                     {
@@ -256,7 +260,7 @@ const getExpenseStatsFromDB = async (
                             date: { $gte: startOfMonth, $lte: endOfMonth },
                         },
                     },
-                    { $group: { _id: null, total: { $sum: '$amount' } } },
+                    { $group: { _id: null, total: { $sum: "$amount" } } },
                 ],
                 thisYear: [
                     {
@@ -264,7 +268,7 @@ const getExpenseStatsFromDB = async (
                             date: { $gte: startOfYear, $lte: endOfYear },
                         },
                     },
-                    { $group: { _id: null, total: { $sum: '$amount' } } },
+                    { $group: { _id: null, total: { $sum: "$amount" } } },
                 ],
             },
         },
@@ -297,7 +301,7 @@ const getAvailableExpenseYearsFromDB = async () => {
     const result = await ExpenseModel.aggregate([
         {
             $group: {
-                _id: { $year: '$date' },
+                _id: { $year: "$date" },
             },
         },
         {
@@ -306,7 +310,7 @@ const getAvailableExpenseYearsFromDB = async () => {
         {
             $project: {
                 _id: 0,
-                year: '$_id',
+                year: "$_id",
             },
         },
     ]);

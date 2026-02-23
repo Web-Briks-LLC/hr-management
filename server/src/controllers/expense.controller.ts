@@ -1,6 +1,6 @@
-import type { Request, Response } from 'express';
-import ExpenseServices from '../services/expense.service.js';
-import type { ExpenseQueryParams } from '../types/expense.type.js';
+import type { Request, Response } from "express";
+import ExpenseServices from "../services/expense.service.js";
+import type { ExpenseQueryParams } from "../types/expense.type.js";
 
 // ===== EXPENSE CONTROLLERS =====
 
@@ -11,7 +11,7 @@ const getAllExpenses = async (req: Request, res: Response) => {
             limit: req.query.limit ? parseInt(req.query.limit as string) : 10,
             search: req.query.search as string,
             sortBy: req.query.sortBy as string,
-            sortOrder: req.query.sortOrder as 'asc' | 'desc',
+            sortOrder: req.query.sortOrder as "asc" | "desc",
             ...(req.query.month
                 ? { month: parseInt(req.query.month as string) }
                 : {}),
@@ -20,6 +20,7 @@ const getAllExpenses = async (req: Request, res: Response) => {
                 : {}),
             branchId: req.query.branchId as string,
             categoryId: req.query.categoryId as string,
+            staffId: req.query.staffId as string,
             status: req.query.status as string,
             filterType: req.query.filterType as any,
             startDate: req.query.startDate as string,
@@ -34,7 +35,7 @@ const getAllExpenses = async (req: Request, res: Response) => {
     } catch (error: any) {
         res.status(500).json({
             success: false,
-            message: error.message || 'Failed to fetch expenses',
+            message: error.message || "Failed to fetch expenses",
         });
     }
 };
@@ -49,7 +50,7 @@ const getExpenseYears = async (_req: Request, res: Response) => {
     } catch (error: any) {
         res.status(500).json({
             success: false,
-            message: error.message || 'Failed to fetch expense years',
+            message: error.message || "Failed to fetch expense years",
         });
     }
 };
@@ -82,7 +83,7 @@ const getExpenseStats = async (req: Request, res: Response) => {
     } catch (error: any) {
         res.status(500).json({
             success: false,
-            message: error.message || 'Failed to fetch expense stats',
+            message: error.message || "Failed to fetch expense stats",
         });
     }
 };
@@ -90,7 +91,7 @@ const getExpenseStats = async (req: Request, res: Response) => {
 const createExpense = async (req: Request, res: Response) => {
     try {
         const userId = req.user?.id;
-        if (!userId) throw new Error('Unauthorized');
+        if (!userId) throw new Error("Unauthorized");
 
         const result = await ExpenseServices.createExpenseInDB({
             ...req.body,
@@ -99,13 +100,13 @@ const createExpense = async (req: Request, res: Response) => {
 
         res.status(201).json({
             success: true,
-            message: 'Expense created successfully',
+            message: "Expense created successfully",
             data: result,
         });
     } catch (error: any) {
         res.status(500).json({
             success: false,
-            message: error.message || 'Failed to create expense',
+            message: error.message || "Failed to create expense",
         });
     }
 };
@@ -113,7 +114,7 @@ const createExpense = async (req: Request, res: Response) => {
 const getExpenseById = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
-        if (!id) throw new Error('ID is required');
+        if (!id) throw new Error("ID is required");
 
         const result = await ExpenseServices.getExpenseByIdFromDB(id);
         res.status(200).json({
@@ -123,7 +124,7 @@ const getExpenseById = async (req: Request, res: Response) => {
     } catch (error: any) {
         res.status(500).json({
             success: false,
-            message: error.message || 'Failed to fetch expense',
+            message: error.message || "Failed to fetch expense",
         });
     }
 };
@@ -131,18 +132,18 @@ const getExpenseById = async (req: Request, res: Response) => {
 const updateExpense = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
-        if (!id) throw new Error('ID is required');
+        if (!id) throw new Error("ID is required");
 
         const result = await ExpenseServices.updateExpenseInDB(id, req.body);
         res.status(200).json({
             success: true,
-            message: 'Expense updated successfully',
+            message: "Expense updated successfully",
             data: result,
         });
     } catch (error: any) {
         res.status(500).json({
             success: false,
-            message: error.message || 'Failed to update expense',
+            message: error.message || "Failed to update expense",
         });
     }
 };
@@ -150,17 +151,17 @@ const updateExpense = async (req: Request, res: Response) => {
 const deleteExpense = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
-        if (!id) throw new Error('ID is required');
+        if (!id) throw new Error("ID is required");
 
         await ExpenseServices.deleteExpenseFromDB(id);
         res.status(200).json({
             success: true,
-            message: 'Expense deleted successfully',
+            message: "Expense deleted successfully",
         });
     } catch (error: any) {
         res.status(500).json({
             success: false,
-            message: error.message || 'Failed to delete expense',
+            message: error.message || "Failed to delete expense",
         });
     }
 };
@@ -177,7 +178,7 @@ const getAllCategories = async (_req: Request, res: Response) => {
     } catch (error: any) {
         res.status(500).json({
             success: false,
-            message: error.message || 'Failed to fetch categories',
+            message: error.message || "Failed to fetch categories",
         });
     }
 };
@@ -187,13 +188,13 @@ const createCategory = async (req: Request, res: Response) => {
         const result = await ExpenseServices.createCategoryInDB(req.body);
         res.status(201).json({
             success: true,
-            message: 'Category created successfully',
+            message: "Category created successfully",
             data: result,
         });
     } catch (error: any) {
         res.status(500).json({
             success: false,
-            message: error.message || 'Failed to create category',
+            message: error.message || "Failed to create category",
         });
     }
 };
@@ -201,18 +202,18 @@ const createCategory = async (req: Request, res: Response) => {
 const updateCategory = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
-        if (!id) throw new Error('ID is required');
+        if (!id) throw new Error("ID is required");
 
         const result = await ExpenseServices.updateCategoryInDB(id, req.body);
         res.status(200).json({
             success: true,
-            message: 'Category updated successfully',
+            message: "Category updated successfully",
             data: result,
         });
     } catch (error: any) {
         res.status(500).json({
             success: false,
-            message: error.message || 'Failed to update category',
+            message: error.message || "Failed to update category",
         });
     }
 };
@@ -220,17 +221,17 @@ const updateCategory = async (req: Request, res: Response) => {
 const deleteCategory = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
-        if (!id) throw new Error('ID is required');
+        if (!id) throw new Error("ID is required");
 
         await ExpenseServices.deleteCategoryFromDB(id);
         res.status(200).json({
             success: true,
-            message: 'Category deleted successfully',
+            message: "Category deleted successfully",
         });
     } catch (error: any) {
         res.status(500).json({
             success: false,
-            message: error.message || 'Failed to delete category',
+            message: error.message || "Failed to delete category",
         });
     }
 };

@@ -30,6 +30,7 @@ import { Separator } from "@/components/ui/separator";
 import { StaffAttendanceTab } from "@/app/(root)/staffs/[id]/_components/attendance-tab";
 import { StaffLeaveTab } from "@/app/(root)/staffs/[id]/_components/staff-leave-tab";
 import { StaffOvertimeTab } from "@/app/(root)/staffs/[id]/_components/overtime-tab";
+import { PaymentHistoryTab } from "@/app/(root)/staffs/[id]/_components/payment-history-tab";
 import { useSession } from "@/lib/auth-client";
 import { Role } from "@/constants/role";
 import { EditStaffDialog } from "@/components/staff/edit-staff-dialog";
@@ -166,6 +167,9 @@ export default function StaffDetailsPage() {
                     <TabsTrigger value="attendance">Attendance</TabsTrigger>
                     <TabsTrigger value="leave">Leaves</TabsTrigger>
                     <TabsTrigger value="overtime">Overtime</TabsTrigger>
+                    {canViewSalary && (
+                        <TabsTrigger value="payments">Payments</TabsTrigger>
+                    )}
                 </TabsList>
 
                 <div className="mt-6">
@@ -489,6 +493,22 @@ export default function StaffDetailsPage() {
                             </CardContent>
                         </Card>
                     </TabsContent>
+
+                    {canViewSalary && (
+                        <TabsContent value="payments">
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Payment History</CardTitle>
+                                    <CardDescription>
+                                        Salary and overtime payments
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <PaymentHistoryTab staffId={id} />
+                                </CardContent>
+                            </Card>
+                        </TabsContent>
+                    )}
                 </div>
             </Tabs>
         </div>
