@@ -1,14 +1,13 @@
-'use client';
+"use client";
 
-import { useGetAllShiftsQuery } from '@/redux/features/shift/shiftApi';
-import { Spinner } from '../ui/spinner';
-import { useSession } from '@/lib/auth-client';
-import CreateBranch from './create-branch';
-import CreateShift from './create-shift';
-import ShiftCard from './shift-card';
-import { IShift } from '@/types/shift.type';
-import ShiftCardSkeleton from './shift-card-skeleton';
-import AssignShift from './assign-shift';
+import { useGetAllShiftsQuery } from "@/redux/features/shift/shiftApi";
+import { useSession } from "@/lib/auth-client";
+import CreateBranch from "./create-branch";
+import CreateShift from "./create-shift";
+import ShiftCard from "./shift-card";
+import { IShift } from "@/types/shift.type";
+import ShiftCardSkeleton from "./shift-card-skeleton";
+import AssignShift from "./assign-shift";
 
 export default function RootShifting() {
     const { isPending, isRefetching } = useSession();
@@ -34,13 +33,13 @@ export default function RootShifting() {
             </div>
 
             {isLoading ? (
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="flex flex-col gap-4">
                     {Array.from({ length: 6 }).map((_, i) => (
                         <ShiftCardSkeleton key={i} />
                     ))}
                 </div>
             ) : (
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 items-start">
+                <div className="flex flex-col gap-4">
                     {shiftData?.shifts?.map((shift: IShift) => (
                         <ShiftCard shift={shift} key={shift._id} />
                     ))}
