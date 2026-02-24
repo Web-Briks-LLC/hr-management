@@ -161,16 +161,6 @@ const getAllAttendance = async (req: Request, res: Response) => {
             limit = '50',
         } = req.query;
 
-        console.log('getAllAttendance called with params:', {
-            startDate,
-            endDate,
-            staffId,
-            status,
-            branchId,
-            page,
-            limit,
-        });
-
         const result = await AttendanceServices.getAllAttendanceFromDB({
             startDate: startDate as string,
             endDate: endDate as string,
