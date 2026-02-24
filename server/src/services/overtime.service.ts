@@ -1,130 +1,177 @@
-import { Types } from 'mongoose';
-import type { PipelineStage } from 'mongoose';
-import OvertimeModel from '../models/overtime.model.js';
-import type { IOvertime } from '../types/overtime.type.js';
-import StaffModel from '../models/staff.model.js';
+import { Types } from "mongoose";
+import type { PipelineStage } from "mongoose";
+import OvertimeModel from "../models/overtime.model.js";
+import type { IOvertime } from "../types/overtime.type.js";
+import StaffModel from "../models/staff.model.js";
 
-const getOvertimeAggregationPipeline = (matchStage: any): PipelineStage[] => [
+const getOvertimeAggregationPipeline = (
+    matchStage: any,
+    postMatchStage: any = {},
+): PipelineStage[] => [
     { $match: matchStage },
     // Lookup Staff
     {
         $lookup: {
-            from: 'staffs',
-            localField: 'staffId',
-            foreignField: '_id',
-            as: 'staffId',
+            from: "staffs",
+            localField: "staffId",
+            foreignField: "_id",
+            as: "staffId",
         },
     },
-    { $unwind: { path: '$staffId', preserveNullAndEmptyArrays: true } },
+    { $unwind: { path: "$staffId", preserveNullAndEmptyArrays: true } },
     // Lookup Staff User (for name & photo)
     {
         $lookup: {
-            from: 'user',
-            localField: 'staffId.userId',
-            foreignField: '_id',
-            as: 'staffUser',
+            from: "user",
+            localField: "staffId.userId",
+            foreignField: "_id",
+            as: "staffUser",
         },
     },
-    { $unwind: { path: '$staffUser', preserveNullAndEmptyArrays: true } },
+    { $unwind: { path: "$staffUser", preserveNullAndEmptyArrays: true } },
     // Enrich Staff Object
     {
         $addFields: {
-            'staffId.name': '$staffUser.name',
-            'staffId.photo': '$staffUser.image',
+            "staffId.name": "$staffUser.name",
+            "staffId.photo": "$staffUser.image",
         },
     },
     // Lookup CreatedBy
     {
         $lookup: {
-            from: 'user',
-            localField: 'createdBy',
-            foreignField: '_id',
-            as: 'createdBy',
+            from: "user",
+            localField: "createdBy",
+            foreignField: "_id",
+            as: "createdBy",
         },
     },
-    { $unwind: { path: '$createdBy', preserveNullAndEmptyArrays: true } },
+    { $unwind: { path: "$createdBy", preserveNullAndEmptyArrays: true } },
     // Lookup ApprovedBy
     {
         $lookup: {
-            from: 'user',
-            localField: 'approvedBy',
-            foreignField: '_id',
-            as: 'approvedBy',
+            from: "user",
+            localField: "approvedBy",
+            foreignField: "_id",
+            as: "approvedBy",
         },
     },
-    { $unwind: { path: '$approvedBy', preserveNullAndEmptyArrays: true } },
+    { $unwind: { path: "$approvedBy", preserveNullAndEmptyArrays: true } },
+    // Additional filters on looked-up fields
+    { $match: postMatchStage },
     // Sort
     { $sort: { date: -1 } },
     // Cleanup
     {
         $project: {
             staffUser: 0,
-            'createdBy.password': 0,
-            'approvedBy.password': 0,
-            'staffId.userId': 0, // optional cleanup
+            "createdBy.password": 0,
+            "approvedBy.password": 0,
+            "staffId.userId": 0, // optional cleanup
         },
     },
 ];
 
 const createOvertimeInDB = async (
-    payload: Partial<IOvertime> & { createdBy: string }
+    payload: Partial<IOvertime> & { createdBy: string },
 ) => {
     const result = await OvertimeModel.create({
         ...payload,
-        status: 'approved',
+        status: "approved",
         approvedBy: payload.createdBy, // Auto-approve by creator
     });
     return result;
 };
 
 const getAllOvertimeFromDB = async (query: Record<string, unknown>) => {
-    // Basic query filtering if needed, for now we just match everything or specific fields
+    const page = Number(query.page) || 1;
+    const limit = Number(query.limit) || 20;
+    const skip = (page - 1) * limit;
+
     const matchStage: any = {};
     if (query.status) matchStage.status = query.status;
-    // Add other filters as needed based on query params
 
-    const result = await OvertimeModel.aggregate(
-        getOvertimeAggregationPipeline(matchStage)
+    const postMatchStage: any = {};
+    if (query.staffId) {
+        postMatchStage["staffId.staffId"] = {
+            $regex: query.staffId as string,
+            $options: "i",
+        };
+    }
+    if (query.name) {
+        postMatchStage["staffId.name"] = {
+            $regex: query.name as string,
+            $options: "i",
+        };
+    }
+
+    const basePipeline = getOvertimeAggregationPipeline(
+        matchStage,
+        postMatchStage,
     );
-    return result;
+
+    const result = await OvertimeModel.aggregate([
+        ...basePipeline,
+        {
+            $facet: {
+                metadata: [{ $count: "total" }],
+                data: [{ $skip: skip }, { $limit: limit }],
+            },
+        },
+    ]);
+
+    const total = result[0]?.metadata[0]?.total || 0;
+    const overtimes = result[0]?.data || [];
+
+    return {
+        overtimes,
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+    };
 };
 
 const getOvertimeByIdFromDB = async (id: string) => {
     const result = await OvertimeModel.aggregate(
-        getOvertimeAggregationPipeline({ _id: new Types.ObjectId(id) })
+        getOvertimeAggregationPipeline({ _id: new Types.ObjectId(id) }),
     );
     return result[0] || null;
 };
 
 const updateOvertimeInDB = async (id: string, payload: Partial<IOvertime>) => {
     // Get the overtime record before update
-    const overtime = await OvertimeModel.findById(id).populate('staffId');
-    
+    const overtime = await OvertimeModel.findById(id).populate("staffId");
+
     const result = await OvertimeModel.findByIdAndUpdate(id, payload, {
         new: true,
     });
-    
+
     // Send notification if status changed to approved or rejected
-    if (payload.status && overtime && (payload.status === 'approved' || payload.status === 'rejected')) {
-        const { default: NotificationServices } = await import('./notification.service.js');
+    if (
+        payload.status &&
+        overtime &&
+        (payload.status === "approved" || payload.status === "rejected")
+    ) {
+        const { default: NotificationServices } =
+            await import("./notification.service.js");
         const staff = overtime.staffId as any;
-        
+
         if (staff?.userId) {
             await NotificationServices.notifyOvertimeStatus({
                 staffUserId: staff.userId,
                 overtimeId: overtime._id,
                 status: payload.status,
                 hours: Math.floor(overtime.durationMinutes / 60),
-                date: new Date(overtime.date).toLocaleDateString('en-US', { 
-                    month: 'short', 
-                    day: 'numeric', 
-                    year: 'numeric' 
+                date: new Date(overtime.date).toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
                 }),
                 approvedBy: payload.approvedBy || overtime.createdBy!,
             });
         }
     }
-    
+
     return result;
 };
 
@@ -134,19 +181,23 @@ const deleteOvertimeFromDB = async (id: string) => {
 };
 
 const getStaffOvertimeFromDB = async (userId: string) => {
-    const staff = await StaffModel.findOne({ userId: new Types.ObjectId(userId) });
+    const staff = await StaffModel.findOne({
+        userId: new Types.ObjectId(userId),
+    });
     if (!staff) {
-        throw new Error('Staff record not found');
+        throw new Error("Staff record not found");
     }
     const result = await OvertimeModel.aggregate(
-        getOvertimeAggregationPipeline({ staffId: staff._id })
+        getOvertimeAggregationPipeline({ staffId: staff._id }),
     );
     return result;
 };
 
 const startOvertimeInDB = async (userId: string) => {
-    const staff = await StaffModel.findOne({ userId: new Types.ObjectId(userId) });
-    if (!staff) throw new Error('Staff record not found');
+    const staff = await StaffModel.findOne({
+        userId: new Types.ObjectId(userId),
+    });
+    if (!staff) throw new Error("Staff record not found");
 
     // Check for scheduled OT today
     const startOfDay = new Date();
@@ -167,7 +218,9 @@ const startOvertimeInDB = async (userId: string) => {
     });
 
     if (!scheduledOT) {
-        throw new Error('No scheduled overtime found for today. Please contact your manager.');
+        throw new Error(
+            "No scheduled overtime found for today. Please contact your manager.",
+        );
     }
 
     // Check if current time is >= scheduled start time
@@ -175,13 +228,15 @@ const startOvertimeInDB = async (userId: string) => {
     const scheduledStartTime = new Date(scheduledOT.startTime);
 
     if (currentTime < scheduledStartTime) {
-        const timeUntilStart = Math.ceil((scheduledStartTime.getTime() - currentTime.getTime()) / 1000 / 60);
+        const timeUntilStart = Math.ceil(
+            (scheduledStartTime.getTime() - currentTime.getTime()) / 1000 / 60,
+        );
         throw new Error(
-            `OT will start at ${scheduledStartTime.toLocaleTimeString('en-US', { 
-                hour: '2-digit', 
-                minute: '2-digit',
-                hour12: true 
-            })}. Please wait ${timeUntilStart} minutes.`
+            `OT will start at ${scheduledStartTime.toLocaleTimeString("en-US", {
+                hour: "2-digit",
+                minute: "2-digit",
+                hour12: true,
+            })}. Please wait ${timeUntilStart} minutes.`,
         );
     }
 
@@ -193,8 +248,10 @@ const startOvertimeInDB = async (userId: string) => {
 };
 
 const stopOvertimeInDB = async (userId: string) => {
-    const staff = await StaffModel.findOne({ userId: new Types.ObjectId(userId) });
-    if (!staff) throw new Error('Staff record not found');
+    const staff = await StaffModel.findOne({
+        userId: new Types.ObjectId(userId),
+    });
+    if (!staff) throw new Error("Staff record not found");
 
     const activeOvertime = await OvertimeModel.findOne({
         staffId: staff._id,
@@ -203,13 +260,14 @@ const stopOvertimeInDB = async (userId: string) => {
     });
 
     if (!activeOvertime) {
-        throw new Error('No active overtime session found');
+        throw new Error("No active overtime session found");
     }
 
     const endTime = new Date();
-    
+
     // Calculate actual duration from actualStartTime (when user checked in)
-    const actualDurationMs = endTime.getTime() - new Date(activeOvertime.actualStartTime!).getTime();
+    const actualDurationMs =
+        endTime.getTime() - new Date(activeOvertime.actualStartTime!).getTime();
     const actualDurationMinutes = Math.floor(actualDurationMs / 1000 / 60);
 
     // Calculate expected duration (set by admin when creating OT)
@@ -217,7 +275,10 @@ const stopOvertimeInDB = async (userId: string) => {
 
     // Calculate early stop
     let earlyStopMinutes = 0;
-    if (expectedDurationMinutes > 0 && actualDurationMinutes < expectedDurationMinutes) {
+    if (
+        expectedDurationMinutes > 0 &&
+        actualDurationMinutes < expectedDurationMinutes
+    ) {
         earlyStopMinutes = expectedDurationMinutes - actualDurationMinutes;
     }
 
@@ -231,8 +292,10 @@ const stopOvertimeInDB = async (userId: string) => {
 };
 
 const getScheduledOvertimeForToday = async (userId: string) => {
-    const staff = await StaffModel.findOne({ userId: new Types.ObjectId(userId) });
-    if (!staff) throw new Error('Staff record not found');
+    const staff = await StaffModel.findOne({
+        userId: new Types.ObjectId(userId),
+    });
+    if (!staff) throw new Error("Staff record not found");
 
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
