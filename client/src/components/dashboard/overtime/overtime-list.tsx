@@ -306,7 +306,7 @@ export default function OvertimeList() {
                                         setPage(1);
                                     }}
                                 >
-                                    <SelectTrigger className="h-8 w-[70px]">
+                                    <SelectTrigger className="w-auto">
                                         <SelectValue placeholder={limit} />
                                     </SelectTrigger>
                                     <SelectContent side="top">
