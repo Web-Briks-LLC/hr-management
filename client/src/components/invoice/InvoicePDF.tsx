@@ -19,6 +19,10 @@ import {
     useSendInvoiceEmailMutation,
     useRecordInvoiceMutation,
 } from "@/redux/features/invoice/invoiceApi";
+import { format } from "date-fns";
+import { toast } from "sonner";
+import { Button } from "../ui/button";
+import { Download, Mail } from "lucide-react";
 
 // Register fonts if needed (optional)
 Font.register({
@@ -348,7 +352,7 @@ const TableRow = ({
     >
         <Text style={[styles.tableCell, styles.colNo]}>{index + 1}</Text>
         <Text style={[styles.tableCell, styles.colDate]}>
-            {format(new Date(order.orderDate), "MMM do, yyyy")}
+            {format(new Date(order.orderDate), "PPP")}
         </Text>
         <Text style={[styles.tableCell, styles.colName]}>
             {order.orderName}
@@ -575,6 +579,7 @@ export const InvoiceDocument = ({
 };
 
 export default function InvoicePDF(props: InvoicePDFProps) {
+    const fileName = `Invoice_${props.client.clientId}_${props.month}_${props.year}.pdf`;
     const [sendInvoiceEmail, { isLoading: isSending }] =
         useSendInvoiceEmailMutation();
     const [recordInvoice] = useRecordInvoiceMutation();

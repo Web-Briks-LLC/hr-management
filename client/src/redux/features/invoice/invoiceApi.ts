@@ -18,6 +18,8 @@ interface RecordInvoiceData {
     totalAmount: number;
     currency: string;
     dueDate: string; // ISO string
+    month: number;
+    year: number;
     items: Array<{ name: string; price: number; quantity: number }>;
 }
 
