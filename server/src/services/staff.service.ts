@@ -1,7 +1,8 @@
-import mongoose, { Types } from 'mongoose';
-import StaffModel from '../models/staff.model.js';
-import type IStaff from '../types/staff.type.js';
-import { startOfDay, endOfDay } from 'date-fns';
+import mongoose, { Types } from "mongoose";
+import StaffModel from "../models/staff.model.js";
+import type IStaff from "../types/staff.type.js";
+import { startOfDay, endOfDay } from "date-fns";
+import { escapeRegex } from "../lib/sanitize.js";
 
 export type IStaffQueryParams = {
     page?: number;
@@ -56,13 +57,13 @@ async function getAllStaffsFromDB(query: IStaffQueryParams) {
         // 2. Lookup User
         {
             $lookup: {
-                from: 'user',
-                let: { userId: '$userId' },
+                from: "user",
+                let: { userId: "$userId" },
                 pipeline: [
                     {
                         $match: {
                             $expr: {
-                                $eq: ['$_id', { $toObjectId: '$$userId' }],
+                                $eq: ["$_id", { $toObjectId: "$$userId" }],
                             },
                         },
                     },
@@ -76,18 +77,18 @@ async function getAllStaffsFromDB(query: IStaffQueryParams) {
                         },
                     },
                 ],
-                as: 'user',
+                as: "user",
             },
         },
-        { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+        { $unwind: { path: "$user", preserveNullAndEmptyArrays: true } },
 
         // 2.5 Exclude Admins (if requested)
         ...(excludeAdmins
             ? [
                   {
                       $match: {
-                          'user.role': {
-                              $nin: ['admin', 'branch_admin', 'super_admin'],
+                          "user.role": {
+                              $nin: ["admin", "branch_admin", "super_admin"],
                           },
                       },
                   },
@@ -100,29 +101,34 @@ async function getAllStaffsFromDB(query: IStaffQueryParams) {
                   {
                       $match: {
                           $or: [
-                              { staffId: { $regex: search, $options: 'i' } },
                               {
-                                  'user.name': {
-                                      $regex: search,
-                                      $options: 'i',
+                                  staffId: {
+                                      $regex: escapeRegex(search),
+                                      $options: "i",
                                   },
                               },
                               {
-                                  'user.email': {
-                                      $regex: search,
-                                      $options: 'i',
+                                  "user.name": {
+                                      $regex: escapeRegex(search),
+                                      $options: "i",
+                                  },
+                              },
+                              {
+                                  "user.email": {
+                                      $regex: escapeRegex(search),
+                                      $options: "i",
                                   },
                               },
                               {
                                   department: {
-                                      $regex: search,
-                                      $options: 'i',
+                                      $regex: escapeRegex(search),
+                                      $options: "i",
                                   },
                               },
                               {
                                   designation: {
-                                      $regex: search,
-                                      $options: 'i',
+                                      $regex: escapeRegex(search),
+                                      $options: "i",
                                   },
                               },
                           ],
@@ -134,27 +140,27 @@ async function getAllStaffsFromDB(query: IStaffQueryParams) {
         // 4. Lookup Branch
         {
             $lookup: {
-                from: 'branches',
-                localField: 'branchId',
-                foreignField: '_id',
-                as: 'branch',
+                from: "branches",
+                localField: "branchId",
+                foreignField: "_id",
+                as: "branch",
             },
         },
-        { $unwind: { path: '$branch', preserveNullAndEmptyArrays: true } },
+        { $unwind: { path: "$branch", preserveNullAndEmptyArrays: true } },
 
         // 5. Lookup Today's Attendance
         {
             $lookup: {
-                from: 'attendancedays',
-                let: { staffId: '$_id' },
+                from: "attendancedays",
+                let: { staffId: "$_id" },
                 pipeline: [
                     {
                         $match: {
                             $expr: {
                                 $and: [
-                                    { $eq: ['$staffId', '$$staffId'] },
-                                    { $gte: ['$date', dayStart] },
-                                    { $lte: ['$date', dayEnd] },
+                                    { $eq: ["$staffId", "$$staffId"] },
+                                    { $gte: ["$date", dayStart] },
+                                    { $lte: ["$date", dayEnd] },
                                 ],
                             },
                         },
@@ -169,12 +175,12 @@ async function getAllStaffsFromDB(query: IStaffQueryParams) {
                         },
                     },
                 ],
-                as: 'todayAttendance',
+                as: "todayAttendance",
             },
         },
         {
             $unwind: {
-                path: '$todayAttendance',
+                path: "$todayAttendance",
                 preserveNullAndEmptyArrays: true,
             },
         },
@@ -182,59 +188,59 @@ async function getAllStaffsFromDB(query: IStaffQueryParams) {
         // 6. Lookup Current Shift
         {
             $lookup: {
-                from: 'shiftassignments',
-                let: { staffId: '$_id' },
+                from: "shiftassignments",
+                let: { staffId: "$_id" },
                 pipeline: [
                     {
                         $match: {
                             $expr: {
                                 $and: [
-                                    { $eq: ['$staffId', '$$staffId'] },
-                                    { $lte: ['$startDate', now] },
+                                    { $eq: ["$staffId", "$$staffId"] },
+                                    { $lte: ["$startDate", now] },
                                     {
                                         $or: [
-                                            { $eq: ['$endDate', null] },
-                                            { $gte: ['$endDate', now] },
+                                            { $eq: ["$endDate", null] },
+                                            { $gte: ["$endDate", now] },
                                         ],
                                     },
-                                    { $eq: ['$isActive', true] },
+                                    { $eq: ["$isActive", true] },
                                 ],
                             },
                         },
                     },
                     {
                         $lookup: {
-                            from: 'shifts',
-                            localField: 'shiftId',
-                            foreignField: '_id',
-                            as: 'shift',
+                            from: "shifts",
+                            localField: "shiftId",
+                            foreignField: "_id",
+                            as: "shift",
                         },
                     },
                     {
                         $unwind: {
-                            path: '$shift',
+                            path: "$shift",
                             preserveNullAndEmptyArrays: true,
                         },
                     },
                     {
                         $project: {
-                            _id: '$shift._id',
-                            name: '$shift.name',
-                            startTime: '$shift.startTime',
-                            endTime: '$shift.endTime',
+                            _id: "$shift._id",
+                            name: "$shift.name",
+                            startTime: "$shift.startTime",
+                            endTime: "$shift.endTime",
                         },
                     },
                 ],
-                as: 'shiftAssignment',
+                as: "shiftAssignment",
             },
         },
         {
             $unwind: {
-                path: '$shiftAssignment',
+                path: "$shiftAssignment",
                 preserveNullAndEmptyArrays: true,
             },
         },
-        { $addFields: { currentShift: '$shiftAssignment' } },
+        { $addFields: { currentShift: "$shiftAssignment" } },
         { $project: { shiftAssignment: 0 } },
 
         // 7. Shift Filter
@@ -242,7 +248,7 @@ async function getAllStaffsFromDB(query: IStaffQueryParams) {
             ? [
                   {
                       $match: {
-                          'currentShift._id': new Types.ObjectId(shiftId),
+                          "currentShift._id": new Types.ObjectId(shiftId),
                       },
                   },
               ]
@@ -251,7 +257,7 @@ async function getAllStaffsFromDB(query: IStaffQueryParams) {
         { $sort: { createdAt: -1 } },
     ];
 
-    const countPipeline = [...pipeline, { $count: 'total' }];
+    const countPipeline = [...pipeline, { $count: "total" }];
     const dataPipeline = [
         ...pipeline,
         { $skip: skip },
@@ -283,13 +289,13 @@ async function getStaffByIdFromDB(id: string) {
         // Lookup User
         {
             $lookup: {
-                from: 'user',
-                let: { userId: '$userId' },
+                from: "user",
+                let: { userId: "$userId" },
                 pipeline: [
                     {
                         $match: {
                             $expr: {
-                                $eq: ['$_id', { $toObjectId: '$$userId' }],
+                                $eq: ["$_id", { $toObjectId: "$$userId" }],
                             },
                         },
                     },
@@ -303,79 +309,79 @@ async function getStaffByIdFromDB(id: string) {
                         },
                     },
                 ],
-                as: 'user',
+                as: "user",
             },
         },
-        { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+        { $unwind: { path: "$user", preserveNullAndEmptyArrays: true } },
 
         // Lookup Branch
         {
             $lookup: {
-                from: 'branches',
-                localField: 'branchId',
-                foreignField: '_id',
-                as: 'branch',
+                from: "branches",
+                localField: "branchId",
+                foreignField: "_id",
+                as: "branch",
             },
         },
-        { $unwind: { path: '$branch', preserveNullAndEmptyArrays: true } },
+        { $unwind: { path: "$branch", preserveNullAndEmptyArrays: true } },
 
         // Lookup Current Shift (Optimized: Only active and current date)
         {
             $lookup: {
-                from: 'shiftassignments',
-                let: { staffId: '$_id' },
+                from: "shiftassignments",
+                let: { staffId: "$_id" },
                 pipeline: [
                     {
                         $match: {
                             $expr: {
                                 $and: [
-                                    { $eq: ['$staffId', '$$staffId'] },
-                                    { $lte: ['$startDate', new Date()] },
+                                    { $eq: ["$staffId", "$$staffId"] },
+                                    { $lte: ["$startDate", new Date()] },
                                     {
                                         $or: [
-                                            { $eq: ['$endDate', null] },
-                                            { $gte: ['$endDate', new Date()] },
+                                            { $eq: ["$endDate", null] },
+                                            { $gte: ["$endDate", new Date()] },
                                         ],
                                     },
-                                    { $eq: ['$isActive', true] },
+                                    { $eq: ["$isActive", true] },
                                 ],
                             },
                         },
                     },
                     {
                         $lookup: {
-                            from: 'shifts',
-                            localField: 'shiftId',
-                            foreignField: '_id',
-                            as: 'shift',
+                            from: "shifts",
+                            localField: "shiftId",
+                            foreignField: "_id",
+                            as: "shift",
                         },
                     },
                     {
                         $unwind: {
-                            path: '$shift',
+                            path: "$shift",
                             preserveNullAndEmptyArrays: true,
                         },
                     },
                     {
                         $project: {
-                            _id: '$shift._id',
-                            name: '$shift.name',
-                            startTime: '$shift.startTime',
-                            endTime: '$shift.endTime',
-                            workDays: '$shift.workDays',
+                            _id: "$shift._id",
+                            name: "$shift.name",
+                            startTime: "$shift.startTime",
+                            endTime: "$shift.endTime",
+                            workDays: "$shift.workDays",
                         },
                     },
                 ],
-                as: 'shiftAssignment',
+                as: "shiftAssignment",
             },
         },
         {
             $unwind: {
-                path: '$shiftAssignment',
+                path: "$shiftAssignment",
                 preserveNullAndEmptyArrays: true,
             },
         },
-        { $addFields: { currentShift: '$shiftAssignment' } },
+        { $addFields: { currentShift: "$shiftAssignment" } },
         { $project: { shiftAssignment: 0 } },
     ];
 
@@ -387,13 +393,13 @@ async function getStaffFromDB(userId: string) {
     const pipeline: any[] = [
         {
             $lookup: {
-                from: 'user',
-                let: { userId: '$userId' },
+                from: "user",
+                let: { userId: "$userId" },
                 pipeline: [
                     {
                         $match: {
                             $expr: {
-                                $eq: ['$_id', { $toObjectId: '$$userId' }],
+                                $eq: ["$_id", { $toObjectId: "$$userId" }],
                             },
                         },
                     },
@@ -407,32 +413,32 @@ async function getStaffFromDB(userId: string) {
                         },
                     },
                 ],
-                as: 'user',
+                as: "user",
             },
         },
-        { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+        { $unwind: { path: "$user", preserveNullAndEmptyArrays: true } },
         {
             $match: {
-                'user._id': new Types.ObjectId(userId),
+                "user._id": new Types.ObjectId(userId),
             },
         },
         {
             $lookup: {
-                from: 'branches',
-                localField: 'branchId',
-                foreignField: '_id',
-                as: 'branch',
+                from: "branches",
+                localField: "branchId",
+                foreignField: "_id",
+                as: "branch",
             },
         },
-        { $unwind: { path: '$branch', preserveNullAndEmptyArrays: true } },
+        { $unwind: { path: "$branch", preserveNullAndEmptyArrays: true } },
         {
             $addFields: {
                 isSalaryPinSet: {
                     $cond: {
                         if: {
                             $and: [
-                                { $ifNull: ['$salaryPin', false] },
-                                { $ne: ['$salaryPin', ''] },
+                                { $ifNull: ["$salaryPin", false] },
+                                { $ne: ["$salaryPin", ""] },
                             ],
                         },
                         then: true,
@@ -465,7 +471,7 @@ async function createStaffInDB(payload: { staff: Partial<IStaff> }) {
             staffId: staff.staffId as string,
         }).session(session);
 
-        if (exists) throw new Error('Staff with this ID already exists.');
+        if (exists) throw new Error("Staff with this ID already exists.");
 
         const newStaff = await StaffModel.create(
             [
@@ -475,7 +481,7 @@ async function createStaffInDB(payload: { staff: Partial<IStaff> }) {
                     department: staff.department as string,
                     designation: staff.designation as string,
                     joinDate: staff.joinDate as Date,
-                    status: 'active',
+                    status: "active",
                     profileCompleted: false,
                 },
             ],
@@ -512,22 +518,22 @@ async function completeProfileInDB(payload: {
             // Generate a unique staffId
             const staffCount =
                 await StaffModel.countDocuments().session(session);
-            const staffId = `STF-${String(staffCount + 1).padStart(4, '0')}`;
+            const staffId = `STF-${String(staffCount + 1).padStart(4, "0")}`;
 
             existingStaff = new StaffModel({
                 userId,
                 staffId,
-                phone: staff.phone || '',
-                designation: staff.designation || 'Staff',
-                department: staff.department || 'General',
+                phone: staff.phone || "",
+                designation: staff.designation || "Staff",
+                department: staff.department || "General",
                 joinDate: staff.joinDate || new Date(),
-                status: 'active',
+                status: "active",
                 profileCompleted: false,
             });
         }
 
         if (existingStaff.profileCompleted) {
-            throw new Error('Profile already completed. Use update instead.');
+            throw new Error("Profile already completed. Use update instead.");
         }
 
         existingStaff.set({
@@ -557,7 +563,7 @@ async function updateProfileInDB(payload: {
     const staff = await StaffModel.findOne({ userId });
 
     if (!staff) {
-        throw new Error('No staff record found for this user.');
+        throw new Error("No staff record found for this user.");
     }
 
     // Update the fields
@@ -577,44 +583,44 @@ async function viewSalaryWithPassword(payload: {
     const { userId, password } = payload;
 
     // Get user from database
-    const db = (await import('../lib/db.js')).client;
+    const db = (await import("../lib/db.js")).client;
     const mongoClient = await db();
-    const envConfig = (await import('../config/env.config.js')).default;
+    const envConfig = (await import("../config/env.config.js")).default;
     const database = mongoClient.db(envConfig.db_name);
 
     const user = await database
-        .collection('user')
+        .collection("user")
         .findOne({ _id: new Types.ObjectId(userId) });
 
     if (!user) {
-        throw new Error('User not found');
+        throw new Error("User not found");
     }
 
     // Verify password using bcrypt (matching Better-Auth default)
     // NOTE: Better-Auth stores passwords using bcrypt or scrypt. We assume standard bcrypt here.
-    const bcrypt = (await import('bcrypt')).default;
+    const bcrypt = (await import("bcrypt")).default;
 
     // Check if password exists
     if (!user.password) {
-        throw new Error('User has no password set (OAuth only?)');
+        throw new Error("User has no password set (OAuth only?)");
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
 
     if (!isMatch) {
-        throw new Error('Invalid password');
+        throw new Error("Invalid password");
     }
 
     // Get staff record
     const staff = await StaffModel.findOne({ userId }).lean();
 
     if (!staff) {
-        throw new Error('Staff profile not found');
+        throw new Error("Staff profile not found");
     }
 
     if (!staff.salaryVisibleToEmployee) {
         throw new Error(
-            'Salary information is currently hidden by administrator',
+            "Salary information is currently hidden by administrator",
         );
     }
 
@@ -635,12 +641,12 @@ async function updateSalaryInDB(payload: {
         payload;
 
     const staff = await StaffModel.findById(staffId);
-    if (!staff) throw new Error('Staff not found');
+    if (!staff) throw new Error("Staff not found");
 
     // Save history if salary changed
     if (salary !== undefined && salary !== staff.salary && changedBy) {
         const SalaryHistoryModel = (
-            await import('../models/salary-history.model.js')
+            await import("../models/salary-history.model.js")
         ).default;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await (SalaryHistoryModel.create as any)({
@@ -668,7 +674,7 @@ async function updateSalaryInDB(payload: {
 
 async function getSalaryHistory(staffId: string) {
     const SalaryHistoryModel = (
-        await import('../models/salary-history.model.js')
+        await import("../models/salary-history.model.js")
     ).default;
     return await SalaryHistoryModel.find({ staffId: staffId as any })
         .sort({ createdAt: -1 })
@@ -690,7 +696,7 @@ async function updateStaffInDB(payload: {
         const staff = await StaffModel.findOne({ staffId }).session(session);
 
         if (!staff) {
-            throw new Error('Staff not found');
+            throw new Error("Staff not found");
         }
 
         // If salary is being changed, we should probably log it (reusing logic or simplified)
@@ -700,7 +706,7 @@ async function updateStaffInDB(payload: {
             changedBy
         ) {
             const SalaryHistoryModel = (
-                await import('../models/salary-history.model.js')
+                await import("../models/salary-history.model.js")
             ).default;
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             await (SalaryHistoryModel.create as any)(
@@ -710,7 +716,7 @@ async function updateStaffInDB(payload: {
                         previousSalary: staff.salary,
                         newSalary: staffData.salary,
                         changedBy,
-                        reason: 'Administrative Update',
+                        reason: "Administrative Update",
                     },
                 ],
                 { session },
@@ -726,7 +732,7 @@ async function updateStaffInDB(payload: {
 
         // Update User Role if provided
         if (role && staff.userId) {
-            const UserModel = (await import('../models/user.model.js')).default;
+            const UserModel = (await import("../models/user.model.js")).default;
             await UserModel.updateOne(
                 { _id: staff.userId },
                 { $set: { role } },
@@ -752,10 +758,10 @@ async function setSalaryPin(staffId: string, pin: string, _changedBy: string) {
         const staff = await StaffModel.findOne({ staffId }).session(session);
 
         if (!staff) {
-            throw new Error('Staff not found');
+            throw new Error("Staff not found");
         }
 
-        const bcrypt = (await import('bcrypt')).default;
+        const bcrypt = (await import("bcrypt")).default;
         const hashedPin = await bcrypt.hash(
             pin,
             Number(process.env.BCRYPT_SALT_ROUNDS) || 10,
@@ -771,7 +777,7 @@ async function setSalaryPin(staffId: string, pin: string, _changedBy: string) {
         // await AuditLog.create(...)
 
         await session.commitTransaction();
-        return { success: true, message: 'Salary PIN set successfully' };
+        return { success: true, message: "Salary PIN set successfully" };
     } catch (err) {
         await session.abortTransaction();
         throw err;
@@ -781,46 +787,46 @@ async function setSalaryPin(staffId: string, pin: string, _changedBy: string) {
 }
 
 async function verifySalaryPin(staffId: string, pin: string) {
-    const staff = await StaffModel.findOne({ staffId }).select('+salaryPin');
+    const staff = await StaffModel.findOne({ staffId }).select("+salaryPin");
 
     if (!staff) {
-        throw new Error('Staff not found');
+        throw new Error("Staff not found");
     }
 
     if (!staff.salaryPin) {
-        throw new Error('Salary PIN not set');
+        throw new Error("Salary PIN not set");
     }
 
-    const bcrypt = (await import('bcrypt')).default;
+    const bcrypt = (await import("bcrypt")).default;
     const isMatch = await bcrypt.compare(pin, staff.salaryPin);
 
     if (!isMatch) {
-        throw new Error('Invalid PIN');
+        throw new Error("Invalid PIN");
     }
 
-    return { success: true, message: 'PIN verified successfully' };
+    return { success: true, message: "PIN verified successfully" };
 }
 
 async function forgotSalaryPin(staffId: string) {
-    const staff = await StaffModel.findOne({ staffId }).populate('userId');
+    const staff = await StaffModel.findOne({ staffId }).populate("userId");
 
     if (!staff) {
-        throw new Error('Staff not found');
+        throw new Error("Staff not found");
     }
 
     const user = staff.userId as unknown as { email: string; name?: string };
 
     if (!user || !user.email) {
-        throw new Error('No email found for this staff member');
+        throw new Error("No email found for this staff member");
     }
 
     // Generate token
-    const crypto = await import('crypto');
-    const resetToken = crypto.randomBytes(32).toString('hex');
+    const crypto = await import("crypto");
+    const resetToken = crypto.randomBytes(32).toString("hex");
     const resetTokenHash = crypto
-        .createHash('sha256')
+        .createHash("sha256")
         .update(resetToken)
-        .digest('hex');
+        .digest("hex");
 
     const resetExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
@@ -835,29 +841,29 @@ async function forgotSalaryPin(staffId: string) {
     );
 
     // Send Email
-    const EmailService = (await import('./email.service.js')).default;
+    const EmailService = (await import("./email.service.js")).default;
     const resetUrl = `${process.env.CLIENT_URL}/staffs/reset-pin?token=${resetToken}`;
 
     try {
         await EmailService.sendPinResetEmail({
             to: user.email,
-            staffName: user.name || 'Staff Member',
+            staffName: user.name || "Staff Member",
             resetUrl,
         });
     } catch (error) {
-        console.error('Failed to send reset email:', error);
-        throw new Error('Failed to send reset email');
+        console.error("Failed to send reset email:", error);
+        throw new Error("Failed to send reset email");
     }
 
-    return { success: true, message: 'Reset link sent to your email' };
+    return { success: true, message: "Reset link sent to your email" };
 }
 
 async function resetSalaryPin(token: string, newPin: string) {
-    const crypto = await import('crypto');
+    const crypto = await import("crypto");
     const resetTokenHash = crypto
-        .createHash('sha256')
+        .createHash("sha256")
         .update(token)
-        .digest('hex');
+        .digest("hex");
 
     const staff = await StaffModel.findOne({
         salaryPinResetToken: resetTokenHash,
@@ -865,10 +871,10 @@ async function resetSalaryPin(token: string, newPin: string) {
     });
 
     if (!staff) {
-        throw new Error('Invalid or expired reset token');
+        throw new Error("Invalid or expired reset token");
     }
 
-    const bcrypt = (await import('bcrypt')).default;
+    const bcrypt = (await import("bcrypt")).default;
     const hashedPin = await bcrypt.hash(
         newPin,
         Number(process.env.BCRYPT_SALT_ROUNDS) || 10,
@@ -885,7 +891,7 @@ async function resetSalaryPin(token: string, newPin: string) {
         },
     );
 
-    return { success: true, message: 'PIN reset successfully' };
+    return { success: true, message: "PIN reset successfully" };
 }
 
 export default {

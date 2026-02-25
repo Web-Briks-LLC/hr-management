@@ -1,10 +1,11 @@
-import { Types } from 'mongoose';
-import ClientModel from '../models/client.model.js';
-import type { ClientQueryParams } from '../types/client.type.js';
+import { Types } from "mongoose";
+import ClientModel from "../models/client.model.js";
+import type { ClientQueryParams } from "../types/client.type.js";
 import type {
     CreateClientInput,
     UpdateClientInput,
-} from '../validators/client.validation.js';
+} from "../validators/client.validation.js";
+import { escapeRegex } from "../lib/sanitize.js";
 
 // Build match stage from query params
 const buildMatchStage = (
@@ -13,10 +14,11 @@ const buildMatchStage = (
     const match: Record<string, unknown> = {};
 
     if (params.search) {
+        const escaped = escapeRegex(params.search);
         match.$or = [
-            { name: { $regex: params.search, $options: 'i' } },
-            { email: { $regex: params.search, $options: 'i' } },
-            { clientId: { $regex: params.search, $options: 'i' } },
+            { name: { $regex: escaped, $options: "i" } },
+            { email: { $regex: escaped, $options: "i" } },
+            { clientId: { $regex: escaped, $options: "i" } },
         ];
     }
 
@@ -47,7 +49,7 @@ const generateSuggestedIds = async (baseId: string): Promise<string[]> => {
             currentNum++;
             const suggestedId = `${prefix}${String(currentNum).padStart(
                 numLength,
-                '0',
+                "0",
             )}`;
             const exists = await ClientModel.findOne({ clientId: suggestedId });
             if (!exists) {
@@ -103,8 +105,8 @@ const getAllClientsFromDB = async (params: ClientQueryParams) => {
     const limit = params.limit || 10;
     const skip = (page - 1) * limit;
 
-    const sortField = params.sortBy || 'createdAt';
-    const sortOrder = params.sortOrder === 'asc' ? 1 : -1;
+    const sortField = params.sortBy || "createdAt";
+    const sortOrder = params.sortOrder === "asc" ? 1 : -1;
     const sortStage: Record<string, 1 | -1> = { [sortField]: sortOrder };
 
     const matchStage = buildMatchStage(params);
@@ -117,21 +119,21 @@ const getAllClientsFromDB = async (params: ClientQueryParams) => {
             { $limit: limit },
             {
                 $lookup: {
-                    from: 'user',
-                    localField: 'createdBy',
-                    foreignField: '_id',
-                    as: 'createdBy',
+                    from: "user",
+                    localField: "createdBy",
+                    foreignField: "_id",
+                    as: "createdBy",
                 },
             },
             {
                 $unwind: {
-                    path: '$createdBy',
+                    path: "$createdBy",
                     preserveNullAndEmptyArrays: true,
                 },
             },
             {
                 $project: {
-                    'createdBy.password': 0,
+                    "createdBy.password": 0,
                 },
             },
         ]),
@@ -155,22 +157,22 @@ const getClientByIdFromDB = async (id: string) => {
         { $match: { _id: new Types.ObjectId(id) } },
         {
             $lookup: {
-                from: 'user',
-                localField: 'createdBy',
-                foreignField: '_id',
-                as: 'createdBy',
+                from: "user",
+                localField: "createdBy",
+                foreignField: "_id",
+                as: "createdBy",
             },
         },
         {
             $unwind: {
-                path: '$createdBy',
+                path: "$createdBy",
                 preserveNullAndEmptyArrays: true,
             },
         },
         {
             $project: {
-                'createdBy.password': 0,
-                'createdBy.passwordHistory': 0,
+                "createdBy.password": 0,
+                "createdBy.passwordHistory": 0,
             },
         },
     ]);
@@ -183,7 +185,7 @@ class ClientIdExistsError extends Error {
 
     constructor(message: string, suggestions: string[]) {
         super(message);
-        this.name = 'ClientIdExistsError';
+        this.name = "ClientIdExistsError";
         this.suggestions = suggestions;
     }
 }
@@ -207,7 +209,7 @@ const createClientInDB = async (
         email: payload.email.toLowerCase(),
     });
     if (existingClient) {
-        throw new Error('A client with this email already exists');
+        throw new Error("A client with this email already exists");
     }
 
     // Prepare data for creation
@@ -248,7 +250,7 @@ const updateClientInDB = async (id: string, payload: UpdateClientInput) => {
             _id: { $ne: new Types.ObjectId(id) },
         });
         if (existingClient) {
-            throw new Error('A client with this email already exists');
+            throw new Error("A client with this email already exists");
         }
     }
 
@@ -277,7 +279,7 @@ const getClientStatsFromDB = async (
     clientId: string,
     filters?: ClientStatsFilters,
 ) => {
-    const { default: OrderModel } = await import('../models/order.model.js');
+    const { default: OrderModel } = await import("../models/order.model.js");
 
     const clientObjectId = new Types.ObjectId(clientId);
 
@@ -289,12 +291,12 @@ const getClientStatsFromDB = async (
         const dateConditions: Record<string, unknown>[] = [];
         if (filters.month) {
             dateConditions.push({
-                $eq: [{ $month: '$orderDate' }, filters.month],
+                $eq: [{ $month: "$orderDate" }, filters.month],
             });
         }
         if (filters.year) {
             dateConditions.push({
-                $eq: [{ $year: '$orderDate' }, filters.year],
+                $eq: [{ $year: "$orderDate" }, filters.year],
             });
         }
         orderMatch.$expr = { $and: dateConditions };
@@ -312,7 +314,10 @@ const getClientStatsFromDB = async (
 
     // Add search filter
     if (filters?.search) {
-        orderMatch.orderName = { $regex: filters.search, $options: 'i' };
+        orderMatch.orderName = {
+            $regex: escapeRegex(filters.search),
+            $options: "i",
+        };
     }
 
     // Aggregation pipeline to calculate stats
@@ -320,15 +325,15 @@ const getClientStatsFromDB = async (
         { $match: orderMatch },
         {
             $lookup: {
-                from: 'earnings',
-                localField: '_id',
-                foreignField: 'orderIds',
-                as: 'earning',
+                from: "earnings",
+                localField: "_id",
+                foreignField: "orderIds",
+                as: "earning",
             },
         },
         {
             $unwind: {
-                path: '$earning',
+                path: "$earning",
                 preserveNullAndEmptyArrays: true,
             },
         },
@@ -336,13 +341,13 @@ const getClientStatsFromDB = async (
             $group: {
                 _id: null,
                 totalOrders: { $sum: 1 },
-                totalAmount: { $sum: '$totalPrice' },
-                totalImages: { $sum: '$imageQuantity' },
+                totalAmount: { $sum: "$totalPrice" },
+                totalImages: { $sum: "$imageQuantity" },
                 paidAmount: {
                     $sum: {
                         $cond: [
-                            { $eq: ['$earning.status', 'paid'] },
-                            '$totalPrice',
+                            { $eq: ["$earning.status", "paid"] },
+                            "$totalPrice",
                             0,
                         ],
                     },
@@ -350,11 +355,11 @@ const getClientStatsFromDB = async (
                 totalBDT: {
                     $sum: {
                         $cond: [
-                            { $eq: ['$earning.status', 'paid'] },
+                            { $eq: ["$earning.status", "paid"] },
                             {
                                 $multiply: [
-                                    '$totalPrice',
-                                    { $ifNull: ['$earning.conversionRate', 0] },
+                                    "$totalPrice",
+                                    { $ifNull: ["$earning.conversionRate", 0] },
                                 ],
                             },
                             0,

@@ -1,12 +1,13 @@
-import OrderModel from '../models/order.model.js';
-import ClientModel from '../models/client.model.js';
+import OrderModel from "../models/order.model.js";
+import ClientModel from "../models/client.model.js";
 import type {
     IOrder,
     OrderStatus,
     OrderPriority,
-} from '../types/order.type.js';
-import mongoose from 'mongoose';
-import earningService from './earning.service.js';
+} from "../types/order.type.js";
+import mongoose from "mongoose";
+import earningService from "./earning.service.js";
+import { escapeRegex } from "../lib/sanitize.js";
 
 interface CreateOrderData {
     orderName: string;
@@ -66,10 +67,10 @@ async function createOrderInDB(data: CreateOrderData): Promise<IOrder> {
         revisionInstructions: [],
         timeline: [
             {
-                status: 'pending' as OrderStatus,
+                status: "pending" as OrderStatus,
                 timestamp: new Date(),
                 changedBy: data.createdBy,
-                note: 'Order created',
+                note: "Order created",
             },
         ],
     };
@@ -81,7 +82,7 @@ async function createOrderInDB(data: CreateOrderData): Promise<IOrder> {
         // Get client to fetch currency
         const client = await ClientModel.findById(data.clientId).lean();
         const currency =
-            (client as { currency?: string } | null)?.currency || 'USD';
+            (client as { currency?: string } | null)?.currency || "USD";
 
         await earningService.createEarningForOrder({
             orderId: (order._id as mongoose.Types.ObjectId).toString(),
@@ -93,7 +94,7 @@ async function createOrderInDB(data: CreateOrderData): Promise<IOrder> {
             createdBy: data.createdBy,
         });
     } catch (err) {
-        console.error('Error auto-creating earning for order:', err);
+        console.error("Error auto-creating earning for order:", err);
         // Don't fail order creation if earning creation fails
     }
 
@@ -185,15 +186,15 @@ async function getAllOrdersFromDB(filters: GetOrdersFilters): Promise<{
         // But for now, let's keep the existing logic: find clients first then filter orders
         const matchingClients = await ClientModel.find({
             $or: [
-                { name: { $regex: search, $options: 'i' } },
-                { clientId: { $regex: search, $options: 'i' } },
+                { name: { $regex: escapeRegex(search), $options: "i" } },
+                { clientId: { $regex: escapeRegex(search), $options: "i" } },
             ],
-        }).select('_id');
+        }).select("_id");
 
         const matchingClientIds = matchingClients.map((client) => client._id);
 
         matchStage.$or = [
-            { orderName: { $regex: search, $options: 'i' } },
+            { orderName: { $regex: escapeRegex(search), $options: "i" } },
             { clientId: { $in: matchingClientIds } },
         ];
     }
@@ -205,38 +206,38 @@ async function getAllOrdersFromDB(filters: GetOrdersFilters): Promise<{
     // Client
     pipeline.push({
         $lookup: {
-            from: 'clients',
-            localField: 'clientId',
-            foreignField: '_id',
-            as: 'clientId',
+            from: "clients",
+            localField: "clientId",
+            foreignField: "_id",
+            as: "clientId",
         },
     });
     pipeline.push({
-        $unwind: { path: '$clientId', preserveNullAndEmptyArrays: true },
+        $unwind: { path: "$clientId", preserveNullAndEmptyArrays: true },
     });
 
     // Services
     pipeline.push({
         $lookup: {
-            from: 'services',
-            localField: 'services',
-            foreignField: '_id',
-            as: 'services',
+            from: "services",
+            localField: "services",
+            foreignField: "_id",
+            as: "services",
         },
     });
 
     // ReturnFileFormat
     pipeline.push({
         $lookup: {
-            from: 'returnfileformats', // Verify collection name usually lowecase plural
-            localField: 'returnFileFormat',
-            foreignField: '_id',
-            as: 'returnFileFormat',
+            from: "returnfileformats", // Verify collection name usually lowecase plural
+            localField: "returnFileFormat",
+            foreignField: "_id",
+            as: "returnFileFormat",
         },
     });
     pipeline.push({
         $unwind: {
-            path: '$returnFileFormat',
+            path: "$returnFileFormat",
             preserveNullAndEmptyArrays: true,
         },
     });
@@ -244,28 +245,28 @@ async function getAllOrdersFromDB(filters: GetOrdersFilters): Promise<{
     // AssignedTo (Staff) and nested User
     pipeline.push({
         $lookup: {
-            from: 'staffs',
-            localField: 'assignedTo',
-            foreignField: '_id',
-            as: 'assignedTo',
+            from: "staffs",
+            localField: "assignedTo",
+            foreignField: "_id",
+            as: "assignedTo",
         },
     });
     pipeline.push({
-        $unwind: { path: '$assignedTo', preserveNullAndEmptyArrays: true },
+        $unwind: { path: "$assignedTo", preserveNullAndEmptyArrays: true },
     });
 
     // Nested User lookup for Staff
     pipeline.push({
         $lookup: {
-            from: 'user', // Native user collection
-            localField: 'assignedTo.userId',
-            foreignField: '_id',
-            as: 'assignedTo.userId',
+            from: "user", // Native user collection
+            localField: "assignedTo.userId",
+            foreignField: "_id",
+            as: "assignedTo.userId",
         },
     });
     pipeline.push({
         $unwind: {
-            path: '$assignedTo.userId',
+            path: "$assignedTo.userId",
             preserveNullAndEmptyArrays: true,
         },
     });
@@ -273,14 +274,14 @@ async function getAllOrdersFromDB(filters: GetOrdersFilters): Promise<{
     // Earning (Virtual) imitation
     pipeline.push({
         $lookup: {
-            from: 'earnings',
-            localField: '_id',
-            foreignField: 'orderId',
-            as: 'earning',
+            from: "earnings",
+            localField: "_id",
+            foreignField: "orderId",
+            as: "earning",
         },
     });
     pipeline.push({
-        $unwind: { path: '$earning', preserveNullAndEmptyArrays: true },
+        $unwind: { path: "$earning", preserveNullAndEmptyArrays: true },
     });
 
     // Sort
@@ -293,7 +294,7 @@ async function getAllOrdersFromDB(filters: GetOrdersFilters): Promise<{
     const facetPipeline = [
         {
             $facet: {
-                totalPrototype: [{ $count: 'total' }],
+                totalPrototype: [{ $count: "total" }],
                 orders: [
                     { $skip: skip },
                     { $limit: limit },
@@ -356,7 +357,7 @@ async function getAllOrdersFromDB(filters: GetOrdersFilters): Promise<{
         },
         {
             $project: {
-                total: { $arrayElemAt: ['$totalPrototype.total', 0] },
+                total: { $arrayElemAt: ["$totalPrototype.total", 0] },
                 orders: 1,
             },
         },
@@ -396,25 +397,25 @@ async function getAllOrdersFromDB(filters: GetOrdersFilters): Promise<{
 async function getOrderByIdFromDB(id: string): Promise<IOrder | null> {
     const order = await OrderModel.findById(id)
         .populate(
-            'clientId',
-            'clientId name email phone currency officeAddress address',
+            "clientId",
+            "clientId name email phone currency officeAddress address",
         )
-        .populate('services', 'name description')
-        .populate('returnFileFormat', 'name extension')
+        .populate("services", "name description")
+        .populate("returnFileFormat", "name extension")
         .populate({
-            path: 'assignedTo',
-            select: 'staffId userId',
+            path: "assignedTo",
+            select: "staffId userId",
             populate: {
-                path: 'userId',
-                select: 'name email',
+                path: "userId",
+                select: "name email",
             },
         })
-        .populate('earning', 'status')
+        .populate("earning", "status")
         .lean();
 
     if (order && order.createdBy) {
         // Manually fetch createdBy user since it's a native collection
-        const { default: UserModel } = await import('../models/user.model.js');
+        const { default: UserModel } = await import("../models/user.model.js");
         const user = await UserModel.findOne(
             { _id: new mongoose.Types.ObjectId(order.createdBy.toString()) },
             { projection: { name: 1, email: 1 } },
@@ -432,10 +433,10 @@ async function updateOrderInDB(
     data: UpdateOrderData,
 ): Promise<IOrder | null> {
     // Handle status changes
-    if (data.status === 'completed' && !data.completedAt) {
+    if (data.status === "completed" && !data.completedAt) {
         data.completedAt = new Date();
     }
-    if (data.status === 'delivered' && !data.deliveredAt) {
+    if (data.status === "delivered" && !data.deliveredAt) {
         data.deliveredAt = new Date();
     }
 
@@ -444,17 +445,17 @@ async function updateOrderInDB(
         runValidators: true,
     })
         .populate(
-            'clientId',
-            'clientId name email currency officeAddress address',
+            "clientId",
+            "clientId name email currency officeAddress address",
         )
-        .populate('services', 'name')
-        .populate('returnFileFormat', 'name extension')
+        .populate("services", "name")
+        .populate("returnFileFormat", "name extension")
         .populate({
-            path: 'assignedTo',
-            select: 'staffId userId',
+            path: "assignedTo",
+            select: "staffId userId",
             populate: {
-                path: 'userId',
-                select: 'name',
+                path: "userId",
+                select: "name",
             },
         })
         .lean();
@@ -495,7 +496,7 @@ async function updateOrderInDB(
                 await earningService.updateEarningForOrder(id, updateData);
             }
         } catch (err) {
-            console.error('Error updating earning for order:', err);
+            console.error("Error updating earning for order:", err);
         }
     }
 
@@ -515,7 +516,7 @@ async function deleteOrderFromDB(id: string): Promise<IOrder | null> {
                 order.imageQuantity,
             );
         } catch (err) {
-            console.error('Error removing order from earning:', err);
+            console.error("Error removing order from earning:", err);
         }
     }
 
@@ -541,13 +542,13 @@ async function updateOrderStatusWithTimeline(
         },
     };
 
-    if (status === 'completed') {
+    if (status === "completed") {
         updateData.completedAt = new Date();
     }
-    if (status === 'delivered') {
+    if (status === "delivered") {
         updateData.deliveredAt = new Date();
     }
-    if (status === 'revision') {
+    if (status === "revision") {
         updateData.$inc = { revisionCount: 1 };
     }
 
@@ -556,17 +557,17 @@ async function updateOrderStatusWithTimeline(
         runValidators: true,
     })
         .populate(
-            'clientId',
-            'clientId name email currency officeAddress address',
+            "clientId",
+            "clientId name email currency officeAddress address",
         )
-        .populate('services', 'name')
-        .populate('returnFileFormat', 'name extension')
+        .populate("services", "name")
+        .populate("returnFileFormat", "name extension")
         .populate({
-            path: 'assignedTo',
-            select: 'staffId userId',
+            path: "assignedTo",
+            select: "staffId userId",
             populate: {
-                path: 'userId',
-                select: 'name',
+                path: "userId",
+                select: "name",
             },
         })
         .lean();
@@ -605,11 +606,11 @@ async function extendDeadline(
         runValidators: true,
     })
         .populate(
-            'clientId',
-            'clientId name email currency officeAddress address',
+            "clientId",
+            "clientId name email currency officeAddress address",
         )
-        .populate('services', 'name')
-        .populate('returnFileFormat', 'name extension')
+        .populate("services", "name")
+        .populate("returnFileFormat", "name extension")
         .lean();
 }
 
@@ -620,7 +621,7 @@ async function addRevision(
     createdBy: string,
 ): Promise<IOrder | null> {
     const updateData = {
-        status: 'revision' as OrderStatus,
+        status: "revision" as OrderStatus,
         $inc: { revisionCount: 1 },
         $push: {
             revisionInstructions: {
@@ -629,10 +630,10 @@ async function addRevision(
                 createdBy,
             },
             timeline: {
-                status: 'revision' as OrderStatus,
+                status: "revision" as OrderStatus,
                 timestamp: new Date(),
                 changedBy: createdBy,
-                note: 'Revision requested',
+                note: "Revision requested",
             },
         },
     };
@@ -642,11 +643,11 @@ async function addRevision(
         runValidators: true,
     })
         .populate(
-            'clientId',
-            'clientId name email currency officeAddress address',
+            "clientId",
+            "clientId name email currency officeAddress address",
         )
-        .populate('services', 'name')
-        .populate('returnFileFormat', 'name extension')
+        .populate("services", "name")
+        .populate("returnFileFormat", "name extension")
         .lean();
 }
 
@@ -672,15 +673,15 @@ async function getOrderStatsFromDB(): Promise<{
         overdue,
     ] = await Promise.all([
         OrderModel.countDocuments(),
-        OrderModel.countDocuments({ status: 'pending' }),
-        OrderModel.countDocuments({ status: 'in_progress' }),
-        OrderModel.countDocuments({ status: 'quality_check' }),
-        OrderModel.countDocuments({ status: 'revision' }),
-        OrderModel.countDocuments({ status: 'completed' }),
-        OrderModel.countDocuments({ status: 'delivered' }),
+        OrderModel.countDocuments({ status: "pending" }),
+        OrderModel.countDocuments({ status: "in_progress" }),
+        OrderModel.countDocuments({ status: "quality_check" }),
+        OrderModel.countDocuments({ status: "revision" }),
+        OrderModel.countDocuments({ status: "completed" }),
+        OrderModel.countDocuments({ status: "delivered" }),
         OrderModel.countDocuments({
             deadline: { $lt: now },
-            status: { $nin: ['completed', 'delivered', 'cancelled'] },
+            status: { $nin: ["completed", "delivered", "cancelled"] },
         }),
     ]);
 
@@ -701,8 +702,8 @@ async function getOrdersByClientFromDB(
     limit: number = 10,
 ): Promise<IOrder[]> {
     return OrderModel.find({ clientId })
-        .populate('services', 'name')
-        .populate('returnFileFormat', 'name extension')
+        .populate("services", "name")
+        .populate("returnFileFormat", "name extension")
         .sort({ createdAt: -1 })
         .limit(limit)
         .lean() as Promise<IOrder[]>;
@@ -713,7 +714,7 @@ async function getOrderYearsFromDB(): Promise<number[]> {
     const result = await OrderModel.aggregate([
         {
             $group: {
-                _id: { $year: '$orderDate' },
+                _id: { $year: "$orderDate" },
             },
         },
         {

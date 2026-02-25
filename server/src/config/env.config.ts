@@ -13,6 +13,16 @@ const requiredVars = [
     "BETTER_AUTH_URL",
     "TRUSTED_ORIGINS",
     "PORT",
+    "NODE_ENV",
+    "SMTP_USER",
+    "SMTP_PASS",
+    "SMTP_HOST",
+    "SMTP_PORT",
+    "SMTP_SECURE",
+    "CLOUDINARY_NAME",
+    "CLOUDINARY_API_KEY",
+    "CLOUDINARY_API_SECRET",
+    "CLOUDINARY_UPLOAD_PATH",
 ] as const;
 
 const missing = requiredVars.filter((key) => !process.env[key]);

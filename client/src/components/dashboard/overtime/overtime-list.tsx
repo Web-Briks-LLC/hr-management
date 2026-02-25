@@ -47,11 +47,13 @@ import { IOvertime } from "@/types/overtime.type";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useDebounce } from "@/hooks/use-debounce";
 
 export default function OvertimeList() {
     const [page, setPage] = useState(1);
     const [searchTerm, setSearchTerm] = useState("");
     const [limit, setLimit] = useState(20);
+    const debouncedSearch = useDebounce(searchTerm, 300);
 
     const {
         data: overtimeData,
@@ -61,7 +63,7 @@ export default function OvertimeList() {
     } = useGetAllOvertimeQuery({
         page,
         limit,
-        search: searchTerm,
+        search: debouncedSearch,
     });
 
     const [deleteOvertime] = useDeleteOvertimeMutation();

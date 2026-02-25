@@ -1,10 +1,11 @@
 import JobApplicationModel, {
     type ApplicationStatus,
-} from '../models/job-application.model.js';
-import cloudinary from '../lib/cloudinary.js';
-import envConfig from '../config/env.config.js';
-import { Types } from 'mongoose';
-import { Readable } from 'stream';
+} from "../models/job-application.model.js";
+import cloudinary from "../lib/cloudinary.js";
+import envConfig from "../config/env.config.js";
+import { Types } from "mongoose";
+import { Readable } from "stream";
+import { escapeRegex } from "../lib/sanitize.js";
 
 interface CreateApplicationInput {
     jobPosition: string;
@@ -37,29 +38,29 @@ interface GetAllFilters {
 
 // Upload CV to Cloudinary
 async function uploadCV(
-    file: Express.Multer.File
+    file: Express.Multer.File,
 ): Promise<{ url: string; publicId: string; fileName: string }> {
     return new Promise((resolve, reject) => {
         // Sanitize filename and create unique public_id with extension
         const originalName = file.originalname;
-        const ext = originalName.split('.').pop();
+        const ext = originalName.split(".").pop();
         const nameWithoutExt = originalName
-            .replace(/\.[^/.]+$/, '')
-            .replace(/[^a-zA-Z0-9.-]/g, '_');
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+            .replace(/\.[^/.]+$/, "")
+            .replace(/[^a-zA-Z0-9.-]/g, "_");
+        const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
         const publicId = `${nameWithoutExt}-${uniqueSuffix}.${ext}`;
 
         const uploadStream = cloudinary.uploader.upload_stream(
             {
                 folder: `${envConfig.cloudinary_upload_path}/career-applications`,
-                resource_type: 'raw' as const,
+                resource_type: "raw" as const,
                 public_id: publicId,
                 use_filename: true,
                 unique_filename: false,
             },
             (error, result) => {
                 if (error || !result) {
-                    reject(error || new Error('Upload failed'));
+                    reject(error || new Error("Upload failed"));
                 } else {
                     resolve({
                         url: result.secure_url,
@@ -67,7 +68,7 @@ async function uploadCV(
                         fileName: file.originalname,
                     });
                 }
-            }
+            },
         );
 
         const readableStream = new Readable();
@@ -79,13 +80,13 @@ async function uploadCV(
 
 // Delete CV from Cloudinary
 async function deleteCV(publicId: string): Promise<void> {
-    await cloudinary.uploader.destroy(publicId, { resource_type: 'raw' });
+    await cloudinary.uploader.destroy(publicId, { resource_type: "raw" });
 }
 
 // Create a new application (public)
 async function createApplication(
     data: CreateApplicationInput,
-    cvFile: Express.Multer.File
+    cvFile: Express.Multer.File,
 ) {
     // Upload CV to Cloudinary
     const cvData = await uploadCV(cvFile);
@@ -122,7 +123,7 @@ async function getAllApplications(filters: GetAllFilters) {
         query.hasExperience = hasExperience;
     }
     if (search) {
-        const searchRegex = { $regex: search, $options: 'i' };
+        const searchRegex = { $regex: escapeRegex(search), $options: "i" };
         query.$or = [
             { firstName: searchRegex },
             { lastName: searchRegex },
@@ -135,7 +136,7 @@ async function getAllApplications(filters: GetAllFilters) {
 
     const [applications, total] = await Promise.all([
         JobApplicationModel.find(query)
-            .populate('jobPosition', 'title company slug')
+            .populate("jobPosition", "title company slug")
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(limit)
@@ -154,7 +155,7 @@ async function getAllApplications(filters: GetAllFilters) {
 // Get application by ID
 async function getApplicationById(id: string) {
     return JobApplicationModel.findById(id)
-        .populate('jobPosition', 'title company slug location deadline')
+        .populate("jobPosition", "title company slug location deadline")
         .lean();
 }
 
@@ -163,7 +164,7 @@ async function updateApplicationStatus(
     id: string,
     status: ApplicationStatus,
     userId: string,
-    notes?: string
+    notes?: string,
 ) {
     const application = await JobApplicationModel.findByIdAndUpdate(
         id,
@@ -173,8 +174,8 @@ async function updateApplicationStatus(
             statusUpdatedAt: new Date(),
             ...(notes !== undefined && { notes }),
         },
-        { new: true }
-    ).populate('jobPosition', 'title company slug');
+        { new: true },
+    ).populate("jobPosition", "title company slug");
 
     // Send email notification if application exists
     if (application) {
@@ -186,11 +187,11 @@ async function updateApplicationStatus(
 
 // Email templates for different statuses
 async function sendStatusEmail(application: any, status: ApplicationStatus) {
-    const { sendMail } = await import('../lib/nodemailer.js');
+    const { sendMail } = await import("../lib/nodemailer.js");
 
     const applicantName = `${application.firstName} ${application.lastName}`;
-    const positionTitle = application.jobPosition?.title || 'the position';
-    const companyName = application.jobPosition?.company || 'Web Briks LLC';
+    const positionTitle = application.jobPosition?.title || "the position";
+    const companyName = application.jobPosition?.company || "Web Briks LLC";
 
     const emailTemplates: Record<
         ApplicationStatus,
@@ -281,10 +282,10 @@ async function sendStatusEmail(application: any, status: ApplicationStatus) {
             body: template.body,
         });
         console.log(
-            `Status email sent to ${application.email} for status: ${status}`
+            `Status email sent to ${application.email} for status: ${status}`,
         );
     } catch (error) {
-        console.error('Error sending status email:', error);
+        console.error("Error sending status email:", error);
         // Don't throw - we don't want email failure to break the status update
     }
 }
@@ -299,7 +300,7 @@ async function deleteApplication(id: string) {
         try {
             await deleteCV(application.cvFile.publicId);
         } catch (error) {
-            console.error('Error deleting CV from Cloudinary:', error);
+            console.error("Error deleting CV from Cloudinary:", error);
         }
     }
 
@@ -318,7 +319,7 @@ async function getApplicationsStats() {
     const stats = await JobApplicationModel.aggregate([
         {
             $group: {
-                _id: '$status',
+                _id: "$status",
                 count: { $sum: 1 },
             },
         },
@@ -327,17 +328,20 @@ async function getApplicationsStats() {
     const experienceStats = await JobApplicationModel.aggregate([
         {
             $group: {
-                _id: '$hasExperience',
+                _id: "$hasExperience",
                 count: { $sum: 1 },
             },
         },
     ]);
 
     return {
-        byStatus: stats.reduce((acc, curr) => {
-            acc[curr._id] = curr.count;
-            return acc;
-        }, {} as Record<string, number>),
+        byStatus: stats.reduce(
+            (acc, curr) => {
+                acc[curr._id] = curr.count;
+                return acc;
+            },
+            {} as Record<string, number>,
+        ),
         byExperience: {
             experienced:
                 experienceStats.find((s) => s._id === true)?.count || 0,

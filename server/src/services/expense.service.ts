@@ -18,6 +18,7 @@ import type {
     ExpenseQueryParams,
     ExpenseStats,
 } from "../types/expense.type.js";
+import { escapeRegex } from "../lib/sanitize.js";
 
 // Aggregation pipeline for expenses with lookups
 const getExpenseAggregationPipeline = (
@@ -137,7 +138,7 @@ const buildMatchStage = (params: ExpenseQueryParams): any => {
     const match: any = {};
 
     if (params.search) {
-        match.title = { $regex: params.search, $options: "i" };
+        match.title = { $regex: escapeRegex(params.search), $options: "i" };
     }
 
     if (params.branchId && Types.ObjectId.isValid(params.branchId)) {

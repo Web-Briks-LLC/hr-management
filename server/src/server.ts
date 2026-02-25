@@ -10,6 +10,8 @@ async function Server() {
     try {
         await connect(mongo_uri);
 
+        console.log("Connected to database successfully.");
+
         const server = createServer(app);
 
         server.listen(envConfig.port, () => {
@@ -17,8 +19,6 @@ async function Server() {
                 `Server is listening the port: http://localhost:${port}`,
             );
         });
-
-        console.log("Connected to database successfully.");
 
         // Start all schedulers (attendance, overtime, leave)
         schedulerService.startAllSchedulers();

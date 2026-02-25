@@ -5,6 +5,7 @@ import AttendanceDayModel from "../models/attendance-day.model.js";
 import type { IShift } from "../types/shift.type.js";
 import StaffModel from "../models/staff.model.js";
 import ShiftOffDateService from "./shift-off-date.service.js";
+import { escapeRegex } from "../lib/sanitize.js";
 
 const checkInInDB = async ({
     userId,
@@ -505,7 +506,7 @@ async function getAllAttendanceFromDB({
     // Search filter: Find users matching name, then find staff, then filter attendance
     if (search) {
         const matchingUsers = await UserModel.find({
-            name: { $regex: search, $options: "i" },
+            name: { $regex: escapeRegex(search), $options: "i" },
         })
             .project({ _id: 1 })
             .toArray();

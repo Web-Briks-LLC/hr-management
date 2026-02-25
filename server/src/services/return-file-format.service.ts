@@ -1,5 +1,6 @@
-import ReturnFileFormatModel from '../models/return-file-format.model.js';
-import type { IReturnFileFormat } from '../types/return-file-format.type.js';
+import ReturnFileFormatModel from "../models/return-file-format.model.js";
+import type { IReturnFileFormat } from "../types/return-file-format.type.js";
+import { escapeRegex } from "../lib/sanitize.js";
 
 async function createReturnFileFormatInDB(data: {
     name: string;
@@ -38,7 +39,7 @@ async function getAllReturnFileFormatsFromDB(options: {
 }
 
 async function getReturnFileFormatByIdFromDB(
-    id: string
+    id: string,
 ): Promise<IReturnFileFormat | null> {
     return ReturnFileFormatModel.findById(id).lean();
 }
@@ -50,7 +51,7 @@ async function updateReturnFileFormatInDB(
         extension?: string;
         description?: string;
         isActive?: boolean;
-    }
+    },
 ): Promise<IReturnFileFormat | null> {
     return ReturnFileFormatModel.findByIdAndUpdate(id, data, {
         new: true,
@@ -59,17 +60,17 @@ async function updateReturnFileFormatInDB(
 }
 
 async function deleteReturnFileFormatFromDB(
-    id: string
+    id: string,
 ): Promise<IReturnFileFormat | null> {
     return ReturnFileFormatModel.findByIdAndDelete(id).lean();
 }
 
 async function checkFormatNameExists(
     name: string,
-    excludeId?: string
+    excludeId?: string,
 ): Promise<boolean> {
     const query: Record<string, unknown> = {
-        name: { $regex: new RegExp(`^${name}$`, 'i') },
+        name: { $regex: new RegExp(`^${escapeRegex(name)}$`, "i") },
     };
     if (excludeId) {
         query._id = { $ne: excludeId };

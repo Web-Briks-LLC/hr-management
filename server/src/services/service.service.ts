@@ -1,5 +1,6 @@
-import ServiceModel from '../models/service.model.js';
-import type { IService } from '../types/service.type.js';
+import ServiceModel from "../models/service.model.js";
+import type { IService } from "../types/service.type.js";
+import { escapeRegex } from "../lib/sanitize.js";
 
 async function createServiceInDB(data: {
     name: string;
@@ -46,7 +47,7 @@ async function updateServiceInDB(
         name?: string;
         description?: string;
         isActive?: boolean;
-    }
+    },
 ): Promise<IService | null> {
     return ServiceModel.findByIdAndUpdate(id, data, {
         new: true,
@@ -60,10 +61,10 @@ async function deleteServiceFromDB(id: string): Promise<IService | null> {
 
 async function checkServiceNameExists(
     name: string,
-    excludeId?: string
+    excludeId?: string,
 ): Promise<boolean> {
     const query: Record<string, unknown> = {
-        name: { $regex: new RegExp(`^${name}$`, 'i') },
+        name: { $regex: new RegExp(`^${escapeRegex(name)}$`, "i") },
     };
     if (excludeId) {
         query._id = { $ne: excludeId };

@@ -1,6 +1,14 @@
-import { model, Schema } from 'mongoose';
+import { model, Schema, Types, type Document } from "mongoose";
 
-const branchSchema = new Schema(
+export interface IBranch extends Document {
+    name: string;
+    code: string;
+    address?: string;
+    isActive: boolean;
+    createdBy: Types.ObjectId;
+}
+
+const branchSchema = new Schema<IBranch>(
     {
         name: {
             type: String,
@@ -29,12 +37,12 @@ const branchSchema = new Schema(
 
         createdBy: {
             type: Schema.Types.ObjectId,
-            ref: 'User',
+            ref: "User",
             required: true,
         },
     },
-    { timestamps: true }
+    { timestamps: true },
 );
 
-const BranchModel = model('Branch', branchSchema);
+const BranchModel = model("Branch", branchSchema);
 export default BranchModel;

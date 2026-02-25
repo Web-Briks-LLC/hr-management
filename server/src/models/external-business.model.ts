@@ -1,5 +1,5 @@
-import { model, Schema } from 'mongoose';
-import type { IExternalBusiness } from '../types/external-business.type.js';
+import { model, Schema } from "mongoose";
+import type { IExternalBusiness } from "../types/external-business.type.js";
 
 const externalBusinessSchema = new Schema<IExternalBusiness>(
     {
@@ -33,17 +33,15 @@ const externalBusinessSchema = new Schema<IExternalBusiness>(
         },
         createdBy: {
             type: Schema.Types.ObjectId,
-            ref: 'User',
+            ref: "User",
             required: true,
         },
     },
     { timestamps: true },
 );
 
-// Compound index for name uniqueness
-
 const ExternalBusinessModel = model<IExternalBusiness>(
-    'ExternalBusiness',
+    "ExternalBusiness",
     externalBusinessSchema,
 );
 export default ExternalBusinessModel;

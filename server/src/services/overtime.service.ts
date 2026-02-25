@@ -3,6 +3,7 @@ import type { PipelineStage } from "mongoose";
 import OvertimeModel from "../models/overtime.model.js";
 import type { IOvertime } from "../types/overtime.type.js";
 import StaffModel from "../models/staff.model.js";
+import { escapeRegex } from "../lib/sanitize.js";
 
 const getOvertimeAggregationPipeline = (
     matchStage: any,
@@ -93,13 +94,13 @@ const getAllOvertimeFromDB = async (query: Record<string, unknown>) => {
     const postMatchStage: any = {};
     if (query.staffId) {
         postMatchStage["staffId.staffId"] = {
-            $regex: query.staffId as string,
+            $regex: escapeRegex(query.staffId as string),
             $options: "i",
         };
     }
     if (query.name) {
         postMatchStage["staffId.name"] = {
-            $regex: query.name as string,
+            $regex: escapeRegex(query.name as string),
             $options: "i",
         };
     }
