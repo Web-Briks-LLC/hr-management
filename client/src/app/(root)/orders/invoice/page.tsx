@@ -1,29 +1,29 @@
-'use client';
+"use client";
 
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect } from "react";
 import {
     useGetOrdersQuery,
     useGetOrderYearsQuery,
-} from '@/redux/features/order/orderApi';
+} from "@/redux/features/order/orderApi";
 import {
     useLazyGetNextInvoiceNumberQuery,
     useSendInvoiceEmailMutation,
-} from '@/redux/features/invoice/invoiceApi';
+} from "@/redux/features/invoice/invoiceApi";
 import {
     Card,
     CardContent,
     CardDescription,
     CardHeader,
     CardTitle,
-} from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import {
     Select,
     SelectContent,
     SelectItem,
     SelectTrigger,
     SelectValue,
-} from '@/components/ui/select';
+} from "@/components/ui/select";
 import {
     Table,
     TableBody,
@@ -31,62 +31,62 @@ import {
     TableHead,
     TableHeader,
     TableRow,
-} from '@/components/ui/table';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, FileText, Mail, Loader } from 'lucide-react';
-import { format } from 'date-fns';
-import Link from 'next/link';
-import type { IOrder, OrderStatus } from '@/types/order.type';
-import type { Client } from '@/types/client.type';
-import dynamic from 'next/dynamic';
-import { pdf } from '@react-pdf/renderer';
-import { InvoiceDocument } from '@/components/invoice/InvoicePDF';
-import { toast } from 'sonner';
+} from "@/components/ui/table";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ArrowLeft, FileText, Mail, Loader } from "lucide-react";
+import { format } from "date-fns";
+import Link from "next/link";
+import type { IOrder, OrderStatus } from "@/types/order.type";
+import type { Client } from "@/types/client.type";
+import dynamic from "next/dynamic";
+import { pdf } from "@react-pdf/renderer";
+import { InvoiceDocument } from "@/components/invoice/InvoicePDF";
+import { toast } from "sonner";
 
 // Dynamically import the PDF component to avoid SSR issues
-const InvoicePDF = dynamic(() => import('@/components/invoice/InvoicePDF'), {
+const InvoicePDF = dynamic(() => import("@/components/invoice/InvoicePDF"), {
     ssr: false,
     loading: () => <span>Loading PDF generator...</span>,
 });
 
 const statusLabels: Record<OrderStatus, string> = {
-    pending: 'Pending',
-    in_progress: 'In Progress',
-    quality_check: 'Quality Check',
-    revision: 'Revision',
-    completed: 'Completed',
-    delivered: 'Delivered',
-    cancelled: 'Cancelled',
+    pending: "Pending",
+    in_progress: "In Progress",
+    quality_check: "Quality Check",
+    revision: "Revision",
+    completed: "Completed",
+    delivered: "Delivered",
+    cancelled: "Cancelled",
 };
 
 const months = [
-    { value: '1', label: 'January' },
-    { value: '2', label: 'February' },
-    { value: '3', label: 'March' },
-    { value: '4', label: 'April' },
-    { value: '5', label: 'May' },
-    { value: '6', label: 'June' },
-    { value: '7', label: 'July' },
-    { value: '8', label: 'August' },
-    { value: '9', label: 'September' },
-    { value: '10', label: 'October' },
-    { value: '11', label: 'November' },
-    { value: '12', label: 'December' },
+    { value: "1", label: "January" },
+    { value: "2", label: "February" },
+    { value: "3", label: "March" },
+    { value: "4", label: "April" },
+    { value: "5", label: "May" },
+    { value: "6", label: "June" },
+    { value: "7", label: "July" },
+    { value: "8", label: "August" },
+    { value: "9", label: "September" },
+    { value: "10", label: "October" },
+    { value: "11", label: "November" },
+    { value: "12", label: "December" },
 ];
 
 export default function InvoicePage() {
     const currentDate = new Date();
-    const [selectedYear, setSelectedYear] = useState<string>('');
+    const [selectedYear, setSelectedYear] = useState<string>("");
     const [selectedMonth, setSelectedMonth] = useState<string>(
         String(currentDate.getMonth() + 1),
     );
-    const [selectedClientId, setSelectedClientId] = useState<string>('');
+    const [selectedClientId, setSelectedClientId] = useState<string>("");
     const [selectedOrders, setSelectedOrders] = useState<Set<string>>(
         new Set(),
     );
-    const [invoiceNumber, setInvoiceNumber] = useState<string>('');
+    const [invoiceNumber, setInvoiceNumber] = useState<string>("");
     const [showPDF, setShowPDF] = useState(false);
 
     const [sendInvoiceEmail, { isLoading: isSending }] =
@@ -101,7 +101,10 @@ export default function InvoicePage() {
     // Fetch available years from database
     const { data: yearsData, isLoading: isLoadingYears } =
         useGetOrderYearsQuery();
-    const years = yearsData?.data?.map(String) || [];
+    const years = useMemo(
+        () => yearsData?.data?.map(String) || [],
+        [yearsData],
+    );
 
     // Auto-select first year when years load
     useEffect(() => {
@@ -123,7 +126,7 @@ export default function InvoicePage() {
             { skip: !selectedYear },
         );
 
-    const allOrders = allOrdersData?.data || [];
+    const allOrders = useMemo(() => allOrdersData?.data || [], [allOrdersData]);
 
     // Extract unique clients from orders
     const availableClients = useMemo(() => {
@@ -145,10 +148,10 @@ export default function InvoicePage() {
                     _id: order.clientId._id,
                     name: order.clientId.name,
                     clientId: order.clientId.clientId,
-                    currency: (order.clientId as any).currency,
-                    address: (order.clientId as any).address,
-                    officeAddress: (order.clientId as any).officeAddress,
-                    email: (order.clientId as any).email,
+                    currency: order.clientId.currency,
+                    address: order.clientId.address,
+                    officeAddress: order.clientId.officeAddress,
+                    email: order.clientId.email,
                 });
             }
         });
@@ -215,13 +218,13 @@ export default function InvoicePage() {
                 // Smooth scroll to PDF section
                 setTimeout(() => {
                     pdfSectionRef.current?.scrollIntoView({
-                        behavior: 'smooth',
-                        block: 'start',
+                        behavior: "smooth",
+                        block: "start",
                     });
                 }, 100);
             }
         } catch (error) {
-            console.error('Failed to generate invoice number:', error);
+            console.error("Failed to generate invoice number:", error);
         }
     };
 
@@ -229,9 +232,9 @@ export default function InvoicePage() {
         if (selectedOrders.size === 0 || !selectedClient) return;
 
         // Check email first
-        const clientEmail = (selectedClient as any).email;
+        const clientEmail = selectedClient.email;
         if (!clientEmail) {
-            toast.error('Client email is missing.');
+            toast.error("Client email is missing.");
             return;
         }
 
@@ -244,18 +247,19 @@ export default function InvoicePage() {
                     currentInvoiceNumber = result.formattedInvoiceNumber;
                     setInvoiceNumber(currentInvoiceNumber);
                 } else {
-                    throw new Error('Failed to generate invoice number');
+                    throw new Error("Failed to generate invoice number");
                 }
             }
 
             const fileName = `Invoice_${selectedClient.clientId}_${selectedMonth}_${selectedYear}.pdf`;
+
             const blob = await pdf(
                 <InvoiceDocument
                     client={selectedClient as Client}
                     orders={selectedOrdersList}
                     month={
                         months.find((m) => m.value === selectedMonth)?.label ||
-                        ''
+                        ""
                     }
                     year={selectedYear}
                     invoiceNumber={currentInvoiceNumber}
@@ -264,34 +268,32 @@ export default function InvoicePage() {
             ).toBlob();
 
             const formData = new FormData();
-            formData.append('file', blob, fileName);
-            formData.append('to', clientEmail);
-            formData.append('clientName', selectedClient.name);
+            formData.append("file", blob, fileName);
+            formData.append("to", clientEmail);
+            formData.append("clientName", selectedClient.name);
             formData.append(
-                'month',
-                months.find((m) => m.value === selectedMonth)?.label || '',
+                "month",
+                months.find((m) => m.value === selectedMonth)?.label || "",
             );
-            formData.append('year', selectedYear);
+            formData.append("year", selectedYear);
 
             const result = await sendInvoiceEmail(formData).unwrap();
 
             if (result.success) {
-                toast.success('Invoice sent successfully to ' + clientEmail);
+                toast.success("Invoice sent successfully to " + clientEmail);
             } else {
-                throw new Error(result.message || 'Failed to send email');
+                throw new Error(result.message || "Failed to send email");
             }
-        } catch (error: any) {
-            console.error('Error sending email:', error);
-            toast.error(
-                error.data?.message || error.message || 'Failed to send email',
-            );
+        } catch (error) {
+            console.error("Error sending email:", error);
+            toast.error((error as Error).message || "Failed to send email");
         }
     };
 
     const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat('en-US', {
-            style: 'currency',
-            currency: (selectedClient as any)?.currency || 'USD',
+        return new Intl.NumberFormat("en-US", {
+            style: "currency",
+            currency: selectedClient?.currency || "USD",
         }).format(amount);
     };
 
@@ -332,7 +334,7 @@ export default function InvoicePage() {
                                     value={selectedYear}
                                     onValueChange={(value) => {
                                         setSelectedYear(value);
-                                        setSelectedClientId('');
+                                        setSelectedClientId("");
                                         setSelectedOrders(new Set());
                                         setShowPDF(false);
                                     }}
@@ -341,8 +343,8 @@ export default function InvoicePage() {
                                         <SelectValue
                                             placeholder={
                                                 years.length === 0
-                                                    ? 'No orders found'
-                                                    : 'Select year'
+                                                    ? "No orders found"
+                                                    : "Select year"
                                             }
                                         />
                                     </SelectTrigger>
@@ -364,7 +366,7 @@ export default function InvoicePage() {
                                 value={selectedMonth}
                                 onValueChange={(value) => {
                                     setSelectedMonth(value);
-                                    setSelectedClientId('');
+                                    setSelectedClientId("");
                                     setSelectedOrders(new Set());
                                     setShowPDF(false);
                                 }}
@@ -405,8 +407,8 @@ export default function InvoicePage() {
                                         <SelectValue
                                             placeholder={
                                                 availableClients.length === 0
-                                                    ? 'No clients found'
-                                                    : 'Select a client'
+                                                    ? "No clients found"
+                                                    : "Select a client"
                                             }
                                         />
                                     </SelectTrigger>
@@ -447,7 +449,7 @@ export default function InvoicePage() {
                                 ) : (
                                     <Mail className="h-4 w-4 " />
                                 )}
-                                {isSending ? 'Sending...' : 'Send'}
+                                {isSending ? "Processing..." : "Send"}
                             </Button>
                             <Button
                                 onClick={handleGenerateInvoice}
@@ -464,7 +466,7 @@ export default function InvoicePage() {
                                     <FileText className="h-4 w-4 " />
                                 )}
                                 {isGeneratingInvoice
-                                    ? 'Generating...'
+                                    ? "Generating..."
                                     : `Generate Invoice (${selectedOrders.size})`}
                             </Button>
                         </div>
@@ -480,12 +482,12 @@ export default function InvoicePage() {
                             <div>
                                 <CardTitle>Orders</CardTitle>
                                 <CardDescription>
-                                    {selectedClient?.name} -{' '}
+                                    {selectedClient?.name} -{" "}
                                     {
                                         months.find(
                                             (m) => m.value === selectedMonth,
                                         )?.label
-                                    }{' '}
+                                    }{" "}
                                     {selectedYear}
                                 </CardDescription>
                             </div>
@@ -495,7 +497,7 @@ export default function InvoicePage() {
                                         Selected: {selectedOrders.size} orders
                                     </p>
                                     <p className="font-semibold">
-                                        Total:{' '}
+                                        Total:{" "}
                                         {formatCurrency(totals.totalAmount)}
                                     </p>
                                 </div>
@@ -553,8 +555,8 @@ export default function InvoicePage() {
                                                     selectedOrders.has(
                                                         order._id,
                                                     )
-                                                        ? 'bg-muted/50'
-                                                        : ''
+                                                        ? "bg-muted/50"
+                                                        : ""
                                                 }
                                             >
                                                 <TableCell className="border">
@@ -580,7 +582,7 @@ export default function InvoicePage() {
                                                         new Date(
                                                             order.orderDate,
                                                         ),
-                                                        'MMM dd, yyyy',
+                                                        "MMM dd, yyyy",
                                                     )}
                                                 </TableCell>
                                                 <TableCell className="border">
@@ -623,7 +625,7 @@ export default function InvoicePage() {
                         orders={selectedOrdersList}
                         month={
                             months.find((m) => m.value === selectedMonth)
-                                ?.label || ''
+                                ?.label || ""
                         }
                         year={selectedYear}
                         invoiceNumber={invoiceNumber}

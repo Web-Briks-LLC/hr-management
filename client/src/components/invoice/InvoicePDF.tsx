@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import {
     Document,
@@ -11,79 +11,79 @@ import {
     PDFDownloadLink,
     Font,
     pdf,
-} from '@react-pdf/renderer';
-import type { IOrder } from '@/types/order.type';
-import type { Client } from '@/types/client.type';
-import { format } from 'date-fns';
-import { Button } from '@/components/ui/button';
-import { Download, Mail } from 'lucide-react';
-import { toast } from 'sonner';
-import { useSendInvoiceEmailMutation } from '@/redux/features/invoice/invoiceApi';
+    Link,
+} from "@react-pdf/renderer";
+import type { IOrder } from "@/types/order.type";
+import type { Client } from "@/types/client.type";
+import {
+    useSendInvoiceEmailMutation,
+    useRecordInvoiceMutation,
+} from "@/redux/features/invoice/invoiceApi";
 
 // Register fonts if needed (optional)
 Font.register({
-    family: 'Open Sans',
+    family: "Open Sans",
     fonts: [
         {
-            src: 'https://cdn.jsdelivr.net/npm/open-sans-all@0.1.3/fonts/open-sans-regular.ttf',
+            src: "https://cdn.jsdelivr.net/npm/open-sans-all@0.1.3/fonts/open-sans-regular.ttf",
         },
         {
-            src: 'https://cdn.jsdelivr.net/npm/open-sans-all@0.1.3/fonts/open-sans-600.ttf',
+            src: "https://cdn.jsdelivr.net/npm/open-sans-all@0.1.3/fonts/open-sans-600.ttf",
             fontWeight: 600,
         },
         {
-            src: 'https://cdn.jsdelivr.net/npm/open-sans-all@0.1.3/fonts/open-sans-700.ttf',
+            src: "https://cdn.jsdelivr.net/npm/open-sans-all@0.1.3/fonts/open-sans-700.ttf",
             fontWeight: 700,
         },
     ],
 });
 
 const colors = {
-    orange: '#FF8A00',
-    teal: '#009999',
-    gray: '#464646',
-    lightGray: '#F0F0F0',
-    white: '#FFFFFF',
-    border: '#E0E0E0',
+    orange: "#FF8A00",
+    teal: "#009999",
+    gray: "#464646",
+    lightGray: "#F0F0F0",
+    white: "#FFFFFF",
+    border: "#E0E0E0",
 };
 
 const styles = StyleSheet.create({
     page: {
-        flexDirection: 'column',
-        backgroundColor: '#FFFFFF',
-        fontFamily: 'Helvetica',
+        flexDirection: "column",
+        backgroundColor: "#FFFFFF",
+        fontFamily: "Helvetica",
         paddingBottom: 60, // Space for footer
     },
     // Top Orange Bar
     topBar: {
         height: 8,
         backgroundColor: colors.orange,
-        width: '100%',
+        width: "100%",
         marginBottom: 20, // Adds gap on all pages (especially needed for page 2+)
     },
     // Header Section
     headerContainer: {
         marginHorizontal: 40,
         marginTop: 10, // Reduced from 30 to account for topBar.marginBottom
-        flexDirection: 'row',
-        justifyContent: 'space-between',
+        flexDirection: "row",
+        justifyContent: "space-between",
         height: 100, // Fixed height for header area
     },
     logoContainer: {
         width: 150,
         height: 70,
-        justifyContent: 'center',
+        justifyContent: "center",
     },
     logo: {
-        width: '100%',
-        objectFit: 'contain',
+        width: "100%",
+        objectFit: "contain",
     },
     invoiceDetailsContainer: {
-        alignItems: 'flex-end',
+        alignItems: "flex-end",
     },
     invoiceTitle: {
         fontSize: 32,
-        fontWeight: 'bold', // Helvetica bold
+        fontWeight: "bold", // Helvetica bold
         color: colors.teal,
         marginBottom: 5,
     },
@@ -101,20 +101,20 @@ const styles = StyleSheet.create({
 
     // Bill From / Bill To Section
     addressContainer: {
-        flexDirection: 'row',
+        flexDirection: "row",
         marginHorizontal: 40,
         marginTop: 40,
-        justifyContent: 'space-between',
+        justifyContent: "space-between",
         gap: 30, // Gap between boxes
     },
     addressBox: {
         flex: 1,
-        flexDirection: 'row', // For the left accent bar
+        flexDirection: "row", // For the left accent bar
         height: 90, // Fixed height or minHeight
     },
     accentBar: {
         width: 8,
-        height: '100%',
+        height: "100%",
     },
     addressContent: {
         flex: 1,
@@ -143,7 +143,7 @@ const styles = StyleSheet.create({
 
     boxTitle: {
         fontSize: 11,
-        fontWeight: 'bold',
+        fontWeight: "bold",
         marginBottom: 10,
     },
     boxText: {
@@ -161,21 +161,21 @@ const styles = StyleSheet.create({
         borderColor: colors.border,
     },
     tableHeader: {
-        flexDirection: 'row',
+        flexDirection: "row",
         backgroundColor: colors.teal,
     },
     tableHeaderText: {
         color: colors.white,
         fontSize: 9,
-        fontWeight: 'bold',
-        textAlign: 'center',
+        fontWeight: "bold",
+        textAlign: "center",
         paddingVertical: 8,
         borderRightWidth: 0.5,
         borderBottomWidth: 0.5,
         borderColor: colors.border,
     },
     tableRow: {
-        flexDirection: 'row',
+        flexDirection: "row",
     },
     tableRowEven: {
         backgroundColor: colors.lightGray,
@@ -183,7 +183,7 @@ const styles = StyleSheet.create({
     tableCell: {
         fontSize: 9,
         color: colors.gray,
-        textAlign: 'center',
+        textAlign: "center",
         paddingVertical: 8,
         borderRightWidth: 0.5,
         borderBottomWidth: 0.5,
@@ -191,73 +191,120 @@ const styles = StyleSheet.create({
     },
 
     // Column Widths
-    colNo: { width: '8%' },
-    colDate: { width: '17%' },
-    colName: { width: '35%', textAlign: 'left', paddingLeft: 5 },
-    colQty: { width: '10%' },
-    colRate: { width: '15%' },
-    colTotal: { width: '15%' },
+    colNo: { width: "8%" },
+    colDate: { width: "17%" },
+    colName: { width: "35%", textAlign: "left", paddingLeft: 5 },
+    colQty: { width: "10%" },
+    colRate: { width: "15%" },
+    colTotal: { width: "15%" },
 
     // Total Section
     totalContainer: {
-        flexDirection: 'row',
-        justifyContent: 'flex-end',
+        flexDirection: "row",
+        justifyContent: "flex-end",
         marginTop: 25,
         marginHorizontal: 40,
     },
     totalBox: {
         width: 180,
         height: 40,
-        flexDirection: 'row',
+        flexDirection: "row",
         backgroundColor: colors.orange,
     },
     totalAccent: {
         width: 8,
-        height: '100%',
+        height: "100%",
         backgroundColor: colors.teal,
     },
     totalContent: {
         flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
         paddingHorizontal: 15,
     },
     totalLabel: {
         color: colors.white,
         fontSize: 10,
-        fontWeight: 'bold',
+        fontWeight: "bold",
     },
     totalValue: {
         color: colors.white,
         fontSize: 12,
-        fontWeight: 'bold',
+        fontWeight: "bold",
     },
 
     // Footer Section
     footer: {
-        position: 'absolute',
+        position: "absolute",
         bottom: 0,
         left: 0,
         right: 0,
         height: 30,
         backgroundColor: colors.teal,
-        justifyContent: 'center',
-        alignItems: 'center',
+        justifyContent: "center",
+        alignItems: "center",
     },
     footerText: {
         fontSize: 9,
         color: colors.white,
-        textAlign: 'center',
+        textAlign: "center",
     },
 
     // Page number
     pageNumber: {
-        position: 'absolute',
+        position: "absolute",
         bottom: 35,
         right: 40,
         fontSize: 8,
         color: colors.gray,
+    },
+
+    // Pay Now Section
+    payNowSection: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginHorizontal: 40,
+        marginTop: 30,
+        paddingTop: 15,
+        borderTopWidth: 1,
+        borderTopColor: colors.border,
+        borderBottomWidth: 1,
+        borderBottomColor: colors.border,
+        paddingBottom: 15,
+        backgroundColor: "#fdfdfd",
+        paddingHorizontal: 15,
+        borderRadius: 4,
+    },
+    payNowTextContainer: {
+        flex: 1,
+        paddingRight: 20,
+    },
+    payNowHeading: {
+        fontSize: 10,
+        fontWeight: "bold",
+        color: colors.teal,
+        marginBottom: 4,
+    },
+    payNowDescription: {
+        fontSize: 8,
+        color: colors.gray,
+        lineHeight: 1.4,
+    },
+    payNowButtonContainer: {
+        width: 140,
+    },
+    payNowButton: {
+        backgroundColor: colors.teal,
+        paddingVertical: 10,
+        borderRadius: 4,
+    },
+    payNowText: {
+        color: colors.white,
+        fontSize: 10,
+        fontWeight: "bold",
+        textAlign: "center",
     },
 });
 
@@ -301,7 +348,7 @@ const TableRow = ({
     >
         <Text style={[styles.tableCell, styles.colNo]}>{index + 1}</Text>
         <Text style={[styles.tableCell, styles.colDate]}>
-            {format(new Date(order.orderDate), 'MMM do, yyyy')}
+            {format(new Date(order.orderDate), "MMM do, yyyy")}
         </Text>
         <Text style={[styles.tableCell, styles.colName]}>
             {order.orderName}
@@ -321,21 +368,64 @@ const TableRow = ({
 export const InvoiceDocument = ({
     client,
     orders,
-    month,
-    year,
     totals,
     invoiceNumber,
 }: InvoicePDFProps) => {
-    const issueDate = format(new Date(), 'MMMM do, yyyy');
+    const issueDate = format(new Date(), "MMMM do, yyyy");
     const logoUrl =
-        'https://res.cloudinary.com/dny7zfbg9/image/upload/v1755954483/mqontecf1xao7znsh6cx.png';
+        "https://res.cloudinary.com/dny7zfbg9/image/upload/v1755954483/mqontecf1xao7znsh6cx.png";
 
     const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat('en-US', {
-            style: 'currency',
-            currency: client.currency || 'USD',
+        return new Intl.NumberFormat("en-US", {
+            style: "currency",
+            currency: client.currency || "USD",
         }).format(amount);
     };
+
+    const calculatedDueDate = new Date(
+        new Date().getTime() + 7 * 24 * 60 * 60 * 1000,
+    ).toISOString();
+
+    const paymentPayload = {
+        invoiceNumber,
+        clientName: client.name,
+        clientId: client.clientId,
+        clientAddress: client.address || client.officeAddress || "N/A",
+        totalAmount: totals.totalAmount,
+        currency: client.currency || "USD",
+        dueDate: calculatedDueDate,
+        items: orders.map((order) => ({
+            name: order.orderName,
+            price: order.perImagePrice * order.imageQuantity,
+            quantity: order.imageQuantity,
+        })),
+    };
+
+    const encodeBase64Url = (payload: Record<string, unknown>) => {
+        try {
+            if (typeof window !== "undefined") {
+                const str = JSON.stringify(payload);
+                const encoded = btoa(
+                    encodeURIComponent(str).replace(
+                        /%([0-9A-F]{2})/g,
+                        (_, p1) => String.fromCharCode(parseInt(p1, 16)),
+                    ),
+                );
+                return encoded
+                    .replace(/\+/g, "-")
+                    .replace(/\//g, "_")
+                    .replace(/=+$/, "");
+            } else {
+                return Buffer.from(JSON.stringify(payload)).toString(
+                    "base64url",
+                );
+            }
+        } catch {
+            return "";
+        }
+    };
+
+    const encodedData = encodeBase64Url(paymentPayload);
 
     return (
         <Document>
@@ -399,12 +489,12 @@ export const InvoiceDocument = ({
                                 {client.name}
                             </Text>
                             <Text style={[styles.boxText, styles.billToText]}>
-                                {client.address && client.address !== 'N/A'
+                                {client.address && client.address !== "N/A"
                                     ? client.address
                                     : client.officeAddress &&
-                                        client.officeAddress !== 'N/A'
+                                        client.officeAddress !== "N/A"
                                       ? client.officeAddress
-                                      : 'Address not provided'}
+                                      : "Address not provided"}
                             </Text>
                         </View>
                     </View>
@@ -436,6 +526,33 @@ export const InvoiceDocument = ({
                     </View>
                 </View>
 
+                {/* Pay Now Section */}
+                <View style={styles.payNowSection} wrap={false}>
+                    <View style={styles.payNowTextContainer}>
+                        <Text style={styles.payNowHeading}>
+                            SECURE ONLINE PAYMENT
+                        </Text>
+                        <Text style={styles.payNowDescription}>
+                            We accept secure online payments via Credit Card,
+                            Debit Card, and PayPal. Click the button to view
+                            your invoice and pay instantly through our protected
+                            portal.
+                        </Text>
+                    </View>
+                    <View style={styles.payNowButtonContainer}>
+                        <Link
+                            src={`${process.env.NEXT_PUBLIC_PAYMENT_URL || "http://localhost:3002"}/payment/${invoiceNumber}?data=${encodedData}`}
+                            style={{ textDecoration: "none" }}
+                        >
+                            <View style={styles.payNowButton}>
+                                <Text style={styles.payNowText}>
+                                    PAY INVOICE
+                                </Text>
+                            </View>
+                        </Link>
+                    </View>
+                </View>
+
                 {/* Footer */}
                 <View style={styles.footer} fixed>
                     <Text style={styles.footerText}>
@@ -458,20 +575,20 @@ export const InvoiceDocument = ({
 };
 
 export default function InvoicePDF(props: InvoicePDFProps) {
-    const fileName = `Invoice_${props.client.clientId}_${props.month}_${props.year}.pdf`;
     const [sendInvoiceEmail, { isLoading: isSending }] =
         useSendInvoiceEmailMutation();
+    const [recordInvoice] = useRecordInvoiceMutation();
 
     const handleSendEmail = async () => {
         if (!props.client.email && !props.client.officeAddress) {
-            toast.error('Client email not found');
+            toast.error("Client email not found");
             return;
         }
 
         // Use provided email or fallback to a placeholder/display error if crucial
-        const clientEmail = props.client.email || '';
+        const clientEmail = props.client.email || "";
         if (!clientEmail) {
-            toast.error('Client email is missing.');
+            toast.error("Client email is missing.");
             return;
         }
 
@@ -479,24 +596,42 @@ export default function InvoicePDF(props: InvoicePDFProps) {
             const blob = await pdf(<InvoiceDocument {...props} />).toBlob();
 
             const formData = new FormData();
-            formData.append('file', blob, fileName);
-            formData.append('to', clientEmail);
-            formData.append('clientName', props.client.name);
-            formData.append('month', props.month);
-            formData.append('year', props.year);
+            formData.append("file", blob, fileName);
+            formData.append("to", clientEmail);
+            formData.append("clientName", props.client.name);
+            formData.append("month", props.month);
+            formData.append("year", props.year);
 
             const result = await sendInvoiceEmail(formData).unwrap();
 
-            if (result.success) {
-                toast.success('Invoice sent successfully to ' + clientEmail);
-            } else {
-                throw new Error(result.message || 'Failed to send email');
-            }
-        } catch (error: any) {
-            console.error('Error sending email:', error);
-            toast.error(
-                error.data?.message || error.message || 'Failed to send email',
+            // Record the invoice in the database as well
+            await recordInvoice({
+                invoiceNumber: props.invoiceNumber,
+                clientName: props.client.name,
+                clientId: props.client.clientId,
+                clientAddress:
+                    props.client.address || props.client.officeAddress || "N/A",
+                totalAmount: props.totals.totalAmount,
+                currency: props.client.currency || "USD",
+                dueDate: new Date(
+                    new Date().getTime() + 7 * 24 * 60 * 60 * 1000,
+                ).toISOString(),
+                month: Number(props.month),
+                year: Number(props.year),
+                items: props.orders.map((order) => ({
+                    name: order.orderName,
+                    price: order.perImagePrice * order.imageQuantity,
+                    quantity: order.imageQuantity,
+                })),
+            }).unwrap();
+
+            // RTK Query throws on non-200 responses, so reaching here implies success.
+            toast.success(
+                result.message || "Invoice sent successfully to " + clientEmail,
             );
+        } catch (error) {
+            console.error("Error sending email:", error);
+            toast.error((error as Error).message || "Failed to send email");
         }
     };
 
@@ -509,7 +644,7 @@ export default function InvoicePDF(props: InvoicePDFProps) {
                     onClick={handleSendEmail}
                 >
                     <Mail className="h-4 w-4 " />
-                    {isSending ? 'Sending...' : 'Send to Client'}
+                    {isSending ? "Sending..." : "Send to Client"}
                 </Button>
                 <PDFDownloadLink
                     document={<InvoiceDocument {...props} />}
@@ -521,7 +656,7 @@ export default function InvoicePDF(props: InvoicePDFProps) {
                             disabled={loading || isSending}
                         >
                             <Download className="h-4 w-4 " />
-                            {loading ? 'Generating PDF...' : 'Download PDF'}
+                            {loading ? "Generating PDF..." : "Download PDF"}
                         </Button>
                     )}
                 </PDFDownloadLink>

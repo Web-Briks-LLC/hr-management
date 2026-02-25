@@ -1,152 +1,157 @@
-import { Router } from 'express';
-import { staffRoute } from './staff.route.js';
-import { userRoute } from './user.route.js';
-import { shiftRoute } from './shift.route.js';
-import { branchRoute } from './branch.route.js';
-import { attendanceRoute } from './attendance.route.js';
-import { ShiftAssignmentRoute } from './shift-assignment.route.js';
-import OvertimeRoutes from './overtime.route.js';
-import { dashboardRoute } from './dashboard.route.js';
-import { invitationRoute } from './invitation.route.js';
-import { analyticsRoute } from './analytics.route.js';
-import { notificationRoute } from './notification.route.js';
-import { expenseRoute } from './expense.route.js';
-import { clientRoute } from './client.route.js';
-import { orderRoute } from './order.route.js';
-import { serviceRoute } from './service.route.js';
-import { returnFileFormatRoute } from './return-file-format.route.js';
-import { earningRoute } from './earning.route.js';
-import { metadataRoute } from './metadata.route.js';
-import { profitShareRoute } from './profit-share.route.js';
-import { debitRoute } from './debit.route.js';
-import invoiceRoute from './invoice.route.js';
-import { leaveRoute } from './leave.route.js';
-import { noticeRoute } from './notice.route.js';
-import externalBusinessRoute from './external-business.routes.js';
-import { careerRoute } from './career.route.js';
-import { currencyRateRoute } from './currency-rate.route.js';
-import { payrollRoute } from './payroll.routes.js';
-import shiftOffDateRoute from './shift-off-date.route.js';
-import payrollBankSettingsRoute from './payroll-bank-settings.route.js';
+import { Router } from "express";
+import { staffRoute } from "./staff.route.js";
+import { userRoute } from "./user.route.js";
+import { shiftRoute } from "./shift.route.js";
+import { branchRoute } from "./branch.route.js";
+import { attendanceRoute } from "./attendance.route.js";
+import { ShiftAssignmentRoute } from "./shift-assignment.route.js";
+import OvertimeRoutes from "./overtime.route.js";
+import { dashboardRoute } from "./dashboard.route.js";
+import { invitationRoute } from "./invitation.route.js";
+import { analyticsRoute } from "./analytics.route.js";
+import { notificationRoute } from "./notification.route.js";
+import { expenseRoute } from "./expense.route.js";
+import { clientRoute } from "./client.route.js";
+import { orderRoute } from "./order.route.js";
+import { serviceRoute } from "./service.route.js";
+import { returnFileFormatRoute } from "./return-file-format.route.js";
+import { earningRoute } from "./earning.route.js";
+import { metadataRoute } from "./metadata.route.js";
+import { profitShareRoute } from "./profit-share.route.js";
+import { debitRoute } from "./debit.route.js";
+import invoiceRoute from "./invoice.route.js";
+import { leaveRoute } from "./leave.route.js";
+import { noticeRoute } from "./notice.route.js";
+import externalBusinessRoute from "./external-business.routes.js";
+import { careerRoute } from "./career.route.js";
+import { currencyRateRoute } from "./currency-rate.route.js";
+import { payrollRoute } from "./payroll.routes.js";
+import shiftOffDateRoute from "./shift-off-date.route.js";
+import payrollBankSettingsRoute from "./payroll-bank-settings.route.js";
+import paymentRoute from "./payment.route.js";
 
 const router: Router = Router();
 
 const moduleRoutes = [
     {
-        path: '/users',
+        path: "/users",
         route: userRoute,
     },
     {
-        path: '/staffs',
+        path: "/staffs",
         route: staffRoute,
     },
     {
-        path: '/branches',
+        path: "/branches",
         route: branchRoute,
     },
     {
-        path: '/shifts',
+        path: "/shifts",
         route: shiftRoute,
     },
     {
-        path: '/shift-off-dates',
+        path: "/shift-off-dates",
         route: shiftOffDateRoute,
     },
     {
-        path: '/payroll-bank-settings',
+        path: "/payroll-bank-settings",
         route: payrollBankSettingsRoute,
     },
     {
-        path: '/shift-assignments',
+        path: "/shift-assignments",
         route: ShiftAssignmentRoute,
     },
     {
-        path: '/attendance',
+        path: "/attendance",
         route: attendanceRoute,
     },
     {
-        path: '/overtime',
+        path: "/overtime",
         route: OvertimeRoutes,
     },
     {
-        path: '/dashboard',
+        path: "/dashboard",
         route: dashboardRoute,
     },
     {
-        path: '/invitations',
+        path: "/invitations",
         route: invitationRoute,
     },
     {
-        path: '/analytics',
+        path: "/analytics",
         route: analyticsRoute,
     },
     {
-        path: '/notifications',
+        path: "/notifications",
         route: notificationRoute,
     },
     {
-        path: '/expenses',
+        path: "/expenses",
         route: expenseRoute,
     },
     {
-        path: '/clients',
+        path: "/clients",
         route: clientRoute,
     },
     {
-        path: '/orders',
+        path: "/orders",
         route: orderRoute,
     },
     {
-        path: '/services',
+        path: "/services",
         route: serviceRoute,
     },
     {
-        path: '/return-file-formats',
+        path: "/return-file-formats",
         route: returnFileFormatRoute,
     },
     {
-        path: '/earnings',
+        path: "/earnings",
         route: earningRoute,
     },
     {
-        path: '/metadata',
+        path: "/metadata",
         route: metadataRoute,
     },
     {
-        path: '/profit-share',
+        path: "/profit-share",
         route: profitShareRoute,
     },
     {
-        path: '/debits',
+        path: "/debits",
         route: debitRoute,
     },
     {
-        path: '/invoices',
+        path: "/invoices",
         route: invoiceRoute,
     },
     {
-        path: '/leave',
+        path: "/leave",
         route: leaveRoute,
     },
     {
-        path: '/notices',
+        path: "/notices",
         route: noticeRoute,
     },
     {
-        path: '/external-business',
+        path: "/external-business",
         route: externalBusinessRoute,
     },
     {
-        path: '/careers',
+        path: "/careers",
         route: careerRoute,
     },
     {
-        path: '/currency-rates',
+        path: "/currency-rates",
         route: currencyRateRoute,
     },
     {
-        path: '/payroll',
+        path: "/payroll",
         route: payrollRoute,
+    },
+    {
+        path: "/payments",
+        route: paymentRoute,
     },
 ];
 

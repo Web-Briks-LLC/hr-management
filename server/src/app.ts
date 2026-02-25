@@ -47,10 +47,22 @@ app.use(
             (req.method === "POST" &&
                 req.path === "/careers/applications/public");
 
+        // Allow public access to invoice portals
+        const isPublicInvoiceRoute =
+            (req.method === "GET" && /^\/invoices\/public\//.test(req.path)) ||
+            (req.method === "POST" && /^\/invoices\/record\/?$/.test(req.path));
+
+        // Allow public access to create/confirm payments
+        const isPublicPaymentRoute =
+            req.method === "POST" &&
+            /^\/payments\/(create-intent|confirm)$/.test(req.path);
+
         if (
             isPublicInvitationRoute ||
             isPublicMetadataRoute ||
-            isPublicCareerRoute
+            isPublicCareerRoute ||
+            isPublicInvoiceRoute ||
+            isPublicPaymentRoute
         ) {
             return next();
         }

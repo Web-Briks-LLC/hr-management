@@ -1,13 +1,13 @@
 export type OrderStatus =
-    | 'pending'
-    | 'in_progress'
-    | 'quality_check'
-    | 'revision'
-    | 'completed'
-    | 'delivered'
-    | 'cancelled';
+    | "pending"
+    | "in_progress"
+    | "quality_check"
+    | "revision"
+    | "completed"
+    | "delivered"
+    | "cancelled";
 
-export type OrderPriority = 'low' | 'normal' | 'high' | 'urgent';
+export type OrderPriority = "low" | "normal" | "high" | "urgent";
 
 export interface IService {
     _id: string;
@@ -53,6 +53,9 @@ export interface IOrder {
         clientId: string;
         name: string;
         email: string;
+        currency?: string;
+        address?: string;
+        officeAddress?: string;
     };
     orderDate: string;
     deadline: string;
@@ -83,7 +86,7 @@ export interface IOrder {
     revisionCount: number;
     isLegacy?: boolean; // Flag for migrated orders
     earning?: {
-        status: 'paid' | 'unpaid';
+        status: "paid" | "unpaid";
     };
     revisionInstructions: IRevisionInstruction[];
     timeline: ITimelineEntry[];
@@ -178,18 +181,18 @@ export interface OrderFilters {
 }
 
 export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
-    pending: 'Pending',
-    in_progress: 'In Progress',
-    quality_check: 'Quality Check',
-    revision: 'Revision',
-    completed: 'Completed',
-    delivered: 'Delivered',
-    cancelled: 'Cancelled',
+    pending: "Pending",
+    in_progress: "In Progress",
+    quality_check: "Quality Check",
+    revision: "Revision",
+    completed: "Completed",
+    delivered: "Delivered",
+    cancelled: "Cancelled",
 };
 
 export const ORDER_PRIORITY_LABELS: Record<OrderPriority, string> = {
-    low: 'Low',
-    normal: 'Normal',
-    high: 'High',
-    urgent: 'Urgent',
+    low: "Low",
+    normal: "Normal",
+    high: "High",
+    urgent: "Urgent",
 };
