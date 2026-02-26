@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
 import { useRouter } from "next/navigation";
+import { usePaymentStore } from "../store/paymentStore";
 
 interface PayPalWrapperProps {
     amount: number;
@@ -15,7 +16,7 @@ export default function PayPalWrapper({
     currency,
     invoiceNumber,
 }: PayPalWrapperProps) {
-    const [error, setError] = useState<string | null>(null);
+    const { error, setError, setProcessing } = usePaymentStore();
     const router = useRouter();
 
     const initialOptions = {
@@ -28,11 +29,7 @@ export default function PayPalWrapper({
     };
 
     return (
-        <div className="w-full mt-4 border-t border-white/10 pt-6">
-            <h3 className="text-center text-sm font-semibold tracking-wider uppercase text-muted-foreground/70 mb-4">
-                Or pay with PayPal
-            </h3>
-
+        <div className="w-full mt-4 border-t border-white/10">
             {error && (
                 <div className="text-red-500 bg-red-500/10 p-3 rounded-md text-sm mb-4 border border-red-500/20 text-center font-medium">
                     {error}
@@ -41,8 +38,10 @@ export default function PayPalWrapper({
 
             <PayPalScriptProvider options={initialOptions}>
                 <PayPalButtons
+                    fundingSource="paypal"
                     style={{ layout: "vertical", shape: "rect", color: "gold" }}
                     createOrder={(data, actions) => {
+                        setProcessing(true);
                         return actions.order.create({
                             intent: "CAPTURE",
                             purchase_units: [
@@ -67,7 +66,7 @@ export default function PayPalWrapper({
 
                             // Call the server to confirm payment and update records
                             await fetch(
-                                "http://localhost:5000/api/payments/confirm",
+                                `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}/api/payments/confirm`,
                                 {
                                     method: "POST",
                                     headers: {
@@ -97,6 +96,7 @@ export default function PayPalWrapper({
                         console.error("PayPal Script Error:", err);
                     }}
                     onCancel={() => {
+                        setProcessing(false);
                         setError(
                             "Payment was cancelled. You have not been charged.",
                         );

@@ -15,7 +15,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-    title: "Payment Portal | Web Briks",
+    title: "Payment | Web Briks",
     description: "Secure payment portal for Web Briks invoices",
 };
 

@@ -1,5 +1,8 @@
 import { type Request, type Response } from "express";
 import Stripe from "stripe";
+import { render } from "@react-email/render";
+import { sendMail } from "../lib/nodemailer.js";
+import PaymentReceiptEmail from "../emails/PaymentReceipt.js";
 import { InvoiceRecord } from "../models/invoice-record.model.js";
 import EarningModel from "../models/earning.model.js";
 import ClientModel from "../models/client.model.js";
@@ -231,6 +234,72 @@ export const confirmPayment = async (
                     console.error(
                         "[Payment] Error updating Earning record:",
                         err,
+                    );
+                }
+            }
+
+            // 5. Send Payment Receipt Email via React Email to the Client
+            if (invoice.clientId) {
+                try {
+                    const client = await ClientModel.findOne({
+                        clientId: invoice.clientId,
+                    });
+                    if (client && client.email) {
+                        const amountInBDT = invoice.totalAmount * 120; // Fallback to 120 just locally scope
+                        const paymentGateway = paymentIntentId
+                            ? "Stripe"
+                            : paypalOrderId
+                              ? "PayPal"
+                              : "Other";
+                        const referenceId =
+                            paymentIntentId ||
+                            paypalOrderId ||
+                            "WB-PAY-SUCCESS";
+
+                        // We query the actual earning model again if it wasn't captured in the block above
+                        const earning = await EarningModel.findOne({
+                            clientId: client._id,
+                            month: invoice.month,
+                            year: invoice.year,
+                        });
+
+                        const finalAmountBDT =
+                            earning?.amountInBDT || amountInBDT;
+
+                        console.log(
+                            `[Payment] Rendering Receipt Email for ${client.email}`,
+                        );
+
+                        const emailHtml = await render(
+                            PaymentReceiptEmail({
+                                clientName: client.name || invoice.clientName,
+                                invoiceNumber: invoice.invoiceNumber,
+                                amountPaidCurrency: invoice.currency,
+                                amountPaidValue: invoice.totalAmount,
+                                amountPaidBDT: finalAmountBDT,
+                                referenceId: referenceId,
+                                paymentGateway: paymentGateway,
+                                date: new Date(),
+                            }),
+                        );
+
+                        await sendMail({
+                            to: client.email,
+                            subject: `Receipt for Invoice #${invoice.invoiceNumber} - Web Briks LLC`,
+                            body: emailHtml,
+                        });
+                        console.log(
+                            `[Payment] Receipt emailed to ${client.email}`,
+                        );
+                    } else {
+                        console.warn(
+                            `[Payment] Client ${invoice.clientId} has no email address. Skipping receipt.`,
+                        );
+                    }
+                } catch (emailErr) {
+                    console.error(
+                        "[Payment] Failed to send receipt email:",
+                        emailErr,
                     );
                 }
             }
