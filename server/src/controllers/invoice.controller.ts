@@ -1,4 +1,5 @@
 import type { Request, Response } from "express";
+import { encryptPayload } from "../utils/crypto.js";
 import { InvoiceCounter } from "../models/invoice-counter.model.js";
 import { InvoiceRecord } from "../models/invoice-record.model.js";
 
@@ -12,6 +13,7 @@ export const getNextInvoiceNumber = async (_req: Request, res: Response) => {
 
         if (!counter) {
             res.status(500).json({
+                success: false, 
                 message: "Failed to generate invoice number",
             });
             return;
@@ -115,6 +117,11 @@ export const recordInvoice = async (req: Request, res: Response) => {
             clientName,
             clientId,
             clientAddress,
+            companyName,
+            totalOrders,
+            totalImages,
+            dateFrom,
+            dateTo,
             totalAmount,
             currency,
             dueDate,
@@ -136,6 +143,27 @@ export const recordInvoice = async (req: Request, res: Response) => {
                 .json({ message: "Missing required invoice fields" });
         }
 
+        const existingInvoice = await InvoiceRecord.findOne({
+            invoiceNumber: String(invoiceNumber),
+        });
+
+        let paymentToken = existingInvoice?.paymentToken;
+        if (!paymentToken) {
+            const payloadInfo = {
+                invoiceNumber,
+                totalPrice: totalAmount,
+                currency: currency || "USD",
+                totalImages,
+                dateFrom,
+                dateTo,
+                totalOrders,
+                clientName,
+                address: clientAddress || "N/A",
+                companyName: companyName || "N/A",
+            };
+            paymentToken = encryptPayload(payloadInfo);
+        }
+
         const invoice = await InvoiceRecord.findOneAndUpdate(
             { invoiceNumber: String(invoiceNumber) },
             {
@@ -148,7 +176,13 @@ export const recordInvoice = async (req: Request, res: Response) => {
                 dueDate,
                 month: month ? Number(month) : undefined,
                 year: year ? Number(year) : undefined,
+                totalImages: totalImages ? Number(totalImages) : undefined,
+                dateFrom,
+                dateTo,
+                totalOrders: totalOrders ? Number(totalOrders) : undefined,
+                companyName: companyName || "N/A",
                 paymentStatus: "pending",
+                paymentToken: paymentToken,
                 items,
             },
             { new: true, upsert: true },

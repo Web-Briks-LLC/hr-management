@@ -318,6 +318,7 @@ export interface InvoicePDFProps {
     month: string;
     year: string;
     invoiceNumber: string;
+    paymentToken?: string;
     totals: {
         totalImages: number;
         totalAmount: number;
@@ -374,6 +375,7 @@ export const InvoiceDocument = ({
     orders,
     totals,
     invoiceNumber,
+    paymentToken,
 }: InvoicePDFProps) => {
     const issueDate = format(new Date(), "MMMM do, yyyy");
     const logoUrl =
@@ -386,50 +388,7 @@ export const InvoiceDocument = ({
         }).format(amount);
     };
 
-    const calculatedDueDate = new Date(
-        new Date().getTime() + 7 * 24 * 60 * 60 * 1000,
-    ).toISOString();
-
-    const paymentPayload = {
-        invoiceNumber,
-        clientName: client.name,
-        clientId: client.clientId,
-        clientAddress: client.address || client.officeAddress || "N/A",
-        totalAmount: totals.totalAmount,
-        currency: client.currency || "USD",
-        dueDate: calculatedDueDate,
-        items: orders.map((order) => ({
-            name: order.orderName,
-            price: order.perImagePrice * order.imageQuantity,
-            quantity: order.imageQuantity,
-        })),
-    };
-
-    const encodeBase64Url = (payload: Record<string, unknown>) => {
-        try {
-            if (typeof window !== "undefined") {
-                const str = JSON.stringify(payload);
-                const encoded = btoa(
-                    encodeURIComponent(str).replace(
-                        /%([0-9A-F]{2})/g,
-                        (_, p1) => String.fromCharCode(parseInt(p1, 16)),
-                    ),
-                );
-                return encoded
-                    .replace(/\+/g, "-")
-                    .replace(/\//g, "_")
-                    .replace(/=+$/, "");
-            } else {
-                return Buffer.from(JSON.stringify(payload)).toString(
-                    "base64url",
-                );
-            }
-        } catch {
-            return "";
-        }
-    };
-
-    const encodedData = encodeBase64Url(paymentPayload);
+    // Data is now fetched from DB using token
 
     return (
         <Document>
@@ -545,7 +504,7 @@ export const InvoiceDocument = ({
                     </View>
                     <View style={styles.payNowButtonContainer}>
                         <Link
-                            src={`${process.env.NEXT_PUBLIC_PAYMENT_URL || "http://localhost:3002"}/payment/${invoiceNumber}?data=${encodedData}`}
+                            src={`${process.env.NEXT_PUBLIC_PAYMENT_URL || "http://localhost:3002"}/payment/${invoiceNumber}?token=${paymentToken || ""}`}
                             style={{ textDecoration: "none" }}
                         >
                             <View style={styles.payNowButton}>
@@ -598,19 +557,8 @@ export default function InvoicePDF(props: InvoicePDFProps) {
         }
 
         try {
-            const blob = await pdf(<InvoiceDocument {...props} />).toBlob();
-
-            const formData = new FormData();
-            formData.append("file", blob, fileName);
-            formData.append("to", clientEmail);
-            formData.append("clientName", props.client.name);
-            formData.append("month", props.month);
-            formData.append("year", props.year);
-
-            const result = await sendInvoiceEmail(formData).unwrap();
-
-            // Record the invoice in the database as well
-            await recordInvoice({
+            // Record the invoice in the database first to get the paymentToken
+            const recordResult = await recordInvoice({
                 invoiceNumber: props.invoiceNumber,
                 clientName: props.client.name,
                 clientId: props.client.clientId,
@@ -629,6 +577,24 @@ export default function InvoicePDF(props: InvoicePDFProps) {
                     quantity: order.imageQuantity,
                 })),
             }).unwrap();
+
+            const paymentToken = (
+                recordResult.invoice as { paymentToken: string }
+            ).paymentToken;
+
+            // Generate blob with the new token
+            const blob = await pdf(
+                <InvoiceDocument {...props} paymentToken={paymentToken} />,
+            ).toBlob();
+
+            const formData = new FormData();
+            formData.append("file", blob, fileName);
+            formData.append("to", clientEmail);
+            formData.append("clientName", props.client.name);
+            formData.append("month", props.month);
+            formData.append("year", props.year);
+
+            const result = await sendInvoiceEmail(formData).unwrap();
 
             // RTK Query throws on non-200 responses, so reaching here implies success.
             toast.success(

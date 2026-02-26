@@ -2,6 +2,7 @@ import { type Request, type Response } from "express";
 import Stripe from "stripe";
 import { InvoiceRecord } from "../models/invoice-record.model.js";
 import EarningModel from "../models/earning.model.js";
+import ClientModel from "../models/client.model.js";
 
 // Initialize Stripe gracefully, so the server doesn't crash if the key is missing in some environments
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
@@ -106,6 +107,53 @@ export const confirmPayment = async (
             // 4. Update corresponding Earning record if billing period info exists
             if (invoice.clientId && invoice.month && invoice.year) {
                 try {
+                    // Try to get live conversion rate (USD to BDT)
+                    let conversionRate = 120; // Default fallback
+                    try {
+                        const response = await fetch(
+                            `https://open.er-api.com/v6/latest/${invoice.currency.toUpperCase()}`,
+                        );
+                        const data: any = await response.json();
+                        if (data && data.rates && data.rates.BDT) {
+                            conversionRate = data.rates.BDT;
+                            console.log(
+                                `[Payment] Live conversion rate fetched: 1 ${invoice.currency} = ${conversionRate} BDT`,
+                            );
+                        } else {
+                            // Fallback to DB rate if API fails
+                            const { default: currencyService } =
+                                await import("../services/currency-rate.service.js");
+                            const dbRate =
+                                await currencyService.getRateForCurrency(
+                                    invoice.month,
+                                    invoice.year,
+                                    invoice.currency,
+                                );
+                            conversionRate = dbRate;
+                            console.log(
+                                `[Payment] Using DB fallback conversion rate: ${conversionRate}`,
+                            );
+                        }
+                    } catch (apiError) {
+                        console.error(
+                            "[Payment] Currency API error:",
+                            apiError,
+                        );
+                        // Fallback to DB
+                        const { default: currencyService } =
+                            await import("../services/currency-rate.service.js");
+                        const dbRate = await currencyService.getRateForCurrency(
+                            invoice.month,
+                            invoice.year,
+                            invoice.currency,
+                        );
+                        conversionRate = dbRate;
+                    }
+
+                    const amountInBDT = Math.round(
+                        invoice.totalAmount * conversionRate,
+                    );
+
                     const statusNotes =
                         `Paid via Invoice #${invoiceNumber}` +
                         (paymentIntentId
@@ -113,9 +161,22 @@ export const confirmPayment = async (
                             : "") +
                         (paypalOrderId ? ` | PayPal: ${paypalOrderId}` : "");
 
+                    const client = await ClientModel.findOne({
+                        clientId: invoice.clientId,
+                    });
+
+                    if (!client) {
+                        console.error(
+                            `[Payment] Client not found with clientId: ${invoice.clientId}`,
+                        );
+                        return res
+                            .status(404)
+                            .json({ error: "Client not found" });
+                    }
+
                     const updatedEarning = await EarningModel.findOneAndUpdate(
                         {
-                            clientId: invoice.clientId,
+                            clientId: client._id,
                             month: invoice.month,
                             year: invoice.year,
                         },
@@ -124,6 +185,8 @@ export const confirmPayment = async (
                                 status: "paid",
                                 paidAt: new Date(),
                                 notes: statusNotes,
+                                conversionRate: conversionRate,
+                                amountInBDT: amountInBDT,
                             },
                         },
                         { new: true },
@@ -131,11 +194,37 @@ export const confirmPayment = async (
 
                     if (updatedEarning) {
                         console.log(
-                            `[Payment] Earning for client ${invoice.clientName} (${invoice.month}/${invoice.year}) marked as PAID`,
+                            `[Payment] Earning for client ${invoice.clientName} (${invoice.month}/${invoice.year}) updated with BDT ${amountInBDT}`,
                         );
                     } else {
                         console.warn(
-                            `[Payment] No matching Earning record found for Invoice ${invoiceNumber} (Client: ${invoice.clientId}, Period: ${invoice.month}/${invoice.year})`,
+                            `[Payment] No matching Earning record found for Invoice ${invoiceNumber}. Creating a new record recursively.`,
+                        );
+                        // If no earning record exists, let's auto-generate one to ensure we don't lose track
+                        // of this payment.
+                        const newEarning = new EarningModel({
+                            clientId: client._id,
+                            month: invoice.month,
+                            year: invoice.year,
+                            imageQty: invoice.totalImages || 0,
+                            totalAmount: invoice.totalAmount,
+                            currency: invoice.currency,
+                            fees: 0,
+                            tax: 0,
+                            conversionRate: conversionRate,
+                            netAmount: invoice.totalAmount,
+                            amountInBDT: amountInBDT,
+                            status: "paid",
+                            paidAt: new Date(),
+                            notes:
+                                statusNotes + " (Auto-generated from Payment)",
+                            isLegacy: false,
+                            createdBy: client.createdBy, // We can attribute the creation to the user who created the client
+                        });
+
+                        await newEarning.save();
+                        console.log(
+                            `[Payment] Created missing Earning for client ${invoice.clientName} (${invoice.month}/${invoice.year}) with BDT ${amountInBDT}`,
                         );
                     }
                 } catch (err) {

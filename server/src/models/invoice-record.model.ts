@@ -9,6 +9,7 @@ export interface IInvoiceRecord {
     currency: string;
     dueDate: Date;
     paymentStatus: "pending" | "paid" | "failed";
+    paymentToken?: string; // Secure token for payment verification
     items: Array<{
         name: string;
         price: number;
@@ -16,6 +17,11 @@ export interface IInvoiceRecord {
     }>;
     month?: number;
     year?: number;
+    totalImages?: number;
+    dateFrom?: Date;
+    dateTo?: Date;
+    totalOrders?: number;
+    companyName?: string;
     createdAt?: Date;
     updatedAt?: Date;
 }
@@ -34,6 +40,7 @@ const invoiceRecordSchema = new Schema<IInvoiceRecord>(
             enum: ["pending", "paid", "failed"],
             default: "pending",
         },
+        paymentToken: { type: String, unique: true, sparse: true },
         items: [
             {
                 name: { type: String, required: true },
@@ -43,6 +50,11 @@ const invoiceRecordSchema = new Schema<IInvoiceRecord>(
         ],
         month: { type: Number },
         year: { type: Number },
+        totalImages: { type: Number },
+        dateFrom: { type: Date },
+        dateTo: { type: Date },
+        totalOrders: { type: Number },
+        companyName: { type: String },
     },
     { timestamps: true },
 );

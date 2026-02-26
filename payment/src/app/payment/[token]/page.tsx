@@ -3,59 +3,85 @@ import {
     Card,
     CardContent,
     CardDescription,
+    CardFooter,
     CardHeader,
     CardTitle,
 } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
-import { ShieldCheck, CalendarDays, MapPin, Building2 } from "lucide-react";
+import {
+    ShieldCheck,
+    CalendarDays,
+    MapPin,
+    Building2,
+    Image as ImageIcon,
+    FileText,
+} from "lucide-react";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import PaymentWrapper from "@/components/PaymentWrapper";
 import PayPalWrapper from "@/components/PayPalWrapper";
 
 export default async function PaymentPage({
-    params,
     searchParams,
 }: {
-    params: Promise<{ token: string }>;
     searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-    const resolvedParams = await params;
+    // const resolvedParams = await params;
     const resolvedSearchParams = await searchParams;
-    const encodedData =
-        typeof resolvedSearchParams.data === "string"
-            ? resolvedSearchParams.data
+
+    let invoice = null;
+    const token =
+        typeof resolvedSearchParams.token === "string"
+            ? resolvedSearchParams.token
             : null;
 
-    let invoice: {
-        invoiceNumber: string;
-        clientName: string;
-        clientId: string;
-        clientAddress: string;
-        totalAmount: number;
-        currency: string;
-        dueDate: string;
-        items: Array<{ name: string; price: number; quantity: number }>;
-    } | null = null;
-    if (encodedData) {
+    if (token) {
         try {
-            // Decode the base64url payload
-            const standardBase64 = encodedData
-                .replace(/-/g, "+")
-                .replace(/_/g, "/");
-            const jsonString = Buffer.from(standardBase64, "base64").toString(
-                "utf-8",
-            );
-            const parsed = JSON.parse(jsonString);
+            const dbConnect = (await import("@/lib/db")).default;
+            await dbConnect();
+            const mongoose = (await import("mongoose")).default;
 
-            // Verify token matches payload
-            if (!parsed || parsed.invoiceNumber !== resolvedParams.token) {
-                throw new Error("Token mismatch");
+            // Define model inline or use existing if shared
+            const InvoiceSchema = new mongoose.Schema({
+                invoiceNumber: String,
+                clientName: String,
+                clientId: String,
+                clientAddress: String,
+                companyName: String,
+                totalAmount: Number,
+                currency: String,
+                dueDate: Date,
+                paymentToken: String,
+                month: Number,
+                year: Number,
+                totalImages: Number,
+                dateFrom: Date,
+                dateTo: Date,
+                totalOrders: Number,
+                items: Array,
+                paymentStatus: String,
+            });
+
+            const InvoiceRecord =
+                mongoose.models.InvoiceRecord ||
+                mongoose.model("InvoiceRecord", InvoiceSchema);
+
+            invoice = await InvoiceRecord.findOne({
+                paymentToken: token,
+            }).lean();
+
+            const { decryptPayload } = await import("@/lib/crypto");
+            const decryptedInfo = decryptPayload(token);
+
+            if (!invoice) {
+                console.error("Invoice not found for token.");
+            } else if (decryptedInfo) {
+                // Attach decrypted info in case DB is missing some fields from older versions
+                invoice = { ...decryptedInfo, ...invoice };
+            } else {
+                console.error("Failed to decrypt token.");
             }
-
-            invoice = parsed;
         } catch (error) {
-            console.error("Failed to decode invoice data:", error);
+            console.error("Failed to fetch invoice from DB:", error);
         }
     }
 
@@ -104,6 +130,51 @@ export default async function PaymentPage({
                             />
                             <span className="text-sm text-foreground/80 leading-relaxed font-medium">
                                 {invoice.clientAddress}
+                                {invoice.companyName &&
+                                    invoice.companyName !== "N/A" && (
+                                        <span className="block text-muted-foreground/70 text-xs mt-1">
+                                            Company: {invoice.companyName}
+                                        </span>
+                                    )}
+                            </span>
+                        </div>
+
+                        <div className="flex justify-between items-center text-sm">
+                            <span className="flex items-center gap-2 text-muted-foreground/80 font-medium">
+                                <CalendarDays size={18} /> Service Period
+                            </span>
+                            <span className="font-semibold text-foreground text-right">
+                                {invoice.dateFrom && invoice.dateTo ? (
+                                    <>
+                                        {new Date(
+                                            invoice.dateFrom,
+                                        ).toLocaleDateString()}{" "}
+                                        - <br />
+                                        {new Date(
+                                            invoice.dateTo,
+                                        ).toLocaleDateString()}
+                                    </>
+                                ) : (
+                                    "N/A"
+                                )}
+                            </span>
+                        </div>
+
+                        <div className="flex justify-between items-center text-sm">
+                            <span className="flex items-center gap-2 text-muted-foreground/80 font-medium">
+                                <ImageIcon size={18} /> Total Images
+                            </span>
+                            <span className="font-semibold text-foreground">
+                                {invoice.totalImages || "N/A"}
+                            </span>
+                        </div>
+
+                        <div className="flex justify-between items-center text-sm">
+                            <span className="flex items-center gap-2 text-muted-foreground/80 font-medium">
+                                <FileText size={18} /> Total Orders
+                            </span>
+                            <span className="font-semibold text-foreground">
+                                {invoice.totalOrders || "N/A"}
                             </span>
                         </div>
                         <div className="flex justify-between items-center text-sm">
@@ -121,54 +192,23 @@ export default async function PaymentPage({
                                 )}
                             </span>
                         </div>
-
-                        <Separator className="my-5 border-white/10" />
-
-                        <div className="space-y-3">
-                            <h4 className="text-sm font-bold tracking-wider uppercase text-muted-foreground/70 mb-4">
-                                Line Items
-                            </h4>
-                            {invoice.items.map(
-                                (
-                                    item: {
-                                        quantity: number;
-                                        name: string;
-                                        price: number;
-                                    },
-                                    idx: number,
-                                ) => (
-                                    <div
-                                        key={idx}
-                                        className="flex justify-between text-sm py-1"
-                                    >
-                                        <span className="text-foreground/90 font-medium line-clamp-2 max-w-[70%]">
-                                            {item.quantity}x {item.name}
-                                        </span>
-                                        <span className="font-mono text-muted-foreground">
-                                            ${item.price.toFixed(2)}
-                                        </span>
-                                    </div>
-                                ),
-                            )}
-                        </div>
-
-                        <Separator className="my-5 border-white/10" />
-
-                        <div className="flex justify-between items-end bg-white/10 p-4 rounded-xl backdrop-blur-md border border-white/10">
-                            <div>
-                                <span className="text-sm font-semibold uppercase tracking-wider text-muted-foreground/80 block mb-1">
-                                    Total Due
-                                </span>
-                                <span className="text-xs text-muted-foreground">
-                                    {invoice.currency}
-                                </span>
-                            </div>
-                            <span className="text-4xl font-black text-teal-600 dark:text-teal-400 tracking-tighter">
-                                {formattedTotal}
-                            </span>
-                        </div>
                     </div>
                 </CardContent>
+                <CardFooter>
+                    <div className="w-full flex justify-between items-end bg-white/10 p-4 rounded-xl backdrop-blur-md border border-white/10">
+                        <div>
+                            <span className="text-sm font-semibold uppercase tracking-wider text-muted-foreground/80 block mb-1">
+                                Total Due
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                                {invoice.currency}
+                            </span>
+                        </div>
+                        <span className="text-4xl font-black text-teal-600 dark:text-teal-400 tracking-tighter">
+                            {formattedTotal}
+                        </span>
+                    </div>
+                </CardFooter>
             </Card>
 
             {/* Payment Action Glass Card */}

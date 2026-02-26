@@ -20,6 +20,11 @@ interface RecordInvoiceData {
     dueDate: string; // ISO string
     month: number;
     year: number;
+    totalImages?: number;
+    dateFrom?: string;
+    dateTo?: string;
+    totalOrders?: number;
+    companyName?: string;
     items: Array<{ name: string; price: number; quantity: number }>;
 }
 

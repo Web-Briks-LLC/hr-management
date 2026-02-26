@@ -65,6 +65,21 @@ export default function PayPalWrapper({
                             // Optional: Send a webhook/API call to your backend here passing details.id to verify the capture server-side
                             // before declaring it successful, but for now we trust the client-side approval for demonstration.
 
+                            // Call the server to confirm payment and update records
+                            await fetch(
+                                "http://localhost:5000/api/payments/confirm",
+                                {
+                                    method: "POST",
+                                    headers: {
+                                        "Content-Type": "application/json",
+                                    },
+                                    body: JSON.stringify({
+                                        invoiceNumber,
+                                        paypalOrderId: details.id,
+                                    }),
+                                },
+                            );
+
                             router.push(
                                 `/success?method=paypal&id=${details.id}&invoice=${invoiceNumber}`,
                             );

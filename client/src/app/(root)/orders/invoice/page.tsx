@@ -8,6 +8,7 @@ import {
 import {
     useLazyGetNextInvoiceNumberQuery,
     useSendInvoiceEmailMutation,
+    useRecordInvoiceMutation,
 } from "@/redux/features/invoice/invoiceApi";
 import {
     Card,
@@ -87,6 +88,7 @@ export default function InvoicePage() {
         new Set(),
     );
     const [invoiceNumber, setInvoiceNumber] = useState<string>("");
+    const [paymentToken, setPaymentToken] = useState<string>("");
     const [showPDF, setShowPDF] = useState(false);
 
     const [sendInvoiceEmail, { isLoading: isSending }] =
@@ -97,6 +99,9 @@ export default function InvoicePage() {
 
     const [getNextInvoiceNumber, { isLoading: isGeneratingInvoice }] =
         useLazyGetNextInvoiceNumberQuery();
+
+    const [recordInvoice, { isLoading: isRecording }] =
+        useRecordInvoiceMutation();
 
     // Fetch available years from database
     const { data: yearsData, isLoading: isLoadingYears } =
@@ -208,23 +213,69 @@ export default function InvoicePage() {
     };
 
     const handleGenerateInvoice = async () => {
-        if (selectedOrders.size === 0) return;
+        if (selectedOrders.size === 0 || !selectedClient) return;
 
         try {
             const result = await getNextInvoiceNumber().unwrap();
             if (result.success) {
-                setInvoiceNumber(result.formattedInvoiceNumber);
-                setShowPDF(true);
-                // Smooth scroll to PDF section
-                setTimeout(() => {
-                    pdfSectionRef.current?.scrollIntoView({
-                        behavior: "smooth",
-                        block: "start",
-                    });
-                }, 100);
+                const generatedNumber = result.formattedInvoiceNumber;
+
+                // Calculate date range
+                const orderDates = selectedOrdersList.map((o) =>
+                    new Date(o.orderDate).getTime(),
+                );
+                const minDate = new Date(Math.min(...orderDates)).toISOString();
+                const maxDate = new Date(Math.max(...orderDates)).toISOString();
+
+                // Record invoice immediately to get the secure hashed link token
+                const recordResult = await recordInvoice({
+                    invoiceNumber: generatedNumber,
+                    clientName: selectedClient.name,
+                    clientId: selectedClient.clientId,
+                    clientAddress:
+                        selectedClient.address ||
+                        selectedClient.officeAddress ||
+                        "N/A",
+                    companyName: selectedClient.officeAddress || "N/A",
+                    totalAmount: totals.totalAmount,
+                    currency: selectedClient.currency || "USD",
+                    dueDate: new Date(
+                        new Date().getTime() + 7 * 24 * 60 * 60 * 1000,
+                    ).toISOString(),
+                    month: Number(selectedMonth),
+                    year: Number(selectedYear),
+                    totalImages: totals.totalImages,
+                    dateFrom: minDate,
+                    dateTo: maxDate,
+                    totalOrders: selectedOrdersList.length,
+                    items: selectedOrdersList.map((order) => ({
+                        name: order.orderName,
+                        price: order.perImagePrice * order.imageQuantity,
+                        quantity: order.imageQuantity,
+                    })),
+                }).unwrap();
+
+                if (recordResult.success && recordResult.invoice) {
+                    const invoiceData = recordResult.invoice as {
+                        paymentToken: string;
+                        [key: string]: unknown;
+                    };
+                    setInvoiceNumber(generatedNumber);
+                    setPaymentToken(invoiceData.paymentToken);
+                    setShowPDF(true);
+
+                    // Smooth scroll to PDF section
+                    setTimeout(() => {
+                        pdfSectionRef.current?.scrollIntoView({
+                            behavior: "smooth",
+                            block: "start",
+                        });
+                    }, 100);
+                }
             }
         } catch (error) {
             console.error("Failed to generate invoice number:", error);
+            toast.error("Failed to generate secure invoice link");
         }
     };
 
@@ -239,13 +290,59 @@ export default function InvoicePage() {
         }
 
         try {
-            // Get invoice number if not exists
             let currentInvoiceNumber = invoiceNumber;
-            if (!currentInvoiceNumber) {
+            let currentToken = paymentToken;
+
+            if (!currentInvoiceNumber || !currentToken) {
                 const result = await getNextInvoiceNumber().unwrap();
                 if (result.success) {
                     currentInvoiceNumber = result.formattedInvoiceNumber;
+
+                    const orderDates = selectedOrdersList.map((o) =>
+                        new Date(o.orderDate).getTime(),
+                    );
+                    const minDate = new Date(
+                        Math.min(...orderDates),
+                    ).toISOString();
+                    const maxDate = new Date(
+                        Math.max(...orderDates),
+                    ).toISOString();
+
+                    const recordResult = await recordInvoice({
+                        invoiceNumber: currentInvoiceNumber,
+                        clientName: selectedClient.name,
+                        clientId: selectedClient.clientId,
+                        clientAddress:
+                            selectedClient.address ||
+                            selectedClient.officeAddress ||
+                            "N/A",
+                        companyName: selectedClient.officeAddress || "N/A",
+                        totalAmount: totals.totalAmount,
+                        currency: selectedClient.currency || "USD",
+                        dueDate: new Date(
+                            new Date().getTime() + 7 * 24 * 60 * 60 * 1000,
+                        ).toISOString(),
+                        month: Number(selectedMonth),
+                        year: Number(selectedYear),
+                        totalImages: totals.totalImages,
+                        dateFrom: minDate,
+                        dateTo: maxDate,
+                        totalOrders: selectedOrdersList.length,
+                        items: selectedOrdersList.map((order) => ({
+                            name: order.orderName,
+                            price: order.perImagePrice * order.imageQuantity,
+                            quantity: order.imageQuantity,
+                        })),
+                    }).unwrap();
+
+                    const invoiceData = recordResult.invoice as {
+                        paymentToken: string;
+                        [key: string]: unknown;
+                    };
+                    currentToken = invoiceData.paymentToken;
+
                     setInvoiceNumber(currentInvoiceNumber);
+                    setPaymentToken(currentToken);
                 } else {
                     throw new Error("Failed to generate invoice number");
                 }
@@ -263,6 +360,7 @@ export default function InvoicePage() {
                     }
                     year={selectedYear}
                     invoiceNumber={currentInvoiceNumber}
+                    paymentToken={currentToken}
                     totals={totals}
                 />,
             ).toBlob();
@@ -456,6 +554,7 @@ export default function InvoicePage() {
                                 disabled={
                                     selectedOrders.size === 0 ||
                                     isGeneratingInvoice ||
+                                    isRecording ||
                                     isSending
                                 }
                                 className="flex-1 bg-teal-500 hover:bg-teal-600"
@@ -629,6 +728,7 @@ export default function InvoicePage() {
                         }
                         year={selectedYear}
                         invoiceNumber={invoiceNumber}
+                        paymentToken={paymentToken}
                         totals={totals}
                     />
                 </div>
