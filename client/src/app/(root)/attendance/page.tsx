@@ -50,6 +50,8 @@ import {
     endOfMonth,
     startOfYear,
     endOfYear,
+    startOfWeek,
+    endOfWeek,
 } from "date-fns";
 import {
     Popover,
@@ -153,10 +155,10 @@ export default function AttendancePage() {
                 end = format(now, "yyyy-MM-dd");
                 break;
             case FILTER_TYPES.WEEKLY:
-                const wStart = new Date(now);
-                wStart.setDate(wStart.getDate() - 7);
+                const wStart = startOfWeek(now, { weekStartsOn: 1 }); // Monday
+                const wEnd = endOfWeek(now, { weekStartsOn: 1 }); // Sunday
                 start = format(wStart, "yyyy-MM-dd");
-                end = format(now, "yyyy-MM-dd");
+                end = format(wEnd, "yyyy-MM-dd");
                 break;
             case FILTER_TYPES.MONTHLY:
                 const mStart = startOfMonth(

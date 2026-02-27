@@ -6,6 +6,8 @@ import PaymentReceiptEmail from "../emails/PaymentReceipt.js";
 import { InvoiceRecord } from "../models/invoice-record.model.js";
 import EarningModel from "../models/earning.model.js";
 import ClientModel from "../models/client.model.js";
+import UserModel from "../models/user.model.js";
+import notificationService from "../services/notification.service.js";
 
 // Initialize Stripe gracefully, so the server doesn't crash if the key is missing in some environments
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
@@ -110,52 +112,8 @@ export const confirmPayment = async (
             // 4. Update corresponding Earning record if billing period info exists
             if (invoice.clientId && invoice.month && invoice.year) {
                 try {
-                    // Try to get live conversion rate (USD to BDT)
-                    let conversionRate = 120; // Default fallback
-                    try {
-                        const response = await fetch(
-                            `https://open.er-api.com/v6/latest/${invoice.currency.toUpperCase()}`,
-                        );
-                        const data: any = await response.json();
-                        if (data && data.rates && data.rates.BDT) {
-                            conversionRate = data.rates.BDT;
-                            console.log(
-                                `[Payment] Live conversion rate fetched: 1 ${invoice.currency} = ${conversionRate} BDT`,
-                            );
-                        } else {
-                            // Fallback to DB rate if API fails
-                            const { default: currencyService } =
-                                await import("../services/currency-rate.service.js");
-                            const dbRate =
-                                await currencyService.getRateForCurrency(
-                                    invoice.month,
-                                    invoice.year,
-                                    invoice.currency,
-                                );
-                            conversionRate = dbRate;
-                            console.log(
-                                `[Payment] Using DB fallback conversion rate: ${conversionRate}`,
-                            );
-                        }
-                    } catch (apiError) {
-                        console.error(
-                            "[Payment] Currency API error:",
-                            apiError,
-                        );
-                        // Fallback to DB
-                        const { default: currencyService } =
-                            await import("../services/currency-rate.service.js");
-                        const dbRate = await currencyService.getRateForCurrency(
-                            invoice.month,
-                            invoice.year,
-                            invoice.currency,
-                        );
-                        conversionRate = dbRate;
-                    }
-
-                    const amountInBDT = Math.round(
-                        invoice.totalAmount * conversionRate,
-                    );
+                    const conversionRate = 0;
+                    const amountInBDT = 0;
 
                     const statusNotes =
                         `Paid via Invoice #${invoiceNumber}` +
@@ -256,12 +214,14 @@ export const confirmPayment = async (
                             paypalOrderId ||
                             "WB-PAY-SUCCESS";
 
-                        // We query the actual earning model again if it wasn't captured in the block above
-                        const earning = await EarningModel.findOne({
-                            clientId: client._id,
-                            month: invoice.month,
-                            year: invoice.year,
-                        });
+                        let earning = null;
+                        if (invoice.month && invoice.year) {
+                            earning = await EarningModel.findOne({
+                                clientId: client._id,
+                                month: invoice.month as number,
+                                year: invoice.year as number,
+                            });
+                        }
 
                         const finalAmountBDT =
                             earning?.amountInBDT || amountInBDT;
@@ -302,6 +262,64 @@ export const confirmPayment = async (
                         emailErr,
                     );
                 }
+            }
+
+            // 6. Notify Admins via In-App and Email
+            try {
+                const client = await ClientModel.findOne({
+                    clientId: invoice.clientId,
+                });
+
+                if (client) {
+                    await notificationService.notifyAdminsPaymentReceived({
+                        clientName: invoice.clientName,
+                        invoiceNumber: invoice.invoiceNumber,
+                        amount: invoice.totalAmount,
+                        currency: invoice.currency,
+                        clientUserId: client._id,
+                    });
+
+                    const admins = await UserModel.find({
+                        role: {
+                            $in: [
+                                "super_admin",
+                                "admin",
+                                "hr_manager",
+                                "owner",
+                            ],
+                        },
+                    }).toArray();
+
+                    const adminEmails = admins
+                        .map((a: any) => a.email)
+                        .filter(Boolean);
+
+                    if (adminEmails.length > 0) {
+                        const adminEmailHtml = `
+                            <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+                                <h2>Payment Received</h2>
+                                <p>Client <strong>${invoice.clientName}</strong> has successfully paid <strong>${invoice.totalAmount} ${invoice.currency}</strong> for Invoice #${invoice.invoiceNumber}.</p>
+                                <p>This earning is now marked as "Paid" but unconverted. Please log in to the admin dashboard, navigate to the Earnings section, and use the "Convert" action to apply the correct BDT exchange rate.</p>
+                                <br/>
+                                <a href="${process.env.CLIENT_URL || "http://localhost:3000"}/earnings" style="display:inline-block; padding: 10px 20px; background-color: #007bff; color: #fff; text-decoration: none; border-radius: 5px;">Go to Earnings</a>
+                            </div>
+                        `;
+
+                        await sendMail({
+                            to: adminEmails.join(", "),
+                            subject: `Action Required: Payment Received from ${invoice.clientName}`,
+                            body: adminEmailHtml,
+                        });
+                        console.log(
+                            `[Payment] Admin notification email sent to ${adminEmails.length} admins.`,
+                        );
+                    }
+                }
+            } catch (adminNotifyErr) {
+                console.error(
+                    "[Payment] Failed to notify admins:",
+                    adminNotifyErr,
+                );
             }
 
             return res.status(200).json({

@@ -1,14 +1,26 @@
-import NotificationModel from '../models/notification.model.js';
-import { Types } from 'mongoose';
+import NotificationModel from "../models/notification.model.js";
+import { Types } from "mongoose";
 
 // Create a notification for a single user
 const createNotification = async (data: {
     userId: Types.ObjectId | string;
     title: string;
     message: string;
-    type: 'overtime' | 'leave' | 'attendance' | 'shift' | 'announcement';
-    priority?: 'low' | 'medium' | 'high' | 'urgent';
-    resourceType?: 'overtime' | 'leave' | 'staff' | 'attendance' | 'shift';
+    type:
+        | "overtime"
+        | "leave"
+        | "attendance"
+        | "shift"
+        | "announcement"
+        | "earning";
+    priority?: "low" | "medium" | "high" | "urgent";
+    resourceType?:
+        | "overtime"
+        | "leave"
+        | "staff"
+        | "attendance"
+        | "shift"
+        | "earning";
     resourceId?: Types.ObjectId | string;
     actionUrl?: string;
     actionLabel?: string;
@@ -20,7 +32,7 @@ const createNotification = async (data: {
         title: data.title,
         message: data.message,
         type: data.type,
-        priority: data.priority || 'medium',
+        priority: data.priority || "medium",
         isRead: false,
         expiresAt: data.expiresAt,
     };
@@ -45,7 +57,7 @@ const getUserNotifications = async (
         type?: string;
         limit?: number;
         skip?: number;
-    }
+    },
 ) => {
     const query: any = { userId: new Types.ObjectId(userId) };
 
@@ -87,7 +99,7 @@ const markAsRead = async (notificationId: string, userId: string) => {
             isRead: true,
             readAt: new Date(),
         },
-        { new: true }
+        { new: true },
     );
 
     return notification;
@@ -103,7 +115,7 @@ const markAllAsRead = async (userId: string) => {
         {
             isRead: true,
             readAt: new Date(),
-        }
+        },
     );
 
     return result;
@@ -136,18 +148,18 @@ const deleteAllNotifications = async (userId: string) => {
 const notifyOvertimeStatus = async (data: {
     staffUserId: Types.ObjectId | string;
     overtimeId: Types.ObjectId | string;
-    status: 'approved' | 'rejected';
+    status: "approved" | "rejected";
     hours: number;
     date: string;
     approvedBy: Types.ObjectId | string;
 }) => {
     const title =
-        data.status === 'approved'
-            ? '✅ Overtime Approved'
-            : '❌ Overtime Rejected';
+        data.status === "approved"
+            ? "✅ Overtime Approved"
+            : "❌ Overtime Rejected";
 
     const message =
-        data.status === 'approved'
+        data.status === "approved"
             ? `Your overtime request for ${data.hours} hours on ${data.date} has been approved`
             : `Your overtime request for ${data.hours} hours on ${data.date} has been rejected`;
 
@@ -155,12 +167,12 @@ const notifyOvertimeStatus = async (data: {
         userId: data.staffUserId,
         title,
         message,
-        type: 'overtime',
-        priority: 'high',
-        resourceType: 'overtime',
+        type: "overtime",
+        priority: "high",
+        resourceType: "overtime",
         resourceId: data.overtimeId,
         actionUrl: `/my-overtime`,
-        actionLabel: 'View Details',
+        actionLabel: "View Details",
         createdBy: data.approvedBy,
     });
 };
@@ -174,13 +186,13 @@ const notifyShiftAssignment = async (data: {
 }) => {
     await createNotification({
         userId: data.staffUserId,
-        title: '📅 New Shift Assigned',
+        title: "📅 New Shift Assigned",
         message: `You have been assigned to ${data.shiftName} starting from ${data.startDate}`,
-        type: 'shift',
-        priority: 'high',
-        resourceType: 'shift',
-        actionUrl: '/my-schedule',
-        actionLabel: 'View Schedule',
+        type: "shift",
+        priority: "high",
+        resourceType: "shift",
+        actionUrl: "/my-schedule",
+        actionLabel: "View Schedule",
         createdBy: data.assignedBy,
     });
 };
@@ -195,13 +207,13 @@ const notifyShiftChange = async (data: {
 }) => {
     await createNotification({
         userId: data.staffUserId,
-        title: '🔄 Shift Changed',
+        title: "🔄 Shift Changed",
         message: `Your shift has been changed from ${data.oldShiftName} to ${data.newShiftName} effective ${data.effectiveDate}`,
-        type: 'shift',
-        priority: 'urgent',
-        resourceType: 'shift',
-        actionUrl: '/my-schedule',
-        actionLabel: 'View Schedule',
+        type: "shift",
+        priority: "urgent",
+        resourceType: "shift",
+        actionUrl: "/my-schedule",
+        actionLabel: "View Schedule",
         createdBy: data.changedBy,
     });
 };
@@ -215,24 +227,24 @@ const notifyAdminsOvertimeRequest = async (data: {
     date: string;
 }) => {
     // Get all users with admin roles
-    const { default: UserModel } = await import('../models/user.model.js');
+    const { default: UserModel } = await import("../models/user.model.js");
 
     // UserModel is a native MongoDB collection, not a Mongoose model
     const admins = await UserModel.find({
-        role: { $in: ['super_admin', 'admin', 'hr_manager'] },
+        role: { $in: ["super_admin", "admin", "hr_manager"] },
     }).toArray();
 
     // Create notification for each admin
     const notifications = admins.map((admin: any) => ({
         userId: admin._id,
-        title: '⏰ Overtime Approval Needed',
+        title: "⏰ Overtime Approval Needed",
         message: `${data.staffName} requested ${data.hours} hours overtime for ${data.date}`,
-        type: 'overtime' as const,
-        priority: 'high' as const,
-        resourceType: 'overtime' as const,
+        type: "overtime" as const,
+        priority: "high" as const,
+        resourceType: "overtime" as const,
         resourceId: data.overtimeId,
         actionUrl: `/overtime/${data.overtimeId}`,
-        actionLabel: 'Review Request',
+        actionLabel: "Review Request",
         createdBy: data.staffUserId,
     }));
 
@@ -247,7 +259,7 @@ const notifyAdminsOvertimeRequest = async (data: {
 const notifyLeaveStatus = async (data: {
     staffUserId: Types.ObjectId | string;
     leaveId: Types.ObjectId | string;
-    status: 'approved' | 'partially_approved' | 'rejected' | 'revoked';
+    status: "approved" | "partially_approved" | "rejected" | "revoked";
     leaveType: string;
     startDate: string;
     endDate: string;
@@ -257,34 +269,34 @@ const notifyLeaveStatus = async (data: {
 }) => {
     let title: string;
     let message: string;
-    let priority: 'low' | 'medium' | 'high' | 'urgent' = 'high';
+    let priority: "low" | "medium" | "high" | "urgent" = "high";
 
     switch (data.status) {
-        case 'approved':
-            title = '✅ Leave Approved';
+        case "approved":
+            title = "✅ Leave Approved";
             message = `Your ${data.leaveType} leave from ${data.startDate} to ${data.endDate} has been approved`;
             break;
-        case 'partially_approved':
-            title = '✅ Leave Partially Approved';
+        case "partially_approved":
+            title = "✅ Leave Partially Approved";
             message = `Your ${
                 data.leaveType
             } leave has been partially approved (${
                 data.approvedDays || 0
             } days)`;
             break;
-        case 'rejected':
-            title = '❌ Leave Rejected';
+        case "rejected":
+            title = "❌ Leave Rejected";
             message = `Your ${data.leaveType} leave from ${data.startDate} to ${data.endDate} has been rejected`;
             if (data.comment) message += `. Reason: ${data.comment}`;
             break;
-        case 'revoked':
-            title = '⚠️ Leave Revoked';
+        case "revoked":
+            title = "⚠️ Leave Revoked";
             message = `Your ${data.leaveType} leave from ${data.startDate} to ${data.endDate} has been revoked. Balance has been restored.`;
-            priority = 'urgent';
+            priority = "urgent";
             if (data.comment) message += ` Reason: ${data.comment}`;
             break;
         default:
-            title = '📋 Leave Update';
+            title = "📋 Leave Update";
             message = `Your ${data.leaveType} leave status has been updated`;
     }
 
@@ -292,12 +304,12 @@ const notifyLeaveStatus = async (data: {
         userId: data.staffUserId,
         title,
         message,
-        type: 'leave',
+        type: "leave",
         priority,
-        resourceType: 'leave',
+        resourceType: "leave",
         resourceId: data.leaveId,
-        actionUrl: '/leave/apply',
-        actionLabel: 'View Details',
+        actionUrl: "/leave/apply",
+        actionLabel: "View Details",
         createdBy: data.approvedBy,
     });
 };
@@ -312,24 +324,56 @@ const notifyAdminsLeaveRequest = async (data: {
     endDate: string;
     days: number;
 }) => {
-    const { default: UserModel } = await import('../models/user.model.js');
+    const { default: UserModel } = await import("../models/user.model.js");
 
     // UserModel is a native MongoDB collection, not a Mongoose model
     const admins = await UserModel.find({
-        role: { $in: ['super_admin', 'admin', 'hr_manager'] },
+        role: { $in: ["super_admin", "admin", "hr_manager"] },
     }).toArray();
 
     const notifications = admins.map((admin: any) => ({
         userId: admin._id,
-        title: '📝 Leave Approval Needed',
+        title: "📝 Leave Approval Needed",
         message: `${data.staffName} requested ${data.days} days of ${data.leaveType} leave (${data.startDate} - ${data.endDate})`,
-        type: 'leave' as const,
-        priority: 'high' as const,
-        resourceType: 'leave' as const,
+        type: "leave" as const,
+        priority: "high" as const,
+        resourceType: "leave" as const,
         resourceId: data.leaveId,
-        actionUrl: '/leave/manage',
-        actionLabel: 'Review Request',
+        actionUrl: "/leave/manage",
+        actionLabel: "Review Request",
         createdBy: data.staffUserId,
+    }));
+
+    if (notifications.length > 0) {
+        await NotificationModel.insertMany(notifications);
+    }
+};
+
+// Notify admins about received payment
+const notifyAdminsPaymentReceived = async (data: {
+    clientName: string;
+    invoiceNumber: string;
+    amount: number;
+    currency: string;
+    clientUserId: Types.ObjectId | string;
+}) => {
+    const { default: UserModel } = await import("../models/user.model.js");
+
+    // Get admins to notify
+    const admins = await UserModel.find({
+        role: { $in: ["super_admin", "admin", "hr_manager", "owner"] },
+    }).toArray();
+
+    const notifications = admins.map((admin: any) => ({
+        userId: admin._id,
+        title: "💰 Payment Received",
+        message: `Client ${data.clientName} just paid ${data.amount} ${data.currency} for Invoice #${data.invoiceNumber}. Please convert to BDT.`,
+        type: "earning" as const,
+        priority: "high" as const,
+        resourceType: "earning" as const,
+        actionUrl: "/earnings",
+        actionLabel: "Convert Now",
+        createdBy: data.clientUserId,
     }));
 
     if (notifications.length > 0) {
@@ -353,4 +397,5 @@ export default {
     // Leave helpers
     notifyLeaveStatus,
     notifyAdminsLeaveRequest,
+    notifyAdminsPaymentReceived,
 };

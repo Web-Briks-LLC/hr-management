@@ -12,7 +12,6 @@ import {
     useCreateExpenseCategoryMutation,
     useGetExpenseYearsQuery,
     type Expense,
-    type ExpenseCategory,
     type ExpenseQueryParams,
 } from "@/redux/features/expense/expenseApi";
 import { useGetAllBranchesQuery } from "@/redux/features/branch/branchApi";
@@ -79,15 +78,11 @@ import {
     Edit2,
     Filter,
     Download,
-    CheckCircle2,
-    Clock,
     RefreshCcw,
-    Undo,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { cn } from "@/lib/utils";
 import {
     ExpenseForm,
     type ExpenseFormData,
@@ -267,9 +262,12 @@ export default function ExpensePage() {
     const finalAmount = financeData?.summary?.finalAmount || 0;
 
     const handleCreateExpense = async (data: ExpenseFormData) => {
-        if (finalAmount <= 0) {
+        const expenseAmount = parseFloat(data.amount);
+
+        if (expenseAmount > finalAmount) {
+            const difference = expenseAmount - finalAmount;
             toast.error(
-                "Cannot add expense when Final Amount (Profit - Shared + Debit) is 0 or negative",
+                `Please add ${formatCurrency(difference)} first, because the current amount is less than the expense.`,
             );
             return;
         }
@@ -277,28 +275,45 @@ export default function ExpensePage() {
         try {
             await createExpense({
                 ...data,
-                amount: parseFloat(data.amount),
+                amount: expenseAmount,
             }).unwrap();
             toast.success("Expense created successfully");
             setIsAddDialogOpen(false);
         } catch (error) {
-            toast.error((error as Error)?.message || "Failed to create expense");
+            toast.error(
+                (error as Error)?.message || "Failed to create expense",
+            );
         }
     };
 
     const handleUpdateExpense = async (data: ExpenseFormData) => {
         if (!selectedExpense) return;
+
+        const newExpenseAmount = parseFloat(data.amount);
+        const oldExpenseAmount = selectedExpense.amount;
+        const maxAllowed = finalAmount + oldExpenseAmount;
+
+        if (newExpenseAmount > maxAllowed) {
+            const difference = newExpenseAmount - maxAllowed;
+            toast.error(
+                `Please add ${formatCurrency(difference)} first, because the current amount is less than the expense.`,
+            );
+            return;
+        }
+
         try {
             await updateExpense({
                 id: selectedExpense._id,
                 ...data,
-                amount: parseFloat(data.amount),
+                amount: newExpenseAmount,
             }).unwrap();
             toast.success("Expense updated successfully");
             setIsEditDialogOpen(false);
             setSelectedExpense(null);
         } catch (error) {
-            toast.error((error as Error)?.message || "Failed to update expense");
+            toast.error(
+                (error as Error)?.message || "Failed to update expense",
+            );
         }
     };
 
@@ -310,7 +325,9 @@ export default function ExpensePage() {
             setIsDeleteDialogOpen(false);
             setSelectedExpense(null);
         } catch (error) {
-            toast.error((error as Error)?.message || "Failed to delete expense");
+            toast.error(
+                (error as Error)?.message || "Failed to delete expense",
+            );
         }
     };
 
@@ -325,7 +342,9 @@ export default function ExpensePage() {
             setIsAddCategoryDialogOpen(false);
             setNewCategoryName("");
         } catch (error) {
-            toast.error((error as Error)?.message || "Failed to create category");
+            toast.error(
+                (error as Error)?.message || "Failed to create category",
+            );
         }
     };
 

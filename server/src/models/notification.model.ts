@@ -1,12 +1,24 @@
-import { model, Schema, Types } from 'mongoose';
+import { model, Schema, Types } from "mongoose";
 
 export interface INotification {
     userId: Types.ObjectId;
     title: string;
     message: string;
-    type: 'overtime' | 'leave' | 'attendance' | 'shift' | 'announcement';
-    priority: 'low' | 'medium' | 'high' | 'urgent';
-    resourceType?: 'overtime' | 'leave' | 'staff' | 'attendance' | 'shift';
+    type:
+        | "overtime"
+        | "leave"
+        | "attendance"
+        | "shift"
+        | "announcement"
+        | "earning";
+    priority: "low" | "medium" | "high" | "urgent";
+    resourceType?:
+        | "overtime"
+        | "leave"
+        | "staff"
+        | "attendance"
+        | "shift"
+        | "earning";
     resourceId?: Types.ObjectId;
     actionUrl?: string;
     actionLabel?: string;
@@ -22,7 +34,7 @@ const notificationSchema = new Schema<INotification>(
     {
         userId: {
             type: Schema.Types.ObjectId,
-            ref: 'User',
+            ref: "User",
             required: true,
             index: true,
         },
@@ -38,18 +50,32 @@ const notificationSchema = new Schema<INotification>(
         },
         type: {
             type: String,
-            enum: ['overtime', 'leave', 'attendance', 'shift', 'announcement'],
+            enum: [
+                "overtime",
+                "leave",
+                "attendance",
+                "shift",
+                "announcement",
+                "earning",
+            ],
             required: true,
             index: true,
         },
         priority: {
             type: String,
-            enum: ['low', 'medium', 'high', 'urgent'],
-            default: 'medium',
+            enum: ["low", "medium", "high", "urgent"],
+            default: "medium",
         },
         resourceType: {
             type: String,
-            enum: ['overtime', 'leave', 'staff', 'attendance', 'shift'],
+            enum: [
+                "overtime",
+                "leave",
+                "staff",
+                "attendance",
+                "shift",
+                "earning",
+            ],
         },
         resourceId: {
             type: Schema.Types.ObjectId,
@@ -71,7 +97,7 @@ const notificationSchema = new Schema<INotification>(
         },
         createdBy: {
             type: Schema.Types.ObjectId,
-            ref: 'User',
+            ref: "User",
         },
         expiresAt: {
             type: Date,
@@ -79,7 +105,7 @@ const notificationSchema = new Schema<INotification>(
     },
     {
         timestamps: true,
-    }
+    },
 );
 
 // Compound indexes for efficient queries
@@ -90,8 +116,8 @@ notificationSchema.index({ userId: 1, type: 1 });
 notificationSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
 const NotificationModel = model<INotification>(
-    'Notification',
-    notificationSchema
+    "Notification",
+    notificationSchema,
 );
 
 export default NotificationModel;

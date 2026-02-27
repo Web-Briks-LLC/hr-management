@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useState, useMemo, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { useState, useMemo, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import {
     Dialog,
     DialogContent,
@@ -10,7 +10,7 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-} from '@/components/ui/dialog';
+} from "@/components/ui/dialog";
 import {
     Table,
     TableBody,
@@ -18,19 +18,19 @@ import {
     TableHead,
     TableHeader,
     TableRow,
-} from '@/components/ui/table';
+} from "@/components/ui/table";
 import {
     Select,
     SelectContent,
     SelectItem,
     SelectTrigger,
     SelectValue,
-} from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Badge } from '@/components/ui/badge';
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -40,13 +40,13 @@ import {
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+} from "@/components/ui/alert-dialog";
 import {
     Popover,
     PopoverContent,
     PopoverTrigger,
-} from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import {
     Trash2,
     DollarSign,
@@ -62,6 +62,7 @@ import {
     Clock,
     CheckCircle2,
     XCircle,
+    AlertCircle,
     Filter,
     Download,
     Search,
@@ -71,15 +72,15 @@ import {
     Info,
     Receipt,
     ArrowRight,
-} from 'lucide-react';
+} from "lucide-react";
 import {
     Tooltip,
     TooltipContent,
     TooltipProvider,
     TooltipTrigger,
-} from '@/components/ui/tooltip';
-import { toast } from 'sonner';
-import { format } from 'date-fns';
+} from "@/components/ui/tooltip";
+import { toast } from "sonner";
+import { format } from "date-fns";
 import {
     useGetEarningsQuery,
     useGetEarningStatsQuery,
@@ -89,18 +90,17 @@ import {
     useLazyGetClientsWithEarningsQuery,
     useUpdateEarningMutation,
     useDeleteEarningMutation,
-} from '@/redux/features/earning/earningApi';
-import { useGetClientsQuery } from '@/redux/features/client/clientApi';
-import { useGetCurrencyRatesQuery } from '@/redux/features/currencyRate/currencyRateApi';
+} from "@/redux/features/earning/earningApi";
+import { useGetClientsQuery } from "@/redux/features/client/clientApi";
 import type {
     IEarning,
     EarningFilters,
     EarningStatus,
-} from '@/types/earning.type';
-import { CURRENCY_SYMBOLS, MONTHS } from '@/types/earning.type';
-import { cn } from '@/lib/utils';
+} from "@/types/earning.type";
+import { CURRENCY_SYMBOLS, MONTHS } from "@/types/earning.type";
+import { cn } from "@/lib/utils";
 
-type FilterType = 'all' | 'today' | 'week' | 'month' | 'year' | 'range';
+type FilterType = "all" | "today" | "week" | "month" | "year" | "range";
 
 // MONTHS moved to types file
 
@@ -111,11 +111,11 @@ export default function EarningsPage() {
     const [page, setPage] = useState(1);
     const [limit, setLimit] = useState(20);
     const perPageOptions = [10, 20, 50, 100];
-    const [filterType, setFilterType] = useState<FilterType>('all');
-    const [statusFilter, setStatusFilter] = useState<EarningStatus | 'all'>(
-        'all',
+    const [filterType, setFilterType] = useState<FilterType>("all");
+    const [statusFilter, setStatusFilter] = useState<EarningStatus | "all">(
+        "all",
     );
-    const [clientFilter, setClientFilter] = useState<string>('all');
+    const [clientFilter, setClientFilter] = useState<string>("all");
     const [selectedMonth, setSelectedMonth] = useState(
         new Date().getMonth() + 1,
     );
@@ -133,61 +133,61 @@ export default function EarningsPage() {
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     // Edit Client Dialog state
     const [isEditClientDialogOpen, setIsEditClientDialogOpen] = useState(false);
-    const [editClientId, setEditClientId] = useState('');
+    const [editClientId, setEditClientId] = useState("");
 
     const [updateEarning, { isLoading: isUpdating }] =
         useUpdateEarningMutation();
 
     // Withdraw form state
 
-    const [withdrawFees, setWithdrawFees] = useState('0');
-    const [withdrawTax, setWithdrawTax] = useState('0');
-    const [withdrawRate, setWithdrawRate] = useState('120');
-    const [withdrawNotes, setWithdrawNotes] = useState('');
+    const [withdrawFees, setWithdrawFees] = useState("0");
+    const [withdrawTax, setWithdrawTax] = useState("0");
+    const [withdrawRate, setWithdrawRate] = useState("");
+    const [withdrawNotes, setWithdrawNotes] = useState("");
 
     // Bulk withdraw state
-    const [bulkClientId, setBulkClientId] = useState('');
+    const [bulkClientId, setBulkClientId] = useState("");
     const [bulkMonth, setBulkMonth] = useState(new Date().getMonth() + 1);
     const [bulkYear, setBulkYear] = useState(currentYear);
-    const [bulkFees, setBulkFees] = useState('0');
-    const [bulkTax, setBulkTax] = useState('0');
-    const [bulkRate, setBulkRate] = useState('120');
-    const [bulkNotes, setBulkNotes] = useState('');
+    const [bulkFees, setBulkFees] = useState("0");
+    const [bulkTax, setBulkTax] = useState("0");
+    const [bulkRate, setBulkRate] = useState("");
+    const [bulkNotes, setBulkNotes] = useState("");
 
     // Build filters
     const filters = useMemo<EarningFilters>(() => {
         const f: EarningFilters = { page, limit };
 
-        if (statusFilter !== 'all') f.status = statusFilter;
+        if (statusFilter !== "all") f.status = statusFilter;
 
         switch (filterType) {
-            case 'today':
-                f.filterType = 'today';
+            case "today":
+                f.filterType = "today";
                 break;
-            case 'week':
-                f.filterType = 'week';
+            case "week":
+                f.filterType = "week";
                 break;
-            case 'month':
-                f.filterType = 'month';
+            case "month":
+                f.filterType = "month";
                 f.month = selectedMonth;
                 f.year = selectedYear;
                 break;
-            case 'year':
-                f.filterType = 'year';
+            case "year":
+                f.filterType = "year";
                 f.year = selectedYear;
                 break;
-            case 'range':
+            case "range":
                 if (dateRange.from) {
-                    f.filterType = 'range';
-                    f.startDate = format(dateRange.from, 'yyyy-MM-dd');
+                    f.filterType = "range";
+                    f.startDate = format(dateRange.from, "yyyy-MM-dd");
                     if (dateRange.to) {
-                        f.endDate = format(dateRange.to, 'yyyy-MM-dd');
+                        f.endDate = format(dateRange.to, "yyyy-MM-dd");
                     }
                 }
                 break;
         }
 
-        if (clientFilter !== 'all') f.clientId = clientFilter;
+        if (clientFilter !== "all") f.clientId = clientFilter;
         return f;
     }, [
         page,
@@ -209,10 +209,6 @@ export default function EarningsPage() {
     const { data: statsData, isLoading: isLoadingStats } =
         useGetEarningStatsQuery(filters);
     const { data: clientsData } = useGetClientsQuery({ limit: 100 });
-    const { data: ratesData } = useGetCurrencyRatesQuery({
-        month: bulkMonth,
-        year: bulkYear,
-    });
 
     // Lazy query for bulk withdraw
     const [
@@ -228,7 +224,6 @@ export default function EarningsPage() {
     useEffect(() => {
         if (isBulkWithdrawDialogOpen) {
             getClients({ month: bulkMonth, year: bulkYear });
-            setBulkClientId('');
         }
     }, [bulkMonth, bulkYear, isBulkWithdrawDialogOpen, getClients]);
 
@@ -262,14 +257,6 @@ export default function EarningsPage() {
     const stats = statsData?.data;
     const clients = clientsData?.clients || [];
 
-    // Get rate from currency rates or default
-    const getRateForCurrency = (currency: string): number => {
-        const rate = ratesData?.data?.rates?.find(
-            (r) => r.currency === currency,
-        );
-        return rate?.rate || 120;
-    };
-
     // Withdraw calculations
     const withdrawFeesNum = parseFloat(withdrawFees) || 0;
     const withdrawTaxNum = parseFloat(withdrawTax) || 0;
@@ -287,23 +274,23 @@ export default function EarningsPage() {
         (bulkOrdersData?.totalAmount || 0) - bulkFeesNum - bulkTaxNum;
     const bulkBDT = bulkNetAmount * bulkRateNum;
 
-    const formatCurrency = (amount: number = 0, curr: string = 'BDT') => {
+    const formatCurrency = (amount: number = 0, curr: string = "BDT") => {
         const safeAmount = Number(amount) || 0;
-        if (curr === 'BDT') {
-            return new Intl.NumberFormat('bn-BD', {
-                style: 'currency',
-                currency: 'BDT',
+        if (curr === "BDT") {
+            return new Intl.NumberFormat("bn-BD", {
+                style: "currency",
+                currency: "BDT",
                 maximumFractionDigits: 0,
             }).format(safeAmount);
         }
-        const symbol = CURRENCY_SYMBOLS[curr] || '$';
+        const symbol = CURRENCY_SYMBOLS[curr] || "$";
         return `${symbol}${safeAmount.toFixed(2)}`;
     };
 
     // Handlers
     const handleEditClient = (earning: IEarning) => {
         setSelectedEarning(earning);
-        setEditClientId(earning.clientId?._id || '');
+        setEditClientId(earning.clientId?._id || "");
         setIsEditClientDialogOpen(true);
     };
 
@@ -316,12 +303,14 @@ export default function EarningsPage() {
                 data: { clientId: editClientId },
             }).unwrap();
 
-            toast.success('Client updated successfully');
+            toast.success("Client updated successfully");
             setIsEditClientDialogOpen(false);
             setSelectedEarning(null);
-        } catch (error: any) {
-            console.error('Error updating client:', error);
-            const message = error?.data?.message || 'Failed to update client';
+        } catch (error: unknown) {
+            console.error("Error updating client:", error);
+            const message =
+                (error as { data?: { message?: string } })?.data?.message ||
+                "Failed to update client";
             toast.error(message);
         }
     };
@@ -331,21 +320,21 @@ export default function EarningsPage() {
 
         try {
             await deleteEarning(selectedEarning._id).unwrap();
-            toast.success('Earning record deleted successfully');
+            toast.success("Earning record deleted successfully");
             setIsDeleteDialogOpen(false);
             setSelectedEarning(null);
         } catch (error) {
-            console.error('Error deleting earning:', error);
-            toast.error('Failed to delete earning record');
+            console.error("Error deleting earning:", error);
+            toast.error("Failed to delete earning record");
         }
     };
 
     const handleWithdraw = (earning: IEarning) => {
         setSelectedEarning(earning);
-        setWithdrawFees('0');
-        setWithdrawTax('0');
-        setWithdrawRate(getRateForCurrency(earning.currency).toString());
-        setWithdrawNotes('');
+        setWithdrawFees("0");
+        setWithdrawTax("0");
+        setWithdrawRate("");
+        setWithdrawNotes("");
         setIsWithdrawDialogOpen(true);
     };
 
@@ -363,12 +352,12 @@ export default function EarningsPage() {
                 },
             }).unwrap();
 
-            toast.success('Earning withdrawn successfully');
+            toast.success("Earning withdrawn successfully");
             setIsWithdrawDialogOpen(false);
             setSelectedEarning(null);
         } catch (error) {
-            console.error('Error withdrawing:', error);
-            toast.error('Failed to withdraw earning');
+            console.error("Error withdrawing:", error);
+            toast.error("Failed to withdraw earning");
         }
     };
 
@@ -376,32 +365,20 @@ export default function EarningsPage() {
         earning: IEarning,
         newStatus: EarningStatus,
     ) => {
-        if (newStatus === 'paid' && earning.status === 'unpaid') {
+        if (newStatus === "paid" && earning.status === "unpaid") {
             handleWithdraw(earning);
-        } else if (newStatus === 'unpaid' && earning.status === 'paid') {
+        } else if (newStatus === "unpaid" && earning.status === "paid") {
             try {
                 await toggleStatus({
                     id: earning._id,
-                    data: { status: 'unpaid' },
+                    data: { status: "unpaid" },
                 }).unwrap();
-                toast.success('Earning marked as unpaid');
+                toast.success("Earning marked as unpaid");
             } catch (error) {
-                console.error('Error toggling status:', error);
-                toast.error('Failed to update status');
+                console.error("Error toggling status:", error);
+                toast.error("Failed to update status");
             }
         }
-    };
-
-    const handleFetchBulkOrders = async () => {
-        if (!bulkClientId) {
-            toast.error('Please select a client');
-            return;
-        }
-        await getClientOrders({
-            clientId: bulkClientId,
-            month: bulkMonth,
-            year: bulkYear,
-        });
     };
 
     const handleBulkClientChange = (clientId: string) => {
@@ -410,13 +387,13 @@ export default function EarningsPage() {
             clients.find((c) => c._id === clientId) ||
             clientsWithEarnings.find((c) => c._id === clientId);
         if (client?.currency) {
-            setBulkRate(getRateForCurrency(client.currency).toString());
+            setBulkRate("");
         }
     };
 
     const handleConfirmBulkWithdraw = async () => {
         if (!bulkOrdersData) {
-            toast.error('No earning to withdraw');
+            toast.error("No earning to withdraw");
             return;
         }
 
@@ -431,12 +408,12 @@ export default function EarningsPage() {
                 },
             }).unwrap();
 
-            toast.success('Monthly earning withdrawn successfully');
+            toast.success("Monthly earning withdrawn successfully");
             setIsBulkWithdrawDialogOpen(false);
-            setBulkClientId('');
+            setBulkClientId("");
         } catch (error) {
-            console.error('Error withdrawing:', error);
-            toast.error('Failed to withdraw');
+            console.error("Error withdrawing:", error);
+            toast.error("Failed to withdraw");
         }
     };
 
@@ -445,7 +422,7 @@ export default function EarningsPage() {
             {/* Header & Stats Overview */}
             <div className="flex flex-col gap-6">
                 <div>
-                    <h2 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">
+                    <h2 className="text-3xl font-bold tracking-tight bg-linear-to-r from-foreground to-foreground/70 bg-clip-text">
                         Earnings Overview
                     </h2>
                     <p className="text-muted-foreground mt-1">
@@ -497,7 +474,7 @@ export default function EarningsPage() {
                                     <p className="text-sm font-medium text-orange-600/80 dark:text-orange-400/80 mt-0.5">
                                         {formatCurrency(
                                             stats?.filteredUnpaidAmount || 0,
-                                            'USD',
+                                            "USD",
                                         )}
                                     </p>
                                 </>
@@ -527,7 +504,7 @@ export default function EarningsPage() {
                                     <p className="text-sm font-medium text-green-600/80 dark:text-green-400/80 mt-0.5">
                                         {formatCurrency(
                                             stats?.filteredPaidAmount || 0,
-                                            'USD',
+                                            "USD",
                                         )}
                                     </p>
                                 </>
@@ -616,7 +593,7 @@ export default function EarningsPage() {
                         </Select>
 
                         {/* Contextual Date Filters */}
-                        {filterType === 'month' && (
+                        {filterType === "month" && (
                             <div className="flex gap-2 animate-in fade-in slide-in-from-left-2 duration-300">
                                 <Select
                                     value={selectedMonth.toString()}
@@ -661,7 +638,7 @@ export default function EarningsPage() {
                             </div>
                         )}
 
-                        {filterType === 'year' && (
+                        {filterType === "year" && (
                             <Select
                                 value={selectedYear.toString()}
                                 onValueChange={(v) =>
@@ -684,7 +661,7 @@ export default function EarningsPage() {
                             </Select>
                         )}
 
-                        {filterType === 'range' && (
+                        {filterType === "range" && (
                             <Popover>
                                 <PopoverTrigger asChild>
                                     <Button
@@ -697,19 +674,19 @@ export default function EarningsPage() {
                                                 <>
                                                     {format(
                                                         dateRange.from,
-                                                        'MMM dd',
-                                                    )}{' '}
-                                                    -{' '}
+                                                        "MMM dd",
+                                                    )}{" "}
+                                                    -{" "}
                                                     {format(
                                                         dateRange.to,
-                                                        'MMM dd',
+                                                        "MMM dd",
                                                     )}
                                                 </>
                                             ) : (
-                                                format(dateRange.from, 'PPP')
+                                                format(dateRange.from, "PPP")
                                             )
                                         ) : (
-                                            'Pick a date range'
+                                            "Pick a date range"
                                         )}
                                     </Button>
                                 </PopoverTrigger>
@@ -735,13 +712,13 @@ export default function EarningsPage() {
                             </Popover>
                         )}
 
-                        <div className="w-[1px] h-6 bg-border mx-1" />
+                        <div className="w-px h-6 bg-border mx-1" />
 
                         {/* Status Filter */}
                         <Select
                             value={statusFilter}
                             onValueChange={(v) => {
-                                setStatusFilter(v as EarningStatus | 'all');
+                                setStatusFilter(v as EarningStatus | "all");
                                 setPage(1);
                             }}
                         >
@@ -803,7 +780,7 @@ export default function EarningsPage() {
                                     <TableHead className="font-semibold text-right">
                                         BDT
                                     </TableHead>
-                                    <TableHead className="text-center font-semibold text-right">
+                                    <TableHead className="font-semibold text-right">
                                         Actions
                                     </TableHead>
                                 </TableRow>
@@ -868,7 +845,7 @@ export default function EarningsPage() {
                                                             m.value ===
                                                             earning.month,
                                                     )?.label
-                                                }{' '}
+                                                }{" "}
                                                 {earning.year}
                                             </TableCell>
                                             <TableCell className="font-medium">
@@ -882,7 +859,7 @@ export default function EarningsPage() {
                                                 ) : (
                                                     <span>
                                                         {earning.orderIds
-                                                            ?.length || 0}{' '}
+                                                            ?.length || 0}{" "}
                                                         orders
                                                     </span>
                                                 )}
@@ -890,7 +867,7 @@ export default function EarningsPage() {
                                             <TableCell className="max-w-[150px] truncate text-muted-foreground">
                                                 {earning.clientId?.name ||
                                                     earning.legacyClientCode ||
-                                                    '-'}
+                                                    "-"}
                                             </TableCell>
                                             <TableCell className="text-right font-medium">
                                                 {formatCurrency(
@@ -911,17 +888,27 @@ export default function EarningsPage() {
                                                 >
                                                     <SelectTrigger
                                                         className={cn(
-                                                            'w-[110px] h-8 border-none focus:ring-0 focus:ring-offset-0',
+                                                            "w-[110px] h-8 border-none focus:ring-0 focus:ring-offset-0",
                                                             earning.status ===
-                                                                'paid'
-                                                                ? 'text-green-600 font-medium hover:text-green-700'
-                                                                : 'text-orange-600 font-medium hover:text-orange-700',
+                                                                "paid" &&
+                                                                earning.amountInBDT >
+                                                                    0
+                                                                ? "text-green-600 font-medium hover:text-green-700"
+                                                                : earning.status ===
+                                                                    "paid"
+                                                                  ? "text-orange-600 font-medium hover:text-orange-700"
+                                                                  : "text-orange-600 font-medium hover:text-orange-700",
                                                         )}
                                                     >
                                                         <div className="flex items-center gap-1.5">
                                                             {earning.status ===
-                                                            'paid' ? (
+                                                                "paid" &&
+                                                            earning.amountInBDT >
+                                                                0 ? (
                                                                 <CheckCircle2 className="h-4 w-4" />
+                                                            ) : earning.status ===
+                                                              "paid" ? (
+                                                                <AlertCircle className="h-4 w-4" />
                                                             ) : (
                                                                 <Clock className="h-4 w-4" />
                                                             )}
@@ -933,13 +920,13 @@ export default function EarningsPage() {
                                                     <SelectContent>
                                                         <SelectItem value="unpaid">
                                                             <span className="flex items-center gap-2 text-orange-600">
-                                                                <XCircle className="h-4 w-4" />{' '}
+                                                                <XCircle className="h-4 w-4" />{" "}
                                                                 Unpaid
                                                             </span>
                                                         </SelectItem>
                                                         <SelectItem value="paid">
                                                             <span className="flex items-center gap-2 text-green-600">
-                                                                <CheckCircle2 className="h-4 w-4" />{' '}
+                                                                <CheckCircle2 className="h-4 w-4" />{" "}
                                                                 Paid
                                                             </span>
                                                         </SelectItem>
@@ -947,11 +934,17 @@ export default function EarningsPage() {
                                                 </Select>
                                             </TableCell>
                                             <TableCell className="text-right">
-                                                {earning.status === 'paid' ? (
+                                                {earning.status === "paid" &&
+                                                earning.amountInBDT > 0 ? (
                                                     <span className="font-mono text-green-600/90 font-medium">
                                                         {formatCurrency(
                                                             earning.amountInBDT,
                                                         )}
+                                                    </span>
+                                                ) : earning.status ===
+                                                  "paid" ? (
+                                                    <span className="text-orange-500/80 text-xs font-medium">
+                                                        Pending
                                                     </span>
                                                 ) : (
                                                     <span className="text-muted-foreground/30">
@@ -1005,8 +998,13 @@ export default function EarningsPage() {
                                                         </Tooltip>
                                                     </TooltipProvider>
 
-                                                    {earning.status ===
-                                                        'unpaid' && (
+                                                    {(earning.status ===
+                                                        "unpaid" ||
+                                                        (earning.status ===
+                                                            "paid" &&
+                                                            (!earning.amountInBDT ||
+                                                                earning.amountInBDT ===
+                                                                    0))) && (
                                                         <Button
                                                             variant="ghost"
                                                             size="icon"
@@ -1050,8 +1048,8 @@ export default function EarningsPage() {
                         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t">
                             <div className="flex items-center gap-2">
                                 <p className="text-sm text-muted-foreground">
-                                    Showing {(page - 1) * limit + 1} to{' '}
-                                    {Math.min(page * limit, meta.total)} of{' '}
+                                    Showing {(page - 1) * limit + 1} to{" "}
+                                    {Math.min(page * limit, meta.total)} of{" "}
                                     {meta.total} entries
                                 </p>
                                 <Select
@@ -1117,13 +1115,13 @@ export default function EarningsPage() {
                                                     2,
                                                     3,
                                                     4,
-                                                    '...',
+                                                    "...",
                                                     totalPages,
                                                 );
                                             } else if (page >= totalPages - 2) {
                                                 pageNumbers.push(
                                                     1,
-                                                    '...',
+                                                    "...",
                                                     totalPages - 3,
                                                     totalPages - 2,
                                                     totalPages - 1,
@@ -1132,17 +1130,17 @@ export default function EarningsPage() {
                                             } else {
                                                 pageNumbers.push(
                                                     1,
-                                                    '...',
+                                                    "...",
                                                     page - 1,
                                                     page,
                                                     page + 1,
-                                                    '...',
+                                                    "...",
                                                     totalPages,
                                                 );
                                             }
                                         }
                                         return pageNumbers.map((num, idx) =>
-                                            num === '...' ? (
+                                            num === "..." ? (
                                                 <span
                                                     key={`ellipsis-${idx}`}
                                                     className="px-2 text-muted-foreground"
@@ -1154,8 +1152,8 @@ export default function EarningsPage() {
                                                     key={num}
                                                     variant={
                                                         page === num
-                                                            ? 'default'
-                                                            : 'outline'
+                                                            ? "default"
+                                                            : "outline"
                                                     }
                                                     size="icon"
                                                     className="h-8 w-8"
@@ -1294,7 +1292,7 @@ export default function EarningsPage() {
                                 </div>
                                 <div className="flex justify-between text-xs text-muted-foreground">
                                     <span>
-                                        Net:{' '}
+                                        Net:{" "}
                                         {formatCurrency(
                                             withdrawNetAmount,
                                             selectedEarning.currency,
@@ -1327,7 +1325,11 @@ export default function EarningsPage() {
                         </Button>
                         <Button
                             onClick={handleConfirmWithdraw}
-                            disabled={isWithdrawing}
+                            disabled={
+                                isWithdrawing ||
+                                !withdrawRateNum ||
+                                withdrawRateNum <= 0
+                            }
                             className="bg-green-600 hover:bg-green-700 text-white"
                         >
                             {isWithdrawing && (
@@ -1353,14 +1355,14 @@ export default function EarningsPage() {
                                 </span>
                                 <Badge
                                     variant={
-                                        selectedEarning.status === 'paid'
-                                            ? 'default'
-                                            : 'secondary'
+                                        selectedEarning.status === "paid"
+                                            ? "default"
+                                            : "secondary"
                                     }
                                     className={
-                                        selectedEarning.status === 'paid'
-                                            ? 'bg-green-500/15 text-green-600 hover:bg-green-500/25'
-                                            : 'bg-orange-500/15 text-orange-600 hover:bg-orange-500/25'
+                                        selectedEarning.status === "paid"
+                                            ? "bg-green-500/15 text-green-600 hover:bg-green-500/25"
+                                            : "bg-orange-500/15 text-orange-600 hover:bg-orange-500/25"
                                     }
                                 >
                                     {selectedEarning.status.toUpperCase()}
@@ -1380,7 +1382,7 @@ export default function EarningsPage() {
                                                         m.value ===
                                                         selectedEarning.month,
                                                 )?.label
-                                            }{' '}
+                                            }{" "}
                                             {selectedEarning.year}
                                         </div>
                                     </div>
@@ -1391,7 +1393,7 @@ export default function EarningsPage() {
                                         <div className="font-medium truncate">
                                             {selectedEarning.clientId?.name ||
                                                 selectedEarning.legacyClientCode ||
-                                                'N/A'}
+                                                "N/A"}
                                         </div>
                                     </div>
                                     <div>
@@ -1400,7 +1402,7 @@ export default function EarningsPage() {
                                         </div>
                                         <div className="font-medium">
                                             {selectedEarning.isLegacy
-                                                ? 'Legacy'
+                                                ? "Legacy"
                                                 : `${selectedEarning.orderIds?.length || 0} orders`}
                                         </div>
                                     </div>
@@ -1417,7 +1419,7 @@ export default function EarningsPage() {
                                     </div>
                                 </div>
 
-                                {selectedEarning.status === 'paid' && (
+                                {selectedEarning.status === "paid" && (
                                     <>
                                         <div className="h-px bg-border/50 my-2" />
                                         <div className="grid grid-cols-2 gap-4 text-sm">
@@ -1452,7 +1454,7 @@ export default function EarningsPage() {
                                                 <div className="font-medium">
                                                     {
                                                         selectedEarning.conversionRate
-                                                    }{' '}
+                                                    }{" "}
                                                     BDT
                                                 </div>
                                             </div>
@@ -1466,9 +1468,9 @@ export default function EarningsPage() {
                                                               new Date(
                                                                   selectedEarning.paidAt,
                                                               ),
-                                                              'P',
+                                                              "P",
                                                           )
-                                                        : '-'}
+                                                        : "-"}
                                                 </div>
                                             </div>
                                         </div>
@@ -1487,7 +1489,7 @@ export default function EarningsPage() {
 
                                 {selectedEarning.notes && (
                                     <div className="text-sm bg-muted/20 p-3 rounded italic text-muted-foreground border border-border/50">
-                                        "{selectedEarning.notes}"
+                                        &quot;{selectedEarning.notes}&quot;
                                     </div>
                                 )}
                             </div>
@@ -1502,24 +1504,24 @@ export default function EarningsPage() {
                 onOpenChange={(open) => {
                     setIsBulkWithdrawDialogOpen(open);
                     if (!open) {
-                        setBulkClientId('');
-                        setBulkFees('0');
-                        setBulkTax('0');
-                        setBulkNotes('');
+                        setBulkClientId("");
+                        setBulkFees("0");
+                        setBulkTax("0");
+                        setBulkNotes("");
                     }
                 }}
             >
-                <DialogContent className="!max-w-4xl max-h-[85vh] w-full overflow-hidden flex flex-col p-0">
+                <DialogContent className="max-w-4xl! max-h-[85vh] w-full overflow-hidden flex flex-col p-0">
                     <DialogHeader className="px-6 py-4 border-b">
                         <DialogTitle className="flex items-center gap-2">
                             <Wallet className="h-5 w-5 text-primary" />
                             Monthly Payout Statement
                         </DialogTitle>
                         <DialogDescription>
-                            Generate and process withdrawal for{' '}
+                            Generate and process withdrawal for{" "}
                             {format(
                                 new Date(bulkYear, bulkMonth - 1),
-                                'MMMM yyyy',
+                                "MMMM yyyy",
                             )}
                         </DialogDescription>
                     </DialogHeader>
@@ -1586,15 +1588,15 @@ export default function EarningsPage() {
                                 >
                                     <SelectTrigger
                                         className={cn(
-                                            'bg-background transition-colors',
-                                            !bulkClientId && 'border-dashed',
+                                            "bg-background transition-colors",
+                                            !bulkClientId && "border-dashed",
                                         )}
                                     >
                                         <SelectValue
                                             placeholder={
                                                 isFetchingClients
-                                                    ? 'Loading clients...'
-                                                    : 'Select client to generate statement...'
+                                                    ? "Loading clients..."
+                                                    : "Select client to generate statement..."
                                             }
                                         />
                                     </SelectTrigger>
@@ -1608,13 +1610,13 @@ export default function EarningsPage() {
                                                     No results found
                                                 </div>
                                                 <p className="text-xs text-muted-foreground">
-                                                    No unpaid earnings found for{' '}
+                                                    No unpaid earnings found for{" "}
                                                     {format(
                                                         new Date(
                                                             bulkYear,
                                                             bulkMonth - 1,
                                                         ),
-                                                        'MMMM yyyy',
+                                                        "MMMM yyyy",
                                                     )}
                                                 </p>
                                             </div>
@@ -1635,7 +1637,7 @@ export default function EarningsPage() {
                                                                 className="text-[10px] h-5"
                                                             >
                                                                 {client.currency ||
-                                                                    'USD'}
+                                                                    "USD"}
                                                             </Badge>
                                                         </div>
                                                     </SelectItem>
@@ -1662,7 +1664,7 @@ export default function EarningsPage() {
                                     <Card className="bg-primary/5 border-primary/20 shadow-sm">
                                         <CardContent className="p-4">
                                             <p className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
-                                                <FileText className="h-3.5 w-3.5" />{' '}
+                                                <FileText className="h-3.5 w-3.5" />{" "}
                                                 Total Orders
                                             </p>
                                             <p className="text-2xl font-bold mt-1 text-foreground">
@@ -1675,7 +1677,7 @@ export default function EarningsPage() {
                                             <div className="flex justify-between items-start">
                                                 <div>
                                                     <p className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
-                                                        <CreditCard className="h-3.5 w-3.5" />{' '}
+                                                        <CreditCard className="h-3.5 w-3.5" />{" "}
                                                         Gross Revenue
                                                     </p>
                                                     <p className="text-2xl font-bold mt-1 text-primary">
@@ -1710,8 +1712,8 @@ export default function EarningsPage() {
                                                 <span className="absolute left-3 top-2.5 text-muted-foreground text-sm font-medium">
                                                     {CURRENCY_SYMBOLS[
                                                         bulkOrdersData?.currency ||
-                                                            'USD'
-                                                    ] || '$'}
+                                                            "USD"
+                                                    ] || "$"}
                                                 </span>
                                                 <Input
                                                     type="number"
@@ -1734,8 +1736,8 @@ export default function EarningsPage() {
                                                 <span className="absolute left-3 top-2.5 text-muted-foreground text-sm font-medium">
                                                     {CURRENCY_SYMBOLS[
                                                         bulkOrdersData?.currency ||
-                                                            'USD'
-                                                    ] || '$'}
+                                                            "USD"
+                                                    ] || "$"}
                                                 </span>
                                                 <Input
                                                     type="number"
@@ -1759,10 +1761,10 @@ export default function EarningsPage() {
                                                             <Info className="h-3 w-3 text-muted-foreground/50 cursor-pointer" />
                                                         </TooltipTrigger>
                                                         <TooltipContent>
-                                                            1{' '}
+                                                            1{" "}
                                                             {
                                                                 bulkOrdersData?.currency
-                                                            }{' '}
+                                                            }{" "}
                                                             = ? BDT
                                                         </TooltipContent>
                                                     </Tooltip>
@@ -1789,7 +1791,7 @@ export default function EarningsPage() {
                                 </div>
 
                                 {/* Net Payout */}
-                                <div className="bg-gradient-to-br from-green-500/10 to-emerald-500/5 rounded-xl border border-green-500/20 p-5">
+                                <div className="bg-linear-to-br from-green-500/10 to-emerald-500/5 rounded-xl border border-green-500/20 p-5">
                                     <div className="flex flex-col sm:flex-row justify-between items-end gap-4">
                                         <div className="space-y-1">
                                             <p className="text-sm font-medium text-green-700 dark:text-green-400">
@@ -1814,7 +1816,7 @@ export default function EarningsPage() {
                                         </div>
                                         <div className="w-full sm:w-auto">
                                             <div className="text-right text-xs text-muted-foreground mb-1">
-                                                Net:{' '}
+                                                Net:{" "}
                                                 {formatCurrency(
                                                     bulkNetAmount,
                                                     bulkOrdersData.currency,
@@ -1869,17 +1871,22 @@ export default function EarningsPage() {
                             </Button>
                             <Button
                                 onClick={handleConfirmBulkWithdraw}
-                                disabled={!bulkOrdersData || isWithdrawing}
+                                disabled={
+                                    !bulkOrdersData ||
+                                    isWithdrawing ||
+                                    !bulkRateNum ||
+                                    bulkRateNum <= 0
+                                }
                                 className="bg-green-600 hover:bg-green-700 text-white min-w-[140px]"
                             >
                                 {isWithdrawing ? (
                                     <>
-                                        <Loader className=" h-4 w-4 animate-spin" />{' '}
+                                        <Loader className=" h-4 w-4 animate-spin" />{" "}
                                         Processing...
                                     </>
                                 ) : (
                                     <>
-                                        Process Payout{' '}
+                                        Process Payout{" "}
                                         <ArrowRight className="ml-2 h-4 w-4" />
                                     </>
                                 )}
@@ -1934,10 +1941,10 @@ export default function EarningsPage() {
                                         selectedEarning.totalAmount,
                                         selectedEarning.currency,
                                     )}
-                                    ) from{' '}
+                                    ) from{" "}
                                     <span className="font-medium text-foreground">
                                         {selectedEarning.clientId?.name ||
-                                            'Unknown'}
+                                            "Unknown"}
                                     </span>
                                 </p>
                             </div>

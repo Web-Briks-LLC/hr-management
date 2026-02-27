@@ -535,8 +535,18 @@ async function getAllAttendanceFromDB({
     // Date filter
     if (startDate || endDate) {
         query.date = {};
-        if (startDate) query.date.$gte = new Date(startDate);
-        if (endDate) query.date.$lte = new Date(endDate);
+        if (startDate) {
+            const startStr = startDate.includes("T")
+                ? startDate
+                : `${startDate}T00:00:00`;
+            query.date.$gte = startOfDay(new Date(startStr));
+        }
+        if (endDate) {
+            const endStr = endDate.includes("T")
+                ? endDate
+                : `${endDate}T00:00:00`;
+            query.date.$lte = endOfDay(new Date(endStr));
+        }
     }
 
     // Status filter
