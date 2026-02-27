@@ -26,6 +26,11 @@ import { ProfileImageUploadDialog } from "./profile-image-upload-dialog";
 import { ProfileCompletionDialog } from "./profile-completion-dialog";
 import { useGetMeQuery } from "@/redux/features/staff/staffApi";
 import { format } from "date-fns";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { StaffAttendanceTab } from "@/app/(root)/staffs/[id]/_components/attendance-tab";
+import { StaffLeaveTab } from "@/app/(root)/staffs/[id]/_components/staff-leave-tab";
+import { StaffOvertimeTab } from "@/app/(root)/staffs/[id]/_components/overtime-tab";
+import { PaymentHistoryTab } from "@/app/(root)/staffs/[id]/_components/payment-history-tab";
 
 export default function RootAccount() {
     const { data, isPending, isRefetching } = useSession();
@@ -158,138 +163,277 @@ export default function RootAccount() {
                     </CardContent>
                 </Card>
 
-                {showDefault && (
-                    <Card className="col-span-2">
-                        <CardHeader>
-                            <CardTitle>Profile Information</CardTitle>
-                            <CardDescription>
-                                Your personal and official staff details
-                            </CardDescription>
-                        </CardHeader>
+                {showDefault && staff?._id && (
+                    <div className="col-span-2 space-y-6">
+                        <Tabs defaultValue="overview" className="w-full">
+                            <TabsList className="flex flex-wrap h-auto w-full sm:w-auto justify-start gap-1 p-1">
+                                <TabsTrigger value="overview">
+                                    Overview
+                                </TabsTrigger>
+                                <TabsTrigger value="attendance">
+                                    Attendance
+                                </TabsTrigger>
+                                <TabsTrigger value="leave">Leaves</TabsTrigger>
+                                <TabsTrigger value="overtime">
+                                    Overtime
+                                </TabsTrigger>
+                                <TabsTrigger value="payments">
+                                    Payments
+                                </TabsTrigger>
+                            </TabsList>
 
-                        <CardContent>
-                            <div className="grid grid-cols-2 gap-4 text-sm">
-                                <p>
-                                    <b>Name:</b> {data?.user?.name}
-                                </p>
-                                <p>
-                                    <b>Email:</b> {data?.user?.email}
-                                </p>
-                                <p>
-                                    <b>Phone:</b> {staff?.phone}
-                                </p>
-                                <p>
-                                    <b>Staff ID:</b> {staff?.staffId}
-                                </p>
-                                <p>
-                                    <b>National ID:</b> {staff?.nationalId}
-                                </p>
-                                <p>
-                                    <b>Blood Group:</b> {staff?.bloodGroup}
-                                </p>
-                                <p>
-                                    <b>Address:</b> {staff?.address}
-                                </p>
+                            <div className="mt-6">
+                                <TabsContent value="overview">
+                                    <Card>
+                                        <CardHeader>
+                                            <CardTitle>
+                                                Profile Information
+                                            </CardTitle>
+                                            <CardDescription>
+                                                Your personal and official staff
+                                                details
+                                            </CardDescription>
+                                        </CardHeader>
 
-                                <p>
-                                    <b>Emergency Name:</b>{" "}
-                                    {staff?.emergencyContact?.name}
-                                </p>
-                                <p>
-                                    <b>Relation:</b>{" "}
-                                    {staff?.emergencyContact?.relation}
-                                </p>
-                                <p>
-                                    <b>Phone:</b>{" "}
-                                    {staff?.emergencyContact?.phone}
-                                </p>
+                                        <CardContent>
+                                            <div className="grid grid-cols-2 gap-4 text-sm">
+                                                <p>
+                                                    <b>Name:</b>{" "}
+                                                    {data?.user?.name}
+                                                </p>
+                                                <p>
+                                                    <b>Email:</b>{" "}
+                                                    {data?.user?.email}
+                                                </p>
+                                                <p>
+                                                    <b>Phone:</b> {staff?.phone}
+                                                </p>
+                                                <p>
+                                                    <b>Staff ID:</b>{" "}
+                                                    {staff?.staffId}
+                                                </p>
+                                                <p>
+                                                    <b>National ID:</b>{" "}
+                                                    {staff?.nationalId}
+                                                </p>
+                                                <p>
+                                                    <b>Blood Group:</b>{" "}
+                                                    {staff?.bloodGroup}
+                                                </p>
+                                                <p>
+                                                    <b>Address:</b>{" "}
+                                                    {staff?.address}
+                                                </p>
 
-                                <p>
-                                    <b>Father:</b> {staff?.fathersName}
-                                </p>
-                                <p>
-                                    <b>Mother:</b> {staff?.mothersName}
-                                </p>
-                                <p>
-                                    <b>Spouse:</b> {staff?.spouseName || "N/A"}
-                                </p>
+                                                <p>
+                                                    <b>Emergency Name:</b>{" "}
+                                                    {
+                                                        staff?.emergencyContact
+                                                            ?.name
+                                                    }
+                                                </p>
+                                                <p>
+                                                    <b>Relation:</b>{" "}
+                                                    {
+                                                        staff?.emergencyContact
+                                                            ?.relation
+                                                    }
+                                                </p>
+                                                <p>
+                                                    <b>Phone:</b>{" "}
+                                                    {
+                                                        staff?.emergencyContact
+                                                            ?.phone
+                                                    }
+                                                </p>
 
-                                <div>
-                                    <p className="text-sm text-gray-500">
-                                        Account Number
-                                    </p>
-                                    <p className="font-medium">
-                                        {staff?.bank?.accountNumber || "N/A"}
-                                    </p>
-                                </div>
-                                <div>
-                                    <p className="text-sm text-gray-500">
-                                        Account Name
-                                    </p>
-                                    <p className="font-medium">
-                                        {staff?.bank?.accountHolderName ||
-                                            "N/A"}
-                                    </p>
-                                </div>
-                                <div>
-                                    <p className="text-sm text-gray-500">
-                                        Bank Name
-                                    </p>
-                                    <p className="font-medium">
-                                        {staff?.bank?.bankName || "N/A"}
-                                    </p>
-                                </div>
-                                <div>
-                                    <p className="text-sm text-gray-500">
-                                        Branch Name
-                                    </p>
-                                    <p className="font-medium">
-                                        {staff?.bank?.branch || "N/A"}
-                                    </p>
-                                </div>
-                                <div>
-                                    <p className="text-sm text-gray-500">
-                                        Routing Number
-                                    </p>
-                                    <p className="font-medium">
-                                        {staff?.bank?.routingNumber || "N/A"}
-                                    </p>
-                                </div>
+                                                <p>
+                                                    <b>Father:</b>{" "}
+                                                    {staff?.fathersName}
+                                                </p>
+                                                <p>
+                                                    <b>Mother:</b>{" "}
+                                                    {staff?.mothersName}
+                                                </p>
+                                                <p>
+                                                    <b>Spouse:</b>{" "}
+                                                    {staff?.spouseName || "N/A"}
+                                                </p>
 
-                                <p>
-                                    <b>Branch:</b>{" "}
-                                    {staff?.branch?.name || "N/A"}
-                                </p>
-                                <p>
-                                    <b>Status:</b> {staff?.status}
-                                </p>
+                                                <div>
+                                                    <p className="text-sm text-gray-500">
+                                                        Account Number
+                                                    </p>
+                                                    <p className="font-medium">
+                                                        {staff?.bank
+                                                            ?.accountNumber ||
+                                                            "N/A"}
+                                                    </p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm text-gray-500">
+                                                        Account Name
+                                                    </p>
+                                                    <p className="font-medium">
+                                                        {staff?.bank
+                                                            ?.accountHolderName ||
+                                                            "N/A"}
+                                                    </p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm text-gray-500">
+                                                        Bank Name
+                                                    </p>
+                                                    <p className="font-medium">
+                                                        {staff?.bank
+                                                            ?.bankName || "N/A"}
+                                                    </p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm text-gray-500">
+                                                        Branch Name
+                                                    </p>
+                                                    <p className="font-medium">
+                                                        {staff?.bank?.branch ||
+                                                            "N/A"}
+                                                    </p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm text-gray-500">
+                                                        Routing Number
+                                                    </p>
+                                                    <p className="font-medium">
+                                                        {staff?.bank
+                                                            ?.routingNumber ||
+                                                            "N/A"}
+                                                    </p>
+                                                </div>
 
-                                <p>
-                                    <b>Join Date:</b>{" "}
-                                    {staff?.joinDate &&
-                                        format(new Date(staff.joinDate), "PPP")}
-                                </p>
+                                                <p>
+                                                    <b>Branch:</b>{" "}
+                                                    {staff?.branch?.name ||
+                                                        "N/A"}
+                                                </p>
+                                                <p>
+                                                    <b>Status:</b>{" "}
+                                                    {staff?.status}
+                                                </p>
 
-                                <p>
-                                    <b>Date of Birth:</b>{" "}
-                                    {staff?.dateOfBirth &&
-                                        format(
-                                            new Date(staff.dateOfBirth),
-                                            "PPP",
-                                        )}
-                                </p>
+                                                <p>
+                                                    <b>Join Date:</b>{" "}
+                                                    {staff?.joinDate &&
+                                                        format(
+                                                            new Date(
+                                                                staff.joinDate,
+                                                            ),
+                                                            "PPP",
+                                                        )}
+                                                </p>
 
-                                <p>
-                                    <b>Last Updated:</b>{" "}
-                                    {staff?.updatedAt &&
-                                        format(
-                                            new Date(staff.updatedAt),
-                                            "PPP",
-                                        )}
-                                </p>
+                                                <p>
+                                                    <b>Date of Birth:</b>{" "}
+                                                    {staff?.dateOfBirth &&
+                                                        format(
+                                                            new Date(
+                                                                staff.dateOfBirth,
+                                                            ),
+                                                            "PPP",
+                                                        )}
+                                                </p>
+
+                                                <p>
+                                                    <b>Last Updated:</b>{" "}
+                                                    {staff?.updatedAt &&
+                                                        format(
+                                                            new Date(
+                                                                staff.updatedAt,
+                                                            ),
+                                                            "PPP",
+                                                        )}
+                                                </p>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                </TabsContent>
+
+                                <TabsContent value="attendance">
+                                    <Card>
+                                        <CardHeader>
+                                            <CardTitle>
+                                                Attendance Record
+                                            </CardTitle>
+                                            <CardDescription>
+                                                Recent attendance history
+                                            </CardDescription>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <StaffAttendanceTab
+                                                staffId={staff._id}
+                                            />
+                                        </CardContent>
+                                    </Card>
+                                </TabsContent>
+
+                                <TabsContent value="leave">
+                                    <Card>
+                                        <CardHeader>
+                                            <CardTitle>
+                                                Leave Applications
+                                            </CardTitle>
+                                            <CardDescription>
+                                                Leave history and status
+                                            </CardDescription>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <StaffLeaveTab
+                                                staffId={staff._id}
+                                            />
+                                        </CardContent>
+                                    </Card>
+                                </TabsContent>
+
+                                <TabsContent value="overtime">
+                                    <Card>
+                                        <CardHeader>
+                                            <CardTitle>
+                                                Overtime Records
+                                            </CardTitle>
+                                            <CardDescription>
+                                                Extra hours worked
+                                            </CardDescription>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <StaffOvertimeTab
+                                                staffId={staff._id}
+                                            />
+                                        </CardContent>
+                                    </Card>
+                                </TabsContent>
+
+                                <TabsContent value="payments">
+                                    <Card>
+                                        <CardHeader>
+                                            <CardTitle>
+                                                Payment History
+                                            </CardTitle>
+                                            <CardDescription>
+                                                Salary and overtime payments
+                                            </CardDescription>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <PaymentHistoryTab
+                                                staffId={staff._id}
+                                                isPinSet={
+                                                    staff.isSalaryPinSet ||
+                                                    false
+                                                }
+                                            />
+                                        </CardContent>
+                                    </Card>
+                                </TabsContent>
                             </div>
-                        </CardContent>
-                    </Card>
+                        </Tabs>
+                    </div>
                 )}
 
                 {showChangePassword && <ChangePassword />}

@@ -1,13 +1,13 @@
-import { Router } from 'express';
-import OvertimeController from '../controllers/overtime.controller.js';
-import { authorize } from '../middlewares/authorize.js';
-import { Role } from '../constants/role.js';
+import { Router } from "express";
+import OvertimeController from "../controllers/overtime.controller.js";
+import { authorize } from "../middlewares/authorize.js";
+import { Role } from "../constants/role.js";
 
 const OvertimeRoutes = Router();
 
 // Staff routes (Read Only)
 OvertimeRoutes.get(
-    '/my-overtime',
+    "/my-overtime",
     authorize(
         Role.STAFF,
         Role.SUPER_ADMIN,
@@ -19,7 +19,7 @@ OvertimeRoutes.get(
 );
 
 OvertimeRoutes.post(
-    '/start',
+    "/start",
     authorize(
         Role.STAFF,
         Role.SUPER_ADMIN,
@@ -31,7 +31,7 @@ OvertimeRoutes.post(
 );
 
 OvertimeRoutes.post(
-    '/stop',
+    "/stop",
     authorize(
         Role.STAFF,
         Role.SUPER_ADMIN,
@@ -43,7 +43,7 @@ OvertimeRoutes.post(
 );
 
 OvertimeRoutes.get(
-    '/scheduled-today',
+    "/scheduled-today",
     authorize(
         Role.STAFF,
         Role.SUPER_ADMIN,
@@ -63,31 +63,31 @@ const adminRoles = [
 ];
 
 OvertimeRoutes.post(
-    '/create',
+    "/create",
     authorize(...adminRoles),
     OvertimeController.createOvertime,
 );
 
 OvertimeRoutes.get(
-    '/',
-    authorize(...adminRoles),
+    "/",
+    authorize(...adminRoles, Role.STAFF),
     OvertimeController.getAllOvertime,
 );
 
 OvertimeRoutes.get(
-    '/:id',
+    "/:id",
     authorize(...adminRoles),
     OvertimeController.getOvertimeById,
 );
 
 OvertimeRoutes.patch(
-    '/:id',
+    "/:id",
     authorize(...adminRoles),
     OvertimeController.updateOvertime,
 );
 
 OvertimeRoutes.delete(
-    '/:id',
+    "/:id",
     authorize(...adminRoles),
     OvertimeController.deleteOvertime,
 );

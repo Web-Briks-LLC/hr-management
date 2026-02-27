@@ -55,21 +55,21 @@ export function StaffLeaveTab({ staffId }: { staffId: string }) {
                     variant: "default" as const,
                     icon: CheckCircle2,
                     className:
-                        "bg-emerald-500/15 text-emerald-700 hover:bg-emerald-500/25 border-emerald-200",
+                        "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/25 border-emerald-200 dark:border-emerald-800",
                 };
             case "rejected":
                 return {
                     variant: "destructive" as const,
                     icon: XCircle,
                     className:
-                        "bg-red-500/15 text-red-700 hover:bg-red-500/25 border-red-200",
+                        "bg-red-500/15 text-red-700 dark:text-red-400 hover:bg-red-500/25 border-red-200 dark:border-red-800",
                 };
             case "pending":
                 return {
                     variant: "secondary" as const,
                     icon: Clock,
                     className:
-                        "bg-amber-500/15 text-amber-700 hover:bg-amber-500/25 border-amber-200",
+                        "bg-amber-500/15 text-amber-700 dark:text-amber-400 hover:bg-amber-500/25 border-amber-200 dark:border-amber-800",
                 };
             default:
                 return {

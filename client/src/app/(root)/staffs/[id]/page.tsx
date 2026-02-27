@@ -609,7 +609,10 @@ export default function StaffDetailsPage() {
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent>
-                                    <PaymentHistoryTab staffId={id} />
+                                    <PaymentHistoryTab
+                                        staffId={id}
+                                        isPinSet={staff.isSalaryPinSet || false}
+                                    />
                                 </CardContent>
                             </Card>
                         </TabsContent>

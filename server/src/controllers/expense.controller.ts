@@ -6,6 +6,20 @@ import type { ExpenseQueryParams } from "../types/expense.type.js";
 
 const getAllExpenses = async (req: Request, res: Response) => {
     try {
+        const userRole = req.user?.role;
+        const userId = req.user?.id as string;
+        if (!userId) throw new Error("Unauthorized");
+
+        let queryStaffId = req.query.staffId as string;
+
+        if (userRole === "staff" || userRole === "team_leader") {
+            const StaffModel = (await import("../models/staff.model.js"))
+                .default;
+            const staff = await StaffModel.findOne({ userId });
+            if (!staff) throw new Error("Staff record not found");
+            queryStaffId = String(staff._id);
+        }
+
         const params: ExpenseQueryParams = {
             page: req.query.page ? parseInt(req.query.page as string) : 1,
             limit: req.query.limit ? parseInt(req.query.limit as string) : 10,
@@ -20,7 +34,7 @@ const getAllExpenses = async (req: Request, res: Response) => {
                 : {}),
             branchId: req.query.branchId as string,
             categoryId: req.query.categoryId as string,
-            staffId: req.query.staffId as string,
+            staffId: queryStaffId,
             status: req.query.status as string,
             filterType: req.query.filterType as any,
             startDate: req.query.startDate as string,

@@ -755,7 +755,7 @@ async function setSalaryPin(staffId: string, pin: string, _changedBy: string) {
     session.startTransaction();
 
     try {
-        const staff = await StaffModel.findOne({ staffId }).session(session);
+        const staff = await StaffModel.findById(staffId).session(session);
 
         if (!staff) {
             throw new Error("Staff not found");
@@ -787,7 +787,7 @@ async function setSalaryPin(staffId: string, pin: string, _changedBy: string) {
 }
 
 async function verifySalaryPin(staffId: string, pin: string) {
-    const staff = await StaffModel.findOne({ staffId }).select("+salaryPin");
+    const staff = await StaffModel.findById(staffId).select("+salaryPin");
 
     if (!staff) {
         throw new Error("Staff not found");
@@ -808,7 +808,7 @@ async function verifySalaryPin(staffId: string, pin: string) {
 }
 
 async function forgotSalaryPin(staffId: string) {
-    const staff = await StaffModel.findOne({ staffId }).populate("userId");
+    const staff = await StaffModel.findById(staffId).populate("userId");
 
     if (!staff) {
         throw new Error("Staff not found");

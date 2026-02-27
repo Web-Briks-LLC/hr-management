@@ -1,9 +1,8 @@
-import { Role } from '@/constants/role';
+import { Role } from "@/constants/role";
 import {
     IconLayoutDashboard,
     IconArrowsShuffle,
     IconCalendarOff,
-    IconNotes,
     IconClock,
     IconMail,
     IconCalendarStats,
@@ -17,7 +16,7 @@ import {
     IconSpeakerphone,
     IconBriefcase,
     IconCash,
-} from '@tabler/icons-react';
+} from "@tabler/icons-react";
 
 export interface SidebarItem {
     title: string;
@@ -33,11 +32,11 @@ export interface SidebarGroup {
 
 export const sidebarGroups: SidebarGroup[] = [
     {
-        groupLabel: 'Overview',
+        groupLabel: "Overview",
         items: [
             {
-                title: 'Dashboard',
-                url: '/dashboard',
+                title: "Dashboard",
+                url: "/dashboard",
                 icon: IconLayoutDashboard,
                 access: [
                     Role.SUPER_ADMIN,
@@ -48,25 +47,31 @@ export const sidebarGroups: SidebarGroup[] = [
                 ],
             },
             {
-                title: 'Analytics',
-                url: '/analytics',
+                title: "Profile",
+                url: "/account",
+                icon: IconUserCircle,
+                access: [Role.TEAM_LEADER, Role.STAFF],
+            },
+            {
+                title: "Analytics",
+                url: "/analytics",
                 icon: IconChartBar,
                 access: [Role.SUPER_ADMIN, Role.ADMIN],
             },
         ],
     },
     {
-        groupLabel: 'Business',
+        groupLabel: "Business",
         items: [
             {
-                title: 'Clients',
-                url: '/clients',
+                title: "Clients",
+                url: "/clients",
                 icon: IconUserCircle,
                 access: [Role.SUPER_ADMIN, Role.ADMIN],
             },
             {
-                title: 'Orders',
-                url: '/orders',
+                title: "Orders",
+                url: "/orders",
                 icon: IconPackage,
                 access: [
                     Role.SUPER_ADMIN,
@@ -76,37 +81,37 @@ export const sidebarGroups: SidebarGroup[] = [
                 ],
             },
             {
-                title: 'Earnings',
-                url: '/earnings',
+                title: "Earnings",
+                url: "/earnings",
                 icon: IconReceipt,
                 access: [Role.SUPER_ADMIN, Role.ADMIN],
             },
             {
-                title: 'Profit Share',
-                url: '/profit-share',
+                title: "Profit Share",
+                url: "/profit-share",
                 icon: IconPigMoney,
                 access: [Role.SUPER_ADMIN, Role.ADMIN],
             },
         ],
     },
     {
-        groupLabel: 'Team Management',
+        groupLabel: "Team Management",
         items: [
             {
-                title: 'Staffs',
-                url: '/staffs',
+                title: "Staffs",
+                url: "/staffs",
                 icon: IconUsers,
                 access: [Role.SUPER_ADMIN, Role.ADMIN, Role.HR_MANAGER],
             },
             {
-                title: 'Invitations',
-                url: '/invitations',
+                title: "Invitations",
+                url: "/invitations",
                 icon: IconMail,
                 access: [Role.SUPER_ADMIN, Role.ADMIN, Role.HR_MANAGER],
             },
             {
-                title: 'Shifting',
-                url: '/shifting',
+                title: "Shifting",
+                url: "/shifting",
                 icon: IconArrowsShuffle,
                 access: [
                     Role.SUPER_ADMIN,
@@ -116,25 +121,25 @@ export const sidebarGroups: SidebarGroup[] = [
                 ],
             },
             {
-                title: 'Attendance',
-                url: '/attendance',
+                title: "Attendance",
+                url: "/attendance",
                 icon: IconCalendarStats,
                 access: [Role.SUPER_ADMIN, Role.ADMIN, Role.HR_MANAGER],
             },
             {
-                title: 'Careers',
-                url: '/careers',
+                title: "Careers",
+                url: "/careers",
                 icon: IconBriefcase,
                 access: [Role.SUPER_ADMIN, Role.ADMIN, Role.HR_MANAGER],
             },
         ],
     },
     {
-        groupLabel: 'HR & Leave',
+        groupLabel: "HR & Leave",
         items: [
             {
-                title: 'Leave Application',
-                url: '/leave/apply',
+                title: "Leave Application",
+                url: "/leave/apply",
                 icon: IconCalendarOff,
                 access: [
                     Role.SUPER_ADMIN,
@@ -145,14 +150,14 @@ export const sidebarGroups: SidebarGroup[] = [
                 ],
             },
             {
-                title: 'Leave Management',
-                url: '/leave/manage',
+                title: "Leave Management",
+                url: "/leave/manage",
                 icon: IconCalendarStats,
                 access: [Role.SUPER_ADMIN, Role.ADMIN, Role.HR_MANAGER],
             },
             {
-                title: 'Overtime',
-                url: '/overtime',
+                title: "Overtime",
+                url: "/overtime",
                 icon: IconClock,
                 access: [
                     Role.SUPER_ADMIN,
@@ -165,34 +170,34 @@ export const sidebarGroups: SidebarGroup[] = [
         ],
     },
     {
-        groupLabel: 'Finance',
+        groupLabel: "Finance",
         items: [
             {
-                title: 'Expense',
-                url: '/expense',
+                title: "Expense",
+                url: "/expense",
                 icon: IconReceipt,
                 access: [Role.SUPER_ADMIN, Role.ADMIN, Role.HR_MANAGER],
             },
             {
-                title: 'Debit',
-                url: '/debit',
+                title: "Debit",
+                url: "/debit",
                 icon: IconCreditCard,
                 access: [Role.SUPER_ADMIN, Role.ADMIN],
             },
             {
-                title: 'Payroll',
-                url: '/payroll',
+                title: "Payroll",
+                url: "/payroll",
                 icon: IconCash,
                 access: [Role.SUPER_ADMIN, Role.ADMIN, Role.HR_MANAGER],
             },
         ],
     },
     {
-        groupLabel: 'Communication',
+        groupLabel: "Communication",
         items: [
             {
-                title: 'Notices',
-                url: '/notices',
+                title: "Notices",
+                url: "/notices",
                 icon: IconSpeakerphone,
                 access: [
                     Role.SUPER_ADMIN,
@@ -203,8 +208,8 @@ export const sidebarGroups: SidebarGroup[] = [
                 ],
             },
             {
-                title: 'Notice Management',
-                url: '/notices/manage',
+                title: "Notice Management",
+                url: "/notices/manage",
                 icon: IconSpeakerphone,
                 access: [Role.SUPER_ADMIN, Role.ADMIN, Role.HR_MANAGER],
             },

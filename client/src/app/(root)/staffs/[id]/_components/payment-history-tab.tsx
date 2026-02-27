@@ -3,6 +3,10 @@
 import { useState } from "react";
 import { useGetExpensesQuery } from "@/redux/features/expense/expenseApi";
 import type { Expense } from "@/redux/features/expense/expenseApi";
+import { useSession } from "@/lib/auth-client";
+import { Role } from "@/constants/role";
+import { SalaryPinDialog } from "@/components/staff/salary-pin-dialog";
+
 import {
     Table,
     TableBody,
@@ -27,12 +31,32 @@ import {
     ChevronRight,
     CheckCircle2,
     Clock,
+    Lock,
 } from "lucide-react";
 import { format } from "date-fns";
 
-export function PaymentHistoryTab({ staffId }: { staffId: string }) {
+export function PaymentHistoryTab({
+    staffId,
+    isPinSet,
+}: {
+    staffId: string;
+    isPinSet: boolean;
+}) {
     const [page, setPage] = useState(1);
     const [limit, setLimit] = useState(10);
+
+    // Privacy Logic for non-admin viewers (e.g., self)
+    const { data: session } = useSession();
+    const userRole = session?.user?.role;
+    const canEdit =
+        userRole === Role.ADMIN ||
+        userRole === Role.HR_MANAGER ||
+        userRole === Role.SUPER_ADMIN;
+
+    const [isPinDialogOpen, setIsPinDialogOpen] = useState(false);
+    const [isUnlocked, setIsUnlocked] = useState(false);
+
+    const isAmountBlurred = !canEdit && !isUnlocked;
 
     const {
         data: response,
@@ -110,6 +134,19 @@ export function PaymentHistoryTab({ staffId }: { staffId: string }) {
 
     return (
         <div className="space-y-4">
+            {isAmountBlurred && (
+                <div className="flex justify-end mb-2">
+                    <Button
+                        variant="secondary"
+                        size="sm"
+                        className="flex items-center shadow-sm hover:bg-muted"
+                        onClick={() => setIsPinDialogOpen(true)}
+                    >
+                        <Lock className="h-4 w-4 mr-2" />
+                        Unlock Salary Amounts
+                    </Button>
+                </div>
+            )}
             <div className="rounded-md border bg-card">
                 <Table>
                     <TableHeader className="bg-muted/50">
@@ -168,7 +205,15 @@ export function PaymentHistoryTab({ staffId }: { staffId: string }) {
                                         {payment.paymentMethod || "Cash"}
                                     </TableCell>
                                     <TableCell className="text-right font-semibold">
-                                        {formattedAmount}
+                                        <span
+                                            className={
+                                                isAmountBlurred
+                                                    ? "blur-md select-none opacity-40 transition-all duration-300"
+                                                    : ""
+                                            }
+                                        >
+                                            {formattedAmount}
+                                        </span>
                                     </TableCell>
                                     <TableCell className="text-right">
                                         <Badge
@@ -261,6 +306,17 @@ export function PaymentHistoryTab({ staffId }: { staffId: string }) {
                     </div>
                 </div>
             )}
+
+            <SalaryPinDialog
+                open={isPinDialogOpen}
+                onOpenChange={setIsPinDialogOpen}
+                staffId={staffId}
+                isPinSet={isPinSet}
+                onSuccess={() => {
+                    setIsUnlocked(true);
+                    setIsPinDialogOpen(false);
+                }}
+            />
         </div>
     );
 }

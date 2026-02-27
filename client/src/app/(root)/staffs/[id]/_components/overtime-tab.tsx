@@ -45,8 +45,14 @@ export function StaffOvertimeTab({ staffId }: { staffId: string }) {
         limit,
     });
 
-    const overtimes = response?.data?.records || [];
-    const pagination = response?.data?.pagination;
+    const overtimes = response?.overtimes || [];
+    const pagination = response
+        ? {
+              page: response.page,
+              pages: response.totalPages,
+              total: response.total,
+          }
+        : null;
 
     const getStatusStyles = (status: string) => {
         switch (status) {

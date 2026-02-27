@@ -1,23 +1,23 @@
-import type { Request, Response } from 'express';
-import AttendanceServices from '../services/attendance.service.js';
+import type { Request, Response } from "express";
+import AttendanceServices from "../services/attendance.service.js";
 
 const checkIn = async (req: Request, res: Response) => {
     try {
         const userId = req.user?.id;
         const ip = req.ip;
-        const userAgent = req.headers['user-agent'] || '';
+        const userAgent = req.headers["user-agent"] || "";
 
         if (!userId) {
             return res.status(401).json({
                 success: false,
-                message: 'Unauthorized',
+                message: "Unauthorized",
             });
         }
 
         if (!ip) {
             return res.status(400).json({
                 success: false,
-                message: 'IP address is required',
+                message: "IP address is required",
             });
         }
 
@@ -25,17 +25,17 @@ const checkIn = async (req: Request, res: Response) => {
             userId,
             ip,
             userAgent,
-            source: 'web',
+            source: "web",
         });
 
         return res.status(200).json({
             success: true,
-            message: 'Checked in successfully',
+            message: "Checked in successfully",
         });
     } catch (error) {
         return res.status(500).json({
             success: false,
-            message: (error as Error).message || 'Failed to check in',
+            message: (error as Error).message || "Failed to check in",
         });
     }
 };
@@ -44,19 +44,19 @@ async function checkOut(req: Request, res: Response) {
     try {
         const userId = req.user?.id;
         const ip = req.ip;
-        const userAgent = req.headers['user-agent'] || '';
+        const userAgent = req.headers["user-agent"] || "";
 
         if (!userId) {
             return res.status(401).json({
                 success: false,
-                message: 'Unauthorized',
+                message: "Unauthorized",
             });
         }
 
         if (!ip) {
             return res.status(400).json({
                 success: false,
-                message: 'IP address is required',
+                message: "IP address is required",
             });
         }
 
@@ -64,18 +64,18 @@ async function checkOut(req: Request, res: Response) {
             userId,
             ip,
             userAgent,
-            source: 'web',
+            source: "web",
         });
 
         return res.status(200).json({
             success: true,
-            message: 'Checked out successfully',
+            message: "Checked out successfully",
             attendanceDay: result.attendanceDay,
         });
     } catch (error) {
         return res.status(500).json({
             success: false,
-            message: (error as Error).message || 'Failed to check out',
+            message: (error as Error).message || "Failed to check out",
         });
     }
 }
@@ -87,7 +87,7 @@ async function getTodayAttendance(req: Request, res: Response) {
         if (!userId) {
             return res.status(401).json({
                 success: false,
-                message: 'Unauthorized',
+                message: "Unauthorized",
             });
         }
 
@@ -111,7 +111,7 @@ async function getTodayAttendance(req: Request, res: Response) {
 const getMonthlyStats = async (req: Request, res: Response) => {
     try {
         const userId = req.user?.id;
-        if (!userId) throw new Error('Unauthorized');
+        if (!userId) throw new Error("Unauthorized");
 
         const result = await AttendanceServices.getMonthlyStatsInDB(userId);
         return res.status(200).json({
@@ -121,7 +121,7 @@ const getMonthlyStats = async (req: Request, res: Response) => {
     } catch (error: any) {
         return res.status(500).json({
             success: false,
-            message: error.message || 'Failed to fetch monthly stats',
+            message: error.message || "Failed to fetch monthly stats",
         });
     }
 };
@@ -129,7 +129,7 @@ const getMonthlyStats = async (req: Request, res: Response) => {
 const getMyAttendanceHistory = async (req: Request, res: Response) => {
     try {
         const userId = req.user?.id;
-        if (!userId) throw new Error('Unauthorized');
+        if (!userId) throw new Error("Unauthorized");
 
         const days = parseInt(req.query.days as string) || 7;
         const result = await AttendanceServices.getMyAttendanceHistoryInDB(
@@ -144,27 +144,41 @@ const getMyAttendanceHistory = async (req: Request, res: Response) => {
     } catch (error: any) {
         return res.status(500).json({
             success: false,
-            message: error.message || 'Failed to fetch attendance history',
+            message: error.message || "Failed to fetch attendance history",
         });
     }
 };
 
 const getAllAttendance = async (req: Request, res: Response) => {
     try {
+        const userRole = req.user?.role;
+        const userId = req.user?.id;
+        if (!userId) throw new Error("Unauthorized");
+
+        let queryStaffId = req.query.staffId as string;
+
+        // If the user is just a STAFF or TEAM_LEADER, enforce their own staffId
+        if (userRole === "staff" || userRole === "team_leader") {
+            const StaffModel = (await import("../models/staff.model.js"))
+                .default;
+            const staff = await StaffModel.findOne({ userId });
+            if (!staff) throw new Error("Staff record not found");
+            queryStaffId = (staff as any)._id.toString();
+        }
+
         const {
             startDate,
             endDate,
-            staffId,
             status,
             branchId,
-            page = '1',
-            limit = '50',
+            page = "1",
+            limit = "50",
         } = req.query;
 
         const result = await AttendanceServices.getAllAttendanceFromDB({
             startDate: startDate as string,
             endDate: endDate as string,
-            staffId: staffId as string,
+            staffId: queryStaffId,
             status: status as string,
             branchId: branchId as string,
             page: parseInt(page as string) || 1,
@@ -177,10 +191,10 @@ const getAllAttendance = async (req: Request, res: Response) => {
             data: result,
         });
     } catch (error: any) {
-        console.error('Error in getAllAttendance:', error);
+        console.error("Error in getAllAttendance:", error);
         return res.status(500).json({
             success: false,
-            message: error.message || 'Failed to fetch attendance records',
+            message: error.message || "Failed to fetch attendance records",
         });
     }
 };
@@ -194,7 +208,7 @@ const updateAttendanceStatus = async (req: Request, res: Response) => {
         if (!updatedBy) {
             return res.status(401).json({
                 success: false,
-                message: 'Unauthorized',
+                message: "Unauthorized",
             });
         }
 
@@ -207,13 +221,13 @@ const updateAttendanceStatus = async (req: Request, res: Response) => {
 
         return res.status(200).json({
             success: true,
-            message: 'Attendance status updated successfully',
+            message: "Attendance status updated successfully",
             data: result,
         });
     } catch (error: any) {
         return res.status(400).json({
             success: false,
-            message: error.message || 'Failed to update attendance status',
+            message: error.message || "Failed to update attendance status",
         });
     }
 };

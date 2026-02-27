@@ -93,10 +93,18 @@ const getAllOvertimeFromDB = async (query: Record<string, unknown>) => {
 
     const postMatchStage: any = {};
     if (query.staffId) {
-        postMatchStage["staffId.staffId"] = {
-            $regex: escapeRegex(query.staffId as string),
-            $options: "i",
-        };
+        const staffIdStr = String(query.staffId);
+        if (
+            Types.ObjectId.isValid(staffIdStr) &&
+            new Types.ObjectId(staffIdStr).toString() === staffIdStr
+        ) {
+            matchStage.staffId = new Types.ObjectId(staffIdStr);
+        } else {
+            postMatchStage["staffId.staffId"] = {
+                $regex: escapeRegex(staffIdStr),
+                $options: "i",
+            };
+        }
     }
     if (query.name) {
         postMatchStage["staffId.name"] = {
