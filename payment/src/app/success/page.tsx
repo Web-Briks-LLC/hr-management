@@ -65,11 +65,16 @@ function SuccessContent() {
                             },
                         );
 
-                        if (!confirmRes.ok) {
-                            const errorData = await confirmRes.json();
+                        const confirmData = await confirmRes.json();
+
+                        if (confirmData.alreadyPaid) {
+                            console.log(
+                                "Invoice was already paid. No duplicate processing.",
+                            );
+                        } else if (!confirmRes.ok) {
                             console.error(
                                 "Backend confirmation failed:",
-                                errorData,
+                                confirmData,
                             );
                         } else {
                             console.log(

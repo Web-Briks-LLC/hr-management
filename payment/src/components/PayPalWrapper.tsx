@@ -61,24 +61,9 @@ export default function PayPalWrapper({
                         try {
                             if (!actions.order) return;
                             const details = await actions.order.capture();
-                            // Optional: Send a webhook/API call to your backend here passing details.id to verify the capture server-side
-                            // before declaring it successful, but for now we trust the client-side approval for demonstration.
 
-                            // Call the server to confirm payment and update records
-                            await fetch(
-                                `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}/api/payments/confirm`,
-                                {
-                                    method: "POST",
-                                    headers: {
-                                        "Content-Type": "application/json",
-                                    },
-                                    body: JSON.stringify({
-                                        invoiceNumber,
-                                        paypalOrderId: details.id,
-                                    }),
-                                },
-                            );
-
+                            // Redirect to success page which will handle the
+                            // single /confirm call to the backend for verification
                             router.push(
                                 `/success?method=paypal&id=${details.id}&invoice=${invoiceNumber}`,
                             );

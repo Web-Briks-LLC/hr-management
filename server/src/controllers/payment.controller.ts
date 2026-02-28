@@ -14,6 +14,40 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
     apiVersion: "2026-01-28.clover", // Use the latest compatible API version
 });
 
+/**
+ * Get a PayPal access token using client credentials.
+ * Used for server-side order verification.
+ */
+const getPayPalAccessToken = async (): Promise<string> => {
+    const clientId = process.env.PAYPAL_CLIENT_ID;
+    const clientSecret = process.env.PAYPAL_CLIENT_SECRET;
+    if (!clientId || !clientSecret) {
+        throw new Error("PayPal credentials are not configured");
+    }
+
+    const baseUrl =
+        process.env.PAYPAL_MODE === "live"
+            ? "https://api-m.paypal.com"
+            : "https://api-m.sandbox.paypal.com";
+
+    const res = await fetch(`${baseUrl}/v1/oauth2/token`, {
+        method: "POST",
+        headers: {
+            Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`,
+            "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: "grant_type=client_credentials",
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+        throw new Error(
+            `PayPal auth failed: ${data.error_description || "Unknown error"}`,
+        );
+    }
+    return data.access_token;
+};
+
 export const createPaymentIntent = async (
     req: Request,
     res: Response,
@@ -74,6 +108,13 @@ export const confirmPayment = async (
                 .json({ error: "Invoice number is required" });
         }
 
+        // Require at least one gateway reference
+        if (!paymentIntentId && !paypalOrderId) {
+            return res
+                .status(400)
+                .json({ error: "Payment gateway reference is required" });
+        }
+
         console.log(
             `[Payment] Confirming payment for Invoice: ${invoiceNumber}`,
         );
@@ -85,15 +126,28 @@ export const confirmPayment = async (
             return res.status(404).json({ error: "Invoice record not found" });
         }
 
-        // 2. Perform validation if gateway IDs are provided
-        let verified = true;
+        // 1b. DUPLICATE PAYMENT GUARD — prevent re-processing already-paid invoices
+        if (invoice.paymentStatus === "paid") {
+            console.log(
+                `[Payment] Invoice ${invoiceNumber} is already paid. Skipping.`,
+            );
+            return res.status(200).json({
+                success: true,
+                message: "Invoice has already been paid",
+                alreadyPaid: true,
+            });
+        }
+
+        // 2. Perform server-side verification with the payment gateway
+        let verified = false;
 
         if (paymentIntentId && process.env.STRIPE_SECRET_KEY) {
             try {
                 const intent =
                     await stripe.paymentIntents.retrieve(paymentIntentId);
-                if (intent.status !== "succeeded") {
-                    verified = false;
+                if (intent.status === "succeeded") {
+                    verified = true;
+                } else {
                     console.warn(
                         `[Payment] Stripe Intent ${paymentIntentId} not succeeded: ${intent.status}`,
                     );
@@ -101,11 +155,43 @@ export const confirmPayment = async (
             } catch (err) {
                 console.error("[Payment] Error retrieving Stripe intent:", err);
             }
+        } else if (paypalOrderId) {
+            // SERVER-SIDE PAYPAL VERIFICATION
+            try {
+                const accessToken = await getPayPalAccessToken();
+                const baseUrl =
+                    process.env.PAYPAL_MODE === "live"
+                        ? "https://api-m.paypal.com"
+                        : "https://api-m.sandbox.paypal.com";
+
+                const orderRes = await fetch(
+                    `${baseUrl}/v2/checkout/orders/${paypalOrderId}`,
+                    {
+                        headers: {
+                            Authorization: `Bearer ${accessToken}`,
+                            "Content-Type": "application/json",
+                        },
+                    },
+                );
+
+                const order = await orderRes.json();
+                if (order.status === "COMPLETED") {
+                    verified = true;
+                } else {
+                    console.warn(
+                        `[Payment] PayPal Order ${paypalOrderId} not completed: ${order.status}`,
+                    );
+                }
+            } catch (err) {
+                console.error("[Payment] Error verifying PayPal order:", err);
+            }
         }
 
         // 3. Update the database status
         if (verified) {
             invoice.paymentStatus = "paid";
+            // Store gateway reference for audit trail
+            invoice.paymentToken = paymentIntentId || paypalOrderId;
             await invoice.save();
             console.log(`[Payment] Invoice ${invoiceNumber} marked as PAID`);
 
