@@ -32,7 +32,7 @@ const createOvertime = async (req: Request, res: Response) => {
             data: result,
         });
     } catch (error: any) {
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             message: error.message || "Failed to create overtime",
         });
