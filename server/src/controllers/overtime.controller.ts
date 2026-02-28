@@ -6,14 +6,29 @@ const createOvertime = async (req: Request, res: Response) => {
         const userId = req.user?.id;
         if (!userId) throw new Error("Unauthorized");
 
+        const { staffIds, staffId, ...rest } = req.body;
+        const ids = Array.isArray(staffIds) ? staffIds : [];
+        if (staffId && !ids.includes(staffId)) ids.push(staffId);
+
+        if (ids.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: "At least one staff member must be selected",
+            });
+        }
+
         const result = await OvertimeServices.createOvertimeInDB({
-            ...req.body,
+            ...rest,
+            staffIds: ids,
             createdBy: userId,
         });
 
-        res.status(201).json({
+        return res.status(201).json({
             success: true,
-            message: "Overtime created successfully",
+            message:
+                result.errorCount > 0
+                    ? `Processed with ${result.errorCount} errors`
+                    : "Overtime created successfully",
             data: result,
         });
     } catch (error: any) {
@@ -31,12 +46,18 @@ const getAllOvertime = async (req: Request, res: Response) => {
         const userId = req.user?.id as string;
         if (!userId) throw new Error("Unauthorized");
 
-        if (userRole === "staff" || userRole === "team_leader") {
+        if (userRole === "staff") {
             const StaffModel = (await import("../models/staff.model.js"))
                 .default;
             const staff = await StaffModel.findOne({ userId });
             if (!staff) throw new Error("Staff record not found");
             queryParams.staffId = String(staff._id);
+        } else if (userRole === "team_leader") {
+            const StaffModel = (await import("../models/staff.model.js"))
+                .default;
+            const staff = await StaffModel.findOne({ userId });
+            if (!staff) throw new Error("Staff record not found");
+            queryParams.branchId = String(staff.branchId);
         }
 
         const result = await OvertimeServices.getAllOvertimeFromDB(queryParams);

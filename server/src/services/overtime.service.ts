@@ -73,14 +73,43 @@ const getOvertimeAggregationPipeline = (
 ];
 
 const createOvertimeInDB = async (
-    payload: Partial<IOvertime> & { createdBy: string },
+    payload: { staffIds: string[] } & Partial<IOvertime> & {
+            createdBy: string;
+        },
 ) => {
-    const result = await OvertimeModel.create({
-        ...payload,
-        status: "approved",
-        approvedBy: payload.createdBy, // Auto-approve by creator
-    });
-    return result;
+    const { staffIds, ...rest } = payload;
+    const results = [];
+    const errors = [];
+
+    for (const staffId of staffIds) {
+        try {
+            const result = await OvertimeModel.create({
+                ...rest,
+                staffId,
+                status: "approved",
+                approvedBy: payload.createdBy,
+            });
+            results.push(result);
+        } catch (error: any) {
+            // Check if it's a duplicate key error (code 11000)
+            if (error.code === 11000) {
+                errors.push({
+                    staffId,
+                    message: "Overtime already exists for this date and type",
+                });
+            } else {
+                errors.push({ staffId, message: error.message });
+            }
+        }
+    }
+
+    return {
+        totalProcessed: staffIds.length,
+        successCount: results.length,
+        errorCount: errors.length,
+        results,
+        errors,
+    };
 };
 
 const getAllOvertimeFromDB = async (query: Record<string, unknown>) => {
@@ -111,6 +140,11 @@ const getAllOvertimeFromDB = async (query: Record<string, unknown>) => {
             $regex: escapeRegex(query.name as string),
             $options: "i",
         };
+    }
+    if (query.branchId) {
+        postMatchStage["staffId.branchId"] = new Types.ObjectId(
+            String(query.branchId),
+        );
     }
 
     const basePipeline = getOvertimeAggregationPipeline(
