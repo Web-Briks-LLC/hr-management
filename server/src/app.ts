@@ -4,6 +4,8 @@ import express, {
     type Request,
 } from "express";
 import cors from "cors";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 import envConfig from "./config/env.config.js";
 import { toNodeHandler } from "better-auth/node";
 import { auth } from "./lib/auth.js";
@@ -14,12 +16,28 @@ const { trusted_origins } = envConfig;
 
 const app: Application = express();
 
+// SECURITY: Add security headers (XSS, clickjacking, MIME-sniffing protection)
+app.use(helmet());
+
 app.use(
     cors({
         origin: trusted_origins.split(","),
         credentials: true,
     }),
 );
+
+// SECURITY: Global rate limiter — 200 requests per 15 minutes per IP
+const globalLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 200,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: {
+        success: false,
+        message: "Too many requests. Please try again later.",
+    },
+});
+app.use(globalLimiter);
 
 app.all("/api/auth/{*any}", toNodeHandler(auth));
 
@@ -47,10 +65,10 @@ app.use(
             (req.method === "POST" &&
                 req.path === "/careers/applications/public");
 
-        // Allow public access to invoice portals
+        // Allow public access to read invoice data (for payment portal)
+        // SECURITY: Removed POST /invoices/record from public routes — it now requires auth
         const isPublicInvoiceRoute =
-            (req.method === "GET" && /^\/invoices\/public\//.test(req.path)) ||
-            (req.method === "POST" && /^\/invoices\/record\/?$/.test(req.path));
+            req.method === "GET" && /^\/invoices\/public\//.test(req.path);
 
         // Allow public access to create/confirm payments
         const isPublicPaymentRoute =

@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router } from "express";
 import {
     createOrder,
     getAllOrders,
@@ -11,20 +11,29 @@ import {
     getOrderStats,
     getOrdersByClient,
     getOrderYears,
-} from '../controllers/order.controller.js';
+} from "../controllers/order.controller.js";
+import { authorize } from "../middlewares/authorize.js";
+import { Role } from "../constants/role.js";
 
 const router = Router();
 
-router.post('/', createOrder);
-router.get('/', getAllOrders);
-router.get('/stats', getOrderStats);
-router.get('/years', getOrderYears);
-router.get('/client/:clientId', getOrdersByClient);
-router.get('/:id', getOrderById);
-router.patch('/:id', updateOrder);
-router.patch('/:id/status', updateOrderStatus);
-router.patch('/:id/extend-deadline', extendDeadline);
-router.post('/:id/revision', addRevision);
-router.delete('/:id', deleteOrder);
+const allowedRoles = [Role.SUPER_ADMIN, Role.ADMIN, Role.HR_MANAGER];
+const extendedRoles = [...allowedRoles, Role.TEAM_LEADER, Role.STAFF];
+
+router.post("/", authorize(...allowedRoles), createOrder);
+router.get("/", authorize(...extendedRoles), getAllOrders);
+router.get("/stats", authorize(...allowedRoles), getOrderStats);
+router.get("/years", authorize(...allowedRoles), getOrderYears);
+router.get("/client/:clientId", authorize(...allowedRoles), getOrdersByClient);
+router.get("/:id", authorize(...extendedRoles), getOrderById);
+router.patch("/:id", authorize(...allowedRoles), updateOrder);
+router.patch("/:id/status", authorize(...allowedRoles), updateOrderStatus);
+router.patch(
+    "/:id/extend-deadline",
+    authorize(...allowedRoles),
+    extendDeadline,
+);
+router.post("/:id/revision", authorize(...allowedRoles), addRevision);
+router.delete("/:id", authorize(...allowedRoles), deleteOrder);
 
 export { router as orderRoute };

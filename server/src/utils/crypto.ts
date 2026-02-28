@@ -1,9 +1,17 @@
 import crypto from "crypto";
 
 const ALGORITHM = "aes-256-cbc";
+
+// SECURITY: Require ENCRYPTION_KEY from environment — never use a fallback.
+const RAW_KEY = process.env.ENCRYPTION_KEY;
+if (!RAW_KEY) {
+    throw new Error(
+        "ENCRYPTION_KEY environment variable is required. " +
+            "Generate one with: node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\"",
+    );
+}
+
 // Must be exactly 32 bytes for aes-256. We hash the input to guarantee 32 bytes.
-const RAW_KEY =
-    process.env.ENCRYPTION_KEY || "your-default-32-byte-secret-key-!";
 const ENCRYPTION_KEY = crypto
     .createHash("sha256")
     .update(String(RAW_KEY))

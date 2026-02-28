@@ -39,7 +39,7 @@ const getPayPalAccessToken = async (): Promise<string> => {
         body: "grant_type=client_credentials",
     });
 
-    const data = await res.json();
+    const data: any = await res.json();
     if (!res.ok) {
         throw new Error(
             `PayPal auth failed: ${data.error_description || "Unknown error"}`,
@@ -48,17 +48,29 @@ const getPayPalAccessToken = async (): Promise<string> => {
     return data.access_token;
 };
 
+/**
+ * Helper: Get the PayPal API base URL based on mode.
+ */
+const getPayPalBaseUrl = (): string =>
+    process.env.PAYPAL_MODE === "live"
+        ? "https://api-m.paypal.com"
+        : "https://api-m.sandbox.paypal.com";
+
+/**
+ * SECURITY FIX: createPaymentIntent now looks up the invoice amount from the database
+ * instead of trusting the client-supplied amount.
+ */
 export const createPaymentIntent = async (
     req: Request,
     res: Response,
 ): Promise<any> => {
     try {
-        const { amount, currency, invoiceNumber, clientName } = req.body;
+        const { invoiceNumber, currency } = req.body;
 
-        if (!amount || !currency) {
+        if (!invoiceNumber) {
             return res
                 .status(400)
-                .json({ error: "Amount and currency are required" });
+                .json({ error: "Invoice number is required" });
         }
 
         if (!process.env.STRIPE_SECRET_KEY) {
@@ -68,21 +80,49 @@ export const createPaymentIntent = async (
                 .json({ error: "Payment gateway is not configured properly" });
         }
 
-        // Create a PaymentIntent with the order amount and currency
+        // SECURITY: Look up the actual invoice amount from the database
+        const invoice = await InvoiceRecord.findOne({
+            invoiceNumber: String(invoiceNumber),
+        });
+
+        if (!invoice) {
+            return res.status(404).json({ error: "Invoice not found" });
+        }
+
+        if (invoice.paymentStatus === "paid") {
+            return res.status(400).json({
+                error: "This invoice has already been paid",
+                alreadyPaid: true,
+            });
+        }
+
+        const amount = invoice.totalAmount;
+        const invoiceCurrency = currency || invoice.currency || "USD";
+
+        if (!amount || amount <= 0) {
+            return res.status(400).json({ error: "Invalid invoice amount" });
+        }
+
+        // Create a PaymentIntent with the VERIFIED amount from the database
         // Stripe requires the amount to be in the smallest currency unit (e.g., cents)
         const paymentIntent = await stripe.paymentIntents.create({
             amount: Math.round(amount * 100), // Convert standard amount (e.g., 50.50) to integer cents (5050)
-            currency: currency.toLowerCase(),
-            // In the latest API, automatic_payment_methods is enabled by default.
-            // It allows Stripe to offer Apple Pay, Google Pay, etc., automatically based on browser support.
+            currency: invoiceCurrency.toLowerCase(),
             automatic_payment_methods: {
                 enabled: true,
             },
             metadata: {
-                invoiceNumber: invoiceNumber || "N/A",
-                clientName: clientName || "N/A",
+                invoiceNumber: invoiceNumber,
+                clientName: invoice.clientName || "N/A",
+                expectedAmount: String(amount), // Store expected amount for verification
             },
         });
+
+        // SECURITY: Store the payment intent ID on the invoice for later verification
+        await InvoiceRecord.findOneAndUpdate(
+            { invoiceNumber: String(invoiceNumber) },
+            { $set: { pendingPaymentIntentId: paymentIntent.id } },
+        );
 
         res.status(200).json({
             clientSecret: paymentIntent.client_secret,
@@ -145,7 +185,38 @@ export const confirmPayment = async (
             try {
                 const intent =
                     await stripe.paymentIntents.retrieve(paymentIntentId);
+
                 if (intent.status === "succeeded") {
+                    // SECURITY: Verify the paid amount matches the invoice amount
+                    const paidAmountCents = intent.amount;
+                    const expectedAmountCents = Math.round(
+                        invoice.totalAmount * 100,
+                    );
+
+                    if (paidAmountCents < expectedAmountCents) {
+                        console.error(
+                            `[Payment] AMOUNT MISMATCH for Invoice ${invoiceNumber}: ` +
+                                `Paid ${paidAmountCents} cents but expected ${expectedAmountCents} cents`,
+                        );
+                        return res.status(400).json({
+                            error: "Payment amount does not match invoice amount",
+                        });
+                    }
+
+                    // SECURITY: Verify the payment intent was created for THIS invoice
+                    if (
+                        intent.metadata?.invoiceNumber &&
+                        intent.metadata.invoiceNumber !== invoiceNumber
+                    ) {
+                        console.error(
+                            `[Payment] INVOICE MISMATCH: Intent ${paymentIntentId} was created for ` +
+                                `invoice ${intent.metadata.invoiceNumber} but confirm was called for ${invoiceNumber}`,
+                        );
+                        return res.status(400).json({
+                            error: "Payment reference does not match this invoice",
+                        });
+                    }
+
                     verified = true;
                 } else {
                     console.warn(
@@ -159,10 +230,7 @@ export const confirmPayment = async (
             // SERVER-SIDE PAYPAL VERIFICATION
             try {
                 const accessToken = await getPayPalAccessToken();
-                const baseUrl =
-                    process.env.PAYPAL_MODE === "live"
-                        ? "https://api-m.paypal.com"
-                        : "https://api-m.sandbox.paypal.com";
+                const baseUrl = getPayPalBaseUrl();
 
                 const orderRes = await fetch(
                     `${baseUrl}/v2/checkout/orders/${paypalOrderId}`,
@@ -174,8 +242,36 @@ export const confirmPayment = async (
                     },
                 );
 
-                const order = await orderRes.json();
+                const order: any = await orderRes.json();
                 if (order.status === "COMPLETED") {
+                    // SECURITY: Verify PayPal paid amount matches invoice amount
+                    const purchaseUnit = order.purchase_units?.[0];
+                    const paidAmount = purchaseUnit?.amount?.value
+                        ? parseFloat(purchaseUnit.amount.value)
+                        : 0;
+
+                    if (paidAmount < invoice.totalAmount) {
+                        console.error(
+                            `[Payment] PAYPAL AMOUNT MISMATCH for Invoice ${invoiceNumber}: ` +
+                                `Paid ${paidAmount} but expected ${invoice.totalAmount}`,
+                        );
+                        return res.status(400).json({
+                            error: "Payment amount does not match invoice amount",
+                        });
+                    }
+
+                    // SECURITY: Verify the PayPal order was for THIS invoice
+                    const referenceId = purchaseUnit?.reference_id;
+                    if (referenceId && referenceId !== invoiceNumber) {
+                        console.error(
+                            `[Payment] PAYPAL INVOICE MISMATCH: Order ${paypalOrderId} ` +
+                                `reference_id is ${referenceId} but expected ${invoiceNumber}`,
+                        );
+                        return res.status(400).json({
+                            error: "Payment reference does not match this invoice",
+                        });
+                    }
+
                     verified = true;
                 } else {
                     console.warn(
