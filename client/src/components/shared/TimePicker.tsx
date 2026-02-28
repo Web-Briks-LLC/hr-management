@@ -44,10 +44,10 @@ export function TimePicker({ value, onChange, className }: TimePickerProps) {
                     Hours
                 </Label>
                 <Select value={hours} onValueChange={handleHourChange}>
-                    <SelectTrigger id="hours" className="w-[70px]">
+                    <SelectTrigger id="hours" className="w-auto">
                         <SelectValue placeholder="HH" />
                     </SelectTrigger>
-                    <SelectContent className="h-[200px]">
+                    <SelectContent>
                         {generateHours().map((hour) => (
                             <SelectItem key={hour} value={hour}>
                                 {hour}
@@ -62,10 +62,10 @@ export function TimePicker({ value, onChange, className }: TimePickerProps) {
                     Minutes
                 </Label>
                 <Select value={minutes} onValueChange={handleMinuteChange}>
-                    <SelectTrigger id="minutes" className="w-[70px]">
+                    <SelectTrigger id="minutes" className="w-auto">
                         <SelectValue placeholder="MM" />
                     </SelectTrigger>
-                    <SelectContent className="h-[200px]">
+                    <SelectContent>
                         {generateMinutes().map((minute) => (
                             <SelectItem key={minute} value={minute}>
                                 {minute}

@@ -1,4 +1,3 @@
-// Imports updated for new components
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -30,7 +29,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, Controller } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { IOvertime } from "@/types/overtime.type";
 import { Textarea } from "@/components/ui/textarea";
 import { DatePicker } from "@/components/shared/DatePicker";
@@ -39,22 +38,15 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import IStaff from "@/types/staff.type";
 import { IBranch } from "@/types/branch.type";
 import { useSession } from "@/lib/auth-client";
-import {
-    Command,
-    CommandEmpty,
-    CommandGroup,
-    CommandInput,
-    CommandItem,
-    CommandList,
-} from "@/components/ui/command";
+import { Badge } from "@/components/ui/badge";
+import { Check, ChevronsUpDown, Loader2, Search, Users, X } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
     Popover,
     PopoverContent,
     PopoverTrigger,
 } from "@/components/ui/popover";
-import { Badge } from "@/components/ui/badge";
-import { ChevronsUpDown, X } from "lucide-react";
-import { Checkbox } from "@/components/ui/checkbox";
+import { cn } from "@/lib/utils";
 
 const overtimeSchema = z.object({
     staffIds: z
@@ -72,7 +64,19 @@ type OvertimeFormValues = z.infer<typeof overtimeSchema>;
 interface OvertimeDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    data?: IOvertime | null; // If valid, we are editing
+    data?: IOvertime | null;
+}
+
+// ─── Debounce hook ───────────────────────────────────────────────────
+function useDebounce<T>(value: T, delay: number): T {
+    const [debouncedValue, setDebouncedValue] = useState(value);
+
+    useEffect(() => {
+        const timer = setTimeout(() => setDebouncedValue(value), delay);
+        return () => clearTimeout(timer);
+    }, [value, delay]);
+
+    return debouncedValue;
 }
 
 export function OvertimeDialog({
@@ -85,36 +89,31 @@ export function OvertimeDialog({
     const [updateOvertime, { isLoading: isUpdating }] =
         useUpdateOvertimeMutation();
 
-    // Get Current User info
+    // Current user
     const { data: session } = useSession();
     const { data: meData } = useGetMeQuery({});
     const currentUser = meData?.staff;
 
-    // Use role from session (auth) or fallback to staff user role
     const userRole = session?.user?.role || currentUser?.user?.role;
-
     const canChangeBranch = userRole === "admin" || userRole === "super_admin";
-
     const isBranchManagementRole =
         canChangeBranch ||
         userRole === "branch_admin" ||
         userRole === "hr_manager" ||
         userRole === "team_leader";
 
-    // State for Branch Selection (only for admins)
+    // Branch selection state
     const [selectedBranchId, setSelectedBranchId] = useState<string>("");
 
-    // Initialize selectedBranchId when currentUser loads
     if (currentUser?.branchId && !selectedBranchId) {
         setSelectedBranchId(currentUser.branchId);
     }
 
-    // Fetch Branches (only if they can change branch)
     const { data: branchesData } = useGetAllBranchesQuery(undefined, {
         skip: !canChangeBranch,
     });
 
-    // Fetch staffs for selection
+    // Staff query
     const { data: staffsData, isLoading: isStaffsLoading } = useGetStaffsQuery(
         {
             limit: 1000,
@@ -127,7 +126,31 @@ export function OvertimeDialog({
         },
     );
 
-    // State for staff selection dropdown
+    // Staff search with debounce
+    const [staffSearchTerm, setStaffSearchTerm] = useState("");
+    const debouncedSearch = useDebounce(staffSearchTerm, 300);
+    const searchInputRef = useRef<HTMLInputElement>(null);
+
+    const filteredStaffs = useMemo(() => {
+        const allStaffs: IStaff[] = staffsData?.staffs || [];
+        if (!debouncedSearch.trim()) return allStaffs;
+
+        const query = debouncedSearch.toLowerCase();
+        return allStaffs.filter((staff) => {
+            const name = staff.user?.name?.toLowerCase() || "";
+            const sid = staff.staffId?.toLowerCase() || "";
+            const designation = staff.designation?.toLowerCase() || "";
+            const email = staff.user?.email?.toLowerCase() || "";
+            return (
+                name.includes(query) ||
+                sid.includes(query) ||
+                designation.includes(query) ||
+                email.includes(query)
+            );
+        });
+    }, [staffsData?.staffs, debouncedSearch]);
+
+    // Staff select popover
     const [staffSelectOpen, setStaffSelectOpen] = useState(false);
 
     const {
@@ -154,7 +177,7 @@ export function OvertimeDialog({
                 staffIds: [data.staffId._id],
                 date: new Date(data.date),
                 type: data.type,
-                startTime: new Date(data.startTime).toTimeString().slice(0, 5), // HH:mm
+                startTime: new Date(data.startTime).toTimeString().slice(0, 5),
                 durationMinutes: data.durationMinutes,
                 reason: data.reason || "",
             });
@@ -172,7 +195,6 @@ export function OvertimeDialog({
 
     const onSubmit = async (values: OvertimeFormValues) => {
         try {
-            // Construct ISO date string for startTime
             const dateStr = values.date.toISOString().split("T")[0];
             const startDateTime = new Date(`${dateStr}T${values.startTime}`);
 
@@ -185,7 +207,6 @@ export function OvertimeDialog({
             };
 
             if (data) {
-                // Editing existing record
                 await updateOvertime({
                     id: data._id,
                     staffId: values.staffIds[0],
@@ -193,7 +214,6 @@ export function OvertimeDialog({
                 }).unwrap();
                 toast.success("Overtime updated successfully");
             } else {
-                // Bulk creation
                 const result = await createOvertime({
                     staffIds: values.staffIds,
                     ...commonPayload,
@@ -216,40 +236,59 @@ export function OvertimeDialog({
 
     const isLoading = isCreating || isUpdating;
 
-    const getInitials = (name: string) => {
+    const getInitials = useCallback((name: string) => {
         return name
             .split(" ")
             .map((n) => n[0])
             .join("")
             .toUpperCase()
             .slice(0, 2);
-    };
+    }, []);
 
-    // Filter branches if needed or just show all
+    const getStaffById = useCallback(
+        (id: string): IStaff | undefined => {
+            return staffsData?.staffs?.find((s: IStaff) => s._id === id);
+        },
+        [staffsData?.staffs],
+    );
+
     const branches = branchesData?.branches || [];
 
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[500px]">
+        <Dialog
+            open={open}
+            onOpenChange={(isOpen) => {
+                if (!isOpen) setStaffSearchTerm("");
+                onOpenChange(isOpen);
+            }}
+        >
+            <DialogContent className="sm:max-w-[520px]">
                 <DialogHeader>
-                    <DialogTitle>
+                    <DialogTitle className="flex items-center gap-2">
+                        <Users className="h-5 w-5" />
                         {data ? "Edit Overtime" : "Add Overtime"}
                     </DialogTitle>
-                </DialogHeader>
-                <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-                    <DialogDescription className="hidden">
-                        Overtime details form
+                    <DialogDescription>
+                        {data
+                            ? "Update the overtime details below."
+                            : "Assign overtime to one or more staff members."}
                     </DialogDescription>
-                    {/* Branch Selection for Admins */}
+                </DialogHeader>
+
+                <form
+                    onSubmit={handleSubmit(onSubmit)}
+                    className="space-y-5 pt-1"
+                >
+                    {/* ── Branch Selection ── */}
                     {canChangeBranch && (
-                        <div className="grid gap-2">
+                        <div className="space-y-2">
                             <Label htmlFor="branch">Branch</Label>
                             <Select
                                 value={selectedBranchId}
                                 onValueChange={setSelectedBranchId}
                             >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select Branch" />
+                                <SelectTrigger className="w-full">
+                                    <SelectValue placeholder="Select branch" />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {branches.map((branch: IBranch) => (
@@ -265,289 +304,343 @@ export function OvertimeDialog({
                         </div>
                     )}
 
-                    {/* Staff Selection */}
-                    <div className="grid gap-2">
+                    {/* ── Staff Multi-Select ── */}
+                    <div className="space-y-2">
                         <Label>Staff Members</Label>
                         <Controller
                             name="staffIds"
                             control={control}
-                            render={({ field }) => (
-                                <div className="space-y-2">
-                                    <Popover
-                                        open={staffSelectOpen}
-                                        onOpenChange={setStaffSelectOpen}
-                                    >
-                                        <PopoverTrigger asChild>
-                                            <Button
-                                                variant="outline"
-                                                role="combobox"
-                                                aria-expanded={staffSelectOpen}
-                                                className="w-full justify-between h-auto min-h-10 text-left font-normal"
-                                                disabled={!!data} // Disable multi-select when editing
+                            render={({ field }) => {
+                                const allStaffIds: string[] =
+                                    staffsData?.staffs?.map(
+                                        (s: IStaff) => s._id,
+                                    ) || [];
+                                const isAllSelected =
+                                    allStaffIds.length > 0 &&
+                                    field.value.length === allStaffIds.length;
+
+                                const toggleStaff = (staffId: string) => {
+                                    const isSelected =
+                                        field.value.includes(staffId);
+                                    if (isSelected) {
+                                        field.onChange(
+                                            field.value.filter(
+                                                (id) => id !== staffId,
+                                            ),
+                                        );
+                                    } else {
+                                        field.onChange([
+                                            ...field.value,
+                                            staffId,
+                                        ]);
+                                    }
+                                };
+
+                                const toggleAll = () => {
+                                    if (isAllSelected) {
+                                        field.onChange([]);
+                                    } else {
+                                        field.onChange(allStaffIds);
+                                    }
+                                };
+
+                                const removeStaff = (
+                                    e: React.MouseEvent,
+                                    staffId: string,
+                                ) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    field.onChange(
+                                        field.value.filter(
+                                            (id) => id !== staffId,
+                                        ),
+                                    );
+                                };
+
+                                const clearAll = (e: React.MouseEvent) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    field.onChange([]);
+                                };
+
+                                return (
+                                    <div className="space-y-2">
+                                        {/* Trigger */}
+                                        <Popover
+                                            open={staffSelectOpen}
+                                            onOpenChange={(isOpen) => {
+                                                setStaffSelectOpen(isOpen);
+                                                if (!isOpen) {
+                                                    setStaffSearchTerm("");
+                                                }
+                                            }}
+                                        >
+                                            <PopoverTrigger asChild>
+                                                <Button
+                                                    variant="outline"
+                                                    role="combobox"
+                                                    aria-expanded={
+                                                        staffSelectOpen
+                                                    }
+                                                    className="w-full justify-between h-10 text-left font-normal"
+                                                    disabled={!!data}
+                                                >
+                                                    <span
+                                                        className={cn(
+                                                            "truncate",
+                                                            field.value
+                                                                .length === 0 &&
+                                                                "text-muted-foreground",
+                                                        )}
+                                                    >
+                                                        {field.value.length ===
+                                                        0
+                                                            ? "Select staff members..."
+                                                            : `${field.value.length} staff selected`}
+                                                    </span>
+                                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                                </Button>
+                                            </PopoverTrigger>
+
+                                            <PopoverContent
+                                                className="p-0"
+                                                align="start"
+                                                style={{
+                                                    width: "var(--radix-popover-trigger-width)",
+                                                }}
                                             >
-                                                <div className="flex flex-wrap gap-1 items-center">
-                                                    {field.value.length > 0 ? (
-                                                        field.value.map(
-                                                            (id) => {
-                                                                const staff =
-                                                                    staffsData?.staffs?.find(
-                                                                        (
-                                                                            s: IStaff,
-                                                                        ) =>
-                                                                            s._id ===
-                                                                            id,
-                                                                    );
-                                                                return (
-                                                                    <Badge
-                                                                        key={id}
-                                                                        variant="secondary"
-                                                                        className="mr-1 mb-1"
-                                                                    >
-                                                                        {staff
-                                                                            ?.user
-                                                                            ?.name ||
-                                                                            "Selected"}
-                                                                        {!data && (
-                                                                            <button
-                                                                                className="ml-1 ring-offset-background rounded-full outline-hidden focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                                                                                onKeyDown={(
-                                                                                    e,
-                                                                                ) => {
-                                                                                    if (
-                                                                                        e.key ===
-                                                                                        "Enter"
-                                                                                    ) {
-                                                                                        field.onChange(
-                                                                                            field.value.filter(
-                                                                                                (
-                                                                                                    v,
-                                                                                                ) =>
-                                                                                                    v !==
-                                                                                                    id,
-                                                                                            ),
-                                                                                        );
-                                                                                    }
-                                                                                }}
-                                                                                onMouseDown={(
-                                                                                    e,
-                                                                                ) => {
-                                                                                    e.preventDefault();
-                                                                                    e.stopPropagation();
-                                                                                }}
-                                                                                onClick={() =>
-                                                                                    field.onChange(
-                                                                                        field.value.filter(
-                                                                                            (
-                                                                                                v,
-                                                                                            ) =>
-                                                                                                v !==
-                                                                                                id,
-                                                                                        ),
-                                                                                    )
-                                                                                }
-                                                                            >
-                                                                                <X className="h-3 w-3 text-muted-foreground hover:text-foreground" />
-                                                                            </button>
-                                                                        )}
-                                                                    </Badge>
-                                                                );
-                                                            },
-                                                        )
-                                                    ) : (
-                                                        <span className="text-muted-foreground">
-                                                            Select staff members
-                                                        </span>
+                                                {/* Search Input */}
+                                                <div className="flex items-center gap-2 border-b px-3 py-2">
+                                                    <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                                    <input
+                                                        ref={searchInputRef}
+                                                        type="text"
+                                                        className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                                                        placeholder="Search by name, ID, or designation..."
+                                                        value={staffSearchTerm}
+                                                        onChange={(e) =>
+                                                            setStaffSearchTerm(
+                                                                e.target.value,
+                                                            )
+                                                        }
+                                                    />
+                                                    {staffSearchTerm && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                setStaffSearchTerm(
+                                                                    "",
+                                                                )
+                                                            }
+                                                            className="text-muted-foreground hover:text-foreground"
+                                                        >
+                                                            <X className="h-3.5 w-3.5" />
+                                                        </button>
                                                     )}
                                                 </div>
-                                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                            </Button>
-                                        </PopoverTrigger>
-                                        <PopoverContent
-                                            className="w-(--radix-popover-trigger-width) p-0"
-                                            align="start"
-                                        >
-                                            <Command>
-                                                <CommandInput placeholder="Search staff..." />
-                                                <CommandList>
+
+                                                {/* Staff List */}
+                                                <div className="max-h-[240px] overflow-y-auto p-1">
                                                     {isStaffsLoading ? (
-                                                        <div className="p-4 text-center text-sm text-muted-foreground italic">
-                                                            Loading staff
-                                                            members...
+                                                        <div className="flex items-center justify-center gap-2 py-6 text-sm text-muted-foreground">
+                                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                                            Loading staff...
+                                                        </div>
+                                                    ) : filteredStaffs.length ===
+                                                      0 ? (
+                                                        <div className="py-6 text-center text-sm text-muted-foreground">
+                                                            {debouncedSearch
+                                                                ? `No staff matching "${debouncedSearch}"`
+                                                                : "No staff available"}
                                                         </div>
                                                     ) : (
                                                         <>
-                                                            <CommandEmpty>
-                                                                No staff found.
-                                                            </CommandEmpty>
-                                                            <CommandGroup>
-                                                                <CommandItem
-                                                                    className="flex items-center gap-2"
-                                                                    onSelect={() => {
-                                                                        const allIds =
-                                                                            staffsData?.staffs?.map(
-                                                                                (
-                                                                                    s: IStaff,
-                                                                                ) =>
-                                                                                    s._id,
-                                                                            ) ||
-                                                                            [];
-                                                                        if (
-                                                                            field
-                                                                                .value
-                                                                                .length ===
-                                                                            allIds.length
-                                                                        ) {
-                                                                            field.onChange(
-                                                                                [],
-                                                                            );
-                                                                        } else {
-                                                                            field.onChange(
-                                                                                allIds,
-                                                                            );
-                                                                        }
-                                                                    }}
+                                                            {/* Select All */}
+                                                            {!debouncedSearch && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={
+                                                                        toggleAll
+                                                                    }
+                                                                    className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground transition-colors"
                                                                 >
                                                                     <Checkbox
                                                                         checked={
-                                                                            field
-                                                                                .value
-                                                                                .length ===
-                                                                                (staffsData
-                                                                                    ?.staffs
-                                                                                    ?.length ||
-                                                                                    0) &&
-                                                                            field
-                                                                                .value
-                                                                                .length >
-                                                                                0
+                                                                            isAllSelected
                                                                         }
-                                                                        className="mr-2"
+                                                                        className="pointer-events-none"
                                                                     />
-                                                                    <span className="font-semibold">
+                                                                    <span className="font-medium">
                                                                         Select
                                                                         All
                                                                     </span>
-                                                                </CommandItem>
-                                                                {staffsData?.staffs?.map(
-                                                                    (
-                                                                        staff: IStaff,
-                                                                    ) => (
-                                                                        <CommandItem
+                                                                    <span className="ml-auto text-xs text-muted-foreground">
+                                                                        {
+                                                                            allStaffIds.length
+                                                                        }{" "}
+                                                                        staff
+                                                                    </span>
+                                                                </button>
+                                                            )}
+
+                                                            {/* Staff Items */}
+                                                            {filteredStaffs.map(
+                                                                (
+                                                                    staff: IStaff,
+                                                                ) => {
+                                                                    const isSelected =
+                                                                        field.value.includes(
+                                                                            staff._id,
+                                                                        );
+                                                                    return (
+                                                                        <button
                                                                             key={
                                                                                 staff._id
                                                                             }
-                                                                            onSelect={() => {
-                                                                                const isSelected =
-                                                                                    field.value.includes(
-                                                                                        staff._id,
-                                                                                    );
-                                                                                if (
-                                                                                    isSelected
-                                                                                ) {
-                                                                                    field.onChange(
-                                                                                        field.value.filter(
-                                                                                            (
-                                                                                                id,
-                                                                                            ) =>
-                                                                                                id !==
-                                                                                                staff._id,
-                                                                                        ),
-                                                                                    );
-                                                                                } else {
-                                                                                    field.onChange(
-                                                                                        [
-                                                                                            ...field.value,
-                                                                                            staff._id,
-                                                                                        ],
-                                                                                    );
-                                                                                }
-                                                                            }}
+                                                                            type="button"
+                                                                            onClick={() =>
+                                                                                toggleStaff(
+                                                                                    staff._id,
+                                                                                )
+                                                                            }
+                                                                            className={cn(
+                                                                                "flex w-full items-center gap-2.5 rounded-sm px-2 py-1.5 text-sm transition-colors",
+                                                                                isSelected
+                                                                                    ? "bg-accent/50"
+                                                                                    : "hover:bg-accent hover:text-accent-foreground",
+                                                                            )}
                                                                         >
                                                                             <Checkbox
-                                                                                checked={field.value.includes(
-                                                                                    staff._id,
-                                                                                )}
-                                                                                className="mr-2"
+                                                                                checked={
+                                                                                    isSelected
+                                                                                }
+                                                                                className="pointer-events-none"
                                                                             />
-                                                                            <div className="flex items-center gap-2">
-                                                                                <Avatar className="h-6 w-6">
-                                                                                    <AvatarImage
-                                                                                        src={
-                                                                                            staff
-                                                                                                .user
-                                                                                                ?.image as string
-                                                                                        }
-                                                                                    />
-                                                                                    <AvatarFallback>
-                                                                                        {getInitials(
-                                                                                            staff
-                                                                                                .user
-                                                                                                ?.name ||
-                                                                                                "U",
-                                                                                        )}
-                                                                                    </AvatarFallback>
-                                                                                </Avatar>
-                                                                                <div className="flex flex-col">
-                                                                                    <span className="text-sm">
-                                                                                        {staff
+                                                                            <Avatar className="h-7 w-7">
+                                                                                <AvatarImage
+                                                                                    src={
+                                                                                        staff
+                                                                                            .user
+                                                                                            ?.image as string
+                                                                                    }
+                                                                                />
+                                                                                <AvatarFallback className="text-[10px]">
+                                                                                    {getInitials(
+                                                                                        staff
                                                                                             .user
                                                                                             ?.name ||
-                                                                                            "Unknown"}
-                                                                                    </span>
-                                                                                    <span className="text-xs text-muted-foreground">
-                                                                                        {
-                                                                                            staff.staffId
-                                                                                        }{" "}
-                                                                                        •{" "}
-                                                                                        {
-                                                                                            staff.designation
-                                                                                        }
-                                                                                    </span>
-                                                                                </div>
+                                                                                            "U",
+                                                                                    )}
+                                                                                </AvatarFallback>
+                                                                            </Avatar>
+                                                                            <div className="flex flex-col items-start min-w-0">
+                                                                                <span className="truncate text-sm leading-tight">
+                                                                                    {staff
+                                                                                        .user
+                                                                                        ?.name ||
+                                                                                        "Unknown"}
+                                                                                </span>
+                                                                                <span className="truncate text-xs text-muted-foreground leading-tight">
+                                                                                    {
+                                                                                        staff.staffId
+                                                                                    }{" "}
+                                                                                    •{" "}
+                                                                                    {
+                                                                                        staff.designation
+                                                                                    }
+                                                                                </span>
                                                                             </div>
-                                                                        </CommandItem>
-                                                                    ),
-                                                                )}
-                                                            </CommandGroup>
+                                                                            {isSelected && (
+                                                                                <Check className="ml-auto h-4 w-4 text-primary shrink-0" />
+                                                                            )}
+                                                                        </button>
+                                                                    );
+                                                                },
+                                                            )}
                                                         </>
                                                     )}
-                                                </CommandList>
-                                            </Command>
-                                        </PopoverContent>
-                                    </Popover>
-                                </div>
-                            )}
+                                                </div>
+                                            </PopoverContent>
+                                        </Popover>
+
+                                        {/* Selected Badges */}
+                                        {field.value.length > 0 && !data && (
+                                            <div className="flex flex-wrap items-center gap-1.5">
+                                                {field.value.map((id) => {
+                                                    const staff =
+                                                        getStaffById(id);
+                                                    return (
+                                                        <Badge
+                                                            key={id}
+                                                            variant="secondary"
+                                                            className="gap-1 pr-1"
+                                                        >
+                                                            <span className="max-w-[120px] truncate">
+                                                                {staff?.user
+                                                                    ?.name ||
+                                                                    "Selected"}
+                                                            </span>
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) =>
+                                                                    removeStaff(
+                                                                        e,
+                                                                        id,
+                                                                    )
+                                                                }
+                                                                className="ml-0.5 rounded-full p-0.5 hover:bg-muted-foreground/20 transition-colors"
+                                                            >
+                                                                <X className="h-3 w-3" />
+                                                            </button>
+                                                        </Badge>
+                                                    );
+                                                })}
+                                                {field.value.length > 1 && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={clearAll}
+                                                        className="text-xs text-muted-foreground hover:text-destructive transition-colors px-1.5 py-0.5"
+                                                    >
+                                                        Clear all
+                                                    </button>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            }}
                         />
                         {errors.staffIds && (
-                            <p className="text-sm text-red-500">
+                            <p className="text-sm text-destructive">
                                 {errors.staffIds.message}
                             </p>
                         )}
                     </div>
 
-                    <div className="grid gap-2">
-                        <Label>Date</Label>
-                        <Controller
-                            control={control}
-                            name="date"
-                            render={({ field }) => (
-                                <DatePicker
-                                    value={field.value}
-                                    onChange={(date) =>
-                                        field.onChange(date as Date)
-                                    }
-                                />
-                            )}
-                        />
-                        {errors.date && (
-                            <p className="text-sm text-red-500">
-                                {errors.date.message}
-                            </p>
-                        )}
-                    </div>
-
+                    {/* ── Date & Type ── */}
                     <div className="grid grid-cols-2 gap-4">
-                        <div className="grid gap-2">
+                        <div className="space-y-2">
+                            <Label>Date</Label>
+                            <Controller
+                                control={control}
+                                name="date"
+                                render={({ field }) => (
+                                    <DatePicker
+                                        value={field.value}
+                                        onChange={(date) =>
+                                            field.onChange(date as Date)
+                                        }
+                                    />
+                                )}
+                            />
+                            {errors.date && (
+                                <p className="text-sm text-destructive">
+                                    {errors.date.message}
+                                </p>
+                            )}
+                        </div>
+
+                        <div className="space-y-2">
                             <Label htmlFor="type">Type</Label>
                             <Controller
                                 name="type"
@@ -579,13 +672,35 @@ export function OvertimeDialog({
                                 )}
                             />
                             {errors.type && (
-                                <p className="text-sm text-red-500">
+                                <p className="text-sm text-destructive">
                                     {errors.type.message}
                                 </p>
                             )}
                         </div>
+                    </div>
 
-                        <div className="grid gap-2">
+                    {/* ── Start Time & Duration ── */}
+                    <div className="grid grid-cols-2 gap-4 items-end">
+                        <div className="space-y-2">
+                            <Label htmlFor="startTime">Start Time</Label>
+                            <Controller
+                                control={control}
+                                name="startTime"
+                                render={({ field }) => (
+                                    <TimePicker
+                                        value={field.value}
+                                        onChange={field.onChange}
+                                    />
+                                )}
+                            />
+                            {errors.startTime && (
+                                <p className="text-sm text-destructive">
+                                    {errors.startTime.message}
+                                </p>
+                            )}
+                        </div>
+
+                        <div className="space-y-2">
                             <Label htmlFor="durationMinutes">
                                 Duration (mins)
                             </Label>
@@ -597,49 +712,53 @@ export function OvertimeDialog({
                                 })}
                             />
                             {errors.durationMinutes && (
-                                <p className="text-sm text-red-500">
+                                <p className="text-sm text-destructive">
                                     {errors.durationMinutes.message}
                                 </p>
                             )}
                         </div>
                     </div>
 
-                    <div className="grid gap-2">
-                        <Label htmlFor="startTime">Start Time</Label>
-                        <Controller
-                            control={control}
-                            name="startTime"
-                            render={({ field }) => (
-                                <TimePicker
-                                    value={field.value}
-                                    onChange={field.onChange}
-                                />
-                            )}
-                        />
-                        {errors.startTime && (
-                            <p className="text-sm text-red-500">
-                                {errors.startTime.message}
-                            </p>
-                        )}
-                    </div>
-
-                    <div className="grid gap-2">
-                        <Label htmlFor="reason">Reason</Label>
+                    {/* ── Reason ── */}
+                    <div className="space-y-2">
+                        <Label htmlFor="reason">
+                            Reason{" "}
+                            <span className="text-muted-foreground font-normal">
+                                (optional)
+                            </span>
+                        </Label>
                         <Textarea
                             id="reason"
-                            placeholder="Optional reason..."
+                            placeholder="Describe why the overtime is needed..."
+                            rows={3}
                             {...register("reason")}
                         />
                         {errors.reason && (
-                            <p className="text-sm text-red-500">
+                            <p className="text-sm text-destructive">
                                 {errors.reason.message}
                             </p>
                         )}
                     </div>
 
-                    <DialogFooter>
+                    {/* ── Footer ── */}
+                    <DialogFooter className="gap-2 pt-2">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => onOpenChange(false)}
+                            disabled={isLoading}
+                        >
+                            Cancel
+                        </Button>
                         <Button type="submit" disabled={isLoading}>
-                            {isLoading ? "Saving..." : "Save Changes"}
+                            {isLoading && (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            )}
+                            {isLoading
+                                ? "Saving..."
+                                : data
+                                  ? "Update Overtime"
+                                  : "Assign Overtime"}
                         </Button>
                     </DialogFooter>
                 </form>
