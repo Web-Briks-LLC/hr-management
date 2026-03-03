@@ -26,10 +26,10 @@ app.use(
     }),
 );
 
-// SECURITY: Global rate limiter — 200 requests per 15 minutes per IP
+// SECURITY: Global rate limiter — 1000 requests per 5 minutes per IP
 const globalLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 200,
+    windowMs: 5 * 60 * 1000, // 5 minutes
+    max: 1000,
     standardHeaders: true,
     legacyHeaders: false,
     message: {
