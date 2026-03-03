@@ -5,6 +5,7 @@ import {
     useGetAllAttendanceQuery,
     useUpdateAttendanceStatusMutation,
 } from "@/redux/features/attendance/attendanceApi";
+import { useGetStaffsQuery } from "@/redux/features/staff/staffApi";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,10 +39,7 @@ import {
     ChevronsRight,
     Calendar as CalendarIcon,
     Users,
-    CheckCircle2,
-    Clock,
-    XCircle,
-    CalendarOff,
+    UserCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -63,16 +61,94 @@ import { cn } from "@/lib/utils";
 import { DateRange } from "react-day-picker";
 import { Skeleton } from "@/components/ui/skeleton";
 
+interface IStaffListItem {
+    _id: string;
+    staffId: string;
+    designation: string;
+    department: string;
+    status: string;
+    user?: {
+        _id: string;
+        name: string;
+        email: string;
+        image?: string;
+        role: string;
+    };
+}
+
 const statusOptions = [
-    { value: "all", label: "All Status" },
-    { value: "present", label: "Present", color: "text-green-600" },
-    { value: "absent", label: "Absent", color: "text-red-600" },
-    { value: "late", label: "Late", color: "text-yellow-600" },
-    { value: "half_day", label: "Half Day", color: "text-orange-600" },
-    { value: "early_exit", label: "Early Exit", color: "text-purple-600" },
-    { value: "on_leave", label: "On Leave", color: "text-blue-600" },
-    { value: "weekend", label: "Weekend", color: "text-gray-600" },
-    { value: "holiday", label: "Holiday", color: "text-pink-600" },
+    {
+        value: "all",
+        label: "All Status",
+        color: "text-green-600",
+        tabActive:
+            "bg-slate-500/15 border-slate-500/40 text-slate-700 dark:text-slate-300",
+        tabBadge: "bg-slate-500/20 text-slate-700 dark:text-slate-300",
+    },
+    {
+        value: "present",
+        label: "Present",
+        color: "text-green-600",
+        tabActive:
+            "bg-green-500/15 border-green-500/40 text-green-700 dark:text-green-300",
+        tabBadge: "bg-green-500/20 text-green-700 dark:text-green-300",
+    },
+    {
+        value: "absent",
+        label: "Absent",
+        color: "text-red-600",
+        tabActive:
+            "bg-red-500/15 border-red-500/40 text-red-700 dark:text-red-300",
+        tabBadge: "bg-red-500/20 text-red-700 dark:text-red-300",
+    },
+    {
+        value: "late",
+        label: "Late",
+        color: "text-yellow-600",
+        tabActive:
+            "bg-yellow-500/15 border-yellow-500/40 text-yellow-700 dark:text-yellow-300",
+        tabBadge: "bg-yellow-500/20 text-yellow-700 dark:text-yellow-300",
+    },
+    {
+        value: "half_day",
+        label: "Half Day",
+        color: "text-orange-600",
+        tabActive:
+            "bg-orange-500/15 border-orange-500/40 text-orange-700 dark:text-orange-300",
+        tabBadge: "bg-orange-500/20 text-orange-700 dark:text-orange-300",
+    },
+    {
+        value: "early_exit",
+        label: "Early Exit",
+        color: "text-purple-600",
+        tabActive:
+            "bg-purple-500/15 border-purple-500/40 text-purple-700 dark:text-purple-300",
+        tabBadge: "bg-purple-500/20 text-purple-700 dark:text-purple-300",
+    },
+    {
+        value: "on_leave",
+        label: "On Leave",
+        color: "text-blue-600",
+        tabActive:
+            "bg-blue-500/15 border-blue-500/40 text-blue-700 dark:text-blue-300",
+        tabBadge: "bg-blue-500/20 text-blue-700 dark:text-blue-300",
+    },
+    {
+        value: "weekend",
+        label: "Weekend",
+        color: "text-gray-600",
+        tabActive:
+            "bg-gray-500/15 border-gray-500/40 text-gray-700 dark:text-gray-300",
+        tabBadge: "bg-gray-500/20 text-gray-700 dark:text-gray-300",
+    },
+    {
+        value: "holiday",
+        label: "Holiday",
+        color: "text-pink-600",
+        tabActive:
+            "bg-pink-500/15 border-pink-500/40 text-pink-700 dark:text-pink-300",
+        tabBadge: "bg-pink-500/20 text-pink-700 dark:text-pink-300",
+    },
 ];
 
 const FILTER_TYPES = {
@@ -227,6 +303,27 @@ export default function AttendancePage() {
     const pagination = data?.data?.pagination;
     const stats: Record<string, number> = data?.data?.stats || {};
 
+    // Staff queries for the info tabs
+    const { data: totalMembersData, isLoading: isTotalLoading } =
+        useGetStaffsQuery({
+            page: 1,
+            limit: 1000,
+        });
+    const { data: attendanceableData, isLoading: isAttendanceableLoading } =
+        useGetStaffsQuery({
+            page: 1,
+            limit: 1000,
+            status: "active",
+            excludeAdmins: true,
+        });
+
+    const totalMembers =
+        totalMembersData?.meta?.total || totalMembersData?.staffs?.length || 0;
+    const attendanceableStaffs = attendanceableData?.staffs || [];
+    const attendanceableCount =
+        attendanceableData?.meta?.total || attendanceableStaffs.length || 0;
+    const allStaffs = totalMembersData?.staffs || [];
+
     return (
         <div className="p-6 space-y-6">
             <div>
@@ -244,125 +341,64 @@ export default function AttendancePage() {
                 onValueChange={(val) => updateUrl("tab", val)}
                 className="w-full"
             >
-                <TabsList className="grid w-full md:w-[400px] grid-cols-2 mb-6">
-                    <TabsTrigger value="attendance">Attendance</TabsTrigger>
-                    <TabsTrigger value="overtime">Overtime</TabsTrigger>
-                </TabsList>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+                    <TabsList className="grid w-full sm:w-[400px] grid-cols-2">
+                        <TabsTrigger value="attendance">Attendance</TabsTrigger>
+                        <TabsTrigger value="overtime">Overtime</TabsTrigger>
+                    </TabsList>
+                    <TabsList className="bg-transparent gap-2 h-auto">
+                        <TabsTrigger
+                            value="total-members"
+                            className={cn(
+                                "flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium transition-all duration-200",
+                                activeTab === "total-members"
+                                    ? "bg-violet-500/15 border-violet-500/40 text-violet-700 dark:text-violet-300"
+                                    : "bg-muted/50 border-border/60 hover:bg-muted",
+                            )}
+                        >
+                            <Users className="h-4 w-4" />
+                            Total Members
+                            <Badge
+                                variant="secondary"
+                                className={cn(
+                                    "font-mono text-[10px] px-1.5 py-0 h-4",
+                                    activeTab === "total-members"
+                                        ? "bg-violet-500/20 text-violet-700 dark:text-violet-300"
+                                        : "bg-muted-foreground/10",
+                                )}
+                            >
+                                {isTotalLoading ? "..." : totalMembers}
+                            </Badge>
+                        </TabsTrigger>
+                        <TabsTrigger
+                            value="attendanceable-staffs"
+                            className={cn(
+                                "flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium transition-all duration-200",
+                                activeTab === "attendanceable-staffs"
+                                    ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-700 dark:text-emerald-300"
+                                    : "bg-muted/50 border-border/60 hover:bg-muted",
+                            )}
+                        >
+                            <UserCheck className="h-4 w-4" />
+                            Attendanceable Staffs
+                            <Badge
+                                variant="secondary"
+                                className={cn(
+                                    "font-mono text-[10px] px-1.5 py-0 h-4",
+                                    activeTab === "attendanceable-staffs"
+                                        ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300"
+                                        : "bg-muted-foreground/10",
+                                )}
+                            >
+                                {isAttendanceableLoading
+                                    ? "..."
+                                    : attendanceableCount}
+                            </Badge>
+                        </TabsTrigger>
+                    </TabsList>
+                </div>
 
                 <TabsContent value="attendance" className="mt-0 space-y-6">
-                    {/* Statistics Cards */}
-                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                        {/* Total Card */}
-                        <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-slate-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-slate-500/5 hover:border-slate-500/30">
-                            <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-slate-500/10 blur-2xl transition-all duration-300 group-hover:bg-slate-500/20" />
-                            <div className="relative">
-                                <div className="flex items-center justify-between mb-3">
-                                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-500/10 text-slate-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-slate-500/20">
-                                        <Users className="h-5 w-5" />
-                                    </div>
-                                </div>
-                                {isLoading || isFetching ? (
-                                    <Skeleton className="h-8 w-20" />
-                                ) : (
-                                    <h3 className="text-3xl font-bold tracking-tight text-slate-600 dark:text-slate-300">
-                                        {stats.total || 0}
-                                    </h3>
-                                )}
-                                <p className="text-xs text-muted-foreground mt-1">
-                                    Total Records
-                                </p>
-                            </div>
-                        </div>
-
-                        {/* Present Card */}
-                        <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-green-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-green-500/5 hover:border-green-500/30">
-                            <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-green-500/10 blur-2xl transition-all duration-300 group-hover:bg-green-500/20" />
-                            <div className="relative">
-                                <div className="flex items-center justify-between mb-3">
-                                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-500/10 text-green-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-green-500/20">
-                                        <CheckCircle2 className="h-5 w-5" />
-                                    </div>
-                                </div>
-                                {isLoading || isFetching ? (
-                                    <Skeleton className="h-8 w-20" />
-                                ) : (
-                                    <h3 className="text-3xl font-bold tracking-tight text-green-600 dark:text-green-400">
-                                        {stats.present || 0}
-                                    </h3>
-                                )}
-                                <p className="text-xs text-muted-foreground mt-1">
-                                    Present
-                                </p>
-                            </div>
-                        </div>
-
-                        {/* Late Card */}
-                        <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-yellow-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-yellow-500/5 hover:border-yellow-500/30">
-                            <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-yellow-500/10 blur-2xl transition-all duration-300 group-hover:bg-yellow-500/20" />
-                            <div className="relative">
-                                <div className="flex items-center justify-between mb-3">
-                                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-yellow-500/10 text-yellow-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-yellow-500/20">
-                                        <Clock className="h-5 w-5" />
-                                    </div>
-                                </div>
-                                {isLoading || isFetching ? (
-                                    <Skeleton className="h-8 w-20" />
-                                ) : (
-                                    <h3 className="text-3xl font-bold tracking-tight text-yellow-600 dark:text-yellow-400">
-                                        {stats.late || 0}
-                                    </h3>
-                                )}
-                                <p className="text-xs text-muted-foreground mt-1">
-                                    Late
-                                </p>
-                            </div>
-                        </div>
-
-                        {/* Absent Card */}
-                        <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-red-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-red-500/5 hover:border-red-500/30">
-                            <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-red-500/10 blur-2xl transition-all duration-300 group-hover:bg-red-500/20" />
-                            <div className="relative">
-                                <div className="flex items-center justify-between mb-3">
-                                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-500/10 text-red-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-red-500/20">
-                                        <XCircle className="h-5 w-5" />
-                                    </div>
-                                </div>
-                                {isLoading || isFetching ? (
-                                    <Skeleton className="h-8 w-20" />
-                                ) : (
-                                    <h3 className="text-3xl font-bold tracking-tight text-red-600 dark:text-red-400">
-                                        {stats.absent || 0}
-                                    </h3>
-                                )}
-                                <p className="text-xs text-muted-foreground mt-1">
-                                    Absent
-                                </p>
-                            </div>
-                        </div>
-
-                        {/* On Leave Card */}
-                        <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-blue-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/5 hover:border-blue-500/30">
-                            <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-blue-500/10 blur-2xl transition-all duration-300 group-hover:bg-blue-500/20" />
-                            <div className="relative">
-                                <div className="flex items-center justify-between mb-3">
-                                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/10 text-blue-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-blue-500/20">
-                                        <CalendarOff className="h-5 w-5" />
-                                    </div>
-                                </div>
-                                {isLoading || isFetching ? (
-                                    <Skeleton className="h-8 w-20" />
-                                ) : (
-                                    <h3 className="text-3xl font-bold tracking-tight text-blue-600 dark:text-blue-400">
-                                        {stats.on_leave || 0}
-                                    </h3>
-                                )}
-                                <p className="text-xs text-muted-foreground mt-1">
-                                    On Leave
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-
                     <Card className="border-border/60 shadow-md">
                         <CardHeader className="pb-3">
                             <CardTitle className="flex items-center gap-2 text-xl">
@@ -617,25 +653,37 @@ export default function AttendancePage() {
                                         }}
                                         className="w-full"
                                     >
-                                        <TabsList className="h-10 bg-muted/50 p-1 w-max">
+                                        <TabsList className="h-auto bg-muted/50 p-1 w-max flex-wrap gap-1">
                                             {statusOptions.map((status) => {
-                                                // Find count from stats (if 'all', use total)
                                                 const count =
                                                     status.value === "all"
                                                         ? stats.total || 0
                                                         : stats[status.value] ||
                                                           0;
+                                                const isActive =
+                                                    statusFilter ===
+                                                    status.value;
 
                                                 return (
                                                     <TabsTrigger
                                                         key={status.value}
                                                         value={status.value}
-                                                        className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-4 gap-2 text-sm"
+                                                        className={cn(
+                                                            "px-4 gap-2 text-sm border border-transparent transition-all duration-200",
+                                                            isActive
+                                                                ? status.tabActive
+                                                                : "data-[state=active]:bg-background data-[state=active]:shadow-sm",
+                                                        )}
                                                     >
                                                         {status.label}
                                                         <Badge
                                                             variant="secondary"
-                                                            className="font-mono text-[10px] px-1.5 py-0 h-4 bg-muted-foreground/10"
+                                                            className={cn(
+                                                                "font-mono text-[10px] px-1.5 py-0 h-4",
+                                                                isActive
+                                                                    ? status.tabBadge
+                                                                    : "bg-muted-foreground/10",
+                                                            )}
                                                         >
                                                             {count}
                                                         </Badge>
@@ -1045,6 +1093,281 @@ export default function AttendancePage() {
 
                 <TabsContent value="overtime" className="mt-0">
                     {role === Role.STAFF ? <MyOvertime /> : <OvertimeList />}
+                </TabsContent>
+
+                <TabsContent value="total-members" className="mt-0">
+                    <Card className="border-border/60 shadow-md">
+                        <CardHeader className="pb-3">
+                            <CardTitle className="flex items-center gap-2 text-xl">
+                                <Users className="h-5 w-5 text-violet-500" />
+                                All Members
+                                <Badge
+                                    variant="secondary"
+                                    className="bg-violet-500/15 text-violet-700 dark:text-violet-300 font-mono"
+                                >
+                                    {totalMembers}
+                                </Badge>
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="border rounded-lg overflow-hidden border-border/60">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow className="bg-muted/40 hover:bg-muted/40 border-b-border/60">
+                                            <TableHead className="font-semibold">
+                                                Staff ID
+                                            </TableHead>
+                                            <TableHead className="font-semibold">
+                                                Name
+                                            </TableHead>
+                                            <TableHead className="font-semibold">
+                                                Email
+                                            </TableHead>
+                                            <TableHead className="font-semibold">
+                                                Designation
+                                            </TableHead>
+                                            <TableHead className="font-semibold">
+                                                Department
+                                            </TableHead>
+                                            <TableHead className="font-semibold">
+                                                Role
+                                            </TableHead>
+                                            <TableHead className="font-semibold">
+                                                Status
+                                            </TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {isTotalLoading ? (
+                                            Array.from({ length: 5 }).map(
+                                                (_, i) => (
+                                                    <TableRow key={i}>
+                                                        {Array.from({
+                                                            length: 7,
+                                                        }).map((_, j) => (
+                                                            <TableCell key={j}>
+                                                                <Skeleton className="h-4 w-[80px]" />
+                                                            </TableCell>
+                                                        ))}
+                                                    </TableRow>
+                                                ),
+                                            )
+                                        ) : allStaffs.length === 0 ? (
+                                            <TableRow>
+                                                <TableCell
+                                                    colSpan={7}
+                                                    className="text-center py-16 text-muted-foreground"
+                                                >
+                                                    <div className="flex flex-col items-center gap-3">
+                                                        <Users className="h-10 w-10 text-muted-foreground/30" />
+                                                        <p className="text-base font-medium">
+                                                            No members found
+                                                        </p>
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
+                                        ) : (
+                                            allStaffs.map(
+                                                (staff: IStaffListItem) => (
+                                                    <TableRow
+                                                        key={staff._id}
+                                                        className="hover:bg-muted/30"
+                                                    >
+                                                        <TableCell className="font-mono text-sm">
+                                                            {staff.staffId ||
+                                                                "-"}
+                                                        </TableCell>
+                                                        <TableCell className="font-medium">
+                                                            <div className="text-sm font-semibold">
+                                                                {staff.user
+                                                                    ?.name ||
+                                                                    "Unknown"}
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell className="text-sm text-muted-foreground">
+                                                            {staff.user
+                                                                ?.email || "-"}
+                                                        </TableCell>
+                                                        <TableCell className="text-sm text-muted-foreground">
+                                                            {staff.designation ||
+                                                                "-"}
+                                                        </TableCell>
+                                                        <TableCell className="text-sm text-muted-foreground">
+                                                            {staff.department ||
+                                                                "-"}
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Badge
+                                                                variant="outline"
+                                                                className="capitalize font-medium shadow-none"
+                                                            >
+                                                                {staff.user?.role?.replace(
+                                                                    "_",
+                                                                    " ",
+                                                                ) || "-"}
+                                                            </Badge>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Badge
+                                                                variant="outline"
+                                                                className={cn(
+                                                                    "capitalize font-medium shadow-none",
+                                                                    staff.status ===
+                                                                        "active"
+                                                                        ? "text-green-600"
+                                                                        : staff.status ===
+                                                                            "inactive"
+                                                                          ? "text-yellow-600"
+                                                                          : "text-red-600",
+                                                                )}
+                                                            >
+                                                                {staff.status ||
+                                                                    "-"}
+                                                            </Badge>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ),
+                                            )
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="attendanceable-staffs" className="mt-0">
+                    <Card className="border-border/60 shadow-md">
+                        <CardHeader className="pb-3">
+                            <CardTitle className="flex items-center gap-2 text-xl">
+                                <UserCheck className="h-5 w-5 text-emerald-500" />
+                                Attendanceable Staffs
+                                <Badge
+                                    variant="secondary"
+                                    className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 font-mono"
+                                >
+                                    {attendanceableCount}
+                                </Badge>
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="border rounded-lg overflow-hidden border-border/60">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow className="bg-muted/40 hover:bg-muted/40 border-b-border/60">
+                                            <TableHead className="font-semibold">
+                                                Staff ID
+                                            </TableHead>
+                                            <TableHead className="font-semibold">
+                                                Name
+                                            </TableHead>
+                                            <TableHead className="font-semibold">
+                                                Email
+                                            </TableHead>
+                                            <TableHead className="font-semibold">
+                                                Designation
+                                            </TableHead>
+                                            <TableHead className="font-semibold">
+                                                Department
+                                            </TableHead>
+                                            <TableHead className="font-semibold">
+                                                Role
+                                            </TableHead>
+                                            <TableHead className="font-semibold">
+                                                Status
+                                            </TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {isAttendanceableLoading ? (
+                                            Array.from({ length: 5 }).map(
+                                                (_, i) => (
+                                                    <TableRow key={i}>
+                                                        {Array.from({
+                                                            length: 7,
+                                                        }).map((_, j) => (
+                                                            <TableCell key={j}>
+                                                                <Skeleton className="h-4 w-[80px]" />
+                                                            </TableCell>
+                                                        ))}
+                                                    </TableRow>
+                                                ),
+                                            )
+                                        ) : attendanceableStaffs.length ===
+                                          0 ? (
+                                            <TableRow>
+                                                <TableCell
+                                                    colSpan={7}
+                                                    className="text-center py-16 text-muted-foreground"
+                                                >
+                                                    <div className="flex flex-col items-center gap-3">
+                                                        <UserCheck className="h-10 w-10 text-muted-foreground/30" />
+                                                        <p className="text-base font-medium">
+                                                            No attendanceable
+                                                            staffs found
+                                                        </p>
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
+                                        ) : (
+                                            attendanceableStaffs.map(
+                                                (staff: IStaffListItem) => (
+                                                    <TableRow
+                                                        key={staff._id}
+                                                        className="hover:bg-muted/30"
+                                                    >
+                                                        <TableCell className="font-mono text-sm">
+                                                            {staff.staffId ||
+                                                                "-"}
+                                                        </TableCell>
+                                                        <TableCell className="font-medium">
+                                                            <div className="text-sm font-semibold">
+                                                                {staff.user
+                                                                    ?.name ||
+                                                                    "Unknown"}
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell className="text-sm text-muted-foreground">
+                                                            {staff.user
+                                                                ?.email || "-"}
+                                                        </TableCell>
+                                                        <TableCell className="text-sm text-muted-foreground">
+                                                            {staff.designation ||
+                                                                "-"}
+                                                        </TableCell>
+                                                        <TableCell className="text-sm text-muted-foreground">
+                                                            {staff.department ||
+                                                                "-"}
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Badge
+                                                                variant="outline"
+                                                                className="capitalize font-medium shadow-none"
+                                                            >
+                                                                {staff.user?.role?.replace(
+                                                                    "_",
+                                                                    " ",
+                                                                ) || "-"}
+                                                            </Badge>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Badge
+                                                                variant="outline"
+                                                                className="capitalize font-medium shadow-none text-green-600"
+                                                            >
+                                                                {staff.status ||
+                                                                    "-"}
+                                                            </Badge>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ),
+                                            )
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        </CardContent>
+                    </Card>
                 </TabsContent>
             </Tabs>
         </div>

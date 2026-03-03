@@ -1,0 +1,2 @@
+sed -i 's/import {.*addRevision,.*getOrderStats/import { createOrder, getAllOrders, getOrderById, updateOrder, deleteOrder, updateOrderStatus, extendDeadline, addRevision, getOrderStats, getOrdersByClient, getOrderYears, sendStatusEmail }/g' src/routes/order.route.ts
+sed -i 's/router.patch("\/:id\/status", authorize(...allowedRoles), updateOrderStatus);/router.patch("\/:id\/status", authorize(...allowedRoles), updateOrderStatus);\nrouter.post("\/:id\/status-email", authorize(...allowedRoles), sendStatusEmail);/g' src/routes/order.route.ts

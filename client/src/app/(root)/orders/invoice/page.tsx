@@ -131,7 +131,12 @@ export default function InvoicePage() {
             { skip: !selectedYear },
         );
 
-    const allOrders = useMemo(() => allOrdersData?.data || [], [allOrdersData]);
+    const allOrders = useMemo(() => {
+        const rawOrders = allOrdersData?.data || [];
+        return rawOrders.filter(
+            (order: IOrder) => order.status !== "cancelled",
+        );
+    }, [allOrdersData]);
 
     // Extract unique clients from orders
     const availableClients = useMemo(() => {

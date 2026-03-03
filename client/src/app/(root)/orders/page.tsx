@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo } from "react";
 import {
     useGetOrdersQuery,
     useCreateOrderMutation,
@@ -12,33 +12,34 @@ import {
     useAddRevisionMutation,
     useLazyGetOrdersQuery,
     useGetOrderYearsQuery,
-} from '@/redux/features/order/orderApi';
-import { useGetClientsQuery } from '@/redux/features/client/clientApi';
+} from "@/redux/features/order/orderApi";
+import { useGetClientsQuery } from "@/redux/features/client/clientApi";
 import type {
     IOrder,
     OrderStatus,
     OrderPriority,
     OrderFilters,
-} from '@/types/order.type';
-import { ORDER_STATUS_LABELS, ORDER_PRIORITY_LABELS } from '@/types/order.type';
+    UpdateStatusInput,
+} from "@/types/order.type";
+import { ORDER_STATUS_LABELS, ORDER_PRIORITY_LABELS } from "@/types/order.type";
 import {
     Card,
     CardContent,
     CardDescription,
     CardHeader,
     CardTitle,
-} from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
     Select,
     SelectContent,
     SelectItem,
     SelectTrigger,
     SelectValue,
-} from '@/components/ui/select';
+} from "@/components/ui/select";
 import {
     Table,
     TableBody,
@@ -46,7 +47,7 @@ import {
     TableHead,
     TableHeader,
     TableRow,
-} from '@/components/ui/table';
+} from "@/components/ui/table";
 import {
     Dialog,
     DialogContent,
@@ -55,7 +56,7 @@ import {
     DialogTitle,
     DialogTrigger,
     DialogFooter,
-} from '@/components/ui/dialog';
+} from "@/components/ui/dialog";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -65,8 +66,8 @@ import {
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { Checkbox } from '@/components/ui/checkbox';
+} from "@/components/ui/alert-dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
     Loader,
     ChevronLeft,
@@ -88,50 +89,51 @@ import {
     Filter,
     X,
     CheckSquare,
-} from 'lucide-react';
-import Link from 'next/link';
-import { Skeleton } from '@/components/ui/skeleton';
-import { toast } from 'sonner';
-import { OrderForm, type OrderFormData } from '@/components/order/OrderForm';
-import { DeadlineCountdown } from '@/components/order/DeadlineCountdown';
-import { OrderTimeline } from '@/components/order/OrderTimeline';
-import { Badge } from '@/components/ui/badge';
+} from "lucide-react";
+import Link from "next/link";
+import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "sonner";
+import { OrderForm, type OrderFormData } from "@/components/order/OrderForm";
+import { DeadlineCountdown } from "@/components/order/DeadlineCountdown";
+import { OrderTimeline } from "@/components/order/OrderTimeline";
+import { EmailDialog } from "./EmailDialog";
+import { Badge } from "@/components/ui/badge";
 import {
     Tooltip,
     TooltipContent,
     TooltipProvider,
     TooltipTrigger,
-} from '@/components/ui/tooltip';
-import { format } from 'date-fns';
-import { DateTimePicker } from '@/components/shared/DateTimePicker';
-import { cn } from '@/lib/utils';
-import { useSession } from '@/lib/auth-client';
+} from "@/components/ui/tooltip";
+import { format } from "date-fns";
+import { DateTimePicker } from "@/components/shared/DateTimePicker";
+import { cn } from "@/lib/utils";
+import { useSession } from "@/lib/auth-client";
 
 const statusColors: Record<OrderStatus, string> = {
-    pending: 'bg-yellow-500/20 text-yellow-700 dark:text-yellow-400',
-    in_progress: 'bg-blue-500/20 text-blue-700 dark:text-blue-400',
-    quality_check: 'bg-purple-500/20 text-purple-700 dark:text-purple-400',
-    revision: 'bg-orange-500/20 text-orange-700 dark:text-orange-400',
-    completed: 'bg-green-500/20 text-green-700 dark:text-green-400',
-    delivered: 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-400',
-    cancelled: 'bg-red-500/20 text-red-700 dark:text-red-400',
+    pending: "bg-yellow-500/20 text-yellow-700 dark:text-yellow-400",
+    in_progress: "bg-blue-500/20 text-blue-700 dark:text-blue-400",
+    quality_check: "bg-purple-500/20 text-purple-700 dark:text-purple-400",
+    revision: "bg-orange-500/20 text-orange-700 dark:text-orange-400",
+    completed: "bg-green-500/20 text-green-700 dark:text-green-400",
+    delivered: "bg-emerald-500/20 text-emerald-700 dark:text-emerald-400",
+    cancelled: "bg-red-500/20 text-red-700 dark:text-red-400",
 };
 
 const priorityColors: Record<OrderPriority, string> = {
-    low: 'bg-muted text-muted-foreground',
-    normal: 'bg-blue-500/20 text-blue-700 dark:text-blue-400',
-    high: 'bg-orange-500/20 text-orange-700 dark:text-orange-400',
-    urgent: 'bg-red-500/20 text-red-700 dark:text-red-400',
+    low: "bg-muted text-muted-foreground",
+    normal: "bg-blue-500/20 text-blue-700 dark:text-blue-400",
+    high: "bg-orange-500/20 text-orange-700 dark:text-orange-400",
+    urgent: "bg-red-500/20 text-red-700 dark:text-red-400",
 };
 
 // Status workflow: defines which statuses can transition to which
 // Key = current status, Value = array of allowed next statuses
 const statusWorkflow: Record<OrderStatus, OrderStatus[]> = {
-    pending: ['in_progress', 'cancelled'],
-    in_progress: ['quality_check', 'revision', 'cancelled'],
-    quality_check: ['completed', 'revision', 'in_progress'],
-    revision: ['in_progress', 'cancelled'],
-    completed: ['delivered', 'revision'],
+    pending: ["in_progress", "cancelled"],
+    in_progress: ["quality_check", "revision", "cancelled"],
+    quality_check: ["completed", "revision", "in_progress"],
+    revision: ["in_progress", "cancelled"],
+    completed: ["delivered", "revision"],
     delivered: [], // Final state - no transitions allowed
     cancelled: [], // Final state - no transitions allowed
 };
@@ -156,7 +158,7 @@ export default function OrdersPage() {
     const { data: session } = useSession();
     const [page, setPage] = useState(1);
     const [filters, setFilters] = useState<OrderFilters>({
-        search: '',
+        search: "",
         status: undefined,
         priority: undefined,
         clientId: undefined,
@@ -191,15 +193,56 @@ export default function OrdersPage() {
 
     // Extend deadline state
     const [newDeadline, setNewDeadline] = useState<Date | undefined>(undefined);
-    const [extendReason, setExtendReason] = useState('');
+    const [extendReason, setExtendReason] = useState("");
 
     // Revision state
-    const [revisionInstruction, setRevisionInstruction] = useState('');
-    const [statusChangeNote, setStatusChangeNote] = useState('');
+    const [revisionInstruction, setRevisionInstruction] = useState("");
+    const [statusChangeNote, setStatusChangeNote] = useState("");
+
+    // Email dialog state
+    const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
+    const [emailPendingOrder, setEmailPendingOrder] = useState<IOrder | null>(
+        null,
+    );
+    const [emailPendingStatus, setEmailPendingStatus] =
+        useState<OrderStatus | null>(null);
+    const [isEmailSending, setIsEmailSending] = useState(false);
+
+    const confirmEmailAndStatusChange = async (
+        message: string,
+        downloadLink?: string,
+    ) => {
+        if (!emailPendingOrder || !emailPendingStatus) return;
+        setIsEmailSending(true);
+        try {
+            await updateOrderStatus({
+                id: emailPendingOrder._id,
+                data: {
+                    status: emailPendingStatus,
+                    customEmailMessage: message,
+                    downloadLink,
+                    sendEmail: true,
+                } as UpdateStatusInput,
+            }).unwrap();
+            toast.success(
+                `Status updated to ${ORDER_STATUS_LABELS[emailPendingStatus]} and email sent!`,
+            );
+            setIsEmailDialogOpen(false);
+            setEmailPendingOrder(null);
+            setEmailPendingStatus(null);
+        } catch (error: unknown) {
+            const err = error as ApiErrorResponse;
+            toast.error(
+                err?.data?.message || "Failed to update status & send email",
+            );
+        } finally {
+            setIsEmailSending(false);
+        }
+    };
 
     // Date filter state
-    const [selectedMonth, setSelectedMonth] = useState<string>('');
-    const [selectedYear, setSelectedYear] = useState<string>('');
+    const [selectedMonth, setSelectedMonth] = useState<string>("");
+    const [selectedYear, setSelectedYear] = useState<string>("");
     const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
     // Queries
@@ -216,18 +259,18 @@ export default function OrdersPage() {
     }, [yearsData]);
 
     const months = [
-        { value: '1', label: 'January' },
-        { value: '2', label: 'February' },
-        { value: '3', label: 'March' },
-        { value: '4', label: 'April' },
-        { value: '5', label: 'May' },
-        { value: '6', label: 'June' },
-        { value: '7', label: 'July' },
-        { value: '8', label: 'August' },
-        { value: '9', label: 'September' },
-        { value: '10', label: 'October' },
-        { value: '11', label: 'November' },
-        { value: '12', label: 'December' },
+        { value: "1", label: "January" },
+        { value: "2", label: "February" },
+        { value: "3", label: "March" },
+        { value: "4", label: "April" },
+        { value: "5", label: "May" },
+        { value: "6", label: "June" },
+        { value: "7", label: "July" },
+        { value: "8", label: "August" },
+        { value: "9", label: "September" },
+        { value: "10", label: "October" },
+        { value: "11", label: "November" },
+        { value: "12", label: "December" },
     ];
 
     // Queries
@@ -257,15 +300,10 @@ export default function OrdersPage() {
     const [triggerGetAll, { isLoading: isLoadingAll }] =
         useLazyGetOrdersQuery();
 
-    const orders = orderData?.data || [];
+    const orders = useMemo(() => orderData?.data || [], [orderData]);
     const meta = orderData?.meta;
     const stats = statsData?.data;
-    const clients = clientsData?.clients || [];
-
-    // Get selected orders from IDs
-    const selectedOrders = useMemo(() => {
-        return orders.filter((order) => selectedOrderIds.has(order._id));
-    }, [orders, selectedOrderIds]);
+    const clients = useMemo(() => clientsData?.clients || [], [clientsData]);
 
     // Check if all current page orders are selected
     const allOrdersSelected = useMemo(() => {
@@ -320,8 +358,8 @@ export default function OrdersPage() {
                 toast.success(`All ${allIds.length} orders selected`);
             }
         } catch (error) {
-            console.error('Failed to select all', error);
-            toast.error('Failed to select all orders');
+            console.error("Failed to select all", error);
+            toast.error("Failed to select all orders");
         }
     };
 
@@ -343,14 +381,14 @@ export default function OrdersPage() {
         setServerErrors(undefined);
         try {
             await createOrder(data).unwrap();
-            toast.success('Order created successfully');
+            toast.success("Order created successfully");
             setIsAddDialogOpen(false);
         } catch (error: unknown) {
             const err = error as ApiErrorResponse;
             if (err?.data?.errors) {
                 setServerErrors(err.data.errors);
             } else {
-                toast.error(err?.data?.message || 'Failed to create order');
+                toast.error(err?.data?.message || "Failed to create order");
             }
         }
     };
@@ -363,7 +401,7 @@ export default function OrdersPage() {
                 id: selectedOrder._id,
                 data,
             }).unwrap();
-            toast.success('Order updated successfully');
+            toast.success("Order updated successfully");
             setIsEditDialogOpen(false);
             setSelectedOrder(null);
         } catch (error: unknown) {
@@ -371,7 +409,7 @@ export default function OrdersPage() {
             if (err?.data?.errors) {
                 setServerErrors(err.data.errors);
             } else {
-                toast.error(err?.data?.message || 'Failed to update order');
+                toast.error(err?.data?.message || "Failed to update order");
             }
         }
     };
@@ -380,12 +418,12 @@ export default function OrdersPage() {
         if (!selectedOrder) return;
         try {
             await deleteOrder(selectedOrder._id).unwrap();
-            toast.success('Order deleted successfully');
+            toast.success("Order deleted successfully");
             setIsDeleteDialogOpen(false);
             setSelectedOrder(null);
         } catch (error: unknown) {
             const err = error as ApiErrorResponse;
-            toast.error(err?.data?.message || 'Failed to delete order');
+            toast.error(err?.data?.message || "Failed to delete order");
         }
     };
 
@@ -400,10 +438,10 @@ export default function OrdersPage() {
             );
 
             const successCount = results.filter(
-                (r) => r.status === 'fulfilled',
+                (r) => r.status === "fulfilled",
             ).length;
             const errorCount = results.filter(
-                (r) => r.status === 'rejected',
+                (r) => r.status === "rejected",
             ).length;
 
             if (successCount > 0) {
@@ -413,8 +451,8 @@ export default function OrdersPage() {
                 toast.error(`Failed to delete ${errorCount} order(s)`);
             }
         } catch (error) {
-            console.error('Bulk delete error:', error);
-            toast.error('An unexpected error occurred during bulk deletion');
+            console.error("Bulk delete error:", error);
+            toast.error("An unexpected error occurred during bulk deletion");
         } finally {
             setIsBulkDeleting(false);
             setIsBulkDeleteDialogOpen(false);
@@ -428,16 +466,27 @@ export default function OrdersPage() {
     ) => {
         // Guard against empty/undefined values
         if (!newStatus) {
-            console.log('handleStatusChange - empty status, skipping');
+            console.log("handleStatusChange - empty status, skipping");
             return;
         }
 
         // If changing to revision, ask for optional instruction
-        if (newStatus === 'revision') {
+        if (newStatus === "revision") {
             setPendingStatusChange({ orderId, status: newStatus });
-            setStatusChangeNote('');
+            setStatusChangeNote("");
             setIsStatusChangeDialogOpen(true);
             return;
+        }
+
+        // Feature: send emails on specific status changes
+        if (["cancelled", "completed", "delivered"].includes(newStatus)) {
+            const orderObj = orderData?.data.find((o) => o._id === orderId);
+            if (orderObj) {
+                setEmailPendingStatus(newStatus);
+                setEmailPendingOrder(orderObj);
+                setIsEmailDialogOpen(true);
+                return;
+            }
         }
 
         try {
@@ -450,7 +499,7 @@ export default function OrdersPage() {
             );
         } catch (error: unknown) {
             const err = error as ApiErrorResponse;
-            toast.error(err?.data?.message || 'Failed to update status');
+            toast.error(err?.data?.message || "Failed to update status");
         }
     };
 
@@ -471,10 +520,10 @@ export default function OrdersPage() {
             );
             setIsStatusChangeDialogOpen(false);
             setPendingStatusChange(null);
-            setStatusChangeNote('');
+            setStatusChangeNote("");
         } catch (error: unknown) {
             const err = error as ApiErrorResponse;
-            toast.error(err?.data?.message || 'Failed to update status');
+            toast.error(err?.data?.message || "Failed to update status");
         }
     };
 
@@ -488,14 +537,14 @@ export default function OrdersPage() {
                     reason: extendReason,
                 },
             }).unwrap();
-            toast.success('Deadline extended successfully');
+            toast.success("Deadline extended successfully");
             setIsExtendDialogOpen(false);
             setNewDeadline(undefined);
-            setExtendReason('');
+            setExtendReason("");
             setSelectedOrder(null);
         } catch (error: unknown) {
             const err = error as ApiErrorResponse;
-            toast.error(err?.data?.message || 'Failed to extend deadline');
+            toast.error(err?.data?.message || "Failed to extend deadline");
         }
     };
 
@@ -506,13 +555,13 @@ export default function OrdersPage() {
                 id: selectedOrder._id,
                 data: { instruction: revisionInstruction },
             }).unwrap();
-            toast.success('Revision added successfully');
+            toast.success("Revision added successfully");
             setIsRevisionDialogOpen(false);
-            setRevisionInstruction('');
+            setRevisionInstruction("");
             setSelectedOrder(null);
         } catch (error: unknown) {
             const err = error as ApiErrorResponse;
-            toast.error(err?.data?.message || 'Failed to add revision');
+            toast.error(err?.data?.message || "Failed to add revision");
         }
     };
 
@@ -522,17 +571,17 @@ export default function OrdersPage() {
         setEditDefaultValues({
             orderName: order.orderName,
             clientId: order.clientId._id,
-            orderDate: order.orderDate.split('T')[0],
+            orderDate: order.orderDate.split("T")[0],
             deadline: order.deadline,
             imageQuantity: order.imageQuantity,
             perImagePrice: order.perImagePrice,
             totalPrice: order.totalPrice,
             services: order.services.map((s) => s._id),
             returnFileFormat: order.returnFileFormat._id,
-            instruction: order.instruction || '',
+            instruction: order.instruction || "",
             priority: order.priority,
-            assignedTo: order.assignedTo?._id || '',
-            notes: order.notes || '',
+            assignedTo: order.assignedTo?._id || "",
+            notes: order.notes || "",
         });
         setIsEditDialogOpen(true);
     };
@@ -721,7 +770,7 @@ export default function OrdersPage() {
                             Manage graphic design orders and track their status
                         </CardDescription>
                     </div>
-                    {session?.user?.role !== 'team_leader' && (
+                    {session?.user?.role !== "team_leader" && (
                         <div className="flex gap-3">
                             {/* Select Mode Toggle Button */}
                             {!isSelectionMode ? (
@@ -797,10 +846,10 @@ export default function OrdersPage() {
                                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                                     <Input
                                         placeholder="Search..."
-                                        value={filters.search || ''}
+                                        value={filters.search || ""}
                                         onChange={(e) =>
                                             handleFilterChange(
-                                                'search',
+                                                "search",
                                                 e.target.value,
                                             )
                                         }
@@ -856,10 +905,10 @@ export default function OrdersPage() {
 
                                 {/* Status Filter */}
                                 <Select
-                                    value={filters.status || ''}
+                                    value={filters.status || ""}
                                     onValueChange={(value) =>
                                         handleFilterChange(
-                                            'status',
+                                            "status",
                                             value as OrderStatus,
                                         )
                                     }
@@ -883,10 +932,10 @@ export default function OrdersPage() {
 
                                 {/* Priority Filter */}
                                 <Select
-                                    value={filters.priority || ''}
+                                    value={filters.priority || ""}
                                     onValueChange={(value) =>
                                         handleFilterChange(
-                                            'priority',
+                                            "priority",
                                             value as OrderPriority,
                                         )
                                     }
@@ -910,9 +959,9 @@ export default function OrdersPage() {
 
                                 {/* Client Filter */}
                                 <Select
-                                    value={filters.clientId || ''}
+                                    value={filters.clientId || ""}
                                     onValueChange={(value) =>
-                                        handleFilterChange('clientId', value)
+                                        handleFilterChange("clientId", value)
                                     }
                                 >
                                     <SelectTrigger className="bg-background w-[140px]">
@@ -938,14 +987,14 @@ export default function OrdersPage() {
                                             size="icon"
                                             onClick={() => {
                                                 setFilters({
-                                                    search: '',
+                                                    search: "",
                                                     status: undefined,
                                                     priority: undefined,
                                                     clientId: undefined,
                                                     limit: 10,
                                                 });
-                                                setSelectedMonth('');
-                                                setSelectedYear('');
+                                                setSelectedMonth("");
+                                                setSelectedYear("");
                                                 setPage(1);
                                             }}
                                             className="bg-background"
@@ -968,8 +1017,8 @@ export default function OrdersPage() {
                                 <span className="text-sm font-medium">
                                     {selectedOrderIds.size} order
                                     {selectedOrderIds.size !== 1
-                                        ? 's'
-                                        : ''}{' '}
+                                        ? "s"
+                                        : ""}{" "}
                                     selected
                                 </span>
                                 {selectedOrderIds.size > 0 && (
@@ -1164,7 +1213,7 @@ export default function OrdersPage() {
                                                         selectedOrderIds.has(
                                                             order._id,
                                                         ) &&
-                                                        'bg-muted/50',
+                                                        "bg-muted/50",
                                                 )}
                                             >
                                                 {isSelectionMode && (
@@ -1187,7 +1236,7 @@ export default function OrdersPage() {
                                                         new Date(
                                                             order.orderDate,
                                                         ),
-                                                        'PPP',
+                                                        "PPP",
                                                     )}
                                                 </TableCell>
                                                 <TableCell className="border-r">
@@ -1462,8 +1511,8 @@ export default function OrdersPage() {
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-6">
                                 <div className="text-sm text-muted-foreground">
-                                    Page {meta.page} of{' '}
-                                    {Math.max(1, meta.totalPages)} ({meta.total}{' '}
+                                    Page {meta.page} of{" "}
+                                    {Math.max(1, meta.totalPages)} ({meta.total}{" "}
                                     total)
                                 </div>
                                 <div className="flex items-center gap-2">
@@ -1474,7 +1523,7 @@ export default function OrdersPage() {
                                         value={`${filters.limit || 10}`}
                                         onValueChange={(value) => {
                                             handleFilterChange(
-                                                'limit',
+                                                "limit",
                                                 Number(value),
                                             );
                                         }}
@@ -1607,7 +1656,7 @@ export default function OrdersPage() {
                                     <p className="font-medium">
                                         {format(
                                             new Date(selectedOrder.orderDate),
-                                            'MMM dd, yyyy',
+                                            "MMM dd, yyyy",
                                         )}
                                     </p>
                                 </div>
@@ -1618,17 +1667,17 @@ export default function OrdersPage() {
                                     <p className="font-medium">
                                         {format(
                                             new Date(selectedOrder.deadline),
-                                            'MMM dd, yyyy h:mm a',
+                                            "MMM dd, yyyy h:mm a",
                                         )}
                                     </p>
                                     {selectedOrder.originalDeadline && (
                                         <p className="text-xs text-muted-foreground">
-                                            Original:{' '}
+                                            Original:{" "}
                                             {format(
                                                 new Date(
                                                     selectedOrder.originalDeadline,
                                                 ),
-                                                'MMM dd, yyyy',
+                                                "MMM dd, yyyy",
                                             )}
                                         </p>
                                     )}
@@ -1721,8 +1770,8 @@ export default function OrdersPage() {
                                                                 new Date(
                                                                     rev.createdAt,
                                                                 ),
-                                                                'MMM dd, yyyy h:mm a',
-                                                            )}{' '}
+                                                                "MMM dd, yyyy h:mm a",
+                                                            )}{" "}
                                                             by Admin
                                                         </p>
                                                     </div>
@@ -1743,7 +1792,7 @@ export default function OrdersPage() {
                     setIsExtendDialogOpen(open);
                     if (!open) {
                         setNewDeadline(undefined);
-                        setExtendReason('');
+                        setExtendReason("");
                     }
                 }}
             >
@@ -1798,7 +1847,7 @@ export default function OrdersPage() {
                 open={isRevisionDialogOpen}
                 onOpenChange={(open) => {
                     setIsRevisionDialogOpen(open);
-                    if (!open) setRevisionInstruction('');
+                    if (!open) setRevisionInstruction("");
                 }}
             >
                 <DialogContent>
@@ -1868,7 +1917,7 @@ export default function OrdersPage() {
                     setIsStatusChangeDialogOpen(open);
                     if (!open) {
                         setPendingStatusChange(null);
-                        setStatusChangeNote('');
+                        setStatusChangeNote("");
                     }
                 }}
             >
@@ -1921,7 +1970,7 @@ export default function OrdersPage() {
                     <AlertDialogHeader>
                         <AlertDialogTitle>Delete Order</AlertDialogTitle>
                         <AlertDialogDescription>
-                            Are you sure you want to delete order{' '}
+                            Are you sure you want to delete order{" "}
                             <strong>{selectedOrder?.orderName}</strong>? This
                             action cannot be undone.
                         </AlertDialogDescription>
@@ -1953,10 +2002,10 @@ export default function OrdersPage() {
                             Delete Selected Orders
                         </AlertDialogTitle>
                         <AlertDialogDescription>
-                            Are you sure you want to delete{' '}
+                            Are you sure you want to delete{" "}
                             <strong>{selectedOrderIds.size}</strong> selected
                             order
-                            {selectedOrderIds.size !== 1 ? 's' : ''}? This
+                            {selectedOrderIds.size !== 1 ? "s" : ""}? This
                             action cannot be undone.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
@@ -1974,11 +2023,21 @@ export default function OrdersPage() {
                                 <Loader className="h-4 w-4  animate-spin" />
                             )}
                             Delete {selectedOrderIds.size} Order
-                            {selectedOrderIds.size !== 1 ? 's' : ''}
+                            {selectedOrderIds.size !== 1 ? "s" : ""}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+
+            {/* Email Notification Dialog */}
+            <EmailDialog
+                open={isEmailDialogOpen}
+                onOpenChange={setIsEmailDialogOpen}
+                order={emailPendingOrder}
+                status={emailPendingStatus as OrderStatus}
+                onSend={confirmEmailAndStatusChange}
+                isLoading={isEmailSending}
+            />
         </div>
     );
 }

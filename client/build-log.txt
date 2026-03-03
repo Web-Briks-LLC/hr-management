@@ -1,0 +1,354 @@
+
+> client@0.1.0 build
+> next build
+
+[baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+   ▲ Next.js 16.0.7 (Turbopack)
+   - Environments: .env
+
+   Creating an optimized production build ...
+[baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+[baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+
+> Build error occurred
+Error: Turbopack build failed with 10 errors:
+./src/app/(root)/orders/page.tsx
+Error evaluating Node.js code
+SyntaxError: C:\Users\fuyad\Codes\Office\hr-management\client\src\app\(root)\orders\page.tsx: Identifier 'EmailDialog' has already been declared. (105:9)
+
+[0m [90m 103 |[39m [36mimport[39m { [33mOrderTimelineDialog[39m } [36mfrom[39m [32m"./components/OrderTimelineDialog"[39m[33m;[39m
+ [90m 104 |[39m [36mimport[39m { [33mEmailDialog[39m } [36mfrom[39m [32m"./EmailDialog"[39m[33m;[39m
+[31m[1m>[22m[39m[90m 105 |[39m [36mimport[39m { [33mEmailDialog[39m } [36mfrom[39m [32m"./EmailDialog"[39m[33m;[39m
+ [90m     |[39m          [31m[1m^[22m[39m
+ [90m 106 |[39m [36mimport[39m { [33mBadge[39m } [36mfrom[39m [32m"@/components/ui/badge"[39m[33m;[39m
+ [90m 107 |[39m [36mimport[39m {
+ [90m 108 |[39m     [33mTooltip[39m[33m,[39m[0m
+    [at constructor (C:\Users\fuyad\Codes\Office\hr-management\client\node_modules\next\dist\compiled\babel\bundle.js:191:137105)]
+    [at TypeScriptParserMixin.raise (C:\Users\fuyad\Codes\Office\hr-management\client\node_modules\next\dist\compiled\babel\bundle.js:191:194164)]
+    [at TypeScriptScopeHandler.declareName (C:\Users\fuyad\Codes\Office\hr-management\client\node_modules\next\dist\compiled\babel\bundle.js:191:270924)]
+    [at TypeScriptParserMixin.declareNameFromIdentifier (C:\Users\fuyad\Codes\Office\hr-management\client\node_modules\next\dist\compiled\babel\bundle.js:191:279226)]
+    [at TypeScriptParserMixin.checkIdentifier (C:\Users\fuyad\Codes\Office\hr-management\client\node_modules\next\dist\compiled\babel\bundle.js:191:279152)]
+    [at TypeScriptParserMixin.checkLVal (C:\Users\fuyad\Codes\Office\hr-management\client\node_modules\next\dist\compiled\babel\bundle.js:191:278197)]
+    [at TypeScriptParserMixin.finishImportSpecifier (C:\Users\fuyad\Codes\Office\hr-management\client\node_modules\next\dist\compiled\babel\bundle.js:191:422705)]
+    [at TypeScriptParserMixin.parseImportSpecifier (C:\Users\fuyad\Codes\Office\hr-management\client\node_modules\next\dist\compiled\babel\bundle.js:191:425882)]
+    [at TypeScriptParserMixin.parseImportSpecifier (C:\Users\fuyad\Codes\Office\hr-management\client\node_modules\next\dist\compiled\babel\bundle.js:191:338125)]
+    [at TypeScriptParserMixin.parseNamedImportSpecifiers (C:\Users\fuyad\Codes\Office\hr-management\client\node_modules\next\dist\compiled\babel\bundle.js:191:425483)]
+    [at TypeScriptParserMixin.parseImportSpecifiersAndAfter (C:\Users\fuyad\Codes\Office\hr-management\client\node_modules\next\dist\compiled\babel\bundle.js:191:422062)]
+    [at TypeScriptParserMixin.parseImport (C:\Users\fuyad\Codes\Office\hr-management\client\node_modules\next\dist\compiled\babel\bundle.js:191:421803)]
+    [at TypeScriptParserMixin.parseImport (C:\Users\fuyad\Codes\Office\hr-management\client\node_modules\next\dist\compiled\babel\bundle.js:191:322073)]
+    [at TypeScriptParserMixin.parseStatementContent (C:\Users\fuyad\Codes\Office\hr-management\client\node_modules\next\dist\compiled\babel\bundle.js:191:391781)]
+    [at TypeScriptParserMixin.parseStatementContent (C:\Users\fuyad\Codes\Office\hr-management\client\node_modules\next\dist\compiled\babel\bundle.js:191:324042)]
+    [at TypeScriptParserMixin.parseStatementLike (C:\Users\fuyad\Codes\Office\hr-management\client\node_modules\next\dist\compiled\babel\bundle.js:191:389494)]
+    [at TypeScriptParserMixin.parseModuleItem (C:\Users\fuyad\Codes\Office\hr-management\client\node_modules\next\dist\compiled\babel\bundle.js:191:389055)]
+    [at TypeScriptParserMixin.parseBlockOrModuleBlockBody (C:\Users\fuyad\Codes\Office\hr-management\client\node_modules\next\dist\compiled\babel\bundle.js:191:401400)]
+    [at TypeScriptParserMixin.parseBlockBody (C:\Users\fuyad\Codes\Office\hr-management\client\node_modules\next\dist\compiled\babel\bundle.js:191:401223)]
+    [at TypeScriptParserMixin.parseProgram (C:\Users\fuyad\Codes\Office\hr-management\client\node_modules\next\dist\compiled\babel\bundle.js:191:386857)]
+    [at TypeScriptParserMixin.parseTopLevel (C:\Users\fuyad\Codes\Office\hr-management\client\node_modules\next\dist\compiled\babel\bundle.js:191:386575)]
+    [at TypeScriptParserMixin.parse (C:\Users\fuyad\Codes\Office\hr-management\client\node_modules\next\dist\compiled\babel\bundle.js:191:426834)]
+    [at TypeScriptParserMixin.parse (C:\Users\fuyad\Codes\Office\hr-management\client\node_modules\next\dist\compiled\babel\bundle.js:191:337631)]
+    [at parse (C:\Users\fuyad\Codes\Office\hr-management\client\node_modules\next\dist\compiled\babel\bundle.js:191:427092)]
+    [at parser (C:\Users\fuyad\Codes\Office\hr-management\client\node_modules\next\dist\compiled\babel\bundle.js:1:142018)]
+    [at <anonymous>]
+    [at normalizeFile (C:\Users\fuyad\Codes\Office\hr-management\client\node_modules\next\dist\compiled\babel\bundle.js:13:13275)]
+    [at <anonymous>]
+    [at consumeIterator (C:\Users\fuyad\Codes\Office\hr-management\client\node_modules\next\dist\build\babel\loader\util.js:13:38)]
+    [at transform (C:\Users\fuyad\Codes\Office\hr-management\client\node_modules\next\dist\build\babel\loader\transform.js:89:44)]
+    [at async (C:\Users\fuyad\Codes\Office\hr-management\client\node_modules\next\dist\build\babel\loader\index.js:36:108)]
+    at async DummySpan.traceAsyncFn (turbopack:///[turbopack-node]/transforms/webpack-loaders.ts:115:12) [C:\Users\fuyad\Codes\Office\hr-management\client\.next\build\chunks\[root-of-the-server]__6e020478._.js:126:16]
+    [at async nextBabelLoader (C:\Users\fuyad\Codes\Office\hr-management\client\node_modules\next\dist\build\babel\loader\index.js:36:63)]
+    at async DummySpan.traceAsyncFn (turbopack:///[turbopack-node]/transforms/webpack-loaders.ts:115:12) [C:\Users\fuyad\Codes\Office\hr-management\client\.next\build\chunks\[root-of-the-server]__6e020478._.js:126:16]
+
+Import traces:
+  Client Component Browser:
+    ./src/app/(root)/orders/page.tsx [Client Component Browser]
+    ./src/app/(root)/orders/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/(root)/orders/page.tsx [Client Component SSR]
+    ./src/app/(root)/orders/page.tsx [Server Component]
+
+
+./src/app/(root)/orders/page.tsx:105:10
+Ecmascript file had an error
+[0m [90m 103 |[39m [36mimport[39m { [33mOrderTimelineDialog[39m } [36mfrom[39m [32m"./components/OrderTimelineDialog"[39m[33m;[39m
+ [90m 104 |[39m [36mimport[39m { [33mEmailDialog[39m } [36mfrom[39m [32m"./EmailDialog"[39m[33m;[39m
+[31m[1m>[22m[39m[90m 105 |[39m [36mimport[39m { [33mEmailDialog[39m } [36mfrom[39m [32m"./EmailDialog"[39m[33m;[39m
+ [90m     |[39m          [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m
+ [90m 106 |[39m [36mimport[39m { [33mBadge[39m } [36mfrom[39m [32m"@/components/ui/badge"[39m[33m;[39m
+ [90m 107 |[39m [36mimport[39m {
+ [90m 108 |[39m     [33mTooltip[39m[33m,[39m[0m
+
+the name `EmailDialog` is defined multiple times
+
+Import traces:
+  Client Component Browser:
+    ./src/app/(root)/orders/page.tsx [Client Component Browser]
+    ./src/app/(root)/orders/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/(root)/orders/page.tsx [Client Component SSR]
+    ./src/app/(root)/orders/page.tsx [Server Component]
+
+
+./src/app/(root)/orders/invoice/page.tsx:19:1
+Module not found: Can't resolve '@react-pdf/renderer'
+[0m [90m 17 |[39m [36mimport[39m type { [33mClient[39m } [36mfrom[39m [32m"@/types/client.type"[39m[33m;[39m
+ [90m 18 |[39m [36mimport[39m dynamic [36mfrom[39m [32m"next/dynamic"[39m[33m;[39m
+[31m[1m>[22m[39m[90m 19 |[39m [36mimport[39m { pdf } [36mfrom[39m [32m"@react-pdf/renderer"[39m[33m;[39m
+ [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m
+ [90m 20 |[39m [36mimport[39m { [33mInvoiceDocument[39m } [36mfrom[39m [32m"@/components/invoice/InvoicePDF"[39m[33m;[39m
+ [90m 21 |[39m [36mimport[39m { toast } [36mfrom[39m [32m"sonner"[39m[33m;[39m
+ [90m 22 |[39m[0m
+
+
+
+Import traces:
+  Client Component Browser:
+    ./src/app/(root)/orders/invoice/page.tsx [Client Component Browser]
+    ./src/app/(root)/orders/invoice/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/(root)/orders/invoice/page.tsx [Client Component SSR]
+    ./src/app/(root)/orders/invoice/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./src/app/(root)/orders/invoice/page.tsx:45:1
+Module not found: Can't resolve '@react-pdf/renderer'
+[0m [90m 43 |[39m [36mimport[39m type { [33mClient[39m } [36mfrom[39m [32m"@/types/client.type"[39m[33m;[39m
+ [90m 44 |[39m [36mimport[39m dynamic [36mfrom[39m [32m"next/dynamic"[39m[33m;[39m
+[31m[1m>[22m[39m[90m 45 |[39m [36mimport[39m { pdf } [36mfrom[39m [32m"@react-pdf/renderer"[39m[33m;[39m
+ [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m
+ [90m 46 |[39m [36mimport[39m { [33mInvoiceDocument[39m } [36mfrom[39m [32m"@/components/invoice/InvoicePDF"[39m[33m;[39m
+ [90m 47 |[39m [36mimport[39m { toast } [36mfrom[39m [32m"sonner"[39m[33m;[39m
+ [90m 48 |[39m[0m
+
+
+
+Import traces:
+  Client Component Browser:
+    ./src/app/(root)/orders/invoice/page.tsx [Client Component Browser]
+    ./src/app/(root)/orders/invoice/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/(root)/orders/invoice/page.tsx [Client Component SSR]
+    ./src/app/(root)/orders/invoice/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./src/components/expense/ExpenseReportPDF.tsx:1:1
+Module not found: Can't resolve '@react-pdf/renderer'
+[0m[31m[1m>[22m[39m[90m  1 |[39m [36mimport[39m {
+ [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m
+[31m[1m>[22m[39m[90m  2 |[39m     [33mDocument[39m[33m,[39m
+ [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m
+[31m[1m>[22m[39m[90m  3 |[39m     [33mPage[39m[33m,[39m
+ [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m
+[31m[1m>[22m[39m[90m  4 |[39m     [33mText[39m[33m,[39m
+ [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m
+[31m[1m>[22m[39m[90m  5 |[39m     [33mView[39m[33m,[39m
+ [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m
+[31m[1m>[22m[39m[90m  6 |[39m     [33mStyleSheet[39m[33m,[39m
+ [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m
+[31m[1m>[22m[39m[90m  7 |[39m     [33mFont[39m[33m,[39m
+ [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m
+[31m[1m>[22m[39m[90m  8 |[39m } [36mfrom[39m [32m'@react-pdf/renderer'[39m[33m;[39m
+ [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m
+ [90m  9 |[39m [36mimport[39m { format } [36mfrom[39m [32m'date-fns'[39m[33m;[39m
+ [90m 10 |[39m [36mimport[39m { [33mExpense[39m } [36mfrom[39m [32m'@/redux/features/expense/expenseApi'[39m[33m;[39m
+ [90m 11 |[39m[0m
+
+
+
+Import traces:
+  Client Component Browser:
+    ./src/components/expense/ExpenseReportPDF.tsx [Client Component Browser]
+    ./src/components/expense/ExportExpenseDialog.tsx [Client Component Browser]
+    ./src/app/(root)/expense/page.tsx [Client Component Browser]
+    ./src/app/(root)/expense/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/components/expense/ExpenseReportPDF.tsx [Client Component SSR]
+    ./src/components/expense/ExportExpenseDialog.tsx [Client Component SSR]
+    ./src/app/(root)/expense/page.tsx [Client Component SSR]
+    ./src/app/(root)/expense/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./src/components/expense/ExpenseReportPDF.tsx:2:1
+Module not found: Can't resolve '@react-pdf/renderer'
+[0m [90m 1 |[39m [36mimport[39m { c [36mas[39m _c } [36mfrom[39m [32m"react/compiler-runtime"[39m[33m;[39m
+[31m[1m>[22m[39m[90m 2 |[39m [36mimport[39m { [33mDocument[39m[33m,[39m [33mPage[39m[33m,[39m [33mText[39m[33m,[39m [33mView[39m[33m,[39m [33mStyleSheet[39m[33m,[39m [33mFont[39m } [36mfrom[39m [32m'@react-pdf/renderer'[39m[33m;[39m
+ [90m   |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m
+ [90m 3 |[39m [36mimport[39m { format } [36mfrom[39m [32m'date-fns'[39m[33m;[39m
+ [90m 4 |[39m [36mimport[39m { [33mExpense[39m } [36mfrom[39m [32m'@/redux/features/expense/expenseApi'[39m[33m;[39m
+ [90m 5 |[39m[0m
+
+
+
+Import traces:
+  Client Component Browser:
+    ./src/components/expense/ExpenseReportPDF.tsx [Client Component Browser]
+    ./src/components/expense/ExportExpenseDialog.tsx [Client Component Browser]
+    ./src/app/(root)/expense/page.tsx [Client Component Browser]
+    ./src/app/(root)/expense/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/components/expense/ExpenseReportPDF.tsx [Client Component SSR]
+    ./src/components/expense/ExportExpenseDialog.tsx [Client Component SSR]
+    ./src/app/(root)/expense/page.tsx [Client Component SSR]
+    ./src/app/(root)/expense/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./src/components/expense/ExportExpenseDialog.tsx:8:1
+Module not found: Can't resolve '@react-pdf/renderer'
+[0m [90m  6 |[39m [36mimport[39m { [33mLoader[39m[33m,[39m [33mDownload[39m } [36mfrom[39m [32m'lucide-react'[39m[33m;[39m
+ [90m  7 |[39m [36mimport[39m { useLazyGetExpensesQuery[33m,[39m type [33mExpenseQueryParams[39m } [36mfrom[39m [32m'@/redux/features/expense/expenseApi'[39m[33m;[39m
+[31m[1m>[22m[39m[90m  8 |[39m [36mimport[39m { pdf } [36mfrom[39m [32m'@react-pdf/renderer'[39m[33m;[39m
+ [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m
+ [90m  9 |[39m [36mimport[39m { [33mExpenseReportPDF[39m } [36mfrom[39m [32m'./ExpenseReportPDF'[39m[33m;[39m
+ [90m 10 |[39m [36mimport[39m { saveAs } [36mfrom[39m [32m'file-saver'[39m[33m;[39m
+ [90m 11 |[39m [36mimport[39m { toast } [36mfrom[39m [32m'sonner'[39m[33m;[39m[0m
+
+
+
+Import traces:
+  Client Component Browser:
+    ./src/components/expense/ExportExpenseDialog.tsx [Client Component Browser]
+    ./src/app/(root)/expense/page.tsx [Client Component Browser]
+    ./src/app/(root)/expense/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/components/expense/ExportExpenseDialog.tsx [Client Component SSR]
+    ./src/app/(root)/expense/page.tsx [Client Component SSR]
+    ./src/app/(root)/expense/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./src/components/expense/ExportExpenseDialog.tsx:24:1
+Module not found: Can't resolve '@react-pdf/renderer'
+[0m [90m 22 |[39m     type [33mExpenseQueryParams[39m[33m,[39m
+ [90m 23 |[39m } [36mfrom[39m [32m'@/redux/features/expense/expenseApi'[39m[33m;[39m
+[31m[1m>[22m[39m[90m 24 |[39m [36mimport[39m { pdf } [36mfrom[39m [32m'@react-pdf/renderer'[39m[33m;[39m
+ [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m
+ [90m 25 |[39m [36mimport[39m { [33mExpenseReportPDF[39m } [36mfrom[39m [32m'./ExpenseReportPDF'[39m[33m;[39m
+ [90m 26 |[39m [36mimport[39m { saveAs } [36mfrom[39m [32m'file-saver'[39m[33m;[39m
+ [90m 27 |[39m [36mimport[39m { toast } [36mfrom[39m [32m'sonner'[39m[33m;[39m[0m
+
+
+
+Import traces:
+  Client Component Browser:
+    ./src/components/expense/ExportExpenseDialog.tsx [Client Component Browser]
+    ./src/app/(root)/expense/page.tsx [Client Component Browser]
+    ./src/app/(root)/expense/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/components/expense/ExportExpenseDialog.tsx [Client Component SSR]
+    ./src/app/(root)/expense/page.tsx [Client Component SSR]
+    ./src/app/(root)/expense/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./src/components/invoice/InvoicePDF.tsx:4:1
+Module not found: Can't resolve '@react-pdf/renderer'
+[0m [90m 2 |[39m
+ [90m 3 |[39m [36mimport[39m { c [36mas[39m _c } [36mfrom[39m [32m"react/compiler-runtime"[39m[33m;[39m
+[31m[1m>[22m[39m[90m 4 |[39m [36mimport[39m { [33mDocument[39m[33m,[39m [33mPage[39m[33m,[39m [33mText[39m[33m,[39m [33mView[39m[33m,[39m [33mImage[39m[33m,[39m [33mStyleSheet[39m[33m,[39m [33mPDFViewer[39m[33m,[39m [33mPDFDownloadLink[39m[33m,[39m [33mFont[39m[33m,[39m pdf[33m,[39m [33mLink[39m } [36mfrom[39m [32m"@react-pdf/renderer"[39m[33m;[39m
+ [90m   |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m
+ [90m 5 |[39m [36mimport[39m type { [33mIOrder[39m } [36mfrom[39m [32m"@/types/order.type"[39m[33m;[39m
+ [90m 6 |[39m [36mimport[39m type { [33mClient[39m } [36mfrom[39m [32m"@/types/client.type"[39m[33m;[39m
+ [90m 7 |[39m [36mimport[39m { useSendInvoiceEmailMutation[33m,[39m useRecordInvoiceMutation } [36mfrom[39m [32m"@/redux/features/invoice/invoiceApi"[39m[33m;[39m[0m
+
+
+
+Import traces:
+  Client Component Browser:
+    ./src/components/invoice/InvoicePDF.tsx [Client Component Browser]
+    ./src/app/(root)/orders/invoice/page.tsx [Client Component Browser]
+    ./src/app/(root)/orders/invoice/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/components/invoice/InvoicePDF.tsx [Client Component SSR]
+    ./src/app/(root)/orders/invoice/page.tsx [Client Component SSR]
+    ./src/app/(root)/orders/invoice/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./src/components/invoice/InvoicePDF.tsx:3:1
+Module not found: Can't resolve '@react-pdf/renderer'
+[0m [90m  1 |[39m [32m"use client"[39m[33m;[39m
+ [90m  2 |[39m
+[31m[1m>[22m[39m[90m  3 |[39m [36mimport[39m {
+ [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m
+[31m[1m>[22m[39m[90m  4 |[39m     [33mDocument[39m[33m,[39m
+ [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m
+[31m[1m>[22m[39m[90m  5 |[39m     [33mPage[39m[33m,[39m
+ [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m
+[31m[1m>[22m[39m[90m  6 |[39m     [33mText[39m[33m,[39m
+ [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m
+[31m[1m>[22m[39m[90m  7 |[39m     [33mView[39m[33m,[39m
+ [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m
+[31m[1m>[22m[39m[90m  8 |[39m     [33mImage[39m[33m,[39m
+ [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m
+[31m[1m>[22m[39m[90m  9 |[39m     [33mStyleSheet[39m[33m,[39m
+ [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m
+[31m[1m>[22m[39m[90m 10 |[39m     [33mPDFViewer[39m[33m,[39m
+ [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m
+[31m[1m>[22m[39m[90m 11 |[39m     [33mPDFDownloadLink[39m[33m,[39m
+ [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m
+[31m[1m>[22m[39m[90m 12 |[39m     [33mFont[39m[33m,[39m
+ [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m
+[31m[1m>[22m[39m[90m 13 |[39m     pdf[33m,[39m
+ [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m
+[31m[1m>[22m[39m[90m 14 |[39m     [33mLink[39m[33m,[39m
+ [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m
+[31m[1m>[22m[39m[90m 15 |[39m } [36mfrom[39m [32m"@react-pdf/renderer"[39m[33m;[39m
+ [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m
+ [90m 16 |[39m [36mimport[39m type { [33mIOrder[39m } [36mfrom[39m [32m"@/types/order.type"[39m[33m;[39m
+ [90m 17 |[39m [36mimport[39m type { [33mClient[39m } [36mfrom[39m [32m"@/types/client.type"[39m[33m;[39m
+ [90m 18 |[39m [36mimport[39m {[0m
+
+
+
+Import traces:
+  Client Component Browser:
+    ./src/components/invoice/InvoicePDF.tsx [Client Component Browser]
+    ./src/app/(root)/orders/invoice/page.tsx [Client Component Browser]
+    ./src/app/(root)/orders/invoice/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/components/invoice/InvoicePDF.tsx [Client Component SSR]
+    ./src/app/(root)/orders/invoice/page.tsx [Client Component SSR]
+    ./src/app/(root)/orders/invoice/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+    at async DummySpan.traceAsyncFn (turbopack:///[turbopack-node]/transforms/webpack-loaders.ts:115:12) [C:\Users\fuyad\Codes\Office\hr-management\client\.next\build\chunks\[root-of-the-server]__6e020478._.js:126:16])
+    at async DummySpan.traceAsyncFn (turbopack:///[turbopack-node]/transforms/webpack-loaders.ts:115:12) [C:\Users\fuyad\Codes\Office\hr-management\client\.next\build\chunks\[root-of-the-server]__6e020478._.js:126:16])
+    at <unknown> (./src/app/(root)/orders/page.tsx:105:10)
+    at <unknown> (./src/app/(root)/orders/invoice/page.tsx:19:1)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (./src/app/(root)/orders/invoice/page.tsx:45:1)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (./src/components/expense/ExpenseReportPDF.tsx:1:1)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (./src/components/expense/ExpenseReportPDF.tsx:2:1)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (./src/components/expense/ExportExpenseDialog.tsx:8:1)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (./src/components/expense/ExportExpenseDialog.tsx:24:1)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (./src/components/invoice/InvoicePDF.tsx:4:1)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (./src/components/invoice/InvoicePDF.tsx:3:1)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
