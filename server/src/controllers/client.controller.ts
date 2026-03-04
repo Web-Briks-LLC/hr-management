@@ -1,23 +1,34 @@
-import type { Request, Response } from 'express';
+import type { Request, Response } from "express";
 import ClientServices, {
     ClientIdExistsError,
-} from '../services/client.service.js';
-import type { ClientQueryParams } from '../types/client.type.js';
+} from "../services/client.service.js";
+import type { ClientQueryParams } from "../types/client.type.js";
 import {
     createClientSchema,
     updateClientSchema,
-} from '../validators/client.validation.js';
+} from "../validators/client.validation.js";
+import { getTelemarketerStaff } from "../utils/telemarketer.util.js";
 
 const getAllClients = async (req: Request, res: Response) => {
     try {
+        const userId = req.user?.id;
         const params: ClientQueryParams = {
             page: req.query.page ? parseInt(req.query.page as string) : 1,
             limit: req.query.limit ? parseInt(req.query.limit as string) : 10,
             search: req.query.search as string,
             sortBy: req.query.sortBy as string,
-            sortOrder: req.query.sortOrder as 'asc' | 'desc',
+            sortOrder: req.query.sortOrder as "asc" | "desc",
             status: req.query.status as string,
         };
+
+        // Ownership filtering: Telemarketers only see their own clients
+        if (userId) {
+            const tmStaff = await getTelemarketerStaff(userId);
+            if (tmStaff) {
+                params.createdBy = userId;
+                params.hasOrdersOnly = true;
+            }
+        }
 
         const result = await ClientServices.getAllClientsFromDB(params);
         res.status(200).json({
@@ -28,7 +39,7 @@ const getAllClients = async (req: Request, res: Response) => {
         const err = error as Error;
         res.status(500).json({
             success: false,
-            message: err.message || 'Failed to fetch clients',
+            message: err.message || "Failed to fetch clients",
         });
     }
 };
@@ -36,13 +47,13 @@ const getAllClients = async (req: Request, res: Response) => {
 const getClientById = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
-        if (!id) throw new Error('ID is required');
+        if (!id) throw new Error("ID is required");
 
         const result = await ClientServices.getClientByIdFromDB(id);
         if (!result) {
             res.status(404).json({
                 success: false,
-                message: 'Client not found',
+                message: "Client not found",
             });
             return;
         }
@@ -55,7 +66,7 @@ const getClientById = async (req: Request, res: Response) => {
         const err = error as Error;
         res.status(500).json({
             success: false,
-            message: err.message || 'Failed to fetch client',
+            message: err.message || "Failed to fetch client",
         });
     }
 };
@@ -63,14 +74,14 @@ const getClientById = async (req: Request, res: Response) => {
 const createClient = async (req: Request, res: Response) => {
     try {
         const userId = req.user?.id;
-        if (!userId) throw new Error('Unauthorized');
+        if (!userId) throw new Error("Unauthorized");
 
         // Validate request body with Zod
         const validationResult = createClientSchema.safeParse(req.body);
         if (!validationResult.success) {
             res.status(400).json({
                 success: false,
-                message: 'Validation failed',
+                message: "Validation failed",
                 errors: validationResult.error.flatten().fieldErrors,
             });
             return;
@@ -83,7 +94,7 @@ const createClient = async (req: Request, res: Response) => {
 
         res.status(201).json({
             success: true,
-            message: 'Client created successfully',
+            message: "Client created successfully",
             data: result,
         });
     } catch (error: unknown) {
@@ -91,11 +102,11 @@ const createClient = async (req: Request, res: Response) => {
         if (error instanceof ClientIdExistsError) {
             res.status(400).json({
                 success: false,
-                message: 'Validation failed',
+                message: "Validation failed",
                 errors: {
                     clientId: [
                         `${error.message}. Try: ${error.suggestions.join(
-                            ', ',
+                            ", ",
                         )}`,
                     ],
                 },
@@ -107,7 +118,7 @@ const createClient = async (req: Request, res: Response) => {
         const err = error as Error;
         res.status(500).json({
             success: false,
-            message: err.message || 'Failed to create client',
+            message: err.message || "Failed to create client",
         });
     }
 };
@@ -115,14 +126,14 @@ const createClient = async (req: Request, res: Response) => {
 const updateClient = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
-        if (!id) throw new Error('ID is required');
+        if (!id) throw new Error("ID is required");
 
         // Validate request body with Zod
         const validationResult = updateClientSchema.safeParse(req.body);
         if (!validationResult.success) {
             res.status(400).json({
                 success: false,
-                message: 'Validation failed',
+                message: "Validation failed",
                 errors: validationResult.error.flatten().fieldErrors,
             });
             return;
@@ -135,14 +146,14 @@ const updateClient = async (req: Request, res: Response) => {
         if (!result) {
             res.status(404).json({
                 success: false,
-                message: 'Client not found',
+                message: "Client not found",
             });
             return;
         }
 
         res.status(200).json({
             success: true,
-            message: 'Client updated successfully',
+            message: "Client updated successfully",
             data: result,
         });
     } catch (error: unknown) {
@@ -150,11 +161,11 @@ const updateClient = async (req: Request, res: Response) => {
         if (error instanceof ClientIdExistsError) {
             res.status(400).json({
                 success: false,
-                message: 'Validation failed',
+                message: "Validation failed",
                 errors: {
                     clientId: [
                         `${error.message}. Try: ${error.suggestions.join(
-                            ', ',
+                            ", ",
                         )}`,
                     ],
                 },
@@ -166,7 +177,7 @@ const updateClient = async (req: Request, res: Response) => {
         const err = error as Error;
         res.status(500).json({
             success: false,
-            message: err.message || 'Failed to update client',
+            message: err.message || "Failed to update client",
         });
     }
 };
@@ -177,7 +188,7 @@ const checkClientId = async (req: Request, res: Response) => {
         if (!clientId) {
             res.status(400).json({
                 success: false,
-                message: 'Client ID is required',
+                message: "Client ID is required",
             });
             return;
         }
@@ -191,7 +202,7 @@ const checkClientId = async (req: Request, res: Response) => {
         const err = error as Error;
         res.status(500).json({
             success: false,
-            message: err.message || 'Failed to check client ID',
+            message: err.message || "Failed to check client ID",
         });
     }
 };
@@ -199,7 +210,7 @@ const checkClientId = async (req: Request, res: Response) => {
 const getClientStats = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
-        if (!id) throw new Error('Client ID is required');
+        if (!id) throw new Error("Client ID is required");
 
         // Extract filter parameters from query
         const filters = {
@@ -223,7 +234,7 @@ const getClientStats = async (req: Request, res: Response) => {
         const err = error as Error;
         res.status(500).json({
             success: false,
-            message: err.message || 'Failed to fetch client stats',
+            message: err.message || "Failed to fetch client stats",
         });
     }
 };

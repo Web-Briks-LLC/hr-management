@@ -1,19 +1,19 @@
-'use client';
+"use client";
 
-import { useState, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
-import { useGetStaffsQuery } from '@/redux/features/staff/staffApi';
-import { useGetAllShiftsQuery } from '@/redux/features/shift/shiftApi';
-import { useGetMetadataByTypeQuery } from '@/redux/features/metadata/metadataApi';
+import { useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
+import { useGetStaffsQuery } from "@/redux/features/staff/staffApi";
+import { useGetAllShiftsQuery } from "@/redux/features/shift/shiftApi";
+import { DESIGNATIONS, DEPARTMENTS } from "@/constants/metadata";
 import {
     Card,
     CardContent,
     CardDescription,
     CardHeader,
     CardTitle,
-} from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
     Table,
     TableBody,
@@ -21,9 +21,9 @@ import {
     TableHead,
     TableHeader,
     TableRow,
-} from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
     Loader,
     Search,
@@ -35,7 +35,7 @@ import {
     ChevronsRight,
     Filter,
     X,
-} from 'lucide-react';
+} from "lucide-react";
 
 import {
     Select,
@@ -43,35 +43,35 @@ import {
     SelectItem,
     SelectTrigger,
     SelectValue,
-} from '@/components/ui/select';
-import { Skeleton } from '@/components/ui/skeleton';
-import { format } from 'date-fns';
-import { useDebounce } from '../../../hooks/use-debounce';
+} from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import { format } from "date-fns";
+import { useDebounce } from "../../../hooks/use-debounce";
 
 const statusColors: Record<string, string> = {
-    active: 'bg-green-500',
-    inactive: 'bg-red-500',
-    present: 'bg-green-500',
-    absent: 'bg-red-500',
-    late: 'bg-yellow-500',
-    half_day: 'bg-orange-500',
-    early_exit: 'bg-purple-500',
-    on_leave: 'bg-blue-500',
-    weekend: 'bg-gray-500',
-    holiday: 'bg-pink-500',
+    active: "bg-green-500",
+    inactive: "bg-red-500",
+    present: "bg-green-500",
+    absent: "bg-red-500",
+    late: "bg-yellow-500",
+    half_day: "bg-orange-500",
+    early_exit: "bg-purple-500",
+    on_leave: "bg-blue-500",
+    weekend: "bg-gray-500",
+    holiday: "bg-pink-500",
 };
 
 const statusLabels: Record<string, string> = {
-    active: 'Active',
-    inactive: 'Inactive',
-    present: 'Present',
-    absent: 'Absent',
-    late: 'Late',
-    half_day: 'Half Day',
-    early_exit: 'Early Exit',
-    on_leave: 'On Leave',
-    weekend: 'Weekend',
-    holiday: 'Holiday',
+    active: "Active",
+    inactive: "Inactive",
+    present: "Present",
+    absent: "Absent",
+    late: "Late",
+    half_day: "Half Day",
+    early_exit: "Early Exit",
+    on_leave: "On Leave",
+    weekend: "Weekend",
+    holiday: "Holiday",
 };
 
 interface Staff {
@@ -110,14 +110,14 @@ interface Staff {
 export default function StaffsPage() {
     const [page, setPage] = useState(1);
     const [limit, setLimit] = useState(20);
-    const [searchQuery, setSearchQuery] = useState('');
+    const [searchQuery, setSearchQuery] = useState("");
     const debouncedSearch = useDebounce(searchQuery, 500);
 
     // Filters
-    const [departmentFilter, setDepartmentFilter] = useState('');
-    const [designationFilter, setDesignationFilter] = useState('');
-    const [shiftFilter, setShiftFilter] = useState<string>('all');
-    const [statusFilter, setStatusFilter] = useState<string>('all');
+    const [departmentFilter, setDepartmentFilter] = useState("");
+    const [designationFilter, setDesignationFilter] = useState("");
+    const [shiftFilter, setShiftFilter] = useState<string>("all");
+    const [statusFilter, setStatusFilter] = useState<string>("all");
     const router = useRouter();
 
     const queryParams: any = {
@@ -126,14 +126,12 @@ export default function StaffsPage() {
         search: debouncedSearch || undefined,
         department: departmentFilter || undefined,
         designation: designationFilter || undefined,
-        shiftId: shiftFilter !== 'all' ? shiftFilter : undefined,
-        status: statusFilter !== 'all' ? statusFilter : undefined,
+        shiftId: shiftFilter !== "all" ? shiftFilter : undefined,
+        status: statusFilter !== "all" ? statusFilter : undefined,
     };
 
     const { data, isLoading, isFetching } = useGetStaffsQuery(queryParams);
     const { data: shiftsData } = useGetAllShiftsQuery({});
-    const { data: departmentsData } = useGetMetadataByTypeQuery('department');
-    const { data: designationsData } = useGetMetadataByTypeQuery('designation');
 
     const staffs: Staff[] = data?.staffs || [];
     const meta = data?.meta;
@@ -150,7 +148,7 @@ export default function StaffsPage() {
         }
         return (
             <Badge
-                className={`${statusColors[status] || 'bg-gray-400'} text-white hover:${statusColors[status]}`}
+                className={`${statusColors[status] || "bg-gray-400"} text-white hover:${statusColors[status]}`}
             >
                 {statusLabels[status] || status}
             </Badge>
@@ -158,11 +156,11 @@ export default function StaffsPage() {
     };
 
     const clearFilters = () => {
-        setSearchQuery('');
-        setDepartmentFilter('');
-        setDesignationFilter('');
-        setShiftFilter('all');
-        setStatusFilter('all');
+        setSearchQuery("");
+        setDepartmentFilter("");
+        setDesignationFilter("");
+        setShiftFilter("all");
+        setStatusFilter("all");
         setPage(1);
     };
 
@@ -201,7 +199,7 @@ export default function StaffsPage() {
                         <Select
                             value={departmentFilter}
                             onValueChange={(v) => {
-                                setDepartmentFilter(v === 'all' ? '' : v);
+                                setDepartmentFilter(v === "all" ? "" : v);
                                 setPage(1);
                             }}
                         >
@@ -212,9 +210,9 @@ export default function StaffsPage() {
                                 <SelectItem value="all">
                                     All Departments
                                 </SelectItem>
-                                {departmentsData?.data?.map((dept) => (
+                                {DEPARTMENTS.map((dept) => (
                                     <SelectItem
-                                        key={dept._id}
+                                        key={dept.value}
                                         value={dept.value}
                                     >
                                         {dept.label}
@@ -227,7 +225,7 @@ export default function StaffsPage() {
                         <Select
                             value={designationFilter}
                             onValueChange={(v) => {
-                                setDesignationFilter(v === 'all' ? '' : v);
+                                setDesignationFilter(v === "all" ? "" : v);
                                 setPage(1);
                             }}
                         >
@@ -238,9 +236,9 @@ export default function StaffsPage() {
                                 <SelectItem value="all">
                                     All Designations
                                 </SelectItem>
-                                {designationsData?.data?.map((desig) => (
+                                {DESIGNATIONS.map((desig) => (
                                     <SelectItem
-                                        key={desig._id}
+                                        key={desig.value}
                                         value={desig.value}
                                     >
                                         {desig.label}
@@ -296,8 +294,8 @@ export default function StaffsPage() {
                         {(searchQuery ||
                             departmentFilter ||
                             designationFilter ||
-                            shiftFilter !== 'all' ||
-                            statusFilter !== 'all') && (
+                            shiftFilter !== "all" ||
+                            statusFilter !== "all") && (
                             <Button
                                 variant="ghost"
                                 size="sm"
@@ -372,16 +370,16 @@ export default function StaffsPage() {
                                             className="hover:bg-muted/20"
                                         >
                                             <TableCell className="font-medium">
-                                                {staff.user?.name || 'N/A'}
+                                                {staff.user?.name || "N/A"}
                                             </TableCell>
                                             <TableCell className="font-mono text-xs text-muted-foreground">
                                                 {staff.staffId}
                                             </TableCell>
                                             <TableCell>
-                                                {staff.department || 'N/A'}
+                                                {staff.department || "N/A"}
                                             </TableCell>
                                             <TableCell>
-                                                {staff.designation || 'N/A'}
+                                                {staff.designation || "N/A"}
                                             </TableCell>
                                             <TableCell>
                                                 {staff.currentShift ? (
@@ -398,8 +396,8 @@ export default function StaffsPage() {
                                                                 staff
                                                                     .currentShift
                                                                     .startTime
-                                                            }{' '}
-                                                            -{' '}
+                                                            }{" "}
+                                                            -{" "}
                                                             {
                                                                 staff
                                                                     .currentShift
@@ -466,8 +464,8 @@ export default function StaffsPage() {
                                     </SelectContent>
                                 </Select>
                                 <span>
-                                    Showing {(page - 1) * limit + 1} to{' '}
-                                    {Math.min(page * limit, meta.total)} of{' '}
+                                    Showing {(page - 1) * limit + 1} to{" "}
+                                    {Math.min(page * limit, meta.total)} of{" "}
                                     {meta.total} entries
                                 </span>
                             </div>

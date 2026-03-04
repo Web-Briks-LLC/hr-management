@@ -108,6 +108,8 @@ import { format } from "date-fns";
 import { DateTimePicker } from "@/components/shared/DateTimePicker";
 import { cn } from "@/lib/utils";
 import { useSession } from "@/lib/auth-client";
+import { useGetMeQuery } from "@/redux/features/staff/staffApi";
+import { Role } from "@/constants/role";
 
 const statusColors: Record<OrderStatus, string> = {
     pending: "bg-yellow-500/20 text-yellow-700 dark:text-yellow-400",
@@ -156,6 +158,13 @@ interface ApiErrorResponse {
 
 export default function OrdersPage() {
     const { data: session } = useSession();
+    const { data: meData } = useGetMeQuery({});
+    const isTelemarketer = useMemo(() => {
+        return (
+            session?.user?.role === Role.STAFF &&
+            meData?.data?.designation === "telemarketer"
+        );
+    }, [session, meData]);
     const [page, setPage] = useState(1);
     const [filters, setFilters] = useState<OrderFilters>({
         search: "",
@@ -770,7 +779,7 @@ export default function OrdersPage() {
                             Manage graphic design orders and track their status
                         </CardDescription>
                     </div>
-                    {session?.user?.role !== "team_leader" && (
+                    {!isTelemarketer && (
                         <div className="flex gap-3">
                             {/* Select Mode Toggle Button */}
                             {!isSelectionMode ? (
@@ -1036,17 +1045,19 @@ export default function OrdersPage() {
                                 )}
                             </div>
                             <div className="flex items-center gap-2">
-                                <Button
-                                    variant="destructive"
-                                    size="sm"
-                                    onClick={() =>
-                                        setIsBulkDeleteDialogOpen(true)
-                                    }
-                                    disabled={selectedOrderIds.size === 0}
-                                >
-                                    <Trash2 className="h-4 w-4 mr-1" />
-                                    Delete ({selectedOrderIds.size})
-                                </Button>
+                                {!isTelemarketer && (
+                                    <Button
+                                        variant="destructive"
+                                        size="sm"
+                                        onClick={() =>
+                                            setIsBulkDeleteDialogOpen(true)
+                                        }
+                                        disabled={selectedOrderIds.size === 0}
+                                    >
+                                        <Trash2 className="h-4 w-4 mr-1" />
+                                        Delete ({selectedOrderIds.size})
+                                    </Button>
+                                )}
                             </div>
                         </div>
                     )}
@@ -1300,6 +1311,7 @@ export default function OrdersPage() {
                                                         }
                                                         disabled={
                                                             isUpdatingStatus ||
+                                                            isTelemarketer ||
                                                             statusWorkflow[
                                                                 order.status
                                                             ].length === 0
@@ -1381,72 +1393,103 @@ export default function OrdersPage() {
                                                                     <p>View</p>
                                                                 </TooltipContent>
                                                             </Tooltip>
-                                                            <Tooltip>
-                                                                <TooltipTrigger
-                                                                    asChild
-                                                                >
-                                                                    <Button
-                                                                        variant="ghost"
-                                                                        size="icon"
-                                                                        onClick={() =>
-                                                                            openEditDialog(
-                                                                                order,
-                                                                            )
-                                                                        }
-                                                                    >
-                                                                        <Edit2 className="h-4 w-4" />
-                                                                    </Button>
-                                                                </TooltipTrigger>
-                                                                <TooltipContent>
-                                                                    <p>Edit</p>
-                                                                </TooltipContent>
-                                                            </Tooltip>
-                                                            <Tooltip>
-                                                                <TooltipTrigger
-                                                                    asChild
-                                                                >
-                                                                    <Button
-                                                                        variant="ghost"
-                                                                        size="icon"
-                                                                        onClick={() =>
-                                                                            openExtendDialog(
-                                                                                order,
-                                                                            )
-                                                                        }
-                                                                    >
-                                                                        <Calendar className="h-4 w-4" />
-                                                                    </Button>
-                                                                </TooltipTrigger>
-                                                                <TooltipContent>
-                                                                    <p>
-                                                                        Extend
-                                                                        Deadline
-                                                                    </p>
-                                                                </TooltipContent>
-                                                            </Tooltip>
-                                                            <Tooltip>
-                                                                <TooltipTrigger
-                                                                    asChild
-                                                                >
-                                                                    <Button
-                                                                        variant="ghost"
-                                                                        size="icon"
-                                                                        onClick={() =>
-                                                                            openRevisionDialog(
-                                                                                order,
-                                                                            )
-                                                                        }
-                                                                    >
-                                                                        <RotateCcw className="h-4 w-4" />
-                                                                    </Button>
-                                                                </TooltipTrigger>
-                                                                <TooltipContent>
-                                                                    <p>
-                                                                        Add
-                                                                        Revision
-                                                                    </p>
-                                                                </TooltipContent>
-                                                            </Tooltip>
+                                                            {!isTelemarketer && (
+                                                                <>
+                                                                    <Tooltip>
+                                                                        <TooltipTrigger
+                                                                            asChild
+                                                                        >
+                                                                            <Button
+                                                                                variant="ghost"
+                                                                                size="icon"
+                                                                                onClick={() =>
+                                                                                    openEditDialog(
+                                                                                        order,
+                                                                                    )
+                                                                                }
+                                                                            >
+                                                                                <Edit2 className="h-4 w-4" />
+                                                                            </Button>
+                                                                        </TooltipTrigger>
+                                                                        <TooltipContent>
+                                                                            <p>
+                                                                                Edit
+                                                                            </p>
+                                                                        </TooltipContent>
+                                                                    </Tooltip>
+                                                                    <Tooltip>
+                                                                        <TooltipTrigger
+                                                                            asChild
+                                                                        >
+                                                                            <Button
+                                                                                variant="ghost"
+                                                                                size="icon"
+                                                                                onClick={() =>
+                                                                                    openExtendDialog(
+                                                                                        order,
+                                                                                    )
+                                                                                }
+                                                                            >
+                                                                                <Calendar className="h-4 w-4" />
+                                                                            </Button>
+                                                                        </TooltipTrigger>
+                                                                        <TooltipContent>
+                                                                            <p>
+                                                                                Extend
+                                                                                Deadline
+                                                                            </p>
+                                                                        </TooltipContent>
+                                                                    </Tooltip>
+                                                                    <Tooltip>
+                                                                        <TooltipTrigger
+                                                                            asChild
+                                                                        >
+                                                                            <Button
+                                                                                variant="ghost"
+                                                                                size="icon"
+                                                                                onClick={() =>
+                                                                                    openRevisionDialog(
+                                                                                        order,
+                                                                                    )
+                                                                                }
+                                                                            >
+                                                                                <RotateCcw className="h-4 w-4" />
+                                                                            </Button>
+                                                                        </TooltipTrigger>
+                                                                        <TooltipContent>
+                                                                            <p>
+                                                                                Add
+                                                                                Revision
+                                                                            </p>
+                                                                        </TooltipContent>
+                                                                    </Tooltip>
+                                                                    <Tooltip>
+                                                                        <TooltipTrigger
+                                                                            asChild
+                                                                        >
+                                                                            <Button
+                                                                                variant="ghost"
+                                                                                size="icon"
+                                                                                onClick={() => {
+                                                                                    setSelectedOrder(
+                                                                                        order,
+                                                                                    );
+                                                                                    setIsDeleteDialogOpen(
+                                                                                        true,
+                                                                                    );
+                                                                                }}
+                                                                            >
+                                                                                <Trash2 className="h-4 w-4 text-destructive" />
+                                                                            </Button>
+                                                                        </TooltipTrigger>
+                                                                        <TooltipContent>
+                                                                            <p>
+                                                                                Delete
+                                                                            </p>
+                                                                        </TooltipContent>
+                                                                    </Tooltip>
+                                                                </>
+                                                            )}
                                                             <Tooltip>
                                                                 <TooltipTrigger
                                                                     asChild
@@ -1467,31 +1510,6 @@ export default function OrdersPage() {
                                                                     <p>
                                                                         View
                                                                         Timeline
-                                                                    </p>
-                                                                </TooltipContent>
-                                                            </Tooltip>
-                                                            <Tooltip>
-                                                                <TooltipTrigger
-                                                                    asChild
-                                                                >
-                                                                    <Button
-                                                                        variant="ghost"
-                                                                        size="icon"
-                                                                        onClick={() => {
-                                                                            setSelectedOrder(
-                                                                                order,
-                                                                            );
-                                                                            setIsDeleteDialogOpen(
-                                                                                true,
-                                                                            );
-                                                                        }}
-                                                                    >
-                                                                        <Trash2 className="h-4 w-4 text-destructive" />
-                                                                    </Button>
-                                                                </TooltipTrigger>
-                                                                <TooltipContent>
-                                                                    <p>
-                                                                        Delete
                                                                     </p>
                                                                 </TooltipContent>
                                                             </Tooltip>

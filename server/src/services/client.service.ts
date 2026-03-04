@@ -26,6 +26,11 @@ const buildMatchStage = (
         match.status = params.status;
     }
 
+    // Ownership filter: restrict to clients created by a specific user
+    if (params.createdBy) {
+        match.createdBy = new Types.ObjectId(params.createdBy);
+    }
+
     return match;
 };
 
@@ -111,33 +116,65 @@ const getAllClientsFromDB = async (params: ClientQueryParams) => {
 
     const matchStage = buildMatchStage(params);
 
-    const [clients, countResult] = await Promise.all([
-        ClientModel.aggregate([
-            { $match: matchStage },
-            { $sort: sortStage },
-            { $skip: skip },
-            { $limit: limit },
+    const pipeline: any[] = [{ $match: matchStage }];
+
+    // Filter for clients with at least one order if hasOrdersOnly is true
+    if (params.hasOrdersOnly) {
+        pipeline.push(
             {
                 $lookup: {
-                    from: "user",
-                    localField: "createdBy",
-                    foreignField: "_id",
-                    as: "createdBy",
+                    from: "orders",
+                    localField: "_id",
+                    foreignField: "clientId",
+                    as: "orders",
                 },
             },
             {
-                $unwind: {
-                    path: "$createdBy",
-                    preserveNullAndEmptyArrays: true,
+                $match: {
+                    "orders.0": { $exists: true },
                 },
             },
             {
                 $project: {
-                    "createdBy.password": 0,
+                    orders: 0,
                 },
             },
-        ]),
-        ClientModel.countDocuments(matchStage),
+        );
+    }
+
+    pipeline.push(
+        { $sort: sortStage },
+        { $skip: skip },
+        { $limit: limit },
+        {
+            $lookup: {
+                from: "user",
+                localField: "createdBy",
+                foreignField: "_id",
+                as: "createdBy",
+            },
+        },
+        {
+            $unwind: {
+                path: "$createdBy",
+                preserveNullAndEmptyArrays: true,
+            },
+        },
+        {
+            $project: {
+                "createdBy.password": 0,
+            },
+        },
+    );
+
+    const [clients, countResult] = await Promise.all([
+        ClientModel.aggregate(pipeline),
+        params.hasOrdersOnly
+            ? ClientModel.aggregate([
+                  ...pipeline.slice(0, -5), // Remove skip, limit, sort, etc.
+                  { $count: "total" },
+              ]).then((res) => res[0]?.total || 0)
+            : ClientModel.countDocuments(matchStage),
     ]);
 
     return {

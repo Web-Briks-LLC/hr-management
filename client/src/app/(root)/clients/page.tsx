@@ -1,28 +1,29 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
+import { useState } from "react";
 import {
     useGetClientsQuery,
     useCreateClientMutation,
     useUpdateClientMutation,
-} from '@/redux/features/client/clientApi';
-import type { Client } from '@/types/client.type';
+} from "@/redux/features/client/clientApi";
+import { useGetMeQuery } from "@/redux/features/staff/staffApi";
+import type { Client } from "@/types/client.type";
 import {
     Card,
     CardContent,
     CardDescription,
     CardHeader,
     CardTitle,
-} from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
     Select,
     SelectContent,
     SelectItem,
     SelectTrigger,
     SelectValue,
-} from '@/components/ui/select';
+} from "@/components/ui/select";
 import {
     Table,
     TableBody,
@@ -30,7 +31,7 @@ import {
     TableHead,
     TableHeader,
     TableRow,
-} from '@/components/ui/table';
+} from "@/components/ui/table";
 import {
     Dialog,
     DialogContent,
@@ -38,46 +39,33 @@ import {
     DialogHeader,
     DialogTitle,
     DialogTrigger,
-} from '@/components/ui/dialog';
+} from "@/components/ui/dialog";
 import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import {
-    Loader,
     ChevronLeft,
     ChevronRight,
     ChevronsLeft,
     ChevronsRight,
     Plus,
-    Trash2,
     Edit2,
     Users,
     Eye,
     UserCheck,
     UserX,
-} from 'lucide-react';
-import Link from 'next/link';
-import { Skeleton } from '@/components/ui/skeleton';
-import { toast } from 'sonner';
+} from "lucide-react";
+import Link from "next/link";
+import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "sonner";
 import {
     ClientForm,
     type ClientFormData,
-} from '@/components/client/ClientForm';
-import { ScrollArea } from '@/components/ui/scroll-area';
+} from "@/components/client/ClientForm";
 
 const statusOptions = [
-    { value: 'active', label: 'Active', color: 'text-green-600 bg-green-100' },
+    { value: "active", label: "Active", color: "text-green-600 bg-green-100" },
     {
-        value: 'inactive',
-        label: 'Inactive',
-        color: 'text-gray-600 bg-gray-100',
+        value: "inactive",
+        label: "Inactive",
+        color: "text-gray-600 bg-gray-100",
     },
 ];
 
@@ -93,11 +81,11 @@ interface ApiErrorResponse {
 export default function ClientsPage() {
     const [page, setPage] = useState(1);
     const [filters, setFilters] = useState({
-        search: '',
-        status: '',
+        search: "",
+        status: "",
         limit: 10,
-        sortBy: 'createdAt',
-        sortOrder: 'desc' as 'asc' | 'desc',
+        sortBy: "createdAt",
+        sortOrder: "desc" as "asc" | "desc",
     });
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -118,6 +106,7 @@ export default function ClientsPage() {
     >(undefined);
 
     // Queries
+    const { data: meData } = useGetMeQuery({});
     const {
         data: clientData,
         isLoading,
@@ -136,10 +125,12 @@ export default function ClientsPage() {
     const totalPages = pagination?.pages || 1;
 
     // Count active and inactive clients from current data
-    const activeClients = clients.filter((c) => c.status === 'active').length;
+    const activeClients = clients.filter((c) => c.status === "active").length;
     const inactiveClients = clients.filter(
-        (c) => c.status === 'inactive',
+        (c) => c.status === "inactive",
     ).length;
+
+    const isTelemarketer = meData?.data?.designation === "telemarketer";
 
     // Generate pagination numbers
     const getPaginationNumbers = () => {
@@ -149,13 +140,13 @@ export default function ClientsPage() {
             for (let i = 1; i <= totalPages; i++) pages.push(i);
         } else {
             pages.push(1);
-            if (page > 3) pages.push('...');
+            if (page > 3) pages.push("...");
             const start = Math.max(2, page - 1);
             const end = Math.min(totalPages - 1, page + 1);
             for (let i = start; i <= end; i++) {
                 if (!pages.includes(i)) pages.push(i);
             }
-            if (page < totalPages - 2) pages.push('...');
+            if (page < totalPages - 2) pages.push("...");
             if (!pages.includes(totalPages)) pages.push(totalPages);
         }
         return pages;
@@ -170,7 +161,7 @@ export default function ClientsPage() {
         setCreateServerErrors(undefined);
         try {
             await createClient(data).unwrap();
-            toast.success('Client created successfully');
+            toast.success("Client created successfully");
             setIsAddDialogOpen(false);
         } catch (error: unknown) {
             const err = error as ApiErrorResponse;
@@ -178,7 +169,7 @@ export default function ClientsPage() {
             if (err?.data?.errors) {
                 setCreateServerErrors(err.data.errors);
             } else {
-                toast.error(err?.data?.message || 'Failed to create client');
+                toast.error(err?.data?.message || "Failed to create client");
             }
         }
     };
@@ -191,7 +182,7 @@ export default function ClientsPage() {
                 id: selectedClient._id,
                 ...data,
             }).unwrap();
-            toast.success('Client updated successfully');
+            toast.success("Client updated successfully");
             setIsEditDialogOpen(false);
             setSelectedClient(null);
         } catch (error: unknown) {
@@ -200,7 +191,7 @@ export default function ClientsPage() {
             if (err?.data?.errors) {
                 setUpdateServerErrors(err.data.errors);
             } else {
-                toast.error(err?.data?.message || 'Failed to update client');
+                toast.error(err?.data?.message || "Failed to update client");
             }
         }
     };
@@ -212,11 +203,11 @@ export default function ClientsPage() {
             clientId: client.clientId,
             name: client.name,
             email: client.email,
-            phone: client.phone || '',
-            address: client.address || '',
-            officeAddress: client.officeAddress || '',
-            description: client.description || '',
-            currency: client.currency || '',
+            phone: client.phone || "",
+            address: client.address || "",
+            officeAddress: client.officeAddress || "",
+            description: client.description || "",
+            currency: client.currency || "",
             status: client.status,
         });
         setIsEditDialogOpen(true);
@@ -306,32 +297,34 @@ export default function ClientsPage() {
                             Manage your clients and their information
                         </CardDescription>
                     </div>
-                    <Dialog
-                        open={isAddDialogOpen}
-                        onOpenChange={handleAddDialogChange}
-                    >
-                        <DialogTrigger asChild>
-                            <Button>
-                                <Plus />
-                                Add Client
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-                            <DialogHeader>
-                                <DialogTitle>Add New Client</DialogTitle>
-                                <DialogDescription>
-                                    Fill in the details to add a new client
-                                </DialogDescription>
-                            </DialogHeader>
-                            <ClientForm
-                                onSubmit={handleCreateClient}
-                                isSubmitting={isCreating}
-                                submitLabel="Create"
-                                onCancel={() => setIsAddDialogOpen(false)}
-                                serverErrors={createServerErrors}
-                            />
-                        </DialogContent>
-                    </Dialog>
+                    {!isTelemarketer && (
+                        <Dialog
+                            open={isAddDialogOpen}
+                            onOpenChange={handleAddDialogChange}
+                        >
+                            <DialogTrigger asChild>
+                                <Button>
+                                    <Plus />
+                                    Add Client
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+                                <DialogHeader>
+                                    <DialogTitle>Add New Client</DialogTitle>
+                                    <DialogDescription>
+                                        Fill in the details to add a new client
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <ClientForm
+                                    onSubmit={handleCreateClient}
+                                    isSubmitting={isCreating}
+                                    submitLabel="Create"
+                                    onCancel={() => setIsAddDialogOpen(false)}
+                                    serverErrors={createServerErrors}
+                                />
+                            </DialogContent>
+                        </Dialog>
+                    )}
                 </CardHeader>
                 <CardContent className="space-y-4">
                     {/* Filters */}
@@ -340,14 +333,14 @@ export default function ClientsPage() {
                             placeholder="Search by name, email, or ID..."
                             value={filters.search}
                             onChange={(e) =>
-                                handleFilterChange('search', e.target.value)
+                                handleFilterChange("search", e.target.value)
                             }
                             className="w-full"
                         />
                         <Select
                             value={filters.status}
                             onValueChange={(value) =>
-                                handleFilterChange('status', value)
+                                handleFilterChange("status", value)
                             }
                         >
                             <SelectTrigger>
@@ -367,7 +360,7 @@ export default function ClientsPage() {
                         <Select
                             value={filters.limit.toString()}
                             onValueChange={(value) =>
-                                handleFilterChange('limit', parseInt(value))
+                                handleFilterChange("limit", parseInt(value))
                             }
                         >
                             <SelectTrigger>
@@ -388,11 +381,11 @@ export default function ClientsPage() {
                             variant="outline"
                             onClick={() => {
                                 setFilters({
-                                    search: '',
-                                    status: '',
+                                    search: "",
+                                    status: "",
                                     limit: 10,
-                                    sortBy: 'createdAt',
-                                    sortOrder: 'desc',
+                                    sortBy: "createdAt",
+                                    sortOrder: "desc",
                                 });
                                 setPage(1);
                             }}
@@ -509,7 +502,7 @@ export default function ClientsPage() {
                                                         {client.email}
                                                     </TableCell>
                                                     <TableCell className="border-r">
-                                                        {client.phone || '-'}
+                                                        {client.phone || "-"}
                                                     </TableCell>
                                                     <TableCell className="border-r text-center">
                                                         <span
@@ -531,17 +524,19 @@ export default function ClientsPage() {
                                                                     <Eye className="h-4 w-4" />
                                                                 </Link>
                                                             </Button>
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                onClick={() =>
-                                                                    openEditDialog(
-                                                                        client,
-                                                                    )
-                                                                }
-                                                            >
-                                                                <Edit2 />
-                                                            </Button>
+                                                            {!isTelemarketer && (
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    onClick={() =>
+                                                                        openEditDialog(
+                                                                            client,
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    <Edit2 />
+                                                                </Button>
+                                                            )}
                                                         </div>
                                                     </TableCell>
                                                 </TableRow>
@@ -557,11 +552,11 @@ export default function ClientsPage() {
                     {pagination && totalPages > 1 && (
                         <div className="flex items-center justify-between">
                             <div className="text-sm text-muted-foreground">
-                                Showing {(page - 1) * filters.limit + 1} to{' '}
+                                Showing {(page - 1) * filters.limit + 1} to{" "}
                                 {Math.min(
                                     page * filters.limit,
                                     pagination.total,
-                                )}{' '}
+                                )}{" "}
                                 of {pagination.total} clients
                             </div>
                             <div className="flex items-center gap-1">
@@ -591,7 +586,7 @@ export default function ClientsPage() {
 
                                 {/* Page Numbers */}
                                 {getPaginationNumbers().map((pageNum, idx) =>
-                                    pageNum === '...' ? (
+                                    pageNum === "..." ? (
                                         <span
                                             key={`ellipsis-${idx}`}
                                             className="px-2 text-muted-foreground"
@@ -603,8 +598,8 @@ export default function ClientsPage() {
                                             key={pageNum}
                                             variant={
                                                 page === pageNum
-                                                    ? 'default'
-                                                    : 'outline'
+                                                    ? "default"
+                                                    : "outline"
                                             }
                                             size="icon"
                                             className="h-8 w-8"

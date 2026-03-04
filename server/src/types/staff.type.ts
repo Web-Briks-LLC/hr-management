@@ -8,7 +8,7 @@ export default interface IStaff {
 
     branchId?: Types.ObjectId;
     department?: string;
-    designation: string;
+    designation: string; // Keep as string for flexibility but we can use Designation enum in logic
     joinDate: Date;
     status: "active" | "inactive" | "terminated";
 
@@ -42,7 +42,7 @@ export default interface IStaff {
     salaryPinResetExpires?: Date;
 
     profileCompleted: boolean;
-
+    balance: number;
     exitDate?: Date;
 
     createdAt: Date;

@@ -24,7 +24,6 @@ export const apiSlice = createApi({
         "Service",
         "ReturnFileFormat",
         "Earning",
-        "Metadata",
         "Shareholder",
         "ProfitSummary",
         "Distribution",

@@ -47,6 +47,7 @@ interface UpdateOrderData {
 
 interface GetOrdersFilters {
     clientId?: string;
+    clientIds?: string[]; // Ownership filter: restrict to specific client IDs
     status?: OrderStatus;
     priority?: OrderPriority;
     assignedTo?: string;
@@ -128,6 +129,13 @@ async function getAllOrdersFromDB(filters: GetOrdersFilters): Promise<{
 
     if (clientId) {
         matchStage.clientId = new mongoose.Types.ObjectId(clientId);
+    }
+
+    // Ownership filter: restrict to specific client IDs (used by Telemarketer role)
+    if (filters.clientIds && filters.clientIds.length > 0) {
+        matchStage.clientId = {
+            $in: filters.clientIds.map((id) => new mongoose.Types.ObjectId(id)),
+        };
     }
 
     if (status) {

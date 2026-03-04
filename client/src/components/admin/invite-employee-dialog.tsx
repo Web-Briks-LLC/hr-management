@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
+import { useState } from "react";
 import {
     Dialog,
     DialogContent,
@@ -8,38 +8,38 @@ import {
     DialogHeader,
     DialogTitle,
     DialogTrigger,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
     Select,
     SelectContent,
     SelectItem,
     SelectTrigger,
     SelectValue,
-} from '@/components/ui/select';
-import { useCreateInvitationMutation } from '@/redux/features/invitation/invitationApi';
-import { useGetAllBranchesQuery } from '@/redux/features/branch/branchApi';
-import { useGetAllShiftsQuery } from '@/redux/features/shift/shiftApi';
-import { useGetMetadataByTypeQuery } from '@/redux/features/metadata/metadataApi';
-import { useSession } from '@/lib/auth-client';
-import { Loader, UserPlus } from 'lucide-react';
-import { toast } from 'sonner';
+} from "@/components/ui/select";
+import { useCreateInvitationMutation } from "@/redux/features/invitation/invitationApi";
+import { useGetAllBranchesQuery } from "@/redux/features/branch/branchApi";
+import { useGetAllShiftsQuery } from "@/redux/features/shift/shiftApi";
+import { DESIGNATIONS, DEPARTMENTS } from "@/constants/metadata";
+import { useSession } from "@/lib/auth-client";
+import { Loader, UserPlus } from "lucide-react";
+import { toast } from "sonner";
 
 type RoleType =
-    | 'staff'
-    | 'team_leader'
-    | 'admin'
-    | 'super_admin'
-    | 'hr_manager';
+    | "staff"
+    | "team_leader"
+    | "admin"
+    | "super_admin"
+    | "hr_manager";
 
 const ROLE_LABELS: Record<RoleType, string> = {
-    staff: 'Staff',
-    team_leader: 'Team Leader',
-    admin: 'Admin',
-    super_admin: 'Super Admin',
-    hr_manager: 'HR Manager',
+    staff: "Staff",
+    team_leader: "Team Leader",
+    admin: "Admin",
+    super_admin: "Super Admin",
+    hr_manager: "HR Manager",
 };
 
 export default function InviteEmployeeDialog() {
@@ -48,42 +48,40 @@ export default function InviteEmployeeDialog() {
     const [createInvitation, { isLoading }] = useCreateInvitationMutation();
     const { data: branchesData } = useGetAllBranchesQuery(undefined);
     const { data: shiftsData } = useGetAllShiftsQuery(undefined);
-    const { data: departmentsData } = useGetMetadataByTypeQuery('department');
-    const { data: designationsData } = useGetMetadataByTypeQuery('designation');
 
     const currentUserRole = session?.user?.role as RoleType | undefined;
 
     const [formData, setFormData] = useState({
-        email: '',
-        salary: '',
-        role: 'staff' as RoleType,
-        department: '',
-        designation: '',
-        branchId: '',
-        shiftId: '',
-        expiryHours: '48',
+        email: "",
+        salary: "",
+        role: "staff" as RoleType,
+        department: "",
+        designation: "",
+        branchId: "",
+        shiftId: "",
+        expiryHours: "48",
     });
 
     // Determine available roles based on current user's role
     const getAvailableRoles = (): RoleType[] => {
-        const baseRoles: RoleType[] = ['staff', 'team_leader'];
+        const baseRoles: RoleType[] = ["staff", "team_leader"];
 
-        if (currentUserRole === 'super_admin') {
+        if (currentUserRole === "super_admin") {
             return [
-                'staff',
-                'team_leader',
-                'admin',
-                'super_admin',
-                'hr_manager',
+                "staff",
+                "team_leader",
+                "admin",
+                "super_admin",
+                "hr_manager",
             ];
         }
 
-        if (currentUserRole === 'admin') {
-            return ['staff', 'team_leader', 'admin', 'hr_manager'];
+        if (currentUserRole === "admin") {
+            return ["staff", "team_leader", "admin", "hr_manager"];
         }
 
-        if (currentUserRole === 'hr_manager') {
-            return ['staff', 'team_leader'];
+        if (currentUserRole === "hr_manager") {
+            return ["staff", "team_leader"];
         }
 
         return baseRoles;
@@ -92,7 +90,7 @@ export default function InviteEmployeeDialog() {
     const availableRoles = getAvailableRoles();
 
     // Admin roles don't require branch assignment
-    const isAdminRole = ['admin', 'super_admin', 'hr_manager'].includes(
+    const isAdminRole = ["admin", "super_admin", "hr_manager"].includes(
         formData.role,
     );
 
@@ -107,30 +105,30 @@ export default function InviteEmployeeDialog() {
                 department: formData.department || undefined,
                 designation: formData.designation,
                 branchId:
-                    formData.branchId && formData.branchId !== 'unassigned'
+                    formData.branchId && formData.branchId !== "unassigned"
                         ? formData.branchId
                         : undefined,
                 shiftId:
-                    formData.shiftId === 'unassigned'
+                    formData.shiftId === "unassigned"
                         ? undefined
                         : formData.shiftId || undefined,
                 expiryHours: Number(formData.expiryHours),
             }).unwrap();
 
-            toast.success('Invitation sent successfully!');
+            toast.success("Invitation sent successfully!");
             setOpen(false);
             setFormData({
-                email: '',
-                salary: '',
-                role: 'staff',
-                department: '',
-                designation: '',
-                branchId: '',
-                shiftId: '',
-                expiryHours: '48',
+                email: "",
+                salary: "",
+                role: "staff",
+                department: "",
+                designation: "",
+                branchId: "",
+                shiftId: "",
+                expiryHours: "48",
             });
         } catch (err: any) {
-            toast.error(err?.data?.message || 'Failed to send invitation');
+            toast.error(err?.data?.message || "Failed to send invitation");
         }
     };
 
@@ -209,8 +207,11 @@ export default function InviteEmployeeDialog() {
                                     <SelectValue placeholder="Select designation" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {designationsData?.data?.map((d) => (
-                                        <SelectItem key={d._id} value={d.value}>
+                                    {DESIGNATIONS.map((d) => (
+                                        <SelectItem
+                                            key={d.value}
+                                            value={d.value}
+                                        >
                                             {d.label}
                                         </SelectItem>
                                     ))}
@@ -234,8 +235,11 @@ export default function InviteEmployeeDialog() {
                                     <SelectValue placeholder="Select department" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {departmentsData?.data?.map((d) => (
-                                        <SelectItem key={d._id} value={d.value}>
+                                    {DEPARTMENTS.map((d) => (
+                                        <SelectItem
+                                            key={d.value}
+                                            value={d.value}
+                                        >
                                             {d.label}
                                         </SelectItem>
                                     ))}
@@ -265,7 +269,7 @@ export default function InviteEmployeeDialog() {
                         {/* Branch */}
                         <div className="grid gap-2">
                             <Label htmlFor="branch">
-                                Branch {isAdminRole ? '(Optional)' : '*'}
+                                Branch {isAdminRole ? "(Optional)" : "*"}
                             </Label>
                             <Select
                                 value={formData.branchId}
@@ -371,7 +375,7 @@ export default function InviteEmployeeDialog() {
                                     Sending...
                                 </>
                             ) : (
-                                'Send Invitation'
+                                "Send Invitation"
                             )}
                         </Button>
                     </div>

@@ -25,6 +25,7 @@ import { useGetAllBranchesQuery } from "@/redux/features/branch/branchApi";
 import { useUpdateStaffMutation } from "@/redux/features/staff/staffApi";
 import IStaff from "@/types/staff.type";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { DESIGNATIONS, DEPARTMENTS } from "@/constants/metadata";
 import { Edit, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
@@ -37,18 +38,16 @@ const formSchema = z.object({
     designation: z.string().min(1, "Designation is required"),
     role: z.string().optional(),
     status: z.enum(["active", "inactive", "terminated"]),
-    salary: z.coerce.number().min(0, "Salary must be positive"),
-    salaryVisibleToEmployee: z.boolean().default(true),
+    salary: z.number().min(0, "Salary must be positive"),
+    salaryVisibleToEmployee: z.boolean(),
     // Bank Account Fields
-    bank: z
-        .object({
-            bankName: z.string().optional(),
-            accountNumber: z.string().optional(),
-            accountHolderName: z.string().optional(),
-            branch: z.string().optional(),
-            routingNumber: z.string().optional(),
-        })
-        .optional(),
+    bank: z.object({
+        bankName: z.string().optional(),
+        accountNumber: z.string().optional(),
+        accountHolderName: z.string().optional(),
+        branch: z.string().optional(),
+        routingNumber: z.string().optional(),
+    }),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -65,7 +64,7 @@ export function EditStaffDialog({ staff }: EditStaffDialogProps) {
     const [updateStaff, { isLoading }] = useUpdateStaffMutation();
 
     const form = useForm<FormData>({
-        resolver: zodResolver(formSchema) as any,
+        resolver: zodResolver(formSchema),
         defaultValues: {
             branchId: staff.branchId || "",
             department: staff.department || "",
@@ -149,10 +148,30 @@ export function EditStaffDialog({ staff }: EditStaffDialogProps) {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {/* Department */}
                         <div className="space-y-2">
-                            <Label htmlFor="department">Department</Label>
-                            <Input
-                                id="department"
-                                {...form.register("department")}
+                            <Label>Department</Label>
+                            <Controller
+                                control={form.control}
+                                name="department"
+                                render={({ field }) => (
+                                    <Select
+                                        onValueChange={field.onChange}
+                                        value={field.value}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select department" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {DEPARTMENTS.map((dept) => (
+                                                <SelectItem
+                                                    key={dept.value}
+                                                    value={dept.value}
+                                                >
+                                                    {dept.label}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                )}
                             />
                             {form.formState.errors.department && (
                                 <p className="text-sm text-destructive">
@@ -163,10 +182,30 @@ export function EditStaffDialog({ staff }: EditStaffDialogProps) {
 
                         {/* Designation */}
                         <div className="space-y-2">
-                            <Label htmlFor="designation">Designation</Label>
-                            <Input
-                                id="designation"
-                                {...form.register("designation")}
+                            <Label>Designation</Label>
+                            <Controller
+                                control={form.control}
+                                name="designation"
+                                render={({ field }) => (
+                                    <Select
+                                        onValueChange={field.onChange}
+                                        value={field.value}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select designation" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {DESIGNATIONS.map((desig) => (
+                                                <SelectItem
+                                                    key={desig.value}
+                                                    value={desig.value}
+                                                >
+                                                    {desig.label}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                )}
                             />
                             {form.formState.errors.designation && (
                                 <p className="text-sm text-destructive">
@@ -296,7 +335,9 @@ export function EditStaffDialog({ staff }: EditStaffDialogProps) {
                                 <Input
                                     id="salary"
                                     type="number"
-                                    {...form.register("salary")}
+                                    {...form.register("salary", {
+                                        valueAsNumber: true,
+                                    })}
                                 />
                                 {form.formState.errors.salary && (
                                     <p className="text-sm text-destructive">

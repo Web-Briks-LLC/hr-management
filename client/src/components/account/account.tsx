@@ -260,54 +260,34 @@ export default function RootAccount() {
                                                     {staff?.spouseName || "N/A"}
                                                 </p>
 
-                                                <div>
-                                                    <p className="text-sm text-gray-500">
-                                                        Account Number
-                                                    </p>
-                                                    <p className="font-medium">
-                                                        {staff?.bank
-                                                            ?.accountNumber ||
-                                                            "N/A"}
-                                                    </p>
-                                                </div>
-                                                <div>
-                                                    <p className="text-sm text-gray-500">
-                                                        Account Name
-                                                    </p>
-                                                    <p className="font-medium">
-                                                        {staff?.bank
-                                                            ?.accountHolderName ||
-                                                            "N/A"}
-                                                    </p>
-                                                </div>
-                                                <div>
-                                                    <p className="text-sm text-gray-500">
-                                                        Bank Name
-                                                    </p>
-                                                    <p className="font-medium">
-                                                        {staff?.bank
-                                                            ?.bankName || "N/A"}
-                                                    </p>
-                                                </div>
-                                                <div>
-                                                    <p className="text-sm text-gray-500">
-                                                        Branch Name
-                                                    </p>
-                                                    <p className="font-medium">
-                                                        {staff?.bank?.branch ||
-                                                            "N/A"}
-                                                    </p>
-                                                </div>
-                                                <div>
-                                                    <p className="text-sm text-gray-500">
-                                                        Routing Number
-                                                    </p>
-                                                    <p className="font-medium">
-                                                        {staff?.bank
-                                                            ?.routingNumber ||
-                                                            "N/A"}
-                                                    </p>
-                                                </div>
+                                                <p>
+                                                    <b>Account Number:</b>{" "}
+                                                    {staff?.bank
+                                                        ?.accountNumber ||
+                                                        "N/A"}
+                                                </p>
+                                                <p>
+                                                    <b>Account Name:</b>{" "}
+                                                    {staff?.bank
+                                                        ?.accountHolderName ||
+                                                        "N/A"}
+                                                </p>
+                                                <p>
+                                                    <b>Bank Name:</b>{" "}
+                                                    {staff?.bank?.bankName ||
+                                                        "N/A"}
+                                                </p>
+                                                <p>
+                                                    <b>Branch Name:</b>{" "}
+                                                    {staff?.bank?.branch ||
+                                                        "N/A"}
+                                                </p>
+                                                <p>
+                                                    <b>Routing Number:</b>{" "}
+                                                    {staff?.bank
+                                                        ?.routingNumber ||
+                                                        "N/A"}
+                                                </p>
 
                                                 <p>
                                                     <b>Branch:</b>{" "}

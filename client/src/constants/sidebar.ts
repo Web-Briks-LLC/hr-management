@@ -50,7 +50,13 @@ export const sidebarGroups: SidebarGroup[] = [
                 title: "Profile",
                 url: "/account",
                 icon: IconUserCircle,
-                access: [Role.TEAM_LEADER, Role.STAFF],
+                access: [
+                    Role.SUPER_ADMIN,
+                    Role.ADMIN,
+                    Role.HR_MANAGER,
+                    Role.TEAM_LEADER,
+                    Role.STAFF,
+                ],
             },
             {
                 title: "Analytics",
@@ -67,7 +73,12 @@ export const sidebarGroups: SidebarGroup[] = [
                 title: "Clients",
                 url: "/clients",
                 icon: IconUserCircle,
-                access: [Role.SUPER_ADMIN, Role.ADMIN],
+                access: [
+                    Role.SUPER_ADMIN,
+                    Role.ADMIN,
+                    Role.TEAM_LEADER,
+                    Role.STAFF,
+                ],
             },
             {
                 title: "Orders",
@@ -78,6 +89,7 @@ export const sidebarGroups: SidebarGroup[] = [
                     Role.ADMIN,
                     Role.HR_MANAGER,
                     Role.TEAM_LEADER,
+                    Role.STAFF,
                 ],
             },
             {

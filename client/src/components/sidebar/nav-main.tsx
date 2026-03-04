@@ -1,31 +1,53 @@
-'use client';
+"use client";
 
 import {
     SidebarGroup,
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
-} from '@/components/ui/sidebar';
-import { usePathname } from 'next/navigation';
-import { cn } from '@/lib/utils';
-import { sidebarData } from '@/constants/sidebar';
-import { useSession } from '@/lib/auth-client';
-import { Skeleton } from '../ui/skeleton';
-import { Role } from '@/constants/role';
-import Link from 'next/link';
+} from "@/components/ui/sidebar";
+import { usePathname } from "next/navigation";
+import { cn } from "@/lib/utils";
+import { sidebarData } from "@/constants/sidebar";
+import { useSession } from "@/lib/auth-client";
+import { Skeleton } from "../ui/skeleton";
+import { Role } from "@/constants/role";
+import Link from "next/link";
+
+import { useGetMeQuery } from "@/redux/features/staff/staffApi";
 
 export function NavMain() {
-    const { data: session, isPending, isRefetching } = useSession();
+    const {
+        data: session,
+        isPending: isSessionPending,
+        isRefetching,
+    } = useSession();
+    const { data: meData, isLoading: isMeLoading } = useGetMeQuery({});
     const pathname = usePathname();
 
     const userRole = session?.user?.role as Role | undefined;
+    const staff = meData?.data;
 
-    // Filter items based on user role
-    const filteredItems = sidebarData.filter((item) =>
-        userRole ? item.access.includes(userRole) : false,
-    );
+    // Filter items based on user role and designation for specific items
+    const filteredItems = sidebarData.filter((item) => {
+        if (!userRole) return false;
+        if (!item.access.includes(userRole)) return false;
 
-    if (isPending || (isRefetching && !session)) {
+        // Restriction: STAFF and TEAM_LEADER can only see Orders and Clients if they are telemarketers
+        if (
+            (userRole === Role.STAFF || userRole === Role.TEAM_LEADER) &&
+            (item.url === "/orders" || item.url === "/clients")
+        ) {
+            return staff?.designation === "telemarketer";
+        }
+
+        return true;
+    });
+
+    const isLoading =
+        isSessionPending || isMeLoading || (isRefetching && !session);
+
+    if (isLoading) {
         return (
             <SidebarGroup className="px-4">
                 <SidebarMenu className="space-y-2">
@@ -48,7 +70,7 @@ export function NavMain() {
                             tooltip={item.title}
                             className={cn(
                                 pathname.startsWith(item.url) &&
-                                    'bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground',
+                                    "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground",
                             )}
                             asChild
                         >
