@@ -130,7 +130,8 @@ export default function ClientsPage() {
         (c) => c.status === "inactive",
     ).length;
 
-    const isTelemarketer = meData?.data?.designation === "telemarketer";
+    const isTelemarketer =
+        meData?.staff?.designation?.toLowerCase() === "telemarketer";
 
     // Generate pagination numbers
     const getPaginationNumbers = () => {
@@ -297,34 +298,32 @@ export default function ClientsPage() {
                             Manage your clients and their information
                         </CardDescription>
                     </div>
-                    {!isTelemarketer && (
-                        <Dialog
-                            open={isAddDialogOpen}
-                            onOpenChange={handleAddDialogChange}
-                        >
-                            <DialogTrigger asChild>
-                                <Button>
-                                    <Plus />
-                                    Add Client
-                                </Button>
-                            </DialogTrigger>
-                            <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-                                <DialogHeader>
-                                    <DialogTitle>Add New Client</DialogTitle>
-                                    <DialogDescription>
-                                        Fill in the details to add a new client
-                                    </DialogDescription>
-                                </DialogHeader>
-                                <ClientForm
-                                    onSubmit={handleCreateClient}
-                                    isSubmitting={isCreating}
-                                    submitLabel="Create"
-                                    onCancel={() => setIsAddDialogOpen(false)}
-                                    serverErrors={createServerErrors}
-                                />
-                            </DialogContent>
-                        </Dialog>
-                    )}
+                    <Dialog
+                        open={isAddDialogOpen}
+                        onOpenChange={handleAddDialogChange}
+                    >
+                        <DialogTrigger asChild>
+                            <Button>
+                                <Plus />
+                                Add Client
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+                            <DialogHeader>
+                                <DialogTitle>Add New Client</DialogTitle>
+                                <DialogDescription>
+                                    Fill in the details to add a new client
+                                </DialogDescription>
+                            </DialogHeader>
+                            <ClientForm
+                                onSubmit={handleCreateClient}
+                                isSubmitting={isCreating}
+                                submitLabel="Create"
+                                onCancel={() => setIsAddDialogOpen(false)}
+                                serverErrors={createServerErrors}
+                            />
+                        </DialogContent>
+                    </Dialog>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     {/* Filters */}

@@ -161,8 +161,9 @@ export default function OrdersPage() {
     const { data: meData } = useGetMeQuery({});
     const isTelemarketer = useMemo(() => {
         return (
-            session?.user?.role === Role.STAFF &&
-            meData?.data?.designation === "telemarketer"
+            (session?.user?.role === Role.STAFF ||
+                session?.user?.role === Role.TEAM_LEADER) &&
+            meData?.staff?.designation?.toLowerCase() === "telemarketer"
         );
     }, [session, meData]);
     const [page, setPage] = useState(1);
@@ -779,10 +780,10 @@ export default function OrdersPage() {
                             Manage graphic design orders and track their status
                         </CardDescription>
                     </div>
-                    {!isTelemarketer && (
-                        <div className="flex gap-3">
-                            {/* Select Mode Toggle Button */}
-                            {!isSelectionMode ? (
+                    <div className="flex gap-3">
+                        {/* Select Mode Toggle Button (Hidden for telemarketers) */}
+                        {!isTelemarketer &&
+                            (!isSelectionMode ? (
                                 <Button
                                     variant="outline"
                                     onClick={() => setIsSelectionMode(true)}
@@ -798,48 +799,43 @@ export default function OrdersPage() {
                                     <X className=" h-4 w-4" />
                                     Cancel
                                 </Button>
-                            )}
-                            <Button variant="outline" asChild>
-                                <Link href="/orders/invoice">
-                                    <FileText className=" h-4 w-4" />
-                                    Generate Invoice
-                                </Link>
-                            </Button>
-                            <Dialog
-                                open={isAddDialogOpen}
-                                onOpenChange={(open) => {
-                                    setIsAddDialogOpen(open);
-                                    if (!open) setServerErrors(undefined);
-                                }}
-                            >
-                                <DialogTrigger asChild>
-                                    <Button>
-                                        <Plus />
-                                        Add Order
-                                    </Button>
-                                </DialogTrigger>
-                                <DialogContent className="max-w-2xl! max-h-[90vh] overflow-y-auto">
-                                    <DialogHeader>
-                                        <DialogTitle>
-                                            Create New Order
-                                        </DialogTitle>
-                                        <DialogDescription>
-                                            Fill in the order details
-                                        </DialogDescription>
-                                    </DialogHeader>
-                                    <OrderForm
-                                        onSubmit={handleCreateOrder}
-                                        isSubmitting={isCreating}
-                                        submitLabel="Create Order"
-                                        onCancel={() =>
-                                            setIsAddDialogOpen(false)
-                                        }
-                                        serverErrors={serverErrors}
-                                    />
-                                </DialogContent>
-                            </Dialog>
-                        </div>
-                    )}
+                            ))}
+                        <Button variant="outline" asChild>
+                            <Link href="/orders/invoice">
+                                <FileText className=" h-4 w-4" />
+                                Generate Invoice
+                            </Link>
+                        </Button>
+                        <Dialog
+                            open={isAddDialogOpen}
+                            onOpenChange={(open) => {
+                                setIsAddDialogOpen(open);
+                                if (!open) setServerErrors(undefined);
+                            }}
+                        >
+                            <DialogTrigger asChild>
+                                <Button>
+                                    <Plus />
+                                    Add Order
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-2xl! max-h-[90vh] overflow-y-auto">
+                                <DialogHeader>
+                                    <DialogTitle>Create New Order</DialogTitle>
+                                    <DialogDescription>
+                                        Fill in the order details
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <OrderForm
+                                    onSubmit={handleCreateOrder}
+                                    isSubmitting={isCreating}
+                                    submitLabel="Create Order"
+                                    onCancel={() => setIsAddDialogOpen(false)}
+                                    serverErrors={serverErrors}
+                                />
+                            </DialogContent>
+                        </Dialog>
+                    </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     {/* Filters */}

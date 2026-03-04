@@ -26,7 +26,6 @@ const getAllClients = async (req: Request, res: Response) => {
             const tmStaff = await getTelemarketerStaff(userId);
             if (tmStaff) {
                 params.createdBy = userId;
-                params.hasOrdersOnly = true;
             }
         }
 

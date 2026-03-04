@@ -16,6 +16,7 @@ import {
     IconSpeakerphone,
     IconBriefcase,
     IconCash,
+    IconWallet,
 } from "@tabler/icons-react";
 
 export interface SidebarItem {
@@ -103,6 +104,17 @@ export const sidebarGroups: SidebarGroup[] = [
                 url: "/profit-share",
                 icon: IconPigMoney,
                 access: [Role.SUPER_ADMIN, Role.ADMIN],
+            },
+            {
+                title: "Balances",
+                url: "/balances",
+                icon: IconWallet,
+                access: [
+                    Role.SUPER_ADMIN,
+                    Role.ADMIN,
+                    Role.TEAM_LEADER,
+                    Role.STAFF,
+                ],
             },
         ],
     },

@@ -1,89 +1,97 @@
-import { apiSlice } from '@/redux/api/apiSlice';
+import { apiSlice } from "@/redux/api/apiSlice";
 
 export const staffApi = apiSlice.injectEndpoints({
     endpoints: (builder) => ({
         getStaffs: builder.query({
             query: (params) => ({
-                url: '/staffs/',
-                method: 'GET',
+                url: "/staffs/",
+                method: "GET",
                 params,
             }),
-            providesTags: ['Staff'],
+            providesTags: ["Staff"],
         }),
         getStaffById: builder.query({
             query: (id) => ({
                 url: `/staffs/${id}`,
-                method: 'GET',
+                method: "GET",
             }),
-            providesTags: (_result, _error, id) => [{ type: 'Staff', id }],
+            providesTags: (_result, _error, id) => [{ type: "Staff", id }],
         }),
         getMe: builder.query({
             query: () => ({
-                url: '/staffs/me',
-                method: 'GET',
+                url: "/staffs/me",
+                method: "GET",
             }),
-            providesTags: ['Staff'],
+            providesTags: ["Staff", "WalletTransaction"],
+        }),
+        getMyWalletTransactions: builder.query({
+            query: (params) => ({
+                url: "/staffs/wallet-transactions/me",
+                method: "GET",
+                params,
+            }),
+            providesTags: ["WalletTransaction"],
         }),
         createStaff: builder.mutation({
             query: (body) => ({
-                url: '/staffs/create',
-                method: 'POST',
+                url: "/staffs/create",
+                method: "POST",
                 body,
                 headers: {
-                    'Content-Type': 'application/json',
+                    "Content-Type": "application/json",
                 },
             }),
-            invalidatesTags: ['Staff'],
+            invalidatesTags: ["Staff"],
         }),
         completeProfile: builder.mutation({
             query: (body) => ({
-                url: '/staffs/complete-profile',
-                method: 'PUT',
+                url: "/staffs/complete-profile",
+                method: "PUT",
                 body,
                 headers: {
-                    'Content-Type': 'application/json',
+                    "Content-Type": "application/json",
                 },
             }),
-            invalidatesTags: ['Staff'],
+            invalidatesTags: ["Staff"],
         }),
         updateProfile: builder.mutation({
             query: (body) => ({
-                url: '/staffs/update-profile',
-                method: 'PUT',
+                url: "/staffs/update-profile",
+                method: "PUT",
                 body,
                 headers: {
-                    'Content-Type': 'application/json',
+                    "Content-Type": "application/json",
                 },
             }),
-            invalidatesTags: ['Staff'],
+            invalidatesTags: ["Staff"],
         }),
         updateStaff: builder.mutation({
             query: ({ id, data }) => ({
                 url: `/staffs/${id}`,
-                method: 'PATCH',
+                method: "PATCH",
                 body: data,
             }),
             invalidatesTags: (_result, _error, { id }) => [
-                'Staff',
-                { type: 'Staff', id },
+                "Staff",
+                { type: "Staff", id },
             ],
         }),
         setSalaryPin: builder.mutation({
             query: ({ staffId, pin }) => ({
                 url: `/staffs/${staffId}/pin/set`,
-                method: 'POST',
+                method: "POST",
                 body: { pin },
             }),
             invalidatesTags: (_result, _error, { staffId }) => [
-                'Staff',
-                { type: 'Staff', id: staffId }, // Invalidate specific staff
-                { type: 'Staff', id: 'LIST' }, // Optional: invalidate list if needed, but likely strict invalidation on ID is enough
+                "Staff",
+                { type: "Staff", id: staffId }, // Invalidate specific staff
+                { type: "Staff", id: "LIST" }, // Optional: invalidate list if needed, but likely strict invalidation on ID is enough
             ],
         }),
         verifySalaryPin: builder.mutation({
             query: ({ staffId, pin }) => ({
                 url: `/staffs/${staffId}/pin/verify`,
-                method: 'POST',
+                method: "POST",
                 body: { pin },
             }),
             // No invalidation needed for verification
@@ -91,14 +99,14 @@ export const staffApi = apiSlice.injectEndpoints({
         forgotSalaryPin: builder.mutation({
             query: ({ staffId }) => ({
                 url: `/staffs/pin/forgot`,
-                method: 'POST',
+                method: "POST",
                 body: { staffId },
             }),
         }),
         resetSalaryPin: builder.mutation({
             query: ({ token, pin }) => ({
                 url: `/staffs/pin/reset`,
-                method: 'POST',
+                method: "POST",
                 body: { token, pin },
             }),
         }),
@@ -109,6 +117,7 @@ export const {
     useGetStaffsQuery,
     useGetStaffByIdQuery,
     useGetMeQuery,
+    useGetMyWalletTransactionsQuery,
     useCreateStaffMutation,
     useCompleteProfileMutation,
     useUpdateProfileMutation,

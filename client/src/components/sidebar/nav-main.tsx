@@ -26,19 +26,21 @@ export function NavMain() {
     const pathname = usePathname();
 
     const userRole = session?.user?.role as Role | undefined;
-    const staff = meData?.data;
+    const staff = meData?.staff;
 
     // Filter items based on user role and designation for specific items
     const filteredItems = sidebarData.filter((item) => {
         if (!userRole) return false;
         if (!item.access.includes(userRole)) return false;
 
-        // Restriction: STAFF and TEAM_LEADER can only see Orders and Clients if they are telemarketers
+        // Restriction: STAFF and TEAM_LEADER can only see Orders, Clients, and Balances if they are telemarketers
         if (
             (userRole === Role.STAFF || userRole === Role.TEAM_LEADER) &&
-            (item.url === "/orders" || item.url === "/clients")
+            (item.url === "/orders" ||
+                item.url === "/clients" ||
+                item.url === "/balances")
         ) {
-            return staff?.designation === "telemarketer";
+            return staff?.designation?.toLowerCase() === "telemarketer";
         }
 
         return true;

@@ -1,5 +1,4 @@
 import StaffModel from "../models/staff.model.js";
-import { Designation } from "../constants/designation.js";
 
 /**
  * Check if a user (by userId) has the Telemarketer designation.
@@ -8,7 +7,7 @@ import { Designation } from "../constants/designation.js";
 export async function getTelemarketerStaff(userId: string) {
     const staff = await StaffModel.findOne({
         userId,
-        designation: Designation.TELEMARKETER,
+        designation: { $regex: /^telemarketer$/i },
         status: "active",
     }).lean();
     return staff;

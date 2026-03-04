@@ -3,32 +3,46 @@ import StaffModel from "../models/staff.model.js";
 import WalletTransactionModel, {
     TransactionType,
 } from "../models/wallet-transaction.model.js";
-import OrderModel from "../models/order.model.js";
-import { Designation } from "../constants/designation.js";
+import EarningModel from "../models/earning.model.js";
 
 const COMMISSION_RATE = 0.05; // 5%
 
 /**
- * Process commission for a delivered order.
- * Only applies if the order was created by a staff member with the TELEMARKETER designation.
+ * Process commission for an earning converted to BDT.
+ * Only applies if the client associated with the earning was created by a telemarketer.
  *
- * @param orderId - The ID of the order that was delivered
- * @param changedBy - The userId who changed the status (for audit)
+ * @param earningId - The ID of the earning that was paid/withdrawn
+ * @param changedBy - The userId who triggered the conversion (for audit)
  */
-async function processCommission(orderId: string, _changedBy: string) {
+async function processEarningCommission(earningId: string, _changedBy: string) {
     const session = await mongoose.startSession();
     session.startTransaction();
 
     try {
-        // 1. Fetch the order
-        const order = await OrderModel.findById(orderId).session(session);
-        if (!order) {
-            throw new Error("Order not found");
+        // 1. Fetch the earning and its associated client
+        const earning = await EarningModel.findById(earningId)
+            .populate("clientId")
+            .session(session);
+
+        if (!earning) {
+            throw new Error("Earning not found");
         }
 
-        // 2. Check if commission was already processed for this order
+        // Only process paid earnings
+        if (earning.status !== "paid") {
+            await session.abortTransaction();
+            return null;
+        }
+
+        const client = earning.clientId as any;
+        if (!client || !client.createdBy) {
+            await session.abortTransaction();
+            return null;
+        }
+
+        // 2. Check if commission was already processed for this earning
         const existingTransaction = await WalletTransactionModel.findOne({
-            orderId: order._id,
+            "metadata.earningId": earning._id,
             type: TransactionType.COMMISSION,
             status: "completed",
         }).session(session);
@@ -39,11 +53,10 @@ async function processCommission(orderId: string, _changedBy: string) {
             return null;
         }
 
-        // 3. Find the staff member who created the order
-        //    The order.createdBy is a User ID, so we look up the staff by userId
+        // 3. Find the staff member who created the client
         const staff = await StaffModel.findOne({
-            userId: order.createdBy,
-            designation: Designation.TELEMARKETER,
+            userId: client.createdBy,
+            designation: { $regex: /^telemarketer$/i },
             status: "active",
         }).session(session);
 
@@ -53,8 +66,13 @@ async function processCommission(orderId: string, _changedBy: string) {
             return null;
         }
 
-        // 4. Calculate commission
-        const commissionAmount = order.totalPrice * COMMISSION_RATE;
+        // 4. Calculate commission based on BDT amount
+        const commissionAmount = earning.amountInBDT * COMMISSION_RATE;
+
+        if (commissionAmount <= 0) {
+            await session.abortTransaction();
+            return null;
+        }
 
         // 5. Create wallet transaction record
         await WalletTransactionModel.create(
@@ -63,12 +81,12 @@ async function processCommission(orderId: string, _changedBy: string) {
                     staffId: staff._id,
                     amount: commissionAmount,
                     type: TransactionType.COMMISSION,
-                    orderId: order._id,
-                    description: `5% commission from order "${order.orderName}" (৳${order.totalPrice.toLocaleString()})`,
+                    description: `5% commission from Client "${client.name}" Earning (${earning.month}/${earning.year}) - ৳${earning.amountInBDT.toLocaleString()}`,
                     status: "completed",
                     metadata: {
-                        orderName: order.orderName,
-                        totalPrice: order.totalPrice,
+                        earningId: earning._id,
+                        clientName: client.name,
+                        amountInBDT: earning.amountInBDT,
                         commissionRate: COMMISSION_RATE,
                     },
                 },
@@ -86,13 +104,13 @@ async function processCommission(orderId: string, _changedBy: string) {
         await session.commitTransaction();
 
         console.log(
-            `[Commission] ৳${commissionAmount} credited to ${staff.staffId} for order ${order.orderName}`,
+            `[Commission] ৳${commissionAmount} credited to ${staff.staffId} for Earning ${earning._id}`,
         );
 
         return {
             staffId: staff.staffId,
             commissionAmount,
-            orderName: order.orderName,
+            earningId: earning._id,
         };
     } catch (err) {
         await session.abortTransaction();
@@ -103,6 +121,6 @@ async function processCommission(orderId: string, _changedBy: string) {
 }
 
 export default {
-    processCommission,
+    processEarningCommission,
     COMMISSION_RATE,
 };

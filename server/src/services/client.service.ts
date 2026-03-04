@@ -118,30 +118,6 @@ const getAllClientsFromDB = async (params: ClientQueryParams) => {
 
     const pipeline: any[] = [{ $match: matchStage }];
 
-    // Filter for clients with at least one order if hasOrdersOnly is true
-    if (params.hasOrdersOnly) {
-        pipeline.push(
-            {
-                $lookup: {
-                    from: "orders",
-                    localField: "_id",
-                    foreignField: "clientId",
-                    as: "orders",
-                },
-            },
-            {
-                $match: {
-                    "orders.0": { $exists: true },
-                },
-            },
-            {
-                $project: {
-                    orders: 0,
-                },
-            },
-        );
-    }
-
     pipeline.push(
         { $sort: sortStage },
         { $skip: skip },
@@ -169,12 +145,7 @@ const getAllClientsFromDB = async (params: ClientQueryParams) => {
 
     const [clients, countResult] = await Promise.all([
         ClientModel.aggregate(pipeline),
-        params.hasOrdersOnly
-            ? ClientModel.aggregate([
-                  ...pipeline.slice(0, -5), // Remove skip, limit, sort, etc.
-                  { $count: "total" },
-              ]).then((res) => res[0]?.total || 0)
-            : ClientModel.countDocuments(matchStage),
+        ClientModel.countDocuments(matchStage),
     ]);
 
     return {

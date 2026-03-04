@@ -1,7 +1,6 @@
 import type { Request, Response } from "express";
 import orderService from "../services/order.service.js";
 import emailService from "../services/email.service.js";
-import commissionService from "../services/commission.service.js";
 import { getTelemarketerStaff } from "../utils/telemarketer.util.js";
 import ClientModel from "../models/client.model.js";
 import type { OrderStatus, OrderPriority } from "../types/order.type.js";
@@ -28,13 +27,6 @@ async function createOrder(req: Request, res: Response) {
 
         if (!userId) {
             return res.status(401).json({ message: "Unauthorized" });
-        }
-
-        const tmStaff = await getTelemarketerStaff(userId);
-        if (tmStaff) {
-            return res.status(403).json({
-                message: "Telemarketers are not allowed to create orders",
-            });
         }
 
         // Build order data, filtering out empty strings for optional ObjectId fields
@@ -128,7 +120,12 @@ async function getAllOrders(req: Request, res: Response) {
                 const ownClients = await ClientModel.find({
                     createdBy: new mongoose.Types.ObjectId(userId),
                 }).select("_id");
-                filters.clientIds = ownClients.map((c) => c._id.toString());
+                if (ownClients.length > 0) {
+                    filters.clientIds = ownClients.map((c) => c._id.toString());
+                } else {
+                    // Telemarketer with no clients → show zero orders
+                    filters.clientIds = ["000000000000000000000000"];
+                }
             }
         }
 
@@ -325,24 +322,6 @@ async function updateOrderStatus(req: Request, res: Response) {
 
         if (!order) {
             return res.status(404).json({ message: "Order not found" });
-        }
-
-        // Process commission if order is delivered
-        if (status === "delivered") {
-            try {
-                const commission = await commissionService.processCommission(
-                    id,
-                    userId,
-                );
-                if (commission) {
-                    console.log(
-                        `[Commission] Processed: ৳${commission.commissionAmount} for ${commission.staffId}`,
-                    );
-                }
-            } catch (commissionError) {
-                console.error("Failed to process commission:", commissionError);
-                // Don't fail the request — order status is already updated
-            }
         }
 
         // Send email notification if requested
