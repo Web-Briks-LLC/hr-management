@@ -448,6 +448,17 @@ async function updateOrderInDB(
         data.deliveredAt = new Date();
     }
 
+    // IMPORTANT: Fetch old order data BEFORE updating, so we have the
+    // original values for the earning diff calculation.
+    let oldOrder: IOrder | null = null;
+    if (
+        data.totalPrice !== undefined ||
+        data.imageQuantity !== undefined ||
+        data.orderDate
+    ) {
+        oldOrder = (await OrderModel.findById(id).lean()) as IOrder | null;
+    }
+
     const order = await OrderModel.findByIdAndUpdate(id, data, {
         new: true,
         runValidators: true,
@@ -469,40 +480,36 @@ async function updateOrderInDB(
         .lean();
 
     // Update monthly earning if order amount, imageQty or date changes
-    if (
-        order &&
-        (data.totalPrice !== undefined ||
-            data.imageQuantity !== undefined ||
-            data.orderDate)
-    ) {
+    if (order && oldOrder) {
         try {
-            // Get the old order data to calculate differences
-            const oldOrder = await OrderModel.findById(id).lean();
-            if (oldOrder) {
-                const updateData: {
-                    orderAmount?: number;
-                    imageQty?: number;
-                    orderDate?: Date;
-                    oldOrderAmount?: number;
-                    oldImageQty?: number;
-                    oldOrderDate?: Date;
-                } = {};
+            const updateData: {
+                orderAmount?: number;
+                imageQty?: number;
+                orderDate?: Date;
+                oldOrderAmount?: number;
+                oldImageQty?: number;
+                oldOrderDate?: Date;
+            } = {
+                // ALWAYS pass the amounts/quantities so the earning service can accurately
+                // move the correct amount if the month changes, even if only the date was edited.
+                orderAmount:
+                    data.totalPrice !== undefined
+                        ? data.totalPrice
+                        : order.totalPrice,
+                oldOrderAmount: oldOrder.totalPrice,
+                imageQty:
+                    data.imageQuantity !== undefined
+                        ? data.imageQuantity
+                        : order.imageQuantity,
+                oldImageQty: oldOrder.imageQuantity,
+                orderDate:
+                    data.orderDate !== undefined
+                        ? data.orderDate
+                        : order.orderDate,
+                oldOrderDate: oldOrder.orderDate,
+            };
 
-                if (data.totalPrice !== undefined) {
-                    updateData.orderAmount = data.totalPrice;
-                    updateData.oldOrderAmount = oldOrder.totalPrice;
-                }
-                if (data.imageQuantity !== undefined) {
-                    updateData.imageQty = data.imageQuantity;
-                    updateData.oldImageQty = oldOrder.imageQuantity;
-                }
-                if (data.orderDate !== undefined) {
-                    updateData.orderDate = data.orderDate;
-                    updateData.oldOrderDate = oldOrder.orderDate;
-                }
-
-                await earningService.updateEarningForOrder(id, updateData);
-            }
+            await earningService.updateEarningForOrder(id, updateData);
         } catch (err) {
             console.error("Error updating earning for order:", err);
         }

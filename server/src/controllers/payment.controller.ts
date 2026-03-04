@@ -6,7 +6,6 @@ import PaymentReceiptEmail from "../emails/PaymentReceipt.js";
 import { InvoiceRecord } from "../models/invoice-record.model.js";
 import EarningModel from "../models/earning.model.js";
 import ClientModel from "../models/client.model.js";
-import UserModel from "../models/user.model.js";
 import notificationService from "../services/notification.service.js";
 
 // Initialize Stripe gracefully, so the server doesn't crash if the key is missing in some environments
@@ -204,13 +203,16 @@ export const confirmPayment = async (
                     }
 
                     // SECURITY: Verify the payment intent was created for THIS invoice
-                    if (
-                        intent.metadata?.invoiceNumber &&
-                        intent.metadata.invoiceNumber !== invoiceNumber
-                    ) {
+                    // Must strictly match, do not allow bypass if metadata is missing
+                    const intentInvoiceStr = String(
+                        intent.metadata?.invoiceNumber || "",
+                    );
+                    const reqInvoiceStr = String(invoiceNumber);
+
+                    if (intentInvoiceStr !== reqInvoiceStr) {
                         console.error(
                             `[Payment] INVOICE MISMATCH: Intent ${paymentIntentId} was created for ` +
-                                `invoice ${intent.metadata.invoiceNumber} but confirm was called for ${invoiceNumber}`,
+                                `invoice '${intentInvoiceStr}' but confirm was called for '${reqInvoiceStr}'`,
                         );
                         return res.status(400).json({
                             error: "Payment reference does not match this invoice",
@@ -261,11 +263,16 @@ export const confirmPayment = async (
                     }
 
                     // SECURITY: Verify the PayPal order was for THIS invoice
-                    const referenceId = purchaseUnit?.reference_id;
-                    if (referenceId && referenceId !== invoiceNumber) {
+                    // Must strictly match, do not allow bypass if reference_id is missing
+                    const referenceIdStr = String(
+                        purchaseUnit?.reference_id || "",
+                    );
+                    const reqInvoiceStr = String(invoiceNumber);
+
+                    if (referenceIdStr !== reqInvoiceStr) {
                         console.error(
                             `[Payment] PAYPAL INVOICE MISMATCH: Order ${paypalOrderId} ` +
-                                `reference_id is ${referenceId} but expected ${invoiceNumber}`,
+                                `reference_id is '${referenceIdStr}' but expected '${reqInvoiceStr}'`,
                         );
                         return res.status(400).json({
                             error: "Payment reference does not match this invoice",
@@ -291,8 +298,13 @@ export const confirmPayment = async (
             await invoice.save();
             console.log(`[Payment] Invoice ${invoiceNumber} marked as PAID`);
 
+            // Look up the client once and reuse across steps 4, 5, and 6
+            const client = invoice.clientId
+                ? await ClientModel.findOne({ clientId: invoice.clientId })
+                : null;
+
             // 4. Update corresponding Earning record if billing period info exists
-            if (invoice.clientId && invoice.month && invoice.year) {
+            if (client && invoice.month && invoice.year) {
                 try {
                     const conversionRate = 0;
                     const amountInBDT = 0;
@@ -303,19 +315,6 @@ export const confirmPayment = async (
                             ? ` | Stripe: ${paymentIntentId}`
                             : "") +
                         (paypalOrderId ? ` | PayPal: ${paypalOrderId}` : "");
-
-                    const client = await ClientModel.findOne({
-                        clientId: invoice.clientId,
-                    });
-
-                    if (!client) {
-                        console.error(
-                            `[Payment] Client not found with clientId: ${invoice.clientId}`,
-                        );
-                        return res
-                            .status(404)
-                            .json({ error: "Client not found" });
-                    }
 
                     const updatedEarning = await EarningModel.findOneAndUpdate(
                         {
@@ -341,10 +340,8 @@ export const confirmPayment = async (
                         );
                     } else {
                         console.warn(
-                            `[Payment] No matching Earning record found for Invoice ${invoiceNumber}. Creating a new record recursively.`,
+                            `[Payment] No matching Earning record found for Invoice ${invoiceNumber}. Creating a new record.`,
                         );
-                        // If no earning record exists, let's auto-generate one to ensure we don't lose track
-                        // of this payment.
                         const newEarning = new EarningModel({
                             clientId: client._id,
                             month: invoice.month,
@@ -362,7 +359,7 @@ export const confirmPayment = async (
                             notes:
                                 statusNotes + " (Auto-generated from Payment)",
                             isLegacy: false,
-                            createdBy: client.createdBy, // We can attribute the creation to the user who created the client
+                            createdBy: client.createdBy,
                         });
 
                         await newEarning.save();
@@ -379,79 +376,65 @@ export const confirmPayment = async (
             }
 
             // 5. Send Payment Receipt Email via React Email to the Client
-            if (invoice.clientId) {
+            if (client && client.email) {
                 try {
-                    const client = await ClientModel.findOne({
-                        clientId: invoice.clientId,
-                    });
-                    if (client && client.email) {
-                        const amountInBDT = invoice.totalAmount * 120; // Fallback to 120 just locally scope
-                        const paymentGateway = paymentIntentId
-                            ? "Stripe"
-                            : paypalOrderId
-                              ? "PayPal"
-                              : "Other";
-                        const referenceId =
-                            paymentIntentId ||
-                            paypalOrderId ||
-                            "WB-PAY-SUCCESS";
+                    const amountInBDT = invoice.totalAmount * 120; // Fallback estimate
+                    const paymentGateway = paymentIntentId
+                        ? "Stripe"
+                        : paypalOrderId
+                          ? "PayPal"
+                          : "Other";
+                    const referenceId =
+                        paymentIntentId || paypalOrderId || "WB-PAY-SUCCESS";
 
-                        let earning = null;
-                        if (invoice.month && invoice.year) {
-                            earning = await EarningModel.findOne({
-                                clientId: client._id,
-                                month: invoice.month as number,
-                                year: invoice.year as number,
-                            });
-                        }
-
-                        const finalAmountBDT =
-                            earning?.amountInBDT || amountInBDT;
-
-                        console.log(
-                            `[Payment] Rendering Receipt Email for ${client.email}`,
-                        );
-
-                        const emailHtml = await render(
-                            PaymentReceiptEmail({
-                                clientName: client.name || invoice.clientName,
-                                invoiceNumber: invoice.invoiceNumber,
-                                amountPaidCurrency: invoice.currency,
-                                amountPaidValue: invoice.totalAmount,
-                                amountPaidBDT: finalAmountBDT,
-                                referenceId: referenceId,
-                                paymentGateway: paymentGateway,
-                                date: new Date(),
-                            }),
-                        );
-
-                        await sendMail({
-                            to: client.email,
-                            subject: `Receipt for Invoice #${invoice.invoiceNumber} - Web Briks LLC`,
-                            body: emailHtml,
+                    let earning = null;
+                    if (invoice.month && invoice.year) {
+                        earning = await EarningModel.findOne({
+                            clientId: client._id,
+                            month: invoice.month as number,
+                            year: invoice.year as number,
                         });
-                        console.log(
-                            `[Payment] Receipt emailed to ${client.email}`,
-                        );
-                    } else {
-                        console.warn(
-                            `[Payment] Client ${invoice.clientId} has no email address. Skipping receipt.`,
-                        );
                     }
+
+                    const finalAmountBDT = earning?.amountInBDT || amountInBDT;
+
+                    console.log(
+                        `[Payment] Rendering Receipt Email for ${client.email}`,
+                    );
+
+                    const emailHtml = await render(
+                        PaymentReceiptEmail({
+                            clientName: client.name || invoice.clientName,
+                            invoiceNumber: invoice.invoiceNumber,
+                            amountPaidCurrency: invoice.currency,
+                            amountPaidValue: invoice.totalAmount,
+                            amountPaidBDT: finalAmountBDT,
+                            referenceId: referenceId,
+                            paymentGateway: paymentGateway,
+                            date: new Date(),
+                        }),
+                    );
+
+                    await sendMail({
+                        to: client.email,
+                        subject: `Receipt for Invoice #${invoice.invoiceNumber} - Web Briks LLC`,
+                        body: emailHtml,
+                    });
+                    console.log(`[Payment] Receipt emailed to ${client.email}`);
                 } catch (emailErr) {
                     console.error(
                         "[Payment] Failed to send receipt email:",
                         emailErr,
                     );
                 }
+            } else if (invoice.clientId) {
+                console.warn(
+                    `[Payment] Client ${invoice.clientId} has no email address. Skipping receipt.`,
+                );
             }
 
             // 6. Notify Admins via In-App and Email
             try {
-                const client = await ClientModel.findOne({
-                    clientId: invoice.clientId,
-                });
-
                 if (client) {
                     await notificationService.notifyAdminsPaymentReceived({
                         clientName: invoice.clientName,
@@ -460,42 +443,29 @@ export const confirmPayment = async (
                         currency: invoice.currency,
                         clientUserId: client._id,
                     });
+                }
 
-                    const admins = await UserModel.find({
-                        role: {
-                            $in: [
-                                "super_admin",
-                                "admin",
-                                "hr_manager",
-                                "owner",
-                            ],
-                        },
-                    }).toArray();
+                const adminEmail = process.env.SMTP_USER;
 
-                    const adminEmails = admins
-                        .map((a: any) => a.email)
-                        .filter(Boolean);
+                if (adminEmail) {
+                    const adminEmailHtml = `
+                        <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+                            <h2>Payment Received</h2>
+                            <p>Client <strong>${invoice.clientName}</strong> has successfully paid <strong>${invoice.totalAmount} ${invoice.currency}</strong> for Invoice #${invoice.invoiceNumber}.</p>
+                            <p>This earning is now marked as "Paid" but unconverted. Please log in to the admin dashboard, navigate to the Earnings section, and use the "Convert" action to apply the correct BDT exchange rate.</p>
+                            <br/>
+                            <a href="${process.env.CLIENT_URL || "http://localhost:3000"}/earnings" style="display:inline-block; padding: 10px 20px; background-color: #007bff; color: #fff; text-decoration: none; border-radius: 5px;">Go to Earnings</a>
+                        </div>
+                    `;
 
-                    if (adminEmails.length > 0) {
-                        const adminEmailHtml = `
-                            <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
-                                <h2>Payment Received</h2>
-                                <p>Client <strong>${invoice.clientName}</strong> has successfully paid <strong>${invoice.totalAmount} ${invoice.currency}</strong> for Invoice #${invoice.invoiceNumber}.</p>
-                                <p>This earning is now marked as "Paid" but unconverted. Please log in to the admin dashboard, navigate to the Earnings section, and use the "Convert" action to apply the correct BDT exchange rate.</p>
-                                <br/>
-                                <a href="${process.env.CLIENT_URL || "http://localhost:3000"}/earnings" style="display:inline-block; padding: 10px 20px; background-color: #007bff; color: #fff; text-decoration: none; border-radius: 5px;">Go to Earnings</a>
-                            </div>
-                        `;
-
-                        await sendMail({
-                            to: adminEmails.join(", "),
-                            subject: `Action Required: Payment Received from ${invoice.clientName}`,
-                            body: adminEmailHtml,
-                        });
-                        console.log(
-                            `[Payment] Admin notification email sent to ${adminEmails.length} admins.`,
-                        );
-                    }
+                    await sendMail({
+                        to: adminEmail,
+                        subject: `Action Required: Payment Received from ${invoice.clientName}`,
+                        body: adminEmailHtml,
+                    });
+                    console.log(
+                        `[Payment] Admin notification email sent to ${adminEmail}.`,
+                    );
                 }
             } catch (adminNotifyErr) {
                 console.error(
