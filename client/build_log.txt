@@ -1,0 +1,28 @@
+
+> client@0.1.0 build
+> next build
+
+[baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+   ▲ Next.js 16.0.7 (Turbopack)
+   - Environments: .env
+
+   Creating an optimized production build ...
+[baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+[baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+ ✓ Compiled successfully in 14.1s
+   Running TypeScript ...
+Failed to compile.
+
+./src/components/admin/bulk-invite-dialog.tsx:55:17
+Type error: Argument of type '(row: Record<string, string>) => { email: string; designation: string; department: string | undefined; role: string; salary: number; branchId: string; shiftId: string | undefined; expiryHours: number; }' is not assignable to parameter of type '(value: unknown, index: number, array: unknown[]) => { email: string; designation: string; department: string | undefined; role: string; salary: number; branchId: string; shiftId: string | undefined; expiryHours: number; }'.
+  Types of parameters 'row' and 'value' are incompatible.
+    Type 'unknown' is not assignable to type 'Record<string, string>'.
+
+[0m [90m 53 |[39m
+ [90m 54 |[39m             [36mconst[39m invitations [33m=[39m parsed[33m.[39mdata[33m.[39mmap(
+[31m[1m>[22m[39m[90m 55 |[39m                 (row[33m:[39m [33mRecord[39m[33m<[39m[33mstring[39m[33m,[39m string[33m>[39m) [33m=>[39m ({
+ [90m    |[39m                 [31m[1m^[22m[39m
+ [90m 56 |[39m                     email[33m:[39m row[33m.[39memail[33m,[39m
+ [90m 57 |[39m                     designation[33m:[39m row[33m.[39mdesignation[33m,[39m
+ [90m 58 |[39m                     department[33m:[39m row[33m.[39mdepartment [33m||[39m undefined[33m,[39m[0m
+Next.js build worker exited with code: 1 and signal: null

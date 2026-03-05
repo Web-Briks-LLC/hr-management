@@ -131,6 +131,22 @@ const validateToken = async (token: string) => {
     return invitation;
 };
 
+const generateStaffId = async (): Promise<string> => {
+    const allStaff = await StaffModel.find({ staffId: /^EMP/ })
+        .select("staffId")
+        .lean();
+
+    let maxNum = 0;
+    for (const s of allStaff) {
+        const num = parseInt(s.staffId.replace("EMP", ""), 10);
+        if (!isNaN(num) && num > maxNum) {
+            maxNum = num;
+        }
+    }
+
+    return `EMP${String(maxNum + 1).padStart(4, "0")}`;
+};
+
 const acceptInvitation = async (data: IAcceptInvitation) => {
     const { token, ...userData } = data;
 
@@ -171,49 +187,68 @@ const acceptInvitation = async (data: IAcceptInvitation) => {
             },
         );
 
-        // Generate staff ID reliably
-        const lastStaff = await StaffModel.findOne({ staffId: /^EMP/ })
-            .sort({ staffId: -1 })
-            .select("staffId");
+        // Generate staff ID with retry for race condition safety
+        let staff: any = null;
+        const MAX_RETRIES = 3;
 
-        let nextNum = 1;
-        if (lastStaff && lastStaff.staffId) {
-            const lastNum = parseInt(lastStaff.staffId.replace("EMP", ""), 10);
-            if (!isNaN(lastNum)) {
-                nextNum = lastNum + 1;
+        for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+            try {
+                const staffId = await generateStaffId();
+
+                // Create staff profile with proper type conversion
+                const staffPayload: any = {
+                    userId: userId as any,
+                    staffId,
+                    phone: userData.phone,
+                    branchId: invitation.branchId as any,
+                    shiftId: invitation.shiftId
+                        ? (invitation.shiftId as any)
+                        : undefined,
+                    department: invitation.department,
+                    designation: invitation.designation,
+                    joinDate: new Date(),
+                    status: "active" as const,
+                    salary: invitation.salary,
+                    salaryVisibleToEmployee: true,
+                    profileCompleted: true,
+                };
+
+                if (userData.dateOfBirth)
+                    staffPayload.dateOfBirth = userData.dateOfBirth;
+                if (userData.bloodGroup)
+                    staffPayload.bloodGroup = userData.bloodGroup;
+                if (userData.nationalId)
+                    staffPayload.nationalId = userData.nationalId;
+                if (userData.address) staffPayload.address = userData.address;
+                if (userData.emergencyContact)
+                    staffPayload.emergencyContact = userData.emergencyContact;
+                if (userData.fathersName)
+                    staffPayload.fathersName = userData.fathersName;
+                if (userData.mothersName)
+                    staffPayload.mothersName = userData.mothersName;
+                if (userData.spouseName)
+                    staffPayload.spouseName = userData.spouseName;
+
+                staff = await StaffModel.create(staffPayload);
+                break; // Success, exit retry loop
+            } catch (retryError: any) {
+                // If duplicate key error on staffId, retry
+                if (
+                    retryError.code === 11000 &&
+                    retryError.keyPattern?.staffId &&
+                    attempt < MAX_RETRIES - 1
+                ) {
+                    continue;
+                }
+                throw retryError;
             }
         }
-        const staffId = `EMP${String(nextNum).padStart(4, "0")}`;
 
-        // Create staff profile with proper type conversion
-        const staffPayload: any = {
-            userId: userId as any,
-            staffId,
-            phone: userData.phone,
-            branchId: invitation.branchId as any,
-            department: invitation.department,
-            designation: invitation.designation,
-            joinDate: new Date(),
-            status: "active" as const,
-            salary: invitation.salary,
-            salaryVisibleToEmployee: true,
-            profileCompleted: true,
-        };
-
-        if (userData.dateOfBirth)
-            staffPayload.dateOfBirth = userData.dateOfBirth;
-        if (userData.bloodGroup) staffPayload.bloodGroup = userData.bloodGroup;
-        if (userData.nationalId) staffPayload.nationalId = userData.nationalId;
-        if (userData.address) staffPayload.address = userData.address;
-        if (userData.emergencyContact)
-            staffPayload.emergencyContact = userData.emergencyContact;
-        if (userData.fathersName)
-            staffPayload.fathersName = userData.fathersName;
-        if (userData.mothersName)
-            staffPayload.mothersName = userData.mothersName;
-        if (userData.spouseName) staffPayload.spouseName = userData.spouseName;
-
-        const staff = await StaffModel.create(staffPayload);
+        if (!staff) {
+            throw new Error(
+                "Failed to create staff profile after multiple attempts",
+            );
+        }
 
         // Mark invitation as used
         invitation.isUsed = true;
@@ -225,12 +260,15 @@ const acceptInvitation = async (data: IAcceptInvitation) => {
             staff,
         };
     } catch (error) {
-        // Rollback user creation
+        // Rollback: clean up all records created by Better Auth + staff
         if (userId) {
-            await database
-                .collection("user")
-                .deleteOne({ _id: new Types.ObjectId(userId) });
+            const userOid = new Types.ObjectId(userId);
+            await database.collection("user").deleteOne({ _id: userOid });
             await database.collection("account").deleteMany({ userId });
+            await database.collection("session").deleteMany({ userId });
+            await database
+                .collection("verification")
+                .deleteMany({ identifier: invitation.email });
         }
         throw error;
     }

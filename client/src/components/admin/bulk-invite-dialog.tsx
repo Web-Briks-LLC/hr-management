@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
+import { useState } from "react";
 import {
     Dialog,
     DialogContent,
@@ -8,28 +8,49 @@ import {
     DialogHeader,
     DialogTitle,
     DialogTrigger,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Upload, Download, Loader, CheckCircle2, XCircle } from 'lucide-react';
-import { toast } from 'sonner';
-import { parse } from 'papaparse';
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Upload, Download, Loader, CheckCircle2, XCircle } from "lucide-react";
+import { toast } from "sonner";
+import { parse } from "papaparse";
+import { useCreateBulkInvitationsMutation } from "@/redux/features/invitation/invitationApi";
+import { IInvitationCreate } from "@/types/invitation.type";
+
+interface SuccessResult {
+    email: string;
+}
+
+interface CsvRow {
+    email?: string;
+    designation?: string;
+    department?: string;
+    role?: string;
+    salary?: string | number;
+    branchId?: string;
+    shiftId?: string;
+    expiryHours?: string | number;
+}
 
 export default function BulkInviteDialog() {
     const [open, setOpen] = useState(false);
-    const [isUploading, setIsUploading] = useState(false);
-    const [results, setResults] = useState<any>(null);
+    const [createBulkInvitations, { isLoading: isUploading }] =
+        useCreateBulkInvitationsMutation();
+    const [results, setResults] = useState<{
+        success: SuccessResult[];
+        failed: { email: string; error: string }[];
+    } | null>(null);
 
     const downloadTemplate = () => {
         const template = `email,designation,department,role,salary,branchId,shiftId,expiryHours
 john@example.com,Software Developer,IT,staff,50000,BRANCH_ID_HERE,,48
 jane@example.com,Team Leader,HR,team_leader,60000,BRANCH_ID_HERE,SHIFT_ID_HERE,72`;
 
-        const blob = new Blob([template], { type: 'text/csv' });
+        const blob = new Blob([template], { type: "text/csv" });
         const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
+        const a = document.createElement("a");
         a.href = url;
-        a.download = 'bulk-invitation-template.csv';
+        a.download = "bulk-invitation-template.csv";
         a.click();
         URL.revokeObjectURL(url);
     };
@@ -38,47 +59,50 @@ jane@example.com,Team Leader,HR,team_leader,60000,BRANCH_ID_HERE,SHIFT_ID_HERE,7
         const file = e.target.files?.[0];
         if (!file) return;
 
-        setIsUploading(true);
-
         try {
             const text = await file.text();
             const parsed = parse(text, { header: true, skipEmptyLines: true });
 
             if (parsed.errors.length > 0) {
-                throw new Error('Invalid CSV format');
+                throw new Error("Invalid CSV format");
             }
 
-            const invitations = parsed.data.map((row: any) => ({
-                email: row.email,
-                designation: row.designation,
+            const invitations = (parsed.data as CsvRow[]).map((row) => ({
+                email: row.email || "",
+                designation: row.designation || "",
                 department: row.department || undefined,
-                role: row.role,
-                salary: Number(row.salary),
-                branchId: row.branchId,
+                role: (row.role || "staff") as IInvitationCreate["role"],
+                salary: Number(row.salary) || 0,
+                branchId: row.branchId || "",
                 shiftId: row.shiftId || undefined,
                 expiryHours: Number(row.expiryHours) || 48,
             }));
 
-            const response = await fetch('/api/invitations/bulk', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({ invitations }),
-            });
+            const result = await createBulkInvitations({
+                invitations,
+            }).unwrap();
 
-            const data = await response.json();
-
-            if (!data.success) {
-                throw new Error(data.message || 'Failed to send invitations');
+            if (result.success && result.data) {
+                setResults(
+                    result.data as {
+                        success: SuccessResult[];
+                        failed: { email: string; error: string }[];
+                    },
+                );
             }
-
-            setResults(data.data);
-            toast.success(data.message);
-        } catch (err: any) {
-            toast.error(err.message || 'Failed to process file');
+            toast.success(result.message);
+        } catch (err: unknown) {
+            const errorData = err as {
+                data?: { message?: string };
+                message?: string;
+            };
+            toast.error(
+                errorData?.data?.message ||
+                    errorData.message ||
+                    "Failed to process file",
+            );
         } finally {
-            setIsUploading(false);
-            e.target.value = '';
+            e.target.value = "";
         }
     };
 
@@ -183,7 +207,7 @@ jane@example.com,Team Leader,HR,team_leader,60000,BRANCH_ID_HERE,SHIFT_ID_HERE,7
                                         <div className="flex items-center gap-2 text-red-600">
                                             <XCircle className="h-4 w-4" />
                                             <span>
-                                                {results.failed.length}{' '}
+                                                {results.failed.length}{" "}
                                                 invitations failed
                                             </span>
                                         </div>
@@ -196,9 +220,15 @@ jane@example.com,Team Leader,HR,team_leader,60000,BRANCH_ID_HERE,SHIFT_ID_HERE,7
                                         </p>
                                         <ul className="text-sm text-red-700 dark:text-red-300 space-y-1">
                                             {results.failed.map(
-                                                (fail: any, idx: number) => (
+                                                (
+                                                    fail: {
+                                                        email: string;
+                                                        error: string;
+                                                    },
+                                                    idx: number,
+                                                ) => (
                                                     <li key={idx}>
-                                                        {fail.email}:{' '}
+                                                        {fail.email}:{" "}
                                                         {fail.error}
                                                     </li>
                                                 ),

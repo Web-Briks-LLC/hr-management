@@ -172,10 +172,11 @@ const createBulkInvitations = async (req: Request, res: Response) => {
             });
         }
 
-        // Add createdBy to each invitation
+        // Add createdBy and currentUserRole to each invitation
         const invitationsWithCreator = invitations.map((inv) => ({
             ...inv,
             createdBy,
+            currentUserRole: req.user?.role || "",
         }));
 
         const results = await InvitationService.createBulkInvitations(

@@ -1,5 +1,5 @@
-import { apiSlice } from '@/redux/api/apiSlice';
-import type { IInvitation, IInvitationCreate } from '@/types/invitation.type';
+import { apiSlice } from "@/redux/api/apiSlice";
+import type { IInvitation, IInvitationCreate } from "@/types/invitation.type";
 
 export const invitationApi = apiSlice.injectEndpoints({
     endpoints: (builder) => ({
@@ -8,11 +8,11 @@ export const invitationApi = apiSlice.injectEndpoints({
             IInvitationCreate
         >({
             query: (data) => ({
-                url: '/invitations/create',
-                method: 'POST',
+                url: "/invitations/create",
+                method: "POST",
                 body: data,
             }),
-            invalidatesTags: ['Invitation'],
+            invalidatesTags: ["Invitation"],
         }),
 
         getInvitations: builder.query<
@@ -20,10 +20,10 @@ export const invitationApi = apiSlice.injectEndpoints({
             { isUsed?: boolean; email?: string } | undefined
         >({
             query: (params) => ({
-                url: '/invitations',
+                url: "/invitations",
                 params,
             }),
-            providesTags: ['Invitation'],
+            providesTags: ["Invitation"],
         }),
 
         validateToken: builder.query<
@@ -36,9 +36,18 @@ export const invitationApi = apiSlice.injectEndpoints({
         acceptInvitation: builder.mutation({
             query: ({ token, data }) => ({
                 url: `/invitations/${token}/accept`,
-                method: 'POST',
+                method: "POST",
                 body: data,
             }),
+        }),
+
+        createBulkInvitations: builder.mutation({
+            query: (data) => ({
+                url: "/invitations/bulk",
+                method: "POST",
+                body: data,
+            }),
+            invalidatesTags: ["Invitation"],
         }),
 
         resendInvitation: builder.mutation<
@@ -47,10 +56,10 @@ export const invitationApi = apiSlice.injectEndpoints({
         >({
             query: (id) => ({
                 url: `/invitations/${id}/resend`,
-                method: 'POST',
+                method: "POST",
                 body: {},
             }),
-            invalidatesTags: ['Invitation'],
+            invalidatesTags: ["Invitation"],
         }),
 
         cancelInvitation: builder.mutation<
@@ -59,9 +68,9 @@ export const invitationApi = apiSlice.injectEndpoints({
         >({
             query: (id) => ({
                 url: `/invitations/${id}`,
-                method: 'DELETE',
+                method: "DELETE",
             }),
-            invalidatesTags: ['Invitation'],
+            invalidatesTags: ["Invitation"],
         }),
     }),
 });
@@ -71,6 +80,7 @@ export const {
     useGetInvitationsQuery,
     useValidateTokenQuery,
     useAcceptInvitationMutation,
+    useCreateBulkInvitationsMutation,
     useResendInvitationMutation,
     useCancelInvitationMutation,
 } = invitationApi;

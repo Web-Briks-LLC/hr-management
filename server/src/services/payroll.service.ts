@@ -78,6 +78,7 @@ const getPayrollPreview = async ({
                 department: 1,
                 salary: 1,
                 joinDate: 1,
+                exitDate: 1,
                 branch: "$branch.name",
                 branchId: 1,
                 bank: 1,
@@ -181,7 +182,28 @@ const getPayrollPreview = async ({
         // C. Salary calculation (fixed /30 policy)
         const staffSalary = staff.salary || 0;
         const perDaySalary = staffSalary / 30;
-        const deduction = absentDays * perDaySalary;
+
+        const halfDayDays = staffAttendance.filter(
+            (a) => a.status === "half_day",
+        ).length;
+
+        // Calculate Unemployed Days (before joining or after exit)
+        let unemployedDays = 0;
+        const joinDate = staff.joinDate ? new Date(staff.joinDate) : null;
+        const exitDate = staff.exitDate ? new Date(staff.exitDate) : null;
+
+        daysInMonth.forEach((day) => {
+            const isBeforeJoin = joinDate && day < joinDate;
+            const isAfterExit = exitDate && day > exitDate;
+            if (isBeforeJoin || isAfterExit) {
+                unemployedDays++;
+            }
+        });
+
+        // Deduction formula: Absent days + Unemployed days + (Half Day days * 0.5)
+        const totalDeductionUnits =
+            absentDays + unemployedDays + halfDayDays * 0.5;
+        const deduction = totalDeductionUnits * perDaySalary;
         const payableSalary = Math.max(0, staffSalary - deduction);
 
         // D. Overtime from approved records only
@@ -218,6 +240,8 @@ const getPayrollPreview = async ({
             late: lateDays,
             onLeave: leaveDays,
             holiday: holidays,
+            halfDay: halfDayDays,
+            unemployedDays,
             perDaySalary: Math.round(perDaySalary),
             payableSalary: Math.round(payableSalary),
             status: salaryExpense ? "paid" : "pending",
@@ -281,15 +305,51 @@ const processPayroll = async ({
 
         // Server-side amount verification for salary payments
         if (paymentType === "salary") {
-            const absentRecords = await AttendanceDayModel.countDocuments({
-                staffId,
-                date: { $gte: startDate, $lte: endDate },
-                status: "absent",
-            }).session(session);
+            const attendanceSummary = await AttendanceDayModel.aggregate([
+                {
+                    $match: {
+                        staffId: new Types.ObjectId(staffId),
+                        date: { $gte: startDate, $lte: endDate },
+                        status: { $in: ["absent", "half_day"] },
+                    },
+                },
+                {
+                    $group: {
+                        _id: "$status",
+                        count: { $sum: 1 },
+                    },
+                },
+            ]).session(session);
+
+            const counts = { absent: 0, half_day: 0 };
+            attendanceSummary.forEach((s) => {
+                if (s._id === "absent") counts.absent = s.count;
+                if (s._id === "half_day") counts.half_day = s.count;
+            });
 
             const staffSalary = staff.salary || 0;
             const perDaySalary = staffSalary / 30;
-            const serverDeduction = absentRecords * perDaySalary;
+
+            // Calculate Unemployed Days for verification
+            const daysInMonth = eachDayOfInterval({
+                start: startDate,
+                end: endDate,
+            });
+            let unemployedDays = 0;
+            const joinDate = staff.joinDate ? new Date(staff.joinDate) : null;
+            const exitDate = staff.exitDate ? new Date(staff.exitDate) : null;
+
+            daysInMonth.forEach((day) => {
+                const isBeforeJoin = joinDate && day < joinDate;
+                const isAfterExit = exitDate && day > exitDate;
+                if (isBeforeJoin || isAfterExit) {
+                    unemployedDays++;
+                }
+            });
+
+            const serverDeduction =
+                (counts.absent + unemployedDays + counts.half_day * 0.5) *
+                perDaySalary;
             const serverPayable = Math.max(0, staffSalary - serverDeduction);
             const expectedAmount = Math.round(
                 serverPayable + bonus - deduction,
@@ -376,18 +436,6 @@ const processPayroll = async ({
                 { session },
             );
             createdExpense = expense[0];
-
-            // Auto-update staff salary if it changed (salary payments only)
-            if (paymentType === "salary") {
-                const currentBaseSalary = amount - bonus + deduction;
-                if (staff.salary !== currentBaseSalary) {
-                    await StaffModel.findByIdAndUpdate(
-                        staffId,
-                        { salary: currentBaseSalary },
-                        { session },
-                    );
-                }
-            }
         }
 
         if (!createdExpense) {
@@ -488,7 +536,7 @@ const graceAttendance = async (
         const attendance = await AttendanceDayModel.findOne({
             staffId,
             date: { $gte: start, $lte: end },
-            status: "absent",
+            status: { $in: ["absent", "late", "half_day", "early_exit"] },
         });
 
         if (attendance) {
