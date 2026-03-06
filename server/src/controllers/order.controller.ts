@@ -1,9 +1,11 @@
-import type { Request, Response } from "express";
-import orderService from "../services/order.service.js";
-import emailService from "../services/email.service.js";
-import { getTelemarketerStaff } from "../utils/telemarketer.util.js";
-import type { OrderStatus, OrderPriority } from "../types/order.type.js";
-import mongoose from "mongoose";
+import type { Request, Response } from 'express';
+import orderService from '../services/order.service.js';
+import emailService from '../services/email.service.js';
+import { isTelemarketer } from '../utils/telemarketer.util.js';
+import type { OrderStatus, OrderPriority } from '../types/order.type.js';
+import { Role } from '../constants/role.js';
+import mongoose from 'mongoose';
+import ClientModel from '../models/client.model.js';
 
 async function createOrder(req: Request, res: Response) {
     try {
@@ -25,7 +27,24 @@ async function createOrder(req: Request, res: Response) {
         const userId = req.user?.id;
 
         if (!userId) {
-            return res.status(401).json({ message: "Unauthorized" });
+            return res.status(401).json({ message: 'Unauthorized' });
+        }
+
+        // Ownership enforcement for telemarketers: can only create orders for their own clients
+        if (
+            req.user &&
+            [Role.STAFF, Role.TEAM_LEADER].includes(req.user.role as Role)
+        ) {
+            const isTM = await isTelemarketer(userId);
+            if (isTM) {
+                const client = await ClientModel.findById(clientId).lean();
+                if (!client || client.createdBy?.toString() !== userId) {
+                    return res.status(403).json({
+                        message:
+                            'Forbidden: You can only create orders for your own clients',
+                    });
+                }
+            }
         }
 
         // Build order data, filtering out empty strings for optional ObjectId fields
@@ -45,7 +64,7 @@ async function createOrder(req: Request, res: Response) {
         // Only include optional fields if they have valid values
         if (instruction) orderData.instruction = instruction;
         if (priority) orderData.priority = priority;
-        if (assignedTo && assignedTo.trim() !== "")
+        if (assignedTo && assignedTo.trim() !== '')
             orderData.assignedTo = assignedTo;
         if (notes) orderData.notes = notes;
 
@@ -53,16 +72,16 @@ async function createOrder(req: Request, res: Response) {
         const order = await orderService.createOrderInDB(orderData as any);
 
         return res.status(201).json({
-            message: "Order created successfully",
+            message: 'Order created successfully',
             data: order,
         });
     } catch (error) {
-        console.error("Error creating order:", error);
+        console.error('Error creating order:', error);
         const errorMessage =
-            error instanceof Error ? error.message : "Unknown error";
+            error instanceof Error ? error.message : 'Unknown error';
         return res
             .status(500)
-            .json({ message: "Internal server error", error: errorMessage });
+            .json({ message: 'Internal server error', error: errorMessage });
     }
 }
 
@@ -113,22 +132,26 @@ async function getAllOrders(req: Request, res: Response) {
         if (year) filters.year = parseInt(year as string);
         if (search) filters.search = (search as string).trim();
 
-        // Ownership filtering: Telemarketers only see their own created orders
-        if (userId) {
-            const tmStaff = await getTelemarketerStaff(userId);
-            if (
-                tmStaff &&
-                req.user &&
-                ["staff", "team leader"].includes(req.user.role)
-            ) {
-                filters.createdBy = userId;
+        // Ownership filtering: Telemarketers only see orders of their own added clients
+        if (
+            userId &&
+            req.user &&
+            [Role.STAFF, Role.TEAM_LEADER].includes(req.user.role as Role)
+        ) {
+            const isTM = await isTelemarketer(userId);
+            if (isTM) {
+                const myClients = await ClientModel.find({ createdBy: userId })
+                    .select('_id')
+                    .lean();
+                const myClientIds = myClients.map((c) => c._id.toString());
+                filters.clientIds = myClientIds;
             }
         }
 
         const result = await orderService.getAllOrdersFromDB(filters);
 
         return res.status(200).json({
-            message: "Orders retrieved successfully",
+            message: 'Orders retrieved successfully',
             data: result.orders,
             meta: {
                 total: result.total,
@@ -137,8 +160,8 @@ async function getAllOrders(req: Request, res: Response) {
             },
         });
     } catch (error) {
-        console.error("Error getting orders:", error);
-        return res.status(500).json({ message: "Internal server error" });
+        console.error('Error getting orders:', error);
+        return res.status(500).json({ message: 'Internal server error' });
     }
 }
 
@@ -147,22 +170,38 @@ async function getOrderById(req: Request, res: Response) {
         const id = req.params.id;
 
         if (!id) {
-            return res.status(400).json({ message: "Order ID is required" });
+            return res.status(400).json({ message: 'Order ID is required' });
         }
 
         const order = await orderService.getOrderByIdFromDB(id);
 
         if (!order) {
-            return res.status(404).json({ message: "Order not found" });
+            return res.status(404).json({ message: 'Order not found' });
+        }
+
+        // Ownership enforcement for telemarketers
+        const userId = req.user?.id;
+        if (
+            userId &&
+            req.user &&
+            [Role.STAFF, Role.TEAM_LEADER].includes(req.user.role as Role)
+        ) {
+            const isTM = await isTelemarketer(userId);
+            if (isTM && order.createdBy?._id?.toString() !== userId) {
+                return res.status(403).json({
+                    message:
+                        'Forbidden: You do not have permission to view this order',
+                });
+            }
         }
 
         return res.status(200).json({
-            message: "Order retrieved successfully",
+            message: 'Order retrieved successfully',
             data: order,
         });
     } catch (error) {
-        console.error("Error getting order:", error);
-        return res.status(500).json({ message: "Internal server error" });
+        console.error('Error getting order:', error);
+        return res.status(500).json({ message: 'Internal server error' });
     }
 }
 
@@ -187,15 +226,26 @@ async function updateOrder(req: Request, res: Response) {
         } = req.body;
 
         if (!id) {
-            return res.status(400).json({ message: "Order ID is required" });
+            return res.status(400).json({ message: 'Order ID is required' });
         }
 
+        const existingOrder = await orderService.getOrderByIdFromDB(id);
+        if (!existingOrder) {
+            return res.status(404).json({ message: 'Order not found' });
+        }
+
+        // Ownership enforcement for telemarketers
         const userId = req.user?.id;
-        if (userId) {
-            const tmStaff = await getTelemarketerStaff(userId);
-            if (tmStaff) {
+        if (
+            userId &&
+            req.user &&
+            [Role.STAFF, Role.TEAM_LEADER].includes(req.user.role as Role)
+        ) {
+            const isTM = await isTelemarketer(userId);
+            if (isTM && existingOrder.createdBy?._id?.toString() !== userId) {
                 return res.status(403).json({
-                    message: "Telemarketers are not allowed to update orders",
+                    message:
+                        'Forbidden: You do not have permission to update this order',
                 });
             }
         }
@@ -219,7 +269,7 @@ async function updateOrder(req: Request, res: Response) {
         if (priority !== undefined) updateData.priority = priority;
         // Handle assignedTo - only include if it's a valid ObjectId, otherwise unset it
         if (assignedTo !== undefined) {
-            if (assignedTo && assignedTo.trim() !== "") {
+            if (assignedTo && assignedTo.trim() !== '') {
                 updateData.assignedTo = assignedTo;
             } else {
                 updateData.assignedTo = null; // This will unset the field
@@ -230,16 +280,16 @@ async function updateOrder(req: Request, res: Response) {
         const order = await orderService.updateOrderInDB(id, updateData);
 
         if (!order) {
-            return res.status(404).json({ message: "Order not found" });
+            return res.status(404).json({ message: 'Order not found' });
         }
 
         return res.status(200).json({
-            message: "Order updated successfully",
+            message: 'Order updated successfully',
             data: order,
         });
     } catch (error) {
-        console.error("Error updating order:", error);
-        return res.status(500).json({ message: "Internal server error" });
+        console.error('Error updating order:', error);
+        return res.status(500).json({ message: 'Internal server error' });
     }
 }
 
@@ -249,37 +299,37 @@ async function deleteOrder(req: Request, res: Response) {
         const userId = req.user?.id;
 
         if (!id) {
-            return res.status(400).json({ message: "Order ID is required" });
+            return res.status(400).json({ message: 'Order ID is required' });
         }
 
         if (!userId) {
-            return res.status(401).json({ message: "Unauthorized" });
+            return res.status(401).json({ message: 'Unauthorized' });
         }
 
         // Check if user is admin
-        const { default: UserModel } = await import("../models/user.model.js");
+        const { default: UserModel } = await import('../models/user.model.js');
         const user = await UserModel.findOne({
             _id: new mongoose.Types.ObjectId(userId),
         });
 
-        if (!user || !["admin", "super_admin"].includes(user.role)) {
+        if (!user || !['admin', 'super_admin'].includes(user.role)) {
             return res.status(403).json({
-                message: "Forbidden. Only admins can delete orders.",
+                message: 'Forbidden. Only admins can delete orders.',
             });
         }
 
         const order = await orderService.deleteOrderFromDB(id);
 
         if (!order) {
-            return res.status(404).json({ message: "Order not found" });
+            return res.status(404).json({ message: 'Order not found' });
         }
 
         return res.status(200).json({
-            message: "Order deleted successfully",
+            message: 'Order deleted successfully',
         });
     } catch (error) {
-        console.error("Error deleting order:", error);
-        return res.status(500).json({ message: "Internal server error" });
+        console.error('Error deleting order:', error);
+        return res.status(500).json({ message: 'Internal server error' });
     }
 }
 
@@ -291,22 +341,35 @@ async function updateOrderStatus(req: Request, res: Response) {
         const userId = req.user?.id;
 
         if (!id) {
-            return res.status(400).json({ message: "Order ID is required" });
+            return res.status(400).json({ message: 'Order ID is required' });
         }
 
         if (!userId) {
-            return res.status(401).json({ message: "Unauthorized" });
+            return res.status(401).json({ message: 'Unauthorized' });
         }
 
-        const tmStaff = await getTelemarketerStaff(userId);
-        if (tmStaff) {
-            return res.status(403).json({
-                message: "Telemarketers are not allowed to update order status",
-            });
+        const existingOrder = await orderService.getOrderByIdFromDB(id);
+        if (!existingOrder) {
+            return res.status(404).json({ message: 'Order not found' });
+        }
+
+        // Ownership enforcement for telemarketers
+        if (
+            userId &&
+            req.user &&
+            [Role.STAFF, Role.TEAM_LEADER].includes(req.user.role as Role)
+        ) {
+            const isTM = await isTelemarketer(userId);
+            if (isTM && existingOrder.createdBy?._id?.toString() !== userId) {
+                return res.status(403).json({
+                    message:
+                        'Forbidden: You do not have permission to update this order status',
+                });
+            }
         }
 
         if (!status) {
-            return res.status(400).json({ message: "Status is required" });
+            return res.status(400).json({ message: 'Status is required' });
         }
 
         const order = await orderService.updateOrderStatusWithTimeline(
@@ -317,7 +380,7 @@ async function updateOrderStatus(req: Request, res: Response) {
         );
 
         if (!order) {
-            return res.status(404).json({ message: "Order not found" });
+            return res.status(404).json({ message: 'Order not found' });
         }
 
         // Send email notification if requested
@@ -327,25 +390,25 @@ async function updateOrderStatus(req: Request, res: Response) {
                 if (client?.email) {
                     await emailService.sendOrderStatusEmail({
                         to: client.email,
-                        clientName: client.name || "",
-                        orderName: (order as any).orderName || "",
+                        clientName: client.name || '',
+                        orderName: (order as any).orderName || '',
                         status,
                         message: customEmailMessage,
                     });
                 }
             } catch (emailError) {
-                console.error("Failed to send status email:", emailError);
+                console.error('Failed to send status email:', emailError);
                 // Don't fail the request — order is already updated
             }
         }
 
         return res.status(200).json({
-            message: "Order status updated successfully",
+            message: 'Order status updated successfully',
             data: order,
         });
     } catch (error) {
-        console.error("Error updating order status:", error);
-        return res.status(500).json({ message: "Internal server error" });
+        console.error('Error updating order status:', error);
+        return res.status(500).json({ message: 'Internal server error' });
     }
 }
 
@@ -357,44 +420,57 @@ async function extendDeadline(req: Request, res: Response) {
         const userId = req.user?.id;
 
         if (!id) {
-            return res.status(400).json({ message: "Order ID is required" });
+            return res.status(400).json({ message: 'Order ID is required' });
         }
 
         if (!userId) {
-            return res.status(401).json({ message: "Unauthorized" });
+            return res.status(401).json({ message: 'Unauthorized' });
         }
 
-        const tmStaff = await getTelemarketerStaff(userId);
-        if (tmStaff) {
-            return res.status(403).json({
-                message: "Telemarketers are not allowed to extend deadlines",
-            });
+        const existingOrder = await orderService.getOrderByIdFromDB(id);
+        if (!existingOrder) {
+            return res.status(404).json({ message: 'Order not found' });
+        }
+
+        // Ownership enforcement for telemarketers
+        if (
+            userId &&
+            req.user &&
+            [Role.STAFF, Role.TEAM_LEADER].includes(req.user.role as Role)
+        ) {
+            const isTM = await isTelemarketer(userId);
+            if (isTM && existingOrder.createdBy?._id?.toString() !== userId) {
+                return res.status(403).json({
+                    message:
+                        "Forbidden: You do not have permission to extend this order's deadline",
+                });
+            }
         }
 
         if (!newDeadline) {
             return res
                 .status(400)
-                .json({ message: "New deadline is required" });
+                .json({ message: 'New deadline is required' });
         }
 
         const order = await orderService.extendDeadline(
             id,
             new Date(newDeadline),
-            reason || "Deadline extended",
+            reason || 'Deadline extended',
             userId,
         );
 
         if (!order) {
-            return res.status(404).json({ message: "Order not found" });
+            return res.status(404).json({ message: 'Order not found' });
         }
 
         return res.status(200).json({
-            message: "Deadline extended successfully",
+            message: 'Deadline extended successfully',
             data: order,
         });
     } catch (error) {
-        console.error("Error extending deadline:", error);
-        return res.status(500).json({ message: "Internal server error" });
+        console.error('Error extending deadline:', error);
+        return res.status(500).json({ message: 'Internal server error' });
     }
 }
 
@@ -406,39 +482,52 @@ async function addRevision(req: Request, res: Response) {
         const userId = req.user?.id;
 
         if (!id) {
-            return res.status(400).json({ message: "Order ID is required" });
+            return res.status(400).json({ message: 'Order ID is required' });
         }
 
         if (!userId) {
-            return res.status(401).json({ message: "Unauthorized" });
+            return res.status(401).json({ message: 'Unauthorized' });
         }
 
-        const tmStaff = await getTelemarketerStaff(userId);
-        if (tmStaff) {
-            return res.status(403).json({
-                message: "Telemarketers are not allowed to add revisions",
-            });
+        const existingOrder = await orderService.getOrderByIdFromDB(id);
+        if (!existingOrder) {
+            return res.status(404).json({ message: 'Order not found' });
+        }
+
+        // Ownership enforcement for telemarketers
+        if (
+            userId &&
+            req.user &&
+            [Role.STAFF, Role.TEAM_LEADER].includes(req.user.role as Role)
+        ) {
+            const isTM = await isTelemarketer(userId);
+            if (isTM && existingOrder.createdBy?._id?.toString() !== userId) {
+                return res.status(403).json({
+                    message:
+                        'Forbidden: You do not have permission to add revision to this order',
+                });
+            }
         }
 
         if (!instruction) {
             return res
                 .status(400)
-                .json({ message: "Revision instruction is required" });
+                .json({ message: 'Revision instruction is required' });
         }
 
         const order = await orderService.addRevision(id, instruction, userId);
 
         if (!order) {
-            return res.status(404).json({ message: "Order not found" });
+            return res.status(404).json({ message: 'Order not found' });
         }
 
         return res.status(200).json({
-            message: "Revision added successfully",
+            message: 'Revision added successfully',
             data: order,
         });
     } catch (error) {
-        console.error("Error adding revision:", error);
-        return res.status(500).json({ message: "Internal server error" });
+        console.error('Error adding revision:', error);
+        return res.status(500).json({ message: 'Internal server error' });
     }
 }
 
@@ -447,12 +536,12 @@ async function getOrderStats(_req: Request, res: Response) {
         const stats = await orderService.getOrderStatsFromDB();
 
         return res.status(200).json({
-            message: "Order stats retrieved successfully",
+            message: 'Order stats retrieved successfully',
             data: stats,
         });
     } catch (error) {
-        console.error("Error getting order stats:", error);
-        return res.status(500).json({ message: "Internal server error" });
+        console.error('Error getting order stats:', error);
+        return res.status(500).json({ message: 'Internal server error' });
     }
 }
 
@@ -462,7 +551,29 @@ async function getOrdersByClient(req: Request, res: Response) {
         const { limit } = req.query;
 
         if (!clientId) {
-            return res.status(400).json({ message: "Client ID is required" });
+            return res.status(400).json({ message: 'Client ID is required' });
+        }
+
+        // Ownership enforcement for telemarketers: check if telemarketer owns the client
+        const userId = req.user?.id;
+        if (
+            userId &&
+            req.user &&
+            [Role.STAFF, Role.TEAM_LEADER].includes(req.user.role as Role)
+        ) {
+            const isTM = await isTelemarketer(userId);
+            if (isTM) {
+                const { default: clientService } =
+                    await import('../services/client.service.js');
+                const client =
+                    await clientService.getClientByIdFromDB(clientId);
+                if (!client || client.createdBy?._id?.toString() !== userId) {
+                    return res.status(403).json({
+                        message:
+                            'Forbidden: You do not have permission to view orders for this client',
+                    });
+                }
+            }
         }
 
         const orders = await orderService.getOrdersByClientFromDB(
@@ -471,12 +582,12 @@ async function getOrdersByClient(req: Request, res: Response) {
         );
 
         return res.status(200).json({
-            message: "Client orders retrieved successfully",
+            message: 'Client orders retrieved successfully',
             data: orders,
         });
     } catch (error) {
-        console.error("Error getting client orders:", error);
-        return res.status(500).json({ message: "Internal server error" });
+        console.error('Error getting client orders:', error);
+        return res.status(500).json({ message: 'Internal server error' });
     }
 }
 
@@ -485,12 +596,12 @@ async function getOrderYears(_req: Request, res: Response) {
         const years = await orderService.getOrderYearsFromDB();
 
         return res.status(200).json({
-            message: "Order years retrieved successfully",
+            message: 'Order years retrieved successfully',
             data: years,
         });
     } catch (error) {
-        console.error("Error getting order years:", error);
-        return res.status(500).json({ message: "Internal server error" });
+        console.error('Error getting order years:', error);
+        return res.status(500).json({ message: 'Internal server error' });
     }
 }
 

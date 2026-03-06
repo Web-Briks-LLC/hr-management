@@ -24,6 +24,7 @@ export interface SidebarItem {
     url: string;
     icon: React.ComponentType<{ strokeWidth?: number; className?: string }>;
     access: Role[];
+    requiredDesignation?: string;
 }
 
 export interface SidebarGroup {
@@ -73,13 +74,14 @@ export const sidebarGroups: SidebarGroup[] = [
             {
                 title: "Clients",
                 url: "/clients",
-                icon: IconUserCircle,
+                icon: IconUsers,
                 access: [
                     Role.SUPER_ADMIN,
                     Role.ADMIN,
                     Role.TEAM_LEADER,
                     Role.STAFF,
                 ],
+                requiredDesignation: "telemarketer",
             },
             {
                 title: "Orders",
@@ -92,6 +94,7 @@ export const sidebarGroups: SidebarGroup[] = [
                     Role.TEAM_LEADER,
                     Role.STAFF,
                 ],
+                requiredDesignation: "telemarketer",
             },
             {
                 title: "Earnings",
@@ -115,6 +118,7 @@ export const sidebarGroups: SidebarGroup[] = [
                     Role.TEAM_LEADER,
                     Role.STAFF,
                 ],
+                requiredDesignation: "telemarketer",
             },
         ],
     },

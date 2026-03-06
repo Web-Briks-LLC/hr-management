@@ -33,18 +33,20 @@ export function NavMain() {
         if (!userRole) return false;
         if (!item.access.includes(userRole)) return false;
 
-        // Restriction: STAFF and TEAM_LEADER can only see Orders, Clients, and Balances if they are telemarketers
+        // Restriction: STAFF and TEAM_LEADER must match requiredDesignation if specified
         if (
             (userRole === Role.STAFF || userRole === Role.TEAM_LEADER) &&
-            (item.url === "/orders" ||
-                item.url === "/clients" ||
-                item.url === "/balances")
+            item.requiredDesignation
         ) {
-            return staff?.designation?.toLowerCase() === "telemarketer";
+            return (
+                staff?.designation?.toLowerCase() ===
+                item.requiredDesignation.toLowerCase()
+            );
         }
 
         return true;
     });
+
 
     const isLoading =
         isSessionPending || isMeLoading || (isRefetching && !session);

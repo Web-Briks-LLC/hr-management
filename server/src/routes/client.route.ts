@@ -1,36 +1,33 @@
 import { Router } from 'express';
 import ClientController from '../controllers/client.controller.js';
-import { authorize } from '../middlewares/authorize.js';
-import { Role } from '../constants/role.js';
+import { authorizeTelemarketer } from '../middlewares/authorizeTelemarketer.js';
 
 const router: Router = Router();
 
-const allowedRoles = [Role.SUPER_ADMIN, Role.ADMIN, Role.HR_MANAGER];
-
 // Get all clients
-router.get('/', authorize(...allowedRoles), ClientController.getAllClients);
+router.get('/', authorizeTelemarketer, ClientController.getAllClients);
 
 // Check client ID availability (must be before :id route)
 router.get(
     '/check-id/:clientId',
-    authorize(...allowedRoles),
+    authorizeTelemarketer,
     ClientController.checkClientId,
 );
 
 // Get client stats (must be before :id route)
 router.get(
     '/:id/stats',
-    authorize(...allowedRoles),
+    authorizeTelemarketer,
     ClientController.getClientStats,
 );
 
 // Get client by ID
-router.get('/:id', authorize(...allowedRoles), ClientController.getClientById);
+router.get('/:id', authorizeTelemarketer, ClientController.getClientById);
 
 // Create client
-router.post('/', authorize(...allowedRoles), ClientController.createClient);
+router.post('/', authorizeTelemarketer, ClientController.createClient);
 
 // Update client
-router.patch('/:id', authorize(...allowedRoles), ClientController.updateClient);
+router.patch('/:id', authorizeTelemarketer, ClientController.updateClient);
 
 export const clientRoute = router;

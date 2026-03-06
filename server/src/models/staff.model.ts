@@ -1,15 +1,13 @@
-import { model, Schema } from "mongoose";
-import type IStaff from "../types/staff.type.js";
-import { Designation } from "../constants/designation.js";
+import { model, Schema } from 'mongoose';
+import type IStaff from '../types/staff.type.js';
+import { Designation } from '../constants/designation.js';
 
 const StaffSchema = new Schema<IStaff>(
     {
         userId: {
             type: Schema.Types.ObjectId,
-            ref: "User",
+            ref: 'User',
             required: false,
-            unique: true,
-            sparse: true,
             index: true,
         },
 
@@ -29,7 +27,7 @@ const StaffSchema = new Schema<IStaff>(
 
         branchId: {
             type: Schema.Types.ObjectId,
-            ref: "Branch",
+            ref: 'Branch',
             required: false, // Optional for admin roles
             index: true,
         },
@@ -55,8 +53,8 @@ const StaffSchema = new Schema<IStaff>(
 
         status: {
             type: String,
-            enum: ["active", "inactive", "terminated"],
-            default: "active",
+            enum: ['active', 'inactive', 'terminated'],
+            default: 'active',
             index: true,
         },
 
@@ -67,15 +65,13 @@ const StaffSchema = new Schema<IStaff>(
 
         nationalId: {
             type: String,
-            unique: true,
-            sparse: true,
-            index: true,
             required: false,
+            index: true,
         },
 
         bloodGroup: {
             type: String,
-            enum: ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"],
+            enum: ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'],
             required: false,
         },
 
@@ -171,5 +167,22 @@ const StaffSchema = new Schema<IStaff>(
     },
 );
 
-const StaffModel = model<IStaff>("Staff", StaffSchema);
+// Add partial unique indexes to allow multiple null/missing values
+StaffSchema.index(
+    { nationalId: 1 },
+    {
+        unique: true,
+        partialFilterExpression: { nationalId: { $type: 'string' } },
+    },
+);
+
+StaffSchema.index(
+    { userId: 1 },
+    {
+        unique: true,
+        partialFilterExpression: { userId: { $exists: true, $ne: null } },
+    },
+);
+
+const StaffModel = model<IStaff>('Staff', StaffSchema);
 export default StaffModel;
