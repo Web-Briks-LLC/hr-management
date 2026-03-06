@@ -1,4 +1,4 @@
-import { eachDayOfInterval, format } from 'date-fns';
+import { eachDayOfInterval } from 'date-fns';
 import StaffModel from '../models/staff.model.js';
 import AttendanceDayModel from '../models/attendance-day.model.js';
 import ShiftAssignmentModel from '../models/shift-assignment.model.js';
@@ -166,7 +166,7 @@ const getPayrollPreview = async ({
         const exitStr = exitDate ? exitDate.toISOString().split('T')[0] : null;
 
         daysInMonth.forEach((day) => {
-            const dayStr = day.toISOString().split('T')[0];
+            const dayStr = day.toISOString().split('T')[0]!;
             const isBeforeJoin = joinStr && dayStr < joinStr;
             const isAfterExit = exitStr && dayStr > exitStr;
             if (isBeforeJoin || isAfterExit) {
@@ -205,18 +205,11 @@ const getPayrollPreview = async ({
 
         // Calculate missing punches (dynamic absent days)
         let missingPunches = 0;
-        const todayUTC = new Date(
-            Date.UTC(
-                new Date().getUTCFullYear(),
-                new Date().getUTCMonth(),
-                new Date().getUTCDate(),
-            ),
-        );
 
         if (shift) {
-            const todayUTCStr = new Date().toISOString().split('T')[0];
+            const todayUTCStr = new Date().toISOString().split('T')[0]!;
             missingPunches = expectedWorkDates.filter((day) => {
-                const dayStr = day.toISOString().split('T')[0];
+                const dayStr = day.toISOString().split('T')[0]!;
                 if (dayStr >= todayUTCStr) return false;
 
                 if (joinStr && dayStr < joinStr) return false;
