@@ -133,11 +133,14 @@ async function fixAllFebruaryData() {
             ).length;
 
             let unemployedDays = 0;
+            const joinStr = joinDate ? format(joinDate, 'yyyy-MM-dd') : null;
+            const exitStr = exitDate ? format(exitDate, 'yyyy-MM-dd') : null;
+
             daysInMonth.forEach((day) => {
-                if (
-                    (joinDate && day < joinDate) ||
-                    (exitDate && day > exitDate)
-                ) {
+                const dayStr = format(day, 'yyyy-MM-dd');
+                const isBeforeJoin = joinStr && dayStr < joinStr;
+                const isAfterExit = exitStr && dayStr > exitStr;
+                if (isBeforeJoin || isAfterExit) {
                     unemployedDays++;
                 }
             });

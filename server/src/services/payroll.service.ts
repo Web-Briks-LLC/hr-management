@@ -1,4 +1,4 @@
-import { eachDayOfInterval } from 'date-fns';
+import { eachDayOfInterval, format } from 'date-fns';
 import StaffModel from '../models/staff.model.js';
 import AttendanceDayModel from '../models/attendance-day.model.js';
 import ShiftAssignmentModel from '../models/shift-assignment.model.js';
@@ -161,9 +161,13 @@ const getPayrollPreview = async ({
         const joinDate = staff.joinDate ? new Date(staff.joinDate) : null;
         const exitDate = staff.exitDate ? new Date(staff.exitDate) : null;
 
+        const joinStr = joinDate ? format(joinDate, 'yyyy-MM-dd') : null;
+        const exitStr = exitDate ? format(exitDate, 'yyyy-MM-dd') : null;
+
         daysInMonth.forEach((day) => {
-            const isBeforeJoin = joinDate && day < joinDate;
-            const isAfterExit = exitDate && day > exitDate;
+            const dayStr = format(day, 'yyyy-MM-dd');
+            const isBeforeJoin = joinStr && dayStr < joinStr;
+            const isAfterExit = exitStr && dayStr > exitStr;
             if (isBeforeJoin || isAfterExit) {
                 unemployedDays++;
             }
