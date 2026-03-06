@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
-import { eachDayOfInterval } from 'date-fns';
+import { eachDayOfInterval, format } from 'date-fns';
 import StaffModel from '../models/staff.model.js';
 import AttendanceDayModel from '../models/attendance-day.model.js';
 import ShiftAssignmentModel from '../models/shift-assignment.model.js';
@@ -19,7 +19,12 @@ const uri = process.env.OFFICE_MONGO_URI;
  */
 async function fixAllFebruaryData() {
     try {
-        await mongoose.connect(uri as string, {
+        if (!uri) {
+            console.error('FATAL: OFFICE_MONGO_URI is not defined in .env!');
+            process.exit(1);
+        }
+
+        await mongoose.connect(uri, {
             serverSelectionTimeoutMS: 5000,
         });
         console.log('Connected to office DB for complete February 2026 fix.');
@@ -29,27 +34,29 @@ async function fixAllFebruaryData() {
         const startDate = new Date(Date.UTC(year, monthNum - 1, 1, 0, 0, 0, 0));
         const endDate = new Date(Date.UTC(year, monthNum, 0, 23, 59, 59, 999));
 
-        // Let's get all active staffs and any that were active in Feb
         const staffs = await StaffModel.find({
             $or: [{ status: 'active' }, { exitDate: { $gte: startDate } }],
         });
 
-        console.log(
-            `Found ${staffs.length} relevant staff members to check for February.`,
-        );
+        console.log(`Checking ${staffs.length} staff members...`);
 
         const salaryCategory = await ExpenseCategoryModel.findOne({
             name: /^Salary/i,
         });
+
         if (!salaryCategory) {
-            console.log('No Salary category found, aborting.');
-            return process.exit(1);
+            console.error(
+                'FATAL: "Salary" expense category not found in the database!',
+            );
+            process.exit(1);
         }
 
         const daysInMonth = eachDayOfInterval({
             start: startDate,
             end: endDate,
         });
+
+        const todayStr = format(new Date(), 'yyyy-MM-dd');
 
         let modifiedEmployees = 0;
         let upsertedAttendances = 0;
@@ -65,105 +72,93 @@ async function fixAllFebruaryData() {
                 ? await ShiftModel.findById(shiftAssignment.shiftId)
                 : null;
 
+            if (!shift) continue;
+
             // Get explicitly existing attendance records
             const existingAttendance = await AttendanceDayModel.find({
                 staffId: staff._id,
                 date: { $gte: startDate, $lte: endDate },
             });
 
-            // Expected dates map
-            const expectedWorkDates: Date[] = [];
-            if (shift) {
-                daysInMonth.forEach((day) => {
-                    if (shift.workDays.includes(day.getDay() as any)) {
-                        expectedWorkDates.push(day);
-                    }
-                });
-            }
-
-            // Unemployed days (outside join/exit bounds)
-            let unemployedDays = 0;
-            const joinDate = staff.joinDate ? new Date(staff.joinDate) : null;
-            const exitDate = staff.exitDate ? new Date(staff.exitDate) : null;
-
-            daysInMonth.forEach((day) => {
-                const isBeforeJoin = joinDate && day < joinDate;
-                const isAfterExit = exitDate && day > exitDate;
-                if (isBeforeJoin || isAfterExit) {
-                    unemployedDays++;
-                }
-            });
-
-            // Find missing punch dates and CREATE literal "absent" records for them.
-            // This is crucial because Grace UI looks at actual absent records for grace eligibility.
-            let missingPunches = 0;
-            const todayUTC = new Date(
-                Date.UTC(
-                    new Date().getUTCFullYear(),
-                    new Date().getUTCMonth(),
-                    new Date().getUTCDate(),
+            // Use a Set of YYYY-MM-DD strings for fast, timezone-agnostic lookup
+            const existingDateStrings = new Set(
+                existingAttendance.map((a) =>
+                    format(new Date(a.date), 'yyyy-MM-dd'),
                 ),
             );
 
-            const missingDatesToCreate: Date[] = [];
+            const joinDate = staff.joinDate ? new Date(staff.joinDate) : null;
+            const exitDate = staff.exitDate ? new Date(staff.exitDate) : null;
 
-            if (shift) {
-                expectedWorkDates.forEach((day) => {
-                    if (day > todayUTC) return; // Future
+            let newAbsentsForThisStaff = 0;
 
-                    const isBeforeJoin = joinDate && day < joinDate;
-                    const isAfterExit = exitDate && day > exitDate;
-                    if (isBeforeJoin || isAfterExit) return;
+            for (const day of daysInMonth) {
+                const dayStr = format(day, 'yyyy-MM-dd');
 
-                    const hasRecord = existingAttendance.some(
-                        (a) => new Date(a.date).getTime() === day.getTime(),
-                    );
+                // 1. Is it a working day for this shift?
+                if (!shift.workDays.includes(day.getDay() as any)) continue;
 
-                    if (!hasRecord) {
-                        missingPunches++;
-                        missingDatesToCreate.push(day);
-                    }
-                });
+                // 2. Was the staff employed on this day?
+                if (joinDate && day < joinDate) continue;
+                if (exitDate && day > exitDate) continue;
+
+                // 3. Is the day in the past? (Don't create absents for today/future)
+                if (dayStr >= todayStr) continue;
+
+                // 4. Do we already have a record (present, absent, etc.)?
+                if (!existingDateStrings.has(dayStr)) {
+                    // Create literal "absent" record
+                    await AttendanceDayModel.create({
+                        staffId: staff._id,
+                        shiftId: shift._id,
+                        date: new Date(dayStr + 'T00:00:00.000Z'), // Force UTC midnight
+                        status: 'absent',
+                        isAutoAbsent: true,
+                        notes: '[Auto Generated Missing Punch]',
+                    });
+                    newAbsentsForThisStaff++;
+                    upsertedAttendances++;
+                    existingDateStrings.add(dayStr);
+                }
             }
 
-            // Insert literal missing records into the database
-            for (const missingDate of missingDatesToCreate) {
-                if (!shift?._id) continue;
-
-                await AttendanceDayModel.create({
-                    staffId: staff._id,
-                    shiftId: shift._id,
-                    date: missingDate,
-                    status: 'absent',
-                    isAutoAbsent: true,
-                    notes: '[Auto Generated Missing Punch]',
-                });
-                upsertedAttendances++;
-            }
-
-            // Calculate actual total deduction
-            const literalAbsentDays = existingAttendance.filter(
-                (a) => a.status === 'absent',
-            ).length;
-            const finalAbsentDays = literalAbsentDays + missingPunches;
-
-            // Calculate final expected paycheck
-            const staffSalary = staff.salary || 0;
-            const perDaySalary = staffSalary / 30;
-            const serverDeduction =
-                (finalAbsentDays + unemployedDays) * perDaySalary;
-            const expectedPayable = Math.max(0, staffSalary - serverDeduction);
-            const expectedRounded = Math.round(expectedPayable);
-
-            // Fetch the payment record if one exists
-            const expense = await ExpenseModel.findOne({
-                categoryId: salaryCategory._id,
+            // Recalculate salary based on total absent counts (including new ones)
+            const updatedAttendance = await AttendanceDayModel.find({
                 staffId: staff._id,
                 date: { $gte: startDate, $lte: endDate },
             });
 
+            const totalAbsentDays = updatedAttendance.filter(
+                (a) => a.status === 'absent',
+            ).length;
+
+            let unemployedDays = 0;
+            daysInMonth.forEach((day) => {
+                if (
+                    (joinDate && day < joinDate) ||
+                    (exitDate && day > exitDate)
+                ) {
+                    unemployedDays++;
+                }
+            });
+
+            const staffSalary = staff.salary || 0;
+            const perDaySalary = staffSalary / 30;
+            // Formula: Base - (Absent + Unemployed) * (Base/30)
+            const expectedPayable = Math.max(
+                0,
+                staffSalary - (totalAbsentDays + unemployedDays) * perDaySalary,
+            );
+            const expectedRounded = Math.round(expectedPayable);
+
+            // Fetch the payment record
+            const expense = await ExpenseModel.findOne({
+                categoryId: salaryCategory._id as any, // Cast to any to bypass exactOptionalPropertyTypes strictness if needed, or just use non-null
+                staffId: staff._id as any,
+                date: { $gte: startDate, $lte: endDate } as any,
+            });
+
             if (expense) {
-                // Determine bonus and deductions from original note
                 let bonus = 0;
                 let deduction = 0;
                 const bonusMatch = expense.note?.match(/Bonus:\s+(\d+)/);
@@ -178,11 +173,9 @@ async function fixAllFebruaryData() {
                 const correctFinalPaid = expectedRounded + bonus - deduction;
 
                 if (expense.amount !== correctFinalPaid) {
-                    // Try to fetch user name or fallback to staff id
-                    // Cast to any to get around User populate missing type check here
                     const staffName = (staff as any).name || staff.staffId;
                     console.log(
-                        `Fixing payment for ${staffName} | Base: ${expectedRounded} | Fix: ${expense.amount} -> ${correctFinalPaid}`,
+                        `[FIX] ${staffName}: Absent ${totalAbsentDays}, Unemp ${unemployedDays} | Amount ${expense.amount} -> ${correctFinalPaid}`,
                     );
                     expense.amount = correctFinalPaid;
                     await expense.save();
@@ -191,22 +184,25 @@ async function fixAllFebruaryData() {
             }
 
             if (
-                missingDatesToCreate.length > 0 ||
+                newAbsentsForThisStaff > 0 ||
                 (expense && expense.isModified('amount'))
             ) {
                 modifiedEmployees++;
             }
         }
 
-        console.log(`\n=== FIX REPORT ===`);
-        console.log(`Employees Processed/Fixed: ${modifiedEmployees}`);
+        console.log(`\n=== FINAL FIX REPORT ===`);
+        console.log(`Employees Processed: ${staffs.length}`);
+        console.log(
+            `Employees Fixed (Record or Expense): ${modifiedEmployees}`,
+        );
         console.log(`Missing Absent Punches Generated: ${upsertedAttendances}`);
         console.log(`Expense Payouts Corrected: ${modifiedExpenses}`);
-        console.log(`==================\n`);
+        console.log(`========================\n`);
 
         process.exit(0);
     } catch (error) {
-        console.error('Error fixing Feb data:', error);
+        console.error('Error in fixAllFebruaryData:', error);
         process.exit(1);
     }
 }
