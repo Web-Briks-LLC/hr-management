@@ -187,11 +187,16 @@ async function getOrderById(req: Request, res: Response) {
             [Role.STAFF, Role.TEAM_LEADER].includes(req.user.role as Role)
         ) {
             const isTM = await isTelemarketer(userId);
-            if (isTM && order.createdBy?._id?.toString() !== userId) {
-                return res.status(403).json({
-                    message:
-                        'Forbidden: You do not have permission to view this order',
-                });
+            if (isTM) {
+                const clientOwnerId = (
+                    order.clientId as any
+                )?.createdBy?.toString();
+                if (clientOwnerId !== userId) {
+                    return res.status(403).json({
+                        message:
+                            'Forbidden: You do not have permission to view this order',
+                    });
+                }
             }
         }
 
@@ -242,11 +247,16 @@ async function updateOrder(req: Request, res: Response) {
             [Role.STAFF, Role.TEAM_LEADER].includes(req.user.role as Role)
         ) {
             const isTM = await isTelemarketer(userId);
-            if (isTM && existingOrder.createdBy?._id?.toString() !== userId) {
-                return res.status(403).json({
-                    message:
-                        'Forbidden: You do not have permission to update this order',
-                });
+            if (isTM) {
+                const clientOwnerId = (
+                    existingOrder.clientId as any
+                )?.createdBy?.toString();
+                if (clientOwnerId !== userId) {
+                    return res.status(403).json({
+                        message:
+                            'Forbidden: You do not have permission to update this order',
+                    });
+                }
             }
         }
 
@@ -360,11 +370,16 @@ async function updateOrderStatus(req: Request, res: Response) {
             [Role.STAFF, Role.TEAM_LEADER].includes(req.user.role as Role)
         ) {
             const isTM = await isTelemarketer(userId);
-            if (isTM && existingOrder.createdBy?._id?.toString() !== userId) {
-                return res.status(403).json({
-                    message:
-                        'Forbidden: You do not have permission to update this order status',
-                });
+            if (isTM) {
+                const clientOwnerId = (
+                    existingOrder.clientId as any
+                )?.createdBy?.toString();
+                if (clientOwnerId !== userId) {
+                    return res.status(403).json({
+                        message:
+                            'Forbidden: You do not have permission to update this order status',
+                    });
+                }
             }
         }
 
@@ -439,11 +454,16 @@ async function extendDeadline(req: Request, res: Response) {
             [Role.STAFF, Role.TEAM_LEADER].includes(req.user.role as Role)
         ) {
             const isTM = await isTelemarketer(userId);
-            if (isTM && existingOrder.createdBy?._id?.toString() !== userId) {
-                return res.status(403).json({
-                    message:
-                        "Forbidden: You do not have permission to extend this order's deadline",
-                });
+            if (isTM) {
+                const clientOwnerId = (
+                    existingOrder.clientId as any
+                )?.createdBy?.toString();
+                if (clientOwnerId !== userId) {
+                    return res.status(403).json({
+                        message:
+                            "Forbidden: You do not have permission to extend this order's deadline",
+                    });
+                }
             }
         }
 
@@ -501,11 +521,16 @@ async function addRevision(req: Request, res: Response) {
             [Role.STAFF, Role.TEAM_LEADER].includes(req.user.role as Role)
         ) {
             const isTM = await isTelemarketer(userId);
-            if (isTM && existingOrder.createdBy?._id?.toString() !== userId) {
-                return res.status(403).json({
-                    message:
-                        'Forbidden: You do not have permission to add revision to this order',
-                });
+            if (isTM) {
+                const clientOwnerId = (
+                    existingOrder.clientId as any
+                )?.createdBy?.toString();
+                if (clientOwnerId !== userId) {
+                    return res.status(403).json({
+                        message:
+                            'Forbidden: You do not have permission to add revision to this order',
+                    });
+                }
             }
         }
 

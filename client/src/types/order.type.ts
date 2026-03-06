@@ -56,6 +56,7 @@ export interface IOrder {
         currency?: string;
         address?: string;
         officeAddress?: string;
+        createdBy?: string;
     };
     orderDate: string;
     deadline: string;

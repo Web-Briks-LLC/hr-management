@@ -1294,24 +1294,8 @@ export default function OrdersPage() {
                                                         2,
                                                     )}
                                                 </TableCell>
-                                                <TableCell className="border-r flex items-center justify-center w-auto">
-                                                    {isTelemarketer ? (
-                                                        <Badge
-                                                            className={cn(
-                                                                statusColors[
-                                                                    order.status
-                                                                ],
-                                                                "pointer-events-none select-none",
-                                                            )}
-                                                        >
-                                                            {
-                                                                ORDER_STATUS_LABELS[
-                                                                    order.status
-                                                                ]
-                                                            }
-                                                        </Badge>
-                                                    ) : (
-                                                        <Select
+                                                <TableCell className='border-r flex items-center justify-center w-auto'>
+                                                    <Select
                                                             value={order.status}
                                                             onValueChange={(
                                                                 value,
@@ -1368,7 +1352,6 @@ export default function OrdersPage() {
                                                                 )}
                                                             </SelectContent>
                                                         </Select>
-                                                    )}
                                                 </TableCell>
                                                 <TableCell className="border-r">
                                                     <span
@@ -1408,7 +1391,14 @@ export default function OrdersPage() {
                                                                     <p>View</p>
                                                                 </TooltipContent>
                                                             </Tooltip>
-                                                            {!isTelemarketer && (
+                                                            {(!isTelemarketer ||
+                                                                (isTelemarketer &&
+                                                                    order
+                                                                        .clientId
+                                                                        ?.createdBy ===
+                                                                        session
+                                                                            ?.user
+                                                                            ?.id)) && (
                                                                 <>
                                                                     <Tooltip>
                                                                         <TooltipTrigger
@@ -1478,32 +1468,34 @@ export default function OrdersPage() {
                                                                             </p>
                                                                         </TooltipContent>
                                                                     </Tooltip>
-                                                                    <Tooltip>
-                                                                        <TooltipTrigger
-                                                                            asChild
-                                                                        >
-                                                                            <Button
-                                                                                variant="ghost"
-                                                                                size="icon"
-                                                                                onClick={() => {
-                                                                                    setSelectedOrder(
-                                                                                        order,
-                                                                                    );
-                                                                                    setIsDeleteDialogOpen(
-                                                                                        true,
-                                                                                    );
-                                                                                }}
-                                                                            >
-                                                                                <Trash2 className="h-4 w-4 text-destructive" />
-                                                                            </Button>
-                                                                        </TooltipTrigger>
-                                                                        <TooltipContent>
-                                                                            <p>
-                                                                                Delete
-                                                                            </p>
-                                                                        </TooltipContent>
-                                                                    </Tooltip>
                                                                 </>
+                                                            )}
+                                                            {!isTelemarketer && (
+                                                                <Tooltip>
+                                                                    <TooltipTrigger
+                                                                        asChild
+                                                                    >
+                                                                        <Button
+                                                                            variant="ghost"
+                                                                            size="icon"
+                                                                            onClick={() => {
+                                                                                setSelectedOrder(
+                                                                                    order,
+                                                                                );
+                                                                                setIsDeleteDialogOpen(
+                                                                                    true,
+                                                                                );
+                                                                            }}
+                                                                        >
+                                                                            <Trash2 className="h-4 w-4 text-destructive" />
+                                                                        </Button>
+                                                                    </TooltipTrigger>
+                                                                    <TooltipContent>
+                                                                        <p>
+                                                                            Delete
+                                                                        </p>
+                                                                    </TooltipContent>
+                                                                </Tooltip>
                                                             )}
                                                             <Tooltip>
                                                                 <TooltipTrigger

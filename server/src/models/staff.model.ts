@@ -66,7 +66,6 @@ const StaffSchema = new Schema<IStaff>(
         nationalId: {
             type: String,
             required: false,
-            index: true,
         },
 
         bloodGroup: {
@@ -164,15 +163,6 @@ const StaffSchema = new Schema<IStaff>(
     },
     {
         timestamps: true,
-    },
-);
-
-// Add partial unique indexes to allow multiple null/missing values
-StaffSchema.index(
-    { nationalId: 1 },
-    {
-        unique: true,
-        partialFilterExpression: { nationalId: { $type: 'string' } },
     },
 );
 
