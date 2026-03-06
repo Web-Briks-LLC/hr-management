@@ -45,6 +45,15 @@ import dynamic from "next/dynamic";
 import { pdf } from "@react-pdf/renderer";
 import { InvoiceDocument } from "@/components/invoice/InvoicePDF";
 import { toast } from "sonner";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog";
 
 // Dynamically import the PDF component to avoid SSR issues
 const InvoicePDF = dynamic(() => import("@/components/invoice/InvoicePDF"), {
@@ -90,6 +99,8 @@ export default function InvoicePage() {
     const [invoiceNumber, setInvoiceNumber] = useState<string>("");
     const [paymentToken, setPaymentToken] = useState<string>("");
     const [showPDF, setShowPDF] = useState(false);
+    const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
+    const [targetEmail, setTargetEmail] = useState<string>("");
 
     const [sendInvoiceEmail, { isLoading: isSending }] =
         useSendInvoiceEmailMutation();
@@ -123,10 +134,10 @@ export default function InvoicePage() {
         useGetOrdersQuery(
             selectedYear
                 ? {
-                      month: parseInt(selectedMonth),
-                      year: parseInt(selectedYear),
-                      limit: 1000,
-                  }
+                    month: parseInt(selectedMonth),
+                    year: parseInt(selectedYear),
+                    limit: 1000,
+                }
                 : undefined,
             { skip: !selectedYear },
         );
@@ -284,15 +295,8 @@ export default function InvoicePage() {
         }
     };
 
-    const handleSendDirectly = async () => {
+    const performDirectSend = async (email: string) => {
         if (selectedOrders.size === 0 || !selectedClient) return;
-
-        // Check email first
-        const clientEmail = selectedClient.emails?.[0];
-        if (!clientEmail) {
-            toast.error("Client email is missing.");
-            return;
-        }
 
         try {
             let currentInvoiceNumber = invoiceNumber;
@@ -372,7 +376,7 @@ export default function InvoicePage() {
 
             const formData = new FormData();
             formData.append("file", blob, fileName);
-            formData.append("to", clientEmail);
+            formData.append("to", email);
             formData.append("clientName", selectedClient.name);
             formData.append(
                 "month",
@@ -383,13 +387,31 @@ export default function InvoicePage() {
             const result = await sendInvoiceEmail(formData).unwrap();
 
             if (result.success) {
-                toast.success("Invoice sent successfully to " + clientEmail);
+                toast.success("Invoice sent successfully to " + email);
+                setIsEmailDialogOpen(false);
             } else {
                 throw new Error(result.message || "Failed to send email");
             }
         } catch (error) {
             console.error("Error sending email:", error);
             toast.error((error as Error).message || "Failed to send email");
+        }
+    };
+
+    const handleSendDirectly = async () => {
+        if (selectedOrders.size === 0 || !selectedClient) return;
+
+        // Check email first
+        if (!selectedClient.emails || selectedClient.emails.length === 0) {
+            toast.error("Client email is missing.");
+            return;
+        }
+
+        if (selectedClient.emails.length > 1) {
+            setTargetEmail(selectedClient.emails[0]);
+            setIsEmailDialogOpen(true);
+        } else {
+            await performDirectSend(selectedClient.emails[0]);
         }
     };
 
@@ -538,22 +560,65 @@ export default function InvoicePage() {
 
                         {/* Buttons */}
                         <div className="flex items-end gap-2 flex-wrap">
-                            <Button
-                                onClick={handleSendDirectly}
-                                disabled={
-                                    selectedOrders.size === 0 ||
-                                    isGeneratingInvoice ||
-                                    isSending
-                                }
-                                className="flex-1 bg-orange-500 hover:bg-orange-600"
-                            >
-                                {isSending ? (
-                                    <Loader className="h-4 w-4  animate-spin" />
-                                ) : (
-                                    <Mail className="h-4 w-4 " />
-                                )}
-                                {isSending ? "Processing..." : "Send"}
-                            </Button>
+                            <Dialog open={isEmailDialogOpen} onOpenChange={setIsEmailDialogOpen}>
+                                <Button
+                                    onClick={handleSendDirectly}
+                                    disabled={
+                                        selectedOrders.size === 0 ||
+                                        isGeneratingInvoice ||
+                                        isSending
+                                    }
+                                    className="flex-1 bg-orange-500 hover:bg-orange-600"
+                                >
+                                    {isSending ? (
+                                        <Loader className="h-4 w-4  animate-spin" />
+                                    ) : (
+                                        <Mail className="h-4 w-4 " />
+                                    )}
+                                    {isSending ? "Processing..." : "Send"}
+                                </Button>
+                                <DialogContent className="sm:max-w-md">
+                                    <DialogHeader>
+                                        <DialogTitle>Select Recipient Email</DialogTitle>
+                                        <DialogDescription>
+                                            This client has multiple email addresses. Please select which one to send the invoice to.
+                                        </DialogDescription>
+                                    </DialogHeader>
+                                    <div className="flex items-center space-x-2 py-4">
+                                        <Select
+                                            value={targetEmail}
+                                            onValueChange={setTargetEmail}
+                                        >
+                                            <SelectTrigger className="w-full">
+                                                <SelectValue placeholder="Select email..." />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {selectedClient?.emails?.map((email) => (
+                                                    <SelectItem key={email} value={email}>
+                                                        {email}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <DialogFooter className="sm:justify-end">
+                                        <Button
+                                            type="button"
+                                            variant="secondary"
+                                            onClick={() => setIsEmailDialogOpen(false)}
+                                        >
+                                            Cancel
+                                        </Button>
+                                        <Button
+                                            className="bg-orange-500 hover:bg-orange-600"
+                                            disabled={isSending}
+                                            onClick={() => performDirectSend(targetEmail)}
+                                        >
+                                            {isSending ? "Sending..." : "Send Invoice"}
+                                        </Button>
+                                    </DialogFooter>
+                                </DialogContent>
+                            </Dialog>
                             <Button
                                 onClick={handleGenerateInvoice}
                                 disabled={
@@ -624,7 +689,7 @@ export default function InvoicePage() {
                                                     checked={
                                                         orders.length > 0 &&
                                                         selectedOrders.size ===
-                                                            orders.length
+                                                        orders.length
                                                     }
                                                     onCheckedChange={
                                                         handleSelectAll
@@ -706,7 +771,7 @@ export default function InvoicePage() {
                                                     <Badge variant="outline">
                                                         {
                                                             statusLabels[
-                                                                order.status
+                                                            order.status
                                                             ]
                                                         }
                                                     </Badge>

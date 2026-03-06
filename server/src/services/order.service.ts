@@ -320,6 +320,7 @@ async function getAllOrdersFromDB(filters: GetOrdersFilters): Promise<{
                                 clientId: 1,
                                 name: 1,
                                 email: 1,
+                                emails: 1,
                                 currency: 1,
                                 officeAddress: 1,
                                 address: 1,
@@ -412,7 +413,7 @@ async function getOrderByIdFromDB(id: string): Promise<IOrder | null> {
     const order = await OrderModel.findById(id)
         .populate(
             'clientId',
-            'clientId name email phone currency officeAddress address createdBy',
+            'clientId name email emails phone currency officeAddress address createdBy',
         )
         .populate('services', 'name description')
         .populate('returnFileFormat', 'name extension')
@@ -471,7 +472,7 @@ async function updateOrderInDB(
     })
         .populate(
             'clientId',
-            'clientId name email currency officeAddress address',
+            'clientId name email emails currency officeAddress address',
         )
         .populate('services', 'name')
         .populate('returnFileFormat', 'name extension')
@@ -579,7 +580,7 @@ async function updateOrderStatusWithTimeline(
     })
         .populate(
             'clientId',
-            'clientId name email currency officeAddress address',
+            'clientId name email emails currency officeAddress address',
         )
         .populate('services', 'name')
         .populate('returnFileFormat', 'name extension')
@@ -628,7 +629,7 @@ async function extendDeadline(
     })
         .populate(
             'clientId',
-            'clientId name email currency officeAddress address',
+            'clientId name email emails currency officeAddress address',
         )
         .populate('services', 'name')
         .populate('returnFileFormat', 'name extension')
@@ -665,7 +666,7 @@ async function addRevision(
     })
         .populate(
             'clientId',
-            'clientId name email currency officeAddress address',
+            'clientId name email emails currency officeAddress address',
         )
         .populate('services', 'name')
         .populate('returnFileFormat', 'name extension')
