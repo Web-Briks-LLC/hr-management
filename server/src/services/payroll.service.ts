@@ -147,7 +147,8 @@ const getPayrollPreview = async ({
 
         if (shift) {
             daysInMonth.forEach((day) => {
-                if (shift.workDays.includes(day.getDay())) {
+                // Use UTC day to match our UTC month start/end
+                if (shift.workDays.includes(day.getUTCDay())) {
                     workDaysCount++;
                     expectedWorkDates.push(day);
                 }
@@ -161,11 +162,11 @@ const getPayrollPreview = async ({
         const joinDate = staff.joinDate ? new Date(staff.joinDate) : null;
         const exitDate = staff.exitDate ? new Date(staff.exitDate) : null;
 
-        const joinStr = joinDate ? format(joinDate, 'yyyy-MM-dd') : null;
-        const exitStr = exitDate ? format(exitDate, 'yyyy-MM-dd') : null;
+        const joinStr = joinDate ? joinDate.toISOString().split('T')[0] : null;
+        const exitStr = exitDate ? exitDate.toISOString().split('T')[0] : null;
 
         daysInMonth.forEach((day) => {
-            const dayStr = format(day, 'yyyy-MM-dd');
+            const dayStr = day.toISOString().split('T')[0];
             const isBeforeJoin = joinStr && dayStr < joinStr;
             const isAfterExit = exitStr && dayStr > exitStr;
             if (isBeforeJoin || isAfterExit) {
@@ -213,15 +214,17 @@ const getPayrollPreview = async ({
         );
 
         if (shift) {
+            const todayUTCStr = new Date().toISOString().split('T')[0];
             missingPunches = expectedWorkDates.filter((day) => {
-                if (day > todayUTC) return false;
+                const dayStr = day.toISOString().split('T')[0];
+                if (dayStr >= todayUTCStr) return false;
 
-                const isBeforeJoin = joinDate && day < joinDate;
-                const isAfterExit = exitDate && day > exitDate;
-                if (isBeforeJoin || isAfterExit) return false;
+                if (joinStr && dayStr < joinStr) return false;
+                if (exitStr && dayStr > exitStr) return false;
 
                 const hasRecord = staffAttendance.some(
-                    (a) => new Date(a.date).getTime() === day.getTime(),
+                    (a) =>
+                        new Date(a.date).toISOString().split('T')[0] === dayStr,
                 );
                 return !hasRecord;
             }).length;

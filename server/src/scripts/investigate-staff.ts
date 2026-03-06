@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
-import { eachDayOfInterval, format } from 'date-fns';
+import { eachDayOfInterval } from 'date-fns';
 import StaffModel from '../models/staff.model.js';
 import AttendanceDayModel from '../models/attendance-day.model.js';
 import ShiftAssignmentModel from '../models/shift-assignment.model.js';
@@ -53,9 +53,11 @@ async function investigate() {
         });
 
         if (!salaryCategory) {
-            console.error('FATAL: Salary category not found');
+            console.error('Salary category not found');
             process.exit(1);
         }
+
+        const todayUTCStr = new Date().toISOString().split('T')[0] as string;
 
         for (const staff of staffs) {
             const userObj = users.find(
@@ -64,15 +66,20 @@ async function investigate() {
             const userName = userObj?.name || 'Unknown';
 
             console.log(`\n--- [STAFF REPORT] ${userName} ---`);
-            console.log(
-                `ID: ${staff.staffId} | Status: ${staff.status} | Base: ${staff.salary}`,
-            );
-            console.log(
-                `Join Date: ${staff.joinDate ? format(new Date(staff.joinDate), 'yyyy-MM-dd HH:mm') : 'N/A'}`,
-            );
-            console.log(
-                `Exit Date: ${staff.exitDate ? format(new Date(staff.exitDate), 'yyyy-MM-dd HH:mm') : 'N/A'}`,
-            );
+            console.log(`ID: ${staff.staffId} | Base: ${staff.salary}`);
+
+            const joinStr = staff.joinDate
+                ? (new Date(staff.joinDate)
+                      .toISOString()
+                      .split('T')[0] as string)
+                : null;
+            const exitStr = staff.exitDate
+                ? (new Date(staff.exitDate)
+                      .toISOString()
+                      .split('T')[0] as string)
+                : null;
+            console.log(`Join Date (UTC): ${joinStr || 'N/A'}`);
+            console.log(`Exit Date (UTC): ${exitStr || 'N/A'}`);
 
             const shiftAssignment = await ShiftAssignmentModel.findOne({
                 staffId: staff._id as any,
@@ -84,13 +91,11 @@ async function investigate() {
                   ).lean()
                 : null;
 
-            if (shift) {
-                console.log(
-                    `Shift: ${shift.name} (Workdays: ${shift.workDays})`,
-                );
-            } else {
+            if (!shift) {
                 console.log('No shift assignment found.');
+                continue;
             }
+            console.log(`Shift: ${shift.name} (Workdays: ${shift.workDays})`);
 
             const staffAttendance = await AttendanceDayModel.find({
                 staffId: staff._id as any,
@@ -106,26 +111,64 @@ async function investigate() {
                     a.status,
                 ),
             ).length;
-            const absent = staffAttendance.filter(
+            const literalAbsent = staffAttendance.filter(
                 (a) => a.status === 'absent',
             ).length;
-            console.log(`Summary: Present: ${present}, Absent: ${absent}`);
 
-            // Unemployed check
+            // Accurate Unemployment logic
             let unempCount = 0;
             const daysInMonth = eachDayOfInterval({
                 start: startDate,
                 end: endDate,
             });
-            const join = staff.joinDate ? new Date(staff.joinDate) : null;
-            const exit = staff.exitDate ? new Date(staff.exitDate) : null;
-
             daysInMonth.forEach((d) => {
-                if ((join && d < join) || (exit && d > exit)) unempCount++;
+                const dayStr = d.toISOString().split('T')[0] as string;
+                if (
+                    (joinStr && dayStr < joinStr) ||
+                    (exitStr && dayStr > exitStr)
+                )
+                    unempCount++;
+            });
+            console.log(`Unemployed days in Feb: ${unempCount}`);
+
+            // Accurate Work Days logic (In Period)
+            const expectedDates = daysInMonth.filter((d) => {
+                const dayStr = d.toISOString().split('T')[0] as string;
+                const isWorkDay = shift.workDays.includes(d.getUTCDay() as any);
+                const isEmployed =
+                    (!joinStr || dayStr >= joinStr) &&
+                    (!exitStr || dayStr <= exitStr);
+                return isWorkDay && isEmployed;
             });
             console.log(
-                `Unemployed days in Feb (based on join/exit): ${unempCount}`,
+                `Expected Work Days (In Employed Period): ${expectedDates.length}`,
             );
+
+            // Accurate Missing Punches logic
+            const missingPunches = expectedDates.filter((d) => {
+                const dayStr = d.toISOString().split('T')[0] as string;
+                if (dayStr >= todayUTCStr) return false;
+                const hasRecord = staffAttendance.some(
+                    (a) =>
+                        (new Date(a.date)
+                            .toISOString()
+                            .split('T')[0] as string) === dayStr,
+                );
+                return !hasRecord;
+            });
+            console.log(
+                `Missing Punches (Working but No Record): ${missingPunches.length}`,
+            );
+
+            const totalAbsent = literalAbsent + missingPunches.length;
+            const units = totalAbsent + unempCount;
+            const perDay = staff.salary / 30;
+            const estSalary = Math.max(0, staff.salary - units * perDay);
+
+            console.log(
+                `Total Deduction Units (Absent ${totalAbsent} + Unemp ${unempCount}): ${units}`,
+            );
+            console.log(`Estimated Payable: ${Math.round(estSalary)}`);
 
             const expense = await ExpenseModel.findOne({
                 staffId: staff._id as any,
@@ -135,10 +178,10 @@ async function investigate() {
 
             if (expense) {
                 console.log(
-                    `Paid Amount: ${expense.amount} | Note: ${expense.note}`,
+                    `Actual Expense Found: ${expense.amount} (Note: ${expense.note})`,
                 );
             } else {
-                console.log('No Expense for Feb.');
+                console.log('No paid Expense record for Feb.');
             }
         }
 
