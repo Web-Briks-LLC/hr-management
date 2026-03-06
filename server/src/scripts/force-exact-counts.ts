@@ -1,6 +1,5 @@
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
-import { eachDayOfInterval } from 'date-fns';
 import StaffModel from '../models/staff.model.js';
 import AttendanceDayModel from '../models/attendance-day.model.js';
 import ExpenseModel from '../models/expense.model.js';
@@ -10,13 +9,11 @@ import ShiftModel from '../models/shift.model.js';
 
 dotenv.config();
 
-const uri = process.env.MONGO_URI;
+const uri = process.env.MONGO_URI || process.env.OFFICE_MONGO_URI;
 
 const manualTargets = [
     { name: 'Asaduzzaman Didar', targetPresent: 15, targetAbsent: 5 },
     { name: 'Md Moni mia', targetPresent: 18, targetAbsent: 6 },
-    { name: 'Ayat Rana', targetPresent: 17, targetAbsent: 3 },
-    { name: 'ABDUR RAHAMAN ARIF', targetPresent: 2, targetAbsent: 22 },
 ];
 
 async function forceExactCounts() {
@@ -30,13 +27,16 @@ async function forceExactCounts() {
         console.log('Connected to DB for exact count override.');
 
         const year = 2026;
-        const monthNum = 2; // February
-        const startDate = new Date(Date.UTC(year, monthNum - 1, 1, 0, 0, 0, 0));
-        const endDate = new Date(Date.UTC(year, monthNum, 0, 23, 59, 59, 999));
-        const daysInMonth = eachDayOfInterval({
-            start: startDate,
-            end: endDate,
-        });
+
+        // Strictly define UTC range for Feb 2026
+        const startDate = new Date(Date.UTC(year, 1, 1, 0, 0, 0, 0));
+        const endDate = new Date(Date.UTC(year, 1, 28, 23, 59, 59, 999));
+
+        // Manually generate days to avoid date-fns timezone interpretation
+        const daysInMonth: Date[] = [];
+        for (let d = 1; d <= 28; d++) {
+            daysInMonth.push(new Date(Date.UTC(year, 1, d)));
+        }
 
         const salaryCategory = await ExpenseCategoryModel.findOne({
             name: /^Salary/i,
