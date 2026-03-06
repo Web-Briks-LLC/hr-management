@@ -1,15 +1,18 @@
 import {
-    Body,
-    Button,
-    Container,
-    Head,
-    Heading,
     Html,
-    Link,
+    Body,
+    Head,
+    Hr,
+    Container,
     Preview,
     Section,
     Text,
+    Img,
+    Link,
+    Button,
 } from '@react-email/components';
+// @ts-ignore
+import * as React from 'react';
 
 interface PinResetEmailProps {
     staffName: string;
@@ -17,35 +20,67 @@ interface PinResetEmailProps {
 }
 
 export const PinResetEmail = ({ staffName, resetUrl }: PinResetEmailProps) => {
+    const previewText = `Reset your Salary PIN`;
+    const logoUrl =
+        'https://res.cloudinary.com/dny7zfbg9/image/upload/v1755954483/mqontecf1xao7znsh6cx.png';
+
     return (
         <Html>
             <Head />
-            <Preview>Reset your Salary PIN</Preview>
+            <Preview>{previewText}</Preview>
             <Body style={main}>
                 <Container style={container}>
-                    <Heading style={h1}>Reset Salary PIN</Heading>
-                    <Text style={text}>Hello {staffName},</Text>
-                    <Text style={text}>
-                        You have requested to reset your Salary PIN. Click the
-                        button below to set a new PIN.
-                    </Text>
-                    <Section style={btnContainer}>
-                        <Button style={button} href={resetUrl}>
-                            Reset PIN
-                        </Button>
+                    <Section style={header}>
+                        <Img
+                            src={logoUrl}
+                            width="120"
+                            height="56"
+                            alt="Web Briks Logo"
+                            style={logo}
+                        />
                     </Section>
-                    <Text style={text}>
-                        Or copy and paste this link into your browser:
-                    </Text>
-                    <Text style={linkText}>
-                        <Link href={resetUrl} style={link}>
-                            {resetUrl}
+
+                    <Section style={content}>
+                        <Text style={heading}>Reset Salary PIN</Text>
+
+                        <Text style={paragraph}>
+                            Hello {staffName},<br />
+                            You have requested to reset your Salary PIN. Click
+                            the button below to set a new PIN.
+                        </Text>
+
+                        <Section style={btnContainer}>
+                            <Button style={button} href={resetUrl}>
+                                Reset PIN
+                            </Button>
+                        </Section>
+
+                        <Text style={paragraph}>
+                            If you didn't request this, you can safely ignore
+                            this email. The link will expire in 1 hour.
+                        </Text>
+
+                        <Hr style={hr} />
+
+                        <Text style={footerText}>
+                            Best regards,
+                            <br />
+                            <strong>HR Team, Web Briks LLC</strong>
+                        </Text>
+                    </Section>
+
+                    <Section style={footer}>
+                        <Text style={footerLegal}>
+                            1209 Mountain Road PL NE, STE R, Albuquerque, NM
+                            87110, US
+                        </Text>
+                        <Link
+                            href="mailto:info@webbriks.com"
+                            style={footerLink}
+                        >
+                            info@webbriks.com
                         </Link>
-                    </Text>
-                    <Text style={footer}>
-                        If you didn't request this, you can ignore this email.
-                        The link will expire in 1 hour.
-                    </Text>
+                    </Section>
                 </Container>
             </Body>
         </Html>
@@ -55,62 +90,92 @@ export const PinResetEmail = ({ staffName, resetUrl }: PinResetEmailProps) => {
 export default PinResetEmail;
 
 const main = {
-    backgroundColor: '#ffffff',
+    backgroundColor: '#f2f2f7',
     fontFamily:
-        '-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Oxygen-Sans,Ubuntu,Cantarell,"Helvetica Neue",sans-serif',
+        'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    padding: '40px 0',
 };
 
 const container = {
+    backgroundColor: '#ffffff',
     margin: '0 auto',
-    padding: '20px 0 48px',
-    maxWidth: '560px',
+    padding: '40px',
+    borderRadius: '24px',
+    boxShadow: '0 4px 24px rgba(0, 0, 0, 0.04)',
+    maxWidth: '600px',
 };
 
-const h1 = {
+const header = {
+    marginBottom: '32px',
+};
+
+const logo = {
+    display: 'block',
+    height: '56px',
+    width: 'auto',
+};
+
+const content = {
+    paddingBottom: '16px',
+};
+
+const heading = {
     fontSize: '24px',
-    fontWeight: 'bold',
-    margin: '40px 0',
-    padding: '0',
-    color: '#333333',
+    fontWeight: '700',
+    color: '#1c1c1e',
+    marginBottom: '24px',
+    letterSpacing: '-0.5px',
 };
 
-const text = {
-    color: '#333',
-    fontSize: '16px',
+const paragraph = {
+    fontSize: '17px',
     lineHeight: '26px',
+    color: '#3a3a3c',
+    marginBottom: '24px',
 };
 
 const btnContainer = {
     textAlign: 'center' as const,
-    marginTop: '32px',
     marginBottom: '32px',
 };
 
 const button = {
-    backgroundColor: '#000000',
-    borderRadius: '3px',
-    color: '#fff',
-    fontSize: '16px',
+    backgroundColor: '#009999',
+    borderRadius: '9999px',
+    color: '#ffffff',
+    fontSize: '17px',
+    fontWeight: '600',
     textDecoration: 'none',
     textAlign: 'center' as const,
-    display: 'block',
-    padding: '12px',
+    display: 'inline-block',
+    padding: '14px 32px',
+    boxShadow: '0 4px 12px rgba(0, 153, 153, 0.25)',
 };
 
-const linkText = {
-    ...text,
-    whiteSpace: 'pre-wrap' as const, // Fix type error if needed, but string works usually
-    wordBreak: 'break-all' as const,
+const hr = {
+    borderColor: '#e5e5ea',
+    margin: '32px 0 24px',
 };
 
-const link = {
-    color: '#0a85ea',
-    textDecoration: 'underline',
+const footerText = {
+    fontSize: '15px',
+    lineHeight: '24px',
+    color: '#3a3a3c',
 };
 
 const footer = {
-    color: '#898989',
-    fontSize: '14px',
-    lineHeight: '22px',
-    marginTop: '12px',
+    marginTop: '32px',
+    textAlign: 'center' as const,
+};
+
+const footerLegal = {
+    fontSize: '13px',
+    color: '#8e8e93',
+    marginBottom: '8px',
+};
+
+const footerLink = {
+    fontSize: '13px',
+    color: '#009999',
+    textDecoration: 'none',
 };

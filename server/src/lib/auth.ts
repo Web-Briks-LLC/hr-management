@@ -1,7 +1,7 @@
 import { betterAuth } from 'better-auth';
 import { mongodbAdapter } from 'better-auth/adapters/mongodb';
 import { client } from './db.js';
-import { sendMail } from './nodemailer.js';
+import emailService from '../services/email.service.js';
 import envConfig from '../config/env.config.js';
 import { Role } from '../constants/role.js';
 
@@ -36,13 +36,10 @@ export const auth = betterAuth({
         requireEmailVerification: true,
         async sendResetPassword(data) {
             try {
-                await sendMail({
+                await emailService.sendResetPasswordEmail({
                     to: data.user.email,
-                    subject: 'Reset Your Password',
-                    body: `<h1>Hello ${data.user.name || ''}</h1>
-                    <p>Click the link below to reset your password:</p>
-                    <a href="${data.url}">Reset Password</a>
-                    <p>If you did not request this, please ignore this email.</p>`,
+                    userName: data.user.name || 'User',
+                    resetPasswordUrl: data.url,
                 });
             } catch (error) {
                 console.error(
@@ -53,16 +50,20 @@ export const auth = betterAuth({
         },
     },
     emailVerification: {
-        sendOnSignUp: true,
+        sendOnSignUp: false,
         async sendVerificationEmail({ url, user }) {
-            await sendMail({
-                to: user.email,
-                subject: 'Verify Your Email',
-                body: `<h1>Hello ${user.name || ''}</h1>
-                <p>Please verify your email:</p>
-                <a href="${url}">Verify</a>
-                <p>If you did not create this account, ignore this email.</p>`,
-            });
+            try {
+                await emailService.sendVerificationEmail({
+                    to: user.email,
+                    userName: user.name || 'User',
+                    verificationUrl: url,
+                });
+            } catch (error) {
+                console.error(
+                    `[Auth] Failed to send verification email to ${user.email}:`,
+                    error,
+                );
+            }
         },
     },
     trustedOrigins: trusted_origins.split(','),

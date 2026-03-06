@@ -11,6 +11,8 @@ import {
     Link,
     Button,
 } from '@react-email/components';
+// @ts-ignore
+import * as React from 'react';
 
 interface OrderExportEmailProps {
     clientName: string;

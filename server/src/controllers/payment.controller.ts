@@ -1,16 +1,17 @@
-import { type Request, type Response } from "express";
-import Stripe from "stripe";
-import { render } from "@react-email/render";
-import { sendMail } from "../lib/nodemailer.js";
-import PaymentReceiptEmail from "../emails/PaymentReceipt.js";
-import { InvoiceRecord } from "../models/invoice-record.model.js";
-import EarningModel from "../models/earning.model.js";
-import ClientModel from "../models/client.model.js";
-import notificationService from "../services/notification.service.js";
+import { type Request, type Response } from 'express';
+import Stripe from 'stripe';
+import { render } from '@react-email/render';
+import { sendMail } from '../lib/nodemailer.js';
+import emailService from '../services/email.service.js';
+import PaymentReceiptEmail from '../emails/PaymentReceipt.js';
+import { InvoiceRecord } from '../models/invoice-record.model.js';
+import EarningModel from '../models/earning.model.js';
+import ClientModel from '../models/client.model.js';
+import notificationService from '../services/notification.service.js';
 
 // Initialize Stripe gracefully, so the server doesn't crash if the key is missing in some environments
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
-    apiVersion: "2026-01-28.clover", // Use the latest compatible API version
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
+    apiVersion: '2026-01-28.clover', // Use the latest compatible API version
 });
 
 /**
@@ -21,27 +22,27 @@ const getPayPalAccessToken = async (): Promise<string> => {
     const clientId = process.env.PAYPAL_CLIENT_ID;
     const clientSecret = process.env.PAYPAL_CLIENT_SECRET;
     if (!clientId || !clientSecret) {
-        throw new Error("PayPal credentials are not configured");
+        throw new Error('PayPal credentials are not configured');
     }
 
     const baseUrl =
-        process.env.PAYPAL_MODE === "live"
-            ? "https://api-m.paypal.com"
-            : "https://api-m.sandbox.paypal.com";
+        process.env.PAYPAL_MODE === 'live'
+            ? 'https://api-m.paypal.com'
+            : 'https://api-m.sandbox.paypal.com';
 
     const res = await fetch(`${baseUrl}/v1/oauth2/token`, {
-        method: "POST",
+        method: 'POST',
         headers: {
-            Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`,
-            "Content-Type": "application/x-www-form-urlencoded",
+            Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`,
+            'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: "grant_type=client_credentials",
+        body: 'grant_type=client_credentials',
     });
 
     const data: any = await res.json();
     if (!res.ok) {
         throw new Error(
-            `PayPal auth failed: ${data.error_description || "Unknown error"}`,
+            `PayPal auth failed: ${data.error_description || 'Unknown error'}`,
         );
     }
     return data.access_token;
@@ -51,9 +52,9 @@ const getPayPalAccessToken = async (): Promise<string> => {
  * Helper: Get the PayPal API base URL based on mode.
  */
 const getPayPalBaseUrl = (): string =>
-    process.env.PAYPAL_MODE === "live"
-        ? "https://api-m.paypal.com"
-        : "https://api-m.sandbox.paypal.com";
+    process.env.PAYPAL_MODE === 'live'
+        ? 'https://api-m.paypal.com'
+        : 'https://api-m.sandbox.paypal.com';
 
 /**
  * SECURITY FIX: createPaymentIntent now looks up the invoice amount from the database
@@ -69,14 +70,14 @@ export const createPaymentIntent = async (
         if (!invoiceNumber) {
             return res
                 .status(400)
-                .json({ error: "Invoice number is required" });
+                .json({ error: 'Invoice number is required' });
         }
 
         if (!process.env.STRIPE_SECRET_KEY) {
-            console.error("Stripe Secret Key is missing in server/.env");
+            console.error('Stripe Secret Key is missing in server/.env');
             return res
                 .status(500)
-                .json({ error: "Payment gateway is not configured properly" });
+                .json({ error: 'Payment gateway is not configured properly' });
         }
 
         // SECURITY: Look up the actual invoice amount from the database
@@ -85,21 +86,21 @@ export const createPaymentIntent = async (
         });
 
         if (!invoice) {
-            return res.status(404).json({ error: "Invoice not found" });
+            return res.status(404).json({ error: 'Invoice not found' });
         }
 
-        if (invoice.paymentStatus === "paid") {
+        if (invoice.paymentStatus === 'paid') {
             return res.status(400).json({
-                error: "This invoice has already been paid",
+                error: 'This invoice has already been paid',
                 alreadyPaid: true,
             });
         }
 
         const amount = invoice.totalAmount;
-        const invoiceCurrency = currency || invoice.currency || "USD";
+        const invoiceCurrency = currency || invoice.currency || 'USD';
 
         if (!amount || amount <= 0) {
-            return res.status(400).json({ error: "Invalid invoice amount" });
+            return res.status(400).json({ error: 'Invalid invoice amount' });
         }
 
         // Create a PaymentIntent with the VERIFIED amount from the database
@@ -112,7 +113,7 @@ export const createPaymentIntent = async (
             },
             metadata: {
                 invoiceNumber: invoiceNumber,
-                clientName: invoice.clientName || "N/A",
+                clientName: invoice.clientName || 'N/A',
                 expectedAmount: String(amount), // Store expected amount for verification
             },
         });
@@ -127,9 +128,9 @@ export const createPaymentIntent = async (
             clientSecret: paymentIntent.client_secret,
         });
     } catch (error: any) {
-        console.error("Stripe Payment Intent Error:", error);
+        console.error('Stripe Payment Intent Error:', error);
         res.status(500).json({
-            error: error.message || "Failed to create payment intent",
+            error: error.message || 'Failed to create payment intent',
         });
     }
 };
@@ -144,14 +145,14 @@ export const confirmPayment = async (
         if (!invoiceNumber) {
             return res
                 .status(400)
-                .json({ error: "Invoice number is required" });
+                .json({ error: 'Invoice number is required' });
         }
 
         // Require at least one gateway reference
         if (!paymentIntentId && !paypalOrderId) {
             return res
                 .status(400)
-                .json({ error: "Payment gateway reference is required" });
+                .json({ error: 'Payment gateway reference is required' });
         }
 
         console.log(
@@ -162,17 +163,17 @@ export const confirmPayment = async (
         const invoice = await InvoiceRecord.findOne({ invoiceNumber });
 
         if (!invoice) {
-            return res.status(404).json({ error: "Invoice record not found" });
+            return res.status(404).json({ error: 'Invoice record not found' });
         }
 
         // 1b. DUPLICATE PAYMENT GUARD — prevent re-processing already-paid invoices
-        if (invoice.paymentStatus === "paid") {
+        if (invoice.paymentStatus === 'paid') {
             console.log(
                 `[Payment] Invoice ${invoiceNumber} is already paid. Skipping.`,
             );
             return res.status(200).json({
                 success: true,
-                message: "Invoice has already been paid",
+                message: 'Invoice has already been paid',
                 alreadyPaid: true,
             });
         }
@@ -185,7 +186,7 @@ export const confirmPayment = async (
                 const intent =
                     await stripe.paymentIntents.retrieve(paymentIntentId);
 
-                if (intent.status === "succeeded") {
+                if (intent.status === 'succeeded') {
                     // SECURITY: Verify the paid amount matches the invoice amount
                     const paidAmountCents = intent.amount;
                     const expectedAmountCents = Math.round(
@@ -198,14 +199,14 @@ export const confirmPayment = async (
                                 `Paid ${paidAmountCents} cents but expected ${expectedAmountCents} cents`,
                         );
                         return res.status(400).json({
-                            error: "Payment amount does not match invoice amount",
+                            error: 'Payment amount does not match invoice amount',
                         });
                     }
 
                     // SECURITY: Verify the payment intent was created for THIS invoice
                     // Must strictly match, do not allow bypass if metadata is missing
                     const intentInvoiceStr = String(
-                        intent.metadata?.invoiceNumber || "",
+                        intent.metadata?.invoiceNumber || '',
                     );
                     const reqInvoiceStr = String(invoiceNumber);
 
@@ -215,7 +216,7 @@ export const confirmPayment = async (
                                 `invoice '${intentInvoiceStr}' but confirm was called for '${reqInvoiceStr}'`,
                         );
                         return res.status(400).json({
-                            error: "Payment reference does not match this invoice",
+                            error: 'Payment reference does not match this invoice',
                         });
                     }
 
@@ -226,7 +227,7 @@ export const confirmPayment = async (
                     );
                 }
             } catch (err) {
-                console.error("[Payment] Error retrieving Stripe intent:", err);
+                console.error('[Payment] Error retrieving Stripe intent:', err);
             }
         } else if (paypalOrderId) {
             // SERVER-SIDE PAYPAL VERIFICATION
@@ -239,13 +240,13 @@ export const confirmPayment = async (
                     {
                         headers: {
                             Authorization: `Bearer ${accessToken}`,
-                            "Content-Type": "application/json",
+                            'Content-Type': 'application/json',
                         },
                     },
                 );
 
                 const order: any = await orderRes.json();
-                if (order.status === "COMPLETED") {
+                if (order.status === 'COMPLETED') {
                     // SECURITY: Verify PayPal paid amount matches invoice amount
                     const purchaseUnit = order.purchase_units?.[0];
                     const paidAmount = purchaseUnit?.amount?.value
@@ -258,14 +259,14 @@ export const confirmPayment = async (
                                 `Paid ${paidAmount} but expected ${invoice.totalAmount}`,
                         );
                         return res.status(400).json({
-                            error: "Payment amount does not match invoice amount",
+                            error: 'Payment amount does not match invoice amount',
                         });
                     }
 
                     // SECURITY: Verify the PayPal order was for THIS invoice
                     // Must strictly match, do not allow bypass if reference_id is missing
                     const referenceIdStr = String(
-                        purchaseUnit?.reference_id || "",
+                        purchaseUnit?.reference_id || '',
                     );
                     const reqInvoiceStr = String(invoiceNumber);
 
@@ -275,7 +276,7 @@ export const confirmPayment = async (
                                 `reference_id is '${referenceIdStr}' but expected '${reqInvoiceStr}'`,
                         );
                         return res.status(400).json({
-                            error: "Payment reference does not match this invoice",
+                            error: 'Payment reference does not match this invoice',
                         });
                     }
 
@@ -286,13 +287,13 @@ export const confirmPayment = async (
                     );
                 }
             } catch (err) {
-                console.error("[Payment] Error verifying PayPal order:", err);
+                console.error('[Payment] Error verifying PayPal order:', err);
             }
         }
 
         // 3. Update the database status
         if (verified) {
-            invoice.paymentStatus = "paid";
+            invoice.paymentStatus = 'paid';
             // Store gateway reference for audit trail
             invoice.paymentToken = paymentIntentId || paypalOrderId;
             await invoice.save();
@@ -313,8 +314,8 @@ export const confirmPayment = async (
                         `Paid via Invoice #${invoiceNumber}` +
                         (paymentIntentId
                             ? ` | Stripe: ${paymentIntentId}`
-                            : "") +
-                        (paypalOrderId ? ` | PayPal: ${paypalOrderId}` : "");
+                            : '') +
+                        (paypalOrderId ? ` | PayPal: ${paypalOrderId}` : '');
 
                     const updatedEarning = await EarningModel.findOneAndUpdate(
                         {
@@ -324,7 +325,7 @@ export const confirmPayment = async (
                         },
                         {
                             $set: {
-                                status: "paid",
+                                status: 'paid',
                                 paidAt: new Date(),
                                 notes: statusNotes,
                                 conversionRate: conversionRate,
@@ -354,10 +355,10 @@ export const confirmPayment = async (
                             conversionRate: conversionRate,
                             netAmount: invoice.totalAmount,
                             amountInBDT: amountInBDT,
-                            status: "paid",
+                            status: 'paid',
                             paidAt: new Date(),
                             notes:
-                                statusNotes + " (Auto-generated from Payment)",
+                                statusNotes + ' (Auto-generated from Payment)',
                             isLegacy: false,
                             createdBy: client.createdBy,
                         });
@@ -369,7 +370,7 @@ export const confirmPayment = async (
                     }
                 } catch (err) {
                     console.error(
-                        "[Payment] Error updating Earning record:",
+                        '[Payment] Error updating Earning record:',
                         err,
                     );
                 }
@@ -380,12 +381,12 @@ export const confirmPayment = async (
                 try {
                     const amountInBDT = invoice.totalAmount * 120; // Fallback estimate
                     const paymentGateway = paymentIntentId
-                        ? "Stripe"
+                        ? 'Stripe'
                         : paypalOrderId
-                          ? "PayPal"
-                          : "Other";
+                          ? 'PayPal'
+                          : 'Other';
                     const referenceId =
-                        paymentIntentId || paypalOrderId || "WB-PAY-SUCCESS";
+                        paymentIntentId || paypalOrderId || 'WB-PAY-SUCCESS';
 
                     let earning = null;
                     if (invoice.month && invoice.year) {
@@ -417,13 +418,14 @@ export const confirmPayment = async (
 
                     await sendMail({
                         to: client.email,
-                        subject: `Receipt for Invoice #${invoice.invoiceNumber} - Web Briks LLC`,
+                        subject: `Receipt for Invoice #${invoice.invoiceNumber} - Web Briks`,
                         body: emailHtml,
+                        fromName: 'Payment - Web Briks',
                     });
                     console.log(`[Payment] Receipt emailed to ${client.email}`);
                 } catch (emailErr) {
                     console.error(
-                        "[Payment] Failed to send receipt email:",
+                        '[Payment] Failed to send receipt email:',
                         emailErr,
                     );
                 }
@@ -448,20 +450,13 @@ export const confirmPayment = async (
                 const adminEmail = process.env.SMTP_USER;
 
                 if (adminEmail) {
-                    const adminEmailHtml = `
-                        <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
-                            <h2>Payment Received</h2>
-                            <p>Client <strong>${invoice.clientName}</strong> has successfully paid <strong>${invoice.totalAmount} ${invoice.currency}</strong> for Invoice #${invoice.invoiceNumber}.</p>
-                            <p>This earning is now marked as "Paid" but unconverted. Please log in to the admin dashboard, navigate to the Earnings section, and use the "Convert" action to apply the correct BDT exchange rate.</p>
-                            <br/>
-                            <a href="${process.env.CLIENT_URL || "http://localhost:3000"}/earnings" style="display:inline-block; padding: 10px 20px; background-color: #007bff; color: #fff; text-decoration: none; border-radius: 5px;">Go to Earnings</a>
-                        </div>
-                    `;
-
-                    await sendMail({
+                    await emailService.sendAdminPaymentEmail({
                         to: adminEmail,
-                        subject: `Action Required: Payment Received from ${invoice.clientName}`,
-                        body: adminEmailHtml,
+                        clientName: invoice.clientName,
+                        invoiceNumber: invoice.invoiceNumber,
+                        amount: invoice.totalAmount,
+                        currency: invoice.currency,
+                        earningsUrl: `${process.env.CLIENT_URL || 'http://localhost:3000'}/earnings`,
                     });
                     console.log(
                         `[Payment] Admin notification email sent to ${adminEmail}.`,
@@ -469,24 +464,24 @@ export const confirmPayment = async (
                 }
             } catch (adminNotifyErr) {
                 console.error(
-                    "[Payment] Failed to notify admins:",
+                    '[Payment] Failed to notify admins:',
                     adminNotifyErr,
                 );
             }
 
             return res.status(200).json({
                 success: true,
-                message: "Payment confirmed and records updated",
+                message: 'Payment confirmed and records updated',
             });
         } else {
             return res.status(400).json({
-                error: "Payment verification failed",
+                error: 'Payment verification failed',
             });
         }
     } catch (error: any) {
-        console.error("Payment Confirmation Error:", error);
+        console.error('Payment Confirmation Error:', error);
         res.status(500).json({
-            error: error.message || "Failed to confirm payment",
+            error: error.message || 'Failed to confirm payment',
         });
     }
 };

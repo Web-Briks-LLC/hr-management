@@ -1,15 +1,25 @@
-import nodemailer from "nodemailer";
-import { render } from "@react-email/render";
-import { OrderExportEmail } from "../templates/OrderExportEmail.js";
-import * as React from "react";
+import nodemailer from 'nodemailer';
+import { render } from '@react-email/render';
+import { OrderExportEmail } from '../templates/OrderExportEmail.js';
+import { VerificationEmail } from '../templates/VerificationEmail.js';
+import { ResetPasswordEmail } from '../templates/ResetPasswordEmail.js';
+import { InvitationEmail } from '../templates/InvitationEmail.js';
+import { ApplicationStatusEmail } from '../templates/ApplicationStatusEmail.js';
+import { OrderStatusUpdateEmail } from '../templates/OrderStatusUpdateEmail.js';
+import { AdminPaymentEmail } from '../templates/AdminPaymentEmail.js';
+import * as React from 'react';
+import envConfig from '../config/env.config.js';
 
 const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT || "465"),
-    secure: process.env.SMTP_SECURE === "true",
+    host: envConfig.smtp_host,
+    port: envConfig.smtp_port,
+    secure: envConfig.smtp_secure === 'true',
     auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
+        user: envConfig.smtp_user,
+        pass: envConfig.smtp_pass,
+    },
+    tls: {
+        rejectUnauthorized: false,
     },
 });
 
@@ -38,9 +48,9 @@ const sendInvoiceEmail = async (data: SendInvoiceData) => {
         );
 
         const mailOptions = {
-            from: `"Web Briks" <${process.env.SMTP_USER}>`,
+            from: 'Invoice | WebBriks',
             to: data.to,
-            subject: `Invoice for ${data.month} ${data.year} - Web Briks`,
+            subject: `Invoice for ${data.month} ${data.year} - WebBriks`,
             html: emailHtml,
             attachments: [
                 {
@@ -54,7 +64,7 @@ const sendInvoiceEmail = async (data: SendInvoiceData) => {
         const info = await transporter.sendMail(mailOptions);
         return info;
     } catch (error) {
-        console.error("Error sending invoice email:", error);
+        console.error('Error sending invoice email:', error);
         throw error;
     }
 };
@@ -67,7 +77,7 @@ interface SendPinResetData {
 
 const sendPinResetEmail = async (data: SendPinResetData) => {
     try {
-        const { PinResetEmail } = await import("../templates/PinResetEmail.js");
+        const { PinResetEmail } = await import('../templates/PinResetEmail.js');
         const emailHtml = await render(
             React.createElement(PinResetEmail, {
                 staffName: data.staffName,
@@ -76,16 +86,16 @@ const sendPinResetEmail = async (data: SendPinResetData) => {
         );
 
         const mailOptions = {
-            from: `"Web Briks" <${process.env.SMTP_USER}>`,
+            from: 'HR Management | WebBriks',
             to: data.to,
-            subject: "Reset your Salary PIN - Web Briks",
+            subject: 'Reset your Salary PIN - WebBriks',
             html: emailHtml,
         };
 
         const info = await transporter.sendMail(mailOptions);
         return info;
     } catch (error) {
-        console.error("Error sending PIN reset email:", error);
+        console.error('Error sending PIN reset email:', error);
         throw error;
     }
 };
@@ -100,25 +110,17 @@ interface SendOrderStatusData {
 
 const sendOrderStatusEmail = async (data: SendOrderStatusData) => {
     try {
-        // Because of dynamically created format on frontend, we send it straight:
-        // We pad it inside a basic layout to look nice.
-        const emailHtml = `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-                <h2 style="color: #333;">Order Status Update</h2>
-                <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0;">
-                    <p><strong>Order:</strong> ${data.orderName}</p>
-                    <p><strong>New Status:</strong> <span style="text-transform: uppercase;">${data.status}</span></p>
-                </div>
-                <div style="white-space: pre-wrap; margin-bottom: 30px; font-size: 16px; color: #444;">
-${data.message.replace(/\n/g, "<br/>")}
-                </div>
-                <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
-                <p style="color: #888; font-size: 12px; text-align: center;">This is an automated message from Web Briks LLC.</p>
-            </div>
-        `;
+        const emailHtml = await render(
+            React.createElement(OrderStatusUpdateEmail, {
+                clientName: data.clientName,
+                orderName: data.orderName,
+                status: data.status,
+                message: data.message,
+            }),
+        );
 
         const mailOptions = {
-            from: `"Web Briks" <${process.env.SMTP_USER}>`,
+            from: 'HR Management | WebBriks',
             to: data.to,
             subject: `Order Update: ${data.orderName} (${data.status})`,
             html: emailHtml,
@@ -127,7 +129,173 @@ ${data.message.replace(/\n/g, "<br/>")}
         const info = await transporter.sendMail(mailOptions);
         return info;
     } catch (error) {
-        console.error("Error sending order status email:", error);
+        console.error('Error sending order status email:', error);
+        throw error;
+    }
+};
+
+interface SendVerificationData {
+    to: string;
+    userName: string;
+    verificationUrl: string;
+}
+
+const sendVerificationEmail = async (data: SendVerificationData) => {
+    try {
+        const emailHtml = await render(
+            React.createElement(VerificationEmail, {
+                userName: data.userName,
+                verificationUrl: data.verificationUrl,
+            }),
+        );
+
+        const mailOptions = {
+            from: 'HR Management | WebBriks',
+            to: data.to,
+            subject: 'Verify Your Email - WebBriks',
+            html: emailHtml,
+        };
+
+        const info = await transporter.sendMail(mailOptions);
+        return info;
+    } catch (error) {
+        console.error('Error sending verification email:', error);
+        throw error;
+    }
+};
+
+interface SendResetPasswordData {
+    to: string;
+    userName: string;
+    resetPasswordUrl: string;
+}
+
+const sendResetPasswordEmail = async (data: SendResetPasswordData) => {
+    try {
+        const emailHtml = await render(
+            React.createElement(ResetPasswordEmail, {
+                userName: data.userName,
+                resetPasswordUrl: data.resetPasswordUrl,
+            }),
+        );
+
+        const mailOptions = {
+            from: 'HR Management | WebBriks',
+            to: data.to,
+            subject: 'Reset Your Password - WebBriks',
+            html: emailHtml,
+        };
+
+        const info = await transporter.sendMail(mailOptions);
+        return info;
+    } catch (error) {
+        console.error('Error sending reset password email:', error);
+        throw error;
+    }
+};
+
+interface SendInvitationData {
+    to: string;
+    designation: string;
+    department: string;
+    salary: number;
+    signupUrl: string;
+    isReminder?: boolean;
+}
+
+const sendInvitationEmail = async (data: SendInvitationData) => {
+    try {
+        const emailHtml = await render(
+            React.createElement(InvitationEmail, {
+                designation: data.designation,
+                department: data.department,
+                salary: data.salary,
+                signupUrl: data.signupUrl,
+                isReminder: data.isReminder || false,
+            }),
+        );
+
+        const mailOptions = {
+            from: 'HR Management | WebBriks',
+            to: data.to,
+            subject: data.isReminder
+                ? 'Reminder: Complete Your Registration - WebBriks'
+                : "You're Invited to Join Our Team - WebBriks",
+            html: emailHtml,
+        };
+
+        const info = await transporter.sendMail(mailOptions);
+        return info;
+    } catch (error) {
+        console.error('Error sending invitation email:', error);
+        throw error;
+    }
+};
+
+interface SendApplicationStatusData {
+    to: string;
+    applicantName: string;
+    positionTitle: string;
+    status: any;
+}
+
+const sendApplicationStatusEmail = async (data: SendApplicationStatusData) => {
+    try {
+        const emailHtml = await render(
+            React.createElement(ApplicationStatusEmail, {
+                applicantName: data.applicantName,
+                positionTitle: data.positionTitle,
+                status: data.status,
+            }),
+        );
+
+        const mailOptions = {
+            from: 'HR Management | WebBriks',
+            to: data.to,
+            subject: 'Application Update - WebBriks',
+            html: emailHtml,
+        };
+
+        const info = await transporter.sendMail(mailOptions);
+        return info;
+    } catch (error) {
+        console.error('Error sending application status email:', error);
+        throw error;
+    }
+};
+
+interface SendAdminPaymentData {
+    to: string;
+    clientName: string;
+    invoiceNumber: string;
+    amount: number;
+    currency: string;
+    earningsUrl: string;
+}
+
+const sendAdminPaymentEmail = async (data: SendAdminPaymentData) => {
+    try {
+        const emailHtml = await render(
+            React.createElement(AdminPaymentEmail, {
+                clientName: data.clientName,
+                invoiceNumber: data.invoiceNumber,
+                amount: data.amount,
+                currency: data.currency,
+                earningsUrl: data.earningsUrl,
+            }),
+        );
+
+        const mailOptions = {
+            from: 'Payment - HR Management | WebBriks',
+            to: data.to,
+            subject: `Payment Received from ${data.clientName}`,
+            html: emailHtml,
+        };
+
+        const info = await transporter.sendMail(mailOptions);
+        return info;
+    } catch (error) {
+        console.error('Error sending admin payment notification:', error);
         throw error;
     }
 };
@@ -136,4 +304,9 @@ export default {
     sendInvoiceEmail,
     sendPinResetEmail,
     sendOrderStatusEmail,
+    sendVerificationEmail,
+    sendResetPasswordEmail,
+    sendInvitationEmail,
+    sendApplicationStatusEmail,
+    sendAdminPaymentEmail,
 };

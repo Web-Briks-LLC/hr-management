@@ -1,28 +1,28 @@
-import crypto from "crypto";
-import { Types } from "mongoose";
-import InvitationModel from "../models/invitation.model.js";
-import StaffModel from "../models/staff.model.js";
-import { sendMail } from "../lib/nodemailer.js";
-import envConfig from "../config/env.config.js";
+import crypto from 'crypto';
+import { Types } from 'mongoose';
+import InvitationModel from '../models/invitation.model.js';
+import StaffModel from '../models/staff.model.js';
+import emailService from './email.service.js';
+import envConfig from '../config/env.config.js';
 import type {
     IInvitationCreate,
     IAcceptInvitation,
-} from "../types/invitation.type.js";
+} from '../types/invitation.type.js';
 
 const createInvitation = async (data: IInvitationCreate) => {
     const { expiryHours = 48, currentUserRole } = data;
 
     // Permission check: only super_admin can invite super_admin
-    if (data.role === "super_admin" && currentUserRole !== "super_admin") {
-        throw new Error("Only Super Admins can invite other Super Admins");
+    if (data.role === 'super_admin' && currentUserRole !== 'super_admin') {
+        throw new Error('Only Super Admins can invite other Super Admins');
     }
 
     // Permission check: only super_admin or admin can invite admin roles
     if (
-        ["admin", "hr_manager"].includes(data.role) &&
-        !["super_admin", "admin"].includes(currentUserRole)
+        ['admin', 'hr_manager'].includes(data.role) &&
+        !['super_admin', 'admin'].includes(currentUserRole)
     ) {
-        throw new Error("Only Admins can invite Admin roles");
+        throw new Error('Only Admins can invite Admin roles');
     }
 
     // Check if email already has pending invitation
@@ -33,23 +33,23 @@ const createInvitation = async (data: IInvitationCreate) => {
     });
 
     if (existingInvitation) {
-        throw new Error("An active invitation already exists for this email");
+        throw new Error('An active invitation already exists for this email');
     }
 
     // Check if user already exists
-    const db = (await import("../lib/db.js")).client;
+    const db = (await import('../lib/db.js')).client;
     const mongoClient = await db();
     const database = mongoClient.db(envConfig.db_name);
     const existingUser = await database
-        .collection("user")
+        .collection('user')
         .findOne({ email: data.email });
 
     if (existingUser) {
-        throw new Error("User with this email already exists");
+        throw new Error('User with this email already exists');
     }
 
     // Generate unique token
-    const token = crypto.randomBytes(32).toString("hex");
+    const token = crypto.randomBytes(32).toString('hex');
 
     // Set expiry
     const expiresAt = new Date();
@@ -71,41 +71,12 @@ const createInvitation = async (data: IInvitationCreate) => {
 
     // Send email
     const signupUrl = `${envConfig.client_url}/sign-up/${token}`;
-    await sendMail({
+    await emailService.sendInvitationEmail({
         to: data.email,
-        subject: "You're Invited to Join Our Team",
-        body: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                <h1 style="color: #333;">Welcome to Our Team!</h1>
-                <p>You've been invited to join our organization as a <strong>${
-                    data.designation
-                }</strong>.</p>
-                
-                <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0;">
-                    <h3 style="margin-top: 0;">Position Details:</h3>
-                    <ul style="list-style: none; padding: 0;">
-                        <li><strong>Role:</strong> ${
-                            data.role === "staff" ? "Staff" : "Team Leader"
-                        }</li>
-                        <li><strong>Department:</strong> ${
-                            data.department || "N/A"
-                        }</li>
-                        <li><strong>Designation:</strong> ${
-                            data.designation
-                        }</li>
-                        <li><strong>Salary:</strong> ৳${data.salary.toLocaleString()}</li>
-                    </ul>
-                </div>
-                
-                <p>Click the button below to complete your registration:</p>
-                <div style="text-align: center; margin: 30px 0;">
-                    <a href="${signupUrl}" style="background: #4F46E5; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; display: inline-block;">Complete Registration</a>
-                </div>
-                
-                <p style="color: #666; font-size: 14px;">This link will expire in ${expiryHours} hours.</p>
-                <p style="color: #666; font-size: 14px;">If you didn't expect this invitation, please ignore this email.</p>
-            </div>
-        `,
+        designation: data.designation,
+        department: data.department || '',
+        salary: data.salary,
+        signupUrl,
     });
 
     return invitation;
@@ -113,19 +84,19 @@ const createInvitation = async (data: IInvitationCreate) => {
 
 const validateToken = async (token: string) => {
     const invitation = await InvitationModel.findOne({ token })
-        .populate("branchId")
-        .populate("shiftId");
+        .populate('branchId')
+        .populate('shiftId');
 
     if (!invitation) {
-        throw new Error("Invalid invitation token");
+        throw new Error('Invalid invitation token');
     }
 
     if (invitation.isUsed) {
-        throw new Error("This invitation has already been used");
+        throw new Error('This invitation has already been used');
     }
 
     if (invitation.expiresAt < new Date()) {
-        throw new Error("This invitation has expired");
+        throw new Error('This invitation has expired');
     }
 
     return invitation;
@@ -133,18 +104,18 @@ const validateToken = async (token: string) => {
 
 const generateStaffId = async (): Promise<string> => {
     const allStaff = await StaffModel.find({ staffId: /^EMP/ })
-        .select("staffId")
+        .select('staffId')
         .lean();
 
     let maxNum = 0;
     for (const s of allStaff) {
-        const num = parseInt(s.staffId.replace("EMP", ""), 10);
+        const num = parseInt(s.staffId.replace('EMP', ''), 10);
         if (!isNaN(num) && num > maxNum) {
             maxNum = num;
         }
     }
 
-    return `EMP${String(maxNum + 1).padStart(4, "0")}`;
+    return `EMP${String(maxNum + 1).padStart(4, '0')}`;
 };
 
 const acceptInvitation = async (data: IAcceptInvitation) => {
@@ -154,8 +125,8 @@ const acceptInvitation = async (data: IAcceptInvitation) => {
     const invitation = await validateToken(token);
 
     // Create user account using Better Auth
-    const { auth } = await import("../lib/auth.js");
-    const db = (await import("../lib/db.js")).client;
+    const { auth } = await import('../lib/auth.js');
+    const db = (await import('../lib/db.js')).client;
     const mongoClient = await db();
     const database = mongoClient.db(envConfig.db_name);
 
@@ -167,22 +138,22 @@ const acceptInvitation = async (data: IAcceptInvitation) => {
                 email: invitation.email,
                 password: userData.password,
                 name: userData.name,
-                role: invitation.role || "staff",
+                role: invitation.role || 'staff',
             },
         });
 
         if (!newUser || !newUser.user) {
-            throw new Error("Failed to create user account");
+            throw new Error('Failed to create user account');
         }
 
         userId = newUser.user.id;
 
         // Set theme to system
-        await database.collection("user").updateOne(
+        await database.collection('user').updateOne(
             { _id: new Types.ObjectId(userId) },
             {
                 $set: {
-                    theme: "system",
+                    theme: 'system',
                 },
             },
         );
@@ -207,7 +178,7 @@ const acceptInvitation = async (data: IAcceptInvitation) => {
                     department: invitation.department,
                     designation: invitation.designation,
                     joinDate: new Date(),
-                    status: "active" as const,
+                    status: 'active' as const,
                     salary: invitation.salary,
                     salaryVisibleToEmployee: true,
                     profileCompleted: true,
@@ -246,7 +217,7 @@ const acceptInvitation = async (data: IAcceptInvitation) => {
 
         if (!staff) {
             throw new Error(
-                "Failed to create staff profile after multiple attempts",
+                'Failed to create staff profile after multiple attempts',
             );
         }
 
@@ -254,6 +225,23 @@ const acceptInvitation = async (data: IAcceptInvitation) => {
         invitation.isUsed = true;
         invitation.usedAt = new Date();
         await invitation.save();
+
+        // Send Email Verification (Manual trigger after successful profile creation)
+        try {
+            await auth.api.sendVerificationEmail({
+                body: {
+                    email: invitation.email,
+                },
+            });
+            console.log(
+                `[Invitation] Verification email triggered for: ${invitation.email}`,
+            );
+        } catch (verifyError) {
+            console.error(
+                `[Invitation] Failed to trigger verification email:`,
+                verifyError,
+            );
+        }
 
         return {
             user: { _id: userId, email: invitation.email, name: userData.name },
@@ -263,11 +251,11 @@ const acceptInvitation = async (data: IAcceptInvitation) => {
         // Rollback: clean up all records created by Better Auth + staff
         if (userId) {
             const userOid = new Types.ObjectId(userId);
-            await database.collection("user").deleteOne({ _id: userOid });
-            await database.collection("account").deleteMany({ userId });
-            await database.collection("session").deleteMany({ userId });
+            await database.collection('user').deleteOne({ _id: userOid });
+            await database.collection('account').deleteMany({ userId });
+            await database.collection('session').deleteMany({ userId });
             await database
-                .collection("verification")
+                .collection('verification')
                 .deleteMany({ identifier: invitation.email });
         }
         throw error;
@@ -285,12 +273,12 @@ const getInvitations = async (filters?: {
     }
 
     if (filters?.email) {
-        query.email = new RegExp(filters.email, "i");
+        query.email = new RegExp(filters.email, 'i');
     }
 
     return await InvitationModel.find(query)
-        .populate("branchId", "name")
-        .populate("shiftId", "name")
+        .populate('branchId', 'name')
+        .populate('shiftId', 'name')
         .sort({ createdAt: -1 });
 };
 
@@ -298,11 +286,11 @@ const resendInvitation = async (invitationId: string) => {
     const invitation = await InvitationModel.findById(invitationId);
 
     if (!invitation) {
-        throw new Error("Invitation not found");
+        throw new Error('Invitation not found');
     }
 
     if (invitation.isUsed) {
-        throw new Error("Cannot resend used invitation");
+        throw new Error('Cannot resend used invitation');
     }
 
     // Extend expiry by 48 hours
@@ -311,21 +299,13 @@ const resendInvitation = async (invitationId: string) => {
 
     // Resend email
     const signupUrl = `${envConfig.client_url}/sign-up/${invitation.token}`;
-    await sendMail({
+    await emailService.sendInvitationEmail({
         to: invitation.email,
-        subject: "Reminder: Complete Your Registration",
-        body: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                <h1 style="color: #333;">Reminder: Join Our Team</h1>
-                <p>This is a reminder to complete your registration as <strong>${invitation.designation}</strong>.</p>
-                
-                <div style="text-align: center; margin: 30px 0;">
-                    <a href="${signupUrl}" style="background: #4F46E5; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; display: inline-block;">Complete Registration</a>
-                </div>
-                
-                <p style="color: #666; font-size: 14px;">This link will expire in 48 hours.</p>
-            </div>
-        `,
+        designation: invitation.designation,
+        department: invitation.department || '',
+        salary: invitation.salary,
+        signupUrl,
+        isReminder: true,
     });
 
     return invitation;
@@ -335,16 +315,16 @@ const cancelInvitation = async (invitationId: string) => {
     const invitation = await InvitationModel.findById(invitationId);
 
     if (!invitation) {
-        throw new Error("Invitation not found");
+        throw new Error('Invitation not found');
     }
 
     if (invitation.isUsed) {
-        throw new Error("Cannot cancel used invitation");
+        throw new Error('Cannot cancel used invitation');
     }
 
     await InvitationModel.deleteOne({ _id: invitationId });
 
-    return { message: "Invitation cancelled successfully" };
+    return { message: 'Invitation cancelled successfully' };
 };
 
 const createBulkInvitations = async (invitations: IInvitationCreate[]) => {
