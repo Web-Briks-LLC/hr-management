@@ -402,9 +402,15 @@ async function updateOrderStatus(req: Request, res: Response) {
         if (sendEmail && customEmailMessage) {
             try {
                 const client = order.clientId as any;
-                if (client?.email) {
+                if (client?.emails?.length > 0) {
+                    const recipientEmail =
+                        typeof req.body.selectedEmail === 'string' &&
+                        req.body.selectedEmail.trim() !== ''
+                            ? req.body.selectedEmail
+                            : client.emails[0];
+
                     await emailService.sendOrderStatusEmail({
-                        to: client.email,
+                        to: recipientEmail,
                         clientName: client.name || '',
                         orderName: (order as any).orderName || '',
                         status,

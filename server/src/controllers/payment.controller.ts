@@ -377,7 +377,7 @@ export const confirmPayment = async (
             }
 
             // 5. Send Payment Receipt Email via React Email to the Client
-            if (client && client.email) {
+            if (client && client.emails?.length > 0) {
                 try {
                     const amountInBDT = invoice.totalAmount * 120; // Fallback estimate
                     const paymentGateway = paymentIntentId
@@ -400,7 +400,7 @@ export const confirmPayment = async (
                     const finalAmountBDT = earning?.amountInBDT || amountInBDT;
 
                     console.log(
-                        `[Payment] Rendering Receipt Email for ${client.email}`,
+                        `[Payment] Rendering Receipt Email for ${client.emails[0]}`,
                     );
 
                     const emailHtml = await render(
@@ -417,12 +417,14 @@ export const confirmPayment = async (
                     );
 
                     await sendMail({
-                        to: client.email,
+                        to: client.emails[0] as string,
                         subject: `Receipt for Invoice #${invoice.invoiceNumber} - Web Briks`,
                         body: emailHtml,
                         fromName: 'Payment - Web Briks',
                     });
-                    console.log(`[Payment] Receipt emailed to ${client.email}`);
+                    console.log(
+                        `[Payment] Receipt emailed to ${client.emails[0]}`,
+                    );
                 } catch (emailErr) {
                     console.error(
                         '[Payment] Failed to send receipt email:',

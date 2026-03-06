@@ -149,7 +149,7 @@ export default function InvoicePage() {
                 currency?: string;
                 address?: string;
                 officeAddress?: string;
-                email?: string;
+                emails: string[];
             }
         >();
         allOrders.forEach((order: IOrder) => {
@@ -161,7 +161,7 @@ export default function InvoicePage() {
                     currency: order.clientId.currency,
                     address: order.clientId.address,
                     officeAddress: order.clientId.officeAddress,
-                    email: order.clientId.email,
+                    emails: order.clientId.emails,
                 });
             }
         });
@@ -288,7 +288,7 @@ export default function InvoicePage() {
         if (selectedOrders.size === 0 || !selectedClient) return;
 
         // Check email first
-        const clientEmail = selectedClient.email;
+        const clientEmail = selectedClient.emails?.[0];
         if (!clientEmail) {
             toast.error("Client email is missing.");
             return;

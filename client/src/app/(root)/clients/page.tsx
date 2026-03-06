@@ -203,7 +203,7 @@ export default function ClientsPage() {
         setEditDefaultValues({
             clientId: client.clientId,
             name: client.name,
-            email: client.email,
+            emails: client.emails,
             phone: client.phone || "",
             address: client.address || "",
             officeAddress: client.officeAddress || "",
@@ -342,7 +342,7 @@ export default function ClientsPage() {
                                 handleFilterChange("status", value)
                             }
                         >
-                            <SelectTrigger>
+                            <SelectTrigger className="w-full">
                                 <SelectValue placeholder="All statuses" />
                             </SelectTrigger>
                             <SelectContent>
@@ -362,7 +362,7 @@ export default function ClientsPage() {
                                 handleFilterChange("limit", parseInt(value))
                             }
                         >
-                            <SelectTrigger>
+                            <SelectTrigger className="w-full">
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -498,7 +498,16 @@ export default function ClientsPage() {
                                                         {client.name}
                                                     </TableCell>
                                                     <TableCell className="border-r">
-                                                        {client.email}
+                                                        <div className="flex items-center gap-1">
+                                                            <span className="truncate max-w-[150px]">
+                                                                {client.emails?.[0] || "-"}
+                                                            </span>
+                                                            {client.emails && client.emails.length > 1 && (
+                                                                <span className="shrink-0 px-1.5 py-0.5 rounded-sm bg-teal-50 text-teal-600 text-[10px] font-bold">
+                                                                    +{client.emails.length - 1}
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                     </TableCell>
                                                     <TableCell className="border-r">
                                                         {client.phone || "-"}
@@ -648,7 +657,7 @@ export default function ClientsPage() {
                 open={isEditDialogOpen}
                 onOpenChange={handleEditDialogChange}
             >
-                <DialogContent className="max-w-md ">
+                <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle>Edit Client</DialogTitle>
                         <DialogDescription>

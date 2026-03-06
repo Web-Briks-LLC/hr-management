@@ -1,4 +1,5 @@
 "use client";
+import * as React from "react";
 
 import {
     Document,
@@ -15,14 +16,21 @@ import {
 } from "@react-pdf/renderer";
 import type { IOrder } from "@/types/order.type";
 import type { Client } from "@/types/client.type";
+import { Mail, Download } from "lucide-react";
+import { toast } from "sonner";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 import {
     useSendInvoiceEmailMutation,
     useRecordInvoiceMutation,
 } from "@/redux/features/invoice/invoiceApi";
 import { format } from "date-fns";
-import { toast } from "sonner";
 import { Button } from "../ui/button";
-import { Download, Mail } from "lucide-react";
 
 // Register fonts if needed (optional)
 Font.register({
@@ -456,8 +464,8 @@ export const InvoiceDocument = ({
                                     ? client.address
                                     : client.officeAddress &&
                                         client.officeAddress !== "N/A"
-                                      ? client.officeAddress
-                                      : "Address not provided"}
+                                        ? client.officeAddress
+                                        : "Address not provided"}
                             </Text>
                         </View>
                     </View>
@@ -542,17 +550,20 @@ export default function InvoicePDF(props: InvoicePDFProps) {
     const [sendInvoiceEmail, { isLoading: isSending }] =
         useSendInvoiceEmailMutation();
     const [recordInvoice] = useRecordInvoiceMutation();
+    const [selectedEmail, setSelectedEmail] = React.useState<string>(
+        (props.client.emails && props.client.emails[0]) || ""
+    );
 
     const handleSendEmail = async () => {
-        if (!props.client.email && !props.client.officeAddress) {
+        if ((!props.client.emails || props.client.emails.length === 0) && !props.client.officeAddress) {
             toast.error("Client email not found");
             return;
         }
 
-        // Use provided email or fallback to a placeholder/display error if crucial
-        const clientEmail = props.client.email || "";
+        // Use selected email
+        const clientEmail = selectedEmail;
         if (!clientEmail) {
-            toast.error("Client email is missing.");
+            toast.error("Client email is missing or not selected.");
             return;
         }
 
@@ -608,7 +619,24 @@ export default function InvoicePDF(props: InvoicePDFProps) {
 
     return (
         <div className="flex flex-col gap-4">
-            <div className="flex justify-end gap-2">
+            <div className="flex justify-end items-center gap-2">
+                {props.client.emails && props.client.emails.length > 1 && (
+                    <Select
+                        value={selectedEmail}
+                        onValueChange={setSelectedEmail}
+                    >
+                        <SelectTrigger className="w-[200px] h-9">
+                            <SelectValue placeholder="Select email..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {props.client.emails.map((email) => (
+                                <SelectItem key={email} value={email}>
+                                    {email}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                )}
                 <Button
                     className="bg-orange-500 hover:bg-orange-600"
                     disabled={isSending}

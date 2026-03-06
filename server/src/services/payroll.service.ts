@@ -1,18 +1,18 @@
-import { eachDayOfInterval } from "date-fns";
-import StaffModel from "../models/staff.model.js";
-import AttendanceDayModel from "../models/attendance-day.model.js";
-import ShiftAssignmentModel from "../models/shift-assignment.model.js";
-import ExpenseModel from "../models/expense.model.js";
-import ExpenseCategoryModel from "../models/expense-category.model.js";
-import OvertimeModel from "../models/overtime.model.js";
-import { PayrollLockModel } from "../models/payroll-lock.model.js";
-import mongoose, { Types } from "mongoose";
+import { eachDayOfInterval } from 'date-fns';
+import StaffModel from '../models/staff.model.js';
+import AttendanceDayModel from '../models/attendance-day.model.js';
+import ShiftAssignmentModel from '../models/shift-assignment.model.js';
+import ExpenseModel from '../models/expense.model.js';
+import ExpenseCategoryModel from '../models/expense-category.model.js';
+import OvertimeModel from '../models/overtime.model.js';
+import { PayrollLockModel } from '../models/payroll-lock.model.js';
+import mongoose, { Types } from 'mongoose';
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
 /** Parse "YYYY-MM" into UTC start/end of month */
 function parseMonthRange(month: string) {
-    const [yearStr, monthStr] = month.split("-");
+    const [yearStr, monthStr] = month.split('-');
     const year = parseInt(yearStr!, 10);
     const monthNum = parseInt(monthStr!, 10);
     const startDate = new Date(Date.UTC(year, monthNum - 1, 1, 0, 0, 0, 0));
@@ -22,9 +22,9 @@ function parseMonthRange(month: string) {
 
 /** Get human-readable month name from YYYY-MM */
 function getMonthName(year: number, monthNum: number): string {
-    return new Date(Date.UTC(year, monthNum - 1, 1)).toLocaleString("default", {
-        month: "long",
-        year: "numeric",
+    return new Date(Date.UTC(year, monthNum - 1, 1)).toLocaleString('default', {
+        month: 'long',
+        year: 'numeric',
     });
 }
 
@@ -41,8 +41,8 @@ const getPayrollPreview = async ({
 }: IPayrollPreviewParams) => {
     const { startDate, endDate } = parseMonthRange(month);
 
-    const matchStage: any = { status: "active" };
-    if (branchId && branchId !== "all") {
+    const matchStage: any = { status: 'active' };
+    if (branchId && branchId !== 'all') {
         matchStage.branchId = new Types.ObjectId(branchId);
     }
 
@@ -51,35 +51,35 @@ const getPayrollPreview = async ({
         { $match: matchStage },
         {
             $lookup: {
-                from: "user",
-                localField: "userId",
-                foreignField: "_id",
-                as: "user",
+                from: 'user',
+                localField: 'userId',
+                foreignField: '_id',
+                as: 'user',
             },
         },
-        { $unwind: { path: "$user", preserveNullAndEmptyArrays: true } },
+        { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
         {
             $lookup: {
-                from: "branches",
-                localField: "branchId",
-                foreignField: "_id",
-                as: "branch",
+                from: 'branches',
+                localField: 'branchId',
+                foreignField: '_id',
+                as: 'branch',
             },
         },
-        { $unwind: { path: "$branch", preserveNullAndEmptyArrays: true } },
+        { $unwind: { path: '$branch', preserveNullAndEmptyArrays: true } },
         {
             $project: {
                 _id: 1,
                 staffId: 1,
-                name: "$user.name",
-                email: "$user.email",
+                name: '$user.name',
+                email: '$user.email',
                 phone: 1,
                 designation: 1,
                 department: 1,
                 salary: 1,
                 joinDate: 1,
                 exitDate: 1,
-                branch: "$branch.name",
+                branch: '$branch.name',
                 branchId: 1,
                 bank: 1,
             },
@@ -98,7 +98,7 @@ const getPayrollPreview = async ({
         ShiftAssignmentModel.find({
             staffId: { $in: staffIds },
             isActive: true,
-        }).populate("shiftId"),
+        }).populate('shiftId'),
         AttendanceDayModel.find({
             staffId: { $in: staffIds },
             date: { $gte: startDate, $lte: endDate },
@@ -106,7 +106,7 @@ const getPayrollPreview = async ({
         OvertimeModel.find({
             staffId: { $in: staffIds },
             date: { $gte: startDate, $lte: endDate },
-            status: "approved",
+            status: 'approved',
         }),
         ExpenseCategoryModel.find({
             name: { $in: [/^Salary/i, /^Overtime/i] },
@@ -143,49 +143,18 @@ const getPayrollPreview = async ({
 
         let workDaysCount = 0;
         const shift: any = shiftAssignment?.shiftId;
+        const expectedWorkDates: Date[] = [];
 
         if (shift) {
             daysInMonth.forEach((day) => {
                 if (shift.workDays.includes(day.getDay())) {
                     workDaysCount++;
+                    expectedWorkDates.push(day);
                 }
             });
         } else {
             workDaysCount = 22;
         }
-
-        // B. Attendance breakdown
-        const staffAttendance = allAttendance.filter(
-            (a) => a.staffId.toString() === staff._id.toString(),
-        );
-
-        const presentDays = staffAttendance.filter((a) =>
-            ["present", "late", "half_day", "early_exit"].includes(a.status),
-        ).length;
-
-        const absentDays = staffAttendance.filter(
-            (a) => a.status === "absent",
-        ).length;
-
-        const leaveDays = staffAttendance.filter(
-            (a) => a.status === "on_leave",
-        ).length;
-
-        const holidays = staffAttendance.filter(
-            (a) => a.status === "holiday",
-        ).length;
-
-        const lateDays = staffAttendance.filter(
-            (a) => a.status === "late",
-        ).length;
-
-        // C. Salary calculation (fixed /30 policy)
-        const staffSalary = staff.salary || 0;
-        const perDaySalary = staffSalary / 30;
-
-        const halfDayDays = staffAttendance.filter(
-            (a) => a.status === "half_day",
-        ).length;
 
         // Calculate Unemployed Days (before joining or after exit)
         let unemployedDays = 0;
@@ -200,9 +169,68 @@ const getPayrollPreview = async ({
             }
         });
 
-        // Deduction formula: Absent days + Unemployed days + (Half Day days * 0.5)
-        const totalDeductionUnits =
-            absentDays + unemployedDays + halfDayDays * 0.5;
+        // B. Attendance breakdown
+        const staffAttendance = allAttendance.filter(
+            (a) => a.staffId.toString() === staff._id.toString(),
+        );
+
+        const presentDays = staffAttendance.filter((a) =>
+            ['present', 'late', 'half_day', 'early_exit'].includes(a.status),
+        ).length;
+
+        const literalAbsentDays = staffAttendance.filter(
+            (a) => a.status === 'absent',
+        ).length;
+
+        const leaveDays = staffAttendance.filter(
+            (a) => a.status === 'on_leave',
+        ).length;
+
+        const holidays = staffAttendance.filter(
+            (a) => a.status === 'holiday',
+        ).length;
+
+        const lateDays = staffAttendance.filter(
+            (a) => a.status === 'late',
+        ).length;
+
+        const halfDayDays = staffAttendance.filter(
+            (a) => a.status === 'half_day',
+        ).length;
+
+        // Calculate missing punches (dynamic absent days)
+        let missingPunches = 0;
+        const todayUTC = new Date(
+            Date.UTC(
+                new Date().getUTCFullYear(),
+                new Date().getUTCMonth(),
+                new Date().getUTCDate(),
+            ),
+        );
+
+        if (shift) {
+            missingPunches = expectedWorkDates.filter((day) => {
+                if (day > todayUTC) return false;
+
+                const isBeforeJoin = joinDate && day < joinDate;
+                const isAfterExit = exitDate && day > exitDate;
+                if (isBeforeJoin || isAfterExit) return false;
+
+                const hasRecord = staffAttendance.some(
+                    (a) => new Date(a.date).getTime() === day.getTime(),
+                );
+                return !hasRecord;
+            }).length;
+        }
+
+        const absentDays = literalAbsentDays + missingPunches;
+
+        // C. Salary calculation (fixed /30 policy)
+        const staffSalary = staff.salary || 0;
+        const perDaySalary = staffSalary / 30;
+
+        // Deduction formula: Absent days + Unemployed days
+        const totalDeductionUnits = absentDays + unemployedDays;
         const deduction = totalDeductionUnits * perDaySalary;
         const payableSalary = Math.max(0, staffSalary - deduction);
 
@@ -244,12 +272,12 @@ const getPayrollPreview = async ({
             unemployedDays,
             perDaySalary: Math.round(perDaySalary),
             payableSalary: Math.round(payableSalary),
-            status: salaryExpense ? "paid" : "pending",
+            status: salaryExpense ? 'paid' : 'pending',
             expenseId: salaryExpense?._id,
             paidAmount: salaryExpense?.amount,
             otMinutes,
             otPayable: Math.round(otPayable),
-            otStatus: otExpense ? "paid" : "pending",
+            otStatus: otExpense ? 'paid' : 'pending',
             otPaidAmount: otExpense?.amount || 0,
         };
     });
@@ -273,7 +301,7 @@ interface IPayrollProcessParams {
     bonus?: number;
     deduction?: number;
     createdBy: string;
-    paymentType?: "salary" | "overtime";
+    paymentType?: 'salary' | 'overtime';
 }
 
 const processPayroll = async ({
@@ -285,7 +313,7 @@ const processPayroll = async ({
     bonus = 0,
     deduction = 0,
     createdBy,
-    paymentType = "salary",
+    paymentType = 'salary',
 }: IPayrollProcessParams) => {
     // Check if month is locked
     const locked = await PayrollLockModel.findOne({ month });
@@ -301,40 +329,45 @@ const processPayroll = async ({
 
     try {
         const staff = await StaffModel.findById(staffId).session(session);
-        if (!staff) throw new Error("Staff not found");
+        if (!staff) throw new Error('Staff not found');
 
         // Server-side amount verification for salary payments
-        if (paymentType === "salary") {
-            const attendanceSummary = await AttendanceDayModel.aggregate([
-                {
-                    $match: {
-                        staffId: new Types.ObjectId(staffId),
-                        date: { $gte: startDate, $lte: endDate },
-                        status: { $in: ["absent", "half_day"] },
-                    },
-                },
-                {
-                    $group: {
-                        _id: "$status",
-                        count: { $sum: 1 },
-                    },
-                },
-            ]).session(session);
+        if (paymentType === 'salary') {
+            const shiftAssignment = await ShiftAssignmentModel.findOne({
+                staffId,
+                isActive: true,
+            })
+                .populate('shiftId')
+                .session(session);
 
-            const counts = { absent: 0, half_day: 0 };
-            attendanceSummary.forEach((s) => {
-                if (s._id === "absent") counts.absent = s.count;
-                if (s._id === "half_day") counts.half_day = s.count;
-            });
+            const shift: any = shiftAssignment?.shiftId;
 
-            const staffSalary = staff.salary || 0;
-            const perDaySalary = staffSalary / 30;
+            const allAttendance = await AttendanceDayModel.find({
+                staffId: new Types.ObjectId(staffId),
+                date: { $gte: startDate, $lte: endDate },
+            }).session(session);
 
-            // Calculate Unemployed Days for verification
+            const literalAbsentDays = allAttendance.filter(
+                (a) => a.status === 'absent',
+            ).length;
+
             const daysInMonth = eachDayOfInterval({
                 start: startDate,
                 end: endDate,
             });
+
+            const expectedWorkDates: Date[] = [];
+            if (shift) {
+                daysInMonth.forEach((day) => {
+                    if (shift.workDays.includes(day.getDay())) {
+                        expectedWorkDates.push(day);
+                    }
+                });
+            }
+
+            const staffSalary = staff.salary || 0;
+            const perDaySalary = staffSalary / 30;
+
             let unemployedDays = 0;
             const joinDate = staff.joinDate ? new Date(staff.joinDate) : null;
             const exitDate = staff.exitDate ? new Date(staff.exitDate) : null;
@@ -347,9 +380,33 @@ const processPayroll = async ({
                 }
             });
 
+            let missingPunches = 0;
+            const todayUTC = new Date(
+                Date.UTC(
+                    new Date().getUTCFullYear(),
+                    new Date().getUTCMonth(),
+                    new Date().getUTCDate(),
+                ),
+            );
+
+            if (shift) {
+                missingPunches = expectedWorkDates.filter((day) => {
+                    if (day > todayUTC) return false;
+
+                    const isBeforeJoin = joinDate && day < joinDate;
+                    const isAfterExit = exitDate && day > exitDate;
+                    if (isBeforeJoin || isAfterExit) return false;
+
+                    const hasRecord = allAttendance.some(
+                        (a) => new Date(a.date).getTime() === day.getTime(),
+                    );
+                    return !hasRecord;
+                }).length;
+            }
+
+            const absentDays = literalAbsentDays + missingPunches;
             const serverDeduction =
-                (counts.absent + unemployedDays + counts.half_day * 0.5) *
-                perDaySalary;
+                (absentDays + unemployedDays) * perDaySalary;
             const serverPayable = Math.max(0, staffSalary - serverDeduction);
             const expectedAmount = Math.round(
                 serverPayable + bonus - deduction,
@@ -367,9 +424,9 @@ const processPayroll = async ({
 
         // Determine expense category
         const categoryName =
-            paymentType === "overtime" ? "Overtime" : "Salary & Wages";
+            paymentType === 'overtime' ? 'Overtime' : 'Salary & Wages';
         const categoryRegex =
-            paymentType === "overtime" ? /^Overtime/i : /^Salary/i;
+            paymentType === 'overtime' ? /^Overtime/i : /^Salary/i;
 
         let category = await ExpenseCategoryModel.findOne({
             name: { $regex: categoryRegex },
@@ -384,7 +441,7 @@ const processPayroll = async ({
 
         if (!staff.branchId) {
             throw new Error(
-                "Staff does not have a branch assigned. Cannot create expense.",
+                'Staff does not have a branch assigned. Cannot create expense.',
             );
         }
 
@@ -393,12 +450,12 @@ const processPayroll = async ({
         const details = [];
         if (bonus) details.push(`Bonus: ${bonus}`);
         if (deduction) details.push(`Deduction: ${deduction}`);
-        const extraNote = details.length > 0 ? ` (${details.join(", ")})` : "";
+        const extraNote = details.length > 0 ? ` (${details.join(', ')})` : '';
         const finalNote =
             (note || `${categoryName} Payment for ${monthName}`) + extraNote;
 
         const expenseTitle = `${
-            paymentType === "overtime" ? "Overtime" : "Salary"
+            paymentType === 'overtime' ? 'Overtime' : 'Salary'
         } - ${staffId} - ${monthName}`;
 
         // Check for existing expense — strict match only
@@ -413,7 +470,7 @@ const processPayroll = async ({
         if (existingExpense) {
             existingExpense.amount = amount;
             existingExpense.note = finalNote;
-            existingExpense.paymentMethod = paymentMethod || "cash";
+            existingExpense.paymentMethod = paymentMethod || 'cash';
             existingExpense.createdBy = new Types.ObjectId(createdBy);
             await existingExpense.save({ session });
             createdExpense = existingExpense;
@@ -427,8 +484,8 @@ const processPayroll = async ({
                         branchId: staff.branchId,
                         staffId: staff._id,
                         amount: amount,
-                        status: "paid",
-                        paymentMethod: paymentMethod || "cash",
+                        status: 'paid',
+                        paymentMethod: paymentMethod || 'cash',
                         note: finalNote,
                         createdBy: createdBy,
                     },
@@ -439,7 +496,7 @@ const processPayroll = async ({
         }
 
         if (!createdExpense) {
-            throw new Error("Failed to create/update expense record");
+            throw new Error('Failed to create/update expense record');
         }
 
         await session.commitTransaction();
@@ -465,7 +522,7 @@ interface IBulkPayrollParams {
     }[];
     paymentMethod: string;
     createdBy: string;
-    paymentType?: "salary" | "overtime";
+    paymentType?: 'salary' | 'overtime';
 }
 
 const bulkProcessPayment = async ({
@@ -473,7 +530,7 @@ const bulkProcessPayment = async ({
     payments,
     paymentMethod,
     createdBy,
-    paymentType = "salary",
+    paymentType = 'salary',
 }: IBulkPayrollParams) => {
     // Check lock once at bulk level
     const locked = await PayrollLockModel.findOne({ month });
@@ -493,7 +550,7 @@ const bulkProcessPayment = async ({
                 month,
                 amount: payment.amount,
                 paymentMethod,
-                note: payment.note || "",
+                note: payment.note || '',
                 bonus: payment.bonus ?? 0,
                 deduction: payment.deduction ?? 0,
                 createdBy,
@@ -501,13 +558,13 @@ const bulkProcessPayment = async ({
             });
             results.push({
                 staffId: payment.staffId,
-                status: "success",
+                status: 'success',
                 expenseId: result._id,
             });
         } catch (error: any) {
             errors.push({
                 staffId: payment.staffId,
-                status: "failed",
+                status: 'failed',
                 message: error.message,
             });
         }
@@ -525,6 +582,15 @@ const graceAttendance = async (
 ) => {
     const updatedRecords = [];
 
+    const shiftAssignment = await ShiftAssignmentModel.findOne({
+        staffId,
+        isActive: true,
+    });
+
+    if (!shiftAssignment) {
+        throw new Error('Staff does not have an active shift assignment.');
+    }
+
     for (const date of dates) {
         const targetDate = new Date(date);
         const y = targetDate.getUTCFullYear();
@@ -536,22 +602,33 @@ const graceAttendance = async (
         const attendance = await AttendanceDayModel.findOne({
             staffId,
             date: { $gte: start, $lte: end },
-            status: { $in: ["absent", "late", "half_day", "early_exit"] },
         });
 
         if (attendance) {
-            attendance.status = "present";
+            attendance.status = 'present';
             attendance.notes = note
-                ? `${attendance.notes || ""} [Grace: ${note}]`
+                ? `${attendance.notes || ''} [Grace: ${note}]`
                 : (attendance.notes ?? null);
             attendance.isManual = true;
             await attendance.save();
             updatedRecords.push(attendance);
+        } else {
+            // Missing punch record -> upsert
+            const newAttendance = await AttendanceDayModel.create({
+                staffId: new Types.ObjectId(staffId),
+                shiftId: shiftAssignment.shiftId,
+                date: start,
+                status: 'present',
+                totalMinutes: 0,
+                isManual: true,
+                notes: note ? `[Grace: ${note}]` : '[Grace]',
+            });
+            updatedRecords.push(newAttendance);
         }
     }
 
     if (updatedRecords.length === 0) {
-        throw new Error("No absent records found for the provided dates");
+        throw new Error('No absent records found for the provided dates');
     }
 
     return updatedRecords;
@@ -562,11 +639,70 @@ const graceAttendance = async (
 const getAbsentDates = async (staffId: string, month: string) => {
     const { startDate, endDate } = parseMonthRange(month);
 
-    return await AttendanceDayModel.find({
+    const staff = await StaffModel.findById(staffId);
+    if (!staff) throw new Error('Staff not found');
+
+    const shiftAssignment = await ShiftAssignmentModel.findOne({
+        staffId,
+        isActive: true,
+    }).populate('shiftId');
+
+    const shift: any = shiftAssignment?.shiftId;
+
+    const allAttendance = await AttendanceDayModel.find({
         staffId,
         date: { $gte: startDate, $lte: endDate },
-        status: "absent",
-    }).select("date status");
+    });
+
+    const literalAbsents = allAttendance
+        .filter((a) => a.status === 'absent')
+        .map((a) => ({ date: a.date, status: 'absent' }));
+
+    const expectedWorkDates: Date[] = [];
+    if (shift) {
+        const daysInMonth = eachDayOfInterval({
+            start: startDate,
+            end: endDate,
+        });
+        daysInMonth.forEach((day) => {
+            if (shift.workDays.includes(day.getDay())) {
+                expectedWorkDates.push(day);
+            }
+        });
+    }
+
+    const missingPunches: { date: Date; status: string }[] = [];
+    const joinDate = staff.joinDate ? new Date(staff.joinDate) : null;
+    const exitDate = staff.exitDate ? new Date(staff.exitDate) : null;
+    const todayUTC = new Date(
+        Date.UTC(
+            new Date().getUTCFullYear(),
+            new Date().getUTCMonth(),
+            new Date().getUTCDate(),
+        ),
+    );
+
+    if (shift) {
+        expectedWorkDates.forEach((day) => {
+            if (day > todayUTC) return;
+
+            const isBeforeJoin = joinDate && day < joinDate;
+            const isAfterExit = exitDate && day > exitDate;
+            if (isBeforeJoin || isAfterExit) return;
+
+            const hasRecord = allAttendance.some(
+                (a) => new Date(a.date).getTime() === day.getTime(),
+            );
+
+            if (!hasRecord) {
+                missingPunches.push({ date: day, status: 'absent' });
+            }
+        });
+    }
+
+    return [...literalAbsents, ...missingPunches].sort(
+        (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
+    );
 };
 
 // ── Undo Payment (UTC-safe) ────────────────────────────────────────────
@@ -574,7 +710,7 @@ const getAbsentDates = async (staffId: string, month: string) => {
 const undoPayroll = async (
     staffId: string,
     month: string,
-    paymentType: "salary" | "overtime" = "salary",
+    paymentType: 'salary' | 'overtime' = 'salary',
 ) => {
     // Check lock
     const locked = await PayrollLockModel.findOne({ month });
@@ -587,7 +723,7 @@ const undoPayroll = async (
     const { startDate, endDate } = parseMonthRange(month);
 
     const categoryRegex =
-        paymentType === "overtime" ? /^Overtime/i : /^Salary/i;
+        paymentType === 'overtime' ? /^Overtime/i : /^Salary/i;
 
     const category = await ExpenseCategoryModel.findOne({
         name: { $regex: categoryRegex },
@@ -595,7 +731,7 @@ const undoPayroll = async (
 
     if (!category) {
         throw new Error(
-            `${paymentType === "overtime" ? "Overtime" : "Salary"} category not found`,
+            `${paymentType === 'overtime' ? 'Overtime' : 'Salary'} category not found`,
         );
     }
 
@@ -607,10 +743,10 @@ const undoPayroll = async (
     });
 
     if (!expense) {
-        throw new Error("Payroll record not found for this month");
+        throw new Error('Payroll record not found for this month');
     }
 
-    return { message: "Payroll payment undone successfully" };
+    return { message: 'Payroll payment undone successfully' };
 };
 
 // ── Payroll Lock Management ────────────────────────────────────────────

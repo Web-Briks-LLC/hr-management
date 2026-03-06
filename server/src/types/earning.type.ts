@@ -43,7 +43,7 @@ export interface IEarningPopulated {
         _id: string;
         clientId: string;
         name: string;
-        email: string;
+        emails: string[];
         currency?: string;
     };
     month: number;

@@ -11,6 +11,13 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 import { IOrder, OrderStatus } from "@/types/order.type";
 
 interface EmailDialogProps {
@@ -18,7 +25,7 @@ interface EmailDialogProps {
     onOpenChange: (open: boolean) => void;
     order: IOrder | null;
     status: OrderStatus;
-    onSend: (message: string, downloadLink?: string) => void;
+    onSend: (message: string, downloadLink?: string, selectedEmail?: string) => void;
     isLoading?: boolean;
 }
 
@@ -41,6 +48,7 @@ export const EmailDialog: React.FC<EmailDialogProps> = ({
 }) => {
     const [message, setMessage] = useState("");
     const [downloadLink, setDownloadLink] = useState("");
+    const [selectedEmail, setSelectedEmail] = useState<string>("");
 
     useEffect(() => {
         if (open && order && status) {
@@ -49,10 +57,11 @@ export const EmailDialog: React.FC<EmailDialogProps> = ({
             let msg = tmpl
                 .replace("{clientName}", order.clientId?.name || "Client")
                 .replace("{orderName}", order.orderName || "Order");
-            
+
             // Link placeholder replacement is done dynamically if needed
             setMessage(msg);
             setDownloadLink("");
+            setSelectedEmail(order.clientId?.emails?.[0] || "");
         }
     }, [open, order, status]);
 
@@ -61,7 +70,7 @@ export const EmailDialog: React.FC<EmailDialogProps> = ({
         if (status === 'delivered') {
             finalMessage = finalMessage.replace("{downloadLink}", downloadLink || 'No link provided');
         }
-        onSend(finalMessage, downloadLink);
+        onSend(finalMessage, downloadLink, selectedEmail);
     };
 
     if (!order) return null;
@@ -77,6 +86,26 @@ export const EmailDialog: React.FC<EmailDialogProps> = ({
                 </DialogHeader>
 
                 <div className="space-y-4 py-4">
+                    {order.clientId?.emails && order.clientId.emails.length > 1 && (
+                        <div className="space-y-2">
+                            <Label htmlFor="recipientEmail">Recipient Email</Label>
+                            <Select
+                                value={selectedEmail}
+                                onValueChange={setSelectedEmail}
+                            >
+                                <SelectTrigger id="recipientEmail" className="w-full">
+                                    <SelectValue placeholder="Select email" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {order.clientId.emails.map((email) => (
+                                        <SelectItem key={email} value={email}>
+                                            {email}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    )}
                     {status === "delivered" && (
                         <div className="space-y-2">
                             <Label htmlFor="downloadLink">Download Link</Label>

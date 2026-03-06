@@ -15,13 +15,15 @@ const ClientSchema = new Schema<IClient>(
             trim: true,
             index: true,
         },
-        email: {
-            type: String,
+        emails: {
+            type: [String],
             required: true,
-            unique: true,
-            lowercase: true,
-            trim: true,
-            index: true,
+            validate: {
+                validator: function (v: string[]) {
+                    return v && v.length > 0;
+                },
+                message: 'At least one email is required',
+            },
         },
         phone: {
             type: String,
@@ -58,11 +60,18 @@ const ClientSchema = new Schema<IClient>(
     },
     {
         timestamps: true,
-    }
+        toJSON: { virtuals: true },
+        toObject: { virtuals: true },
+    },
 );
 
+// Virtual for backward compatibility
+ClientSchema.virtual('email').get(function () {
+    return this.emails && this.emails.length > 0 ? this.emails[0] : '';
+});
+
 // Compound index for search
-ClientSchema.index({ name: 'text', email: 'text' });
+ClientSchema.index({ name: 'text', emails: 'text' });
 
 const ClientModel = model<IClient>('Client', ClientSchema);
 export default ClientModel;

@@ -53,6 +53,7 @@ export interface IOrder {
         clientId: string;
         name: string;
         email: string;
+        emails: string[];
         currency?: string;
         address?: string;
         officeAddress?: string;
@@ -132,6 +133,10 @@ export interface UpdateOrderInput extends Partial<CreateOrderInput> {
 export interface UpdateStatusInput {
     status: OrderStatus;
     note?: string;
+    customEmailMessage?: string;
+    downloadLink?: string;
+    sendEmail?: boolean;
+    selectedEmail?: string;
 }
 
 export interface ExtendDeadlineInput {

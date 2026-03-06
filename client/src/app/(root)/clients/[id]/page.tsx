@@ -262,7 +262,7 @@ export default function ClientDetailsPage() {
                     <div>
                         <h1 className="text-2xl font-bold">{client.name}</h1>
                         <p className="text-muted-foreground">
-                            {client.clientId} • {client.email}
+                            {client.clientId} • {client.emails?.[0]}
                         </p>
                     </div>
                 </div>
@@ -388,9 +388,15 @@ export default function ClientDetailsPage() {
                             </div>
                             <div>
                                 <p className="text-sm text-muted-foreground">
-                                    Email
+                                    Emails
                                 </p>
-                                <p className="font-medium">{client.email}</p>
+                                <div className="flex flex-col gap-1">
+                                    {client.emails?.map((email, idx) => (
+                                        <p key={idx} className="font-medium">
+                                            {email}
+                                        </p>
+                                    ))}
+                                </div>
                             </div>
                         </div>
                         <div className="flex items-start gap-3">

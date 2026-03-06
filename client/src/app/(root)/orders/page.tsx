@@ -221,6 +221,7 @@ export default function OrdersPage() {
     const confirmEmailAndStatusChange = async (
         message: string,
         downloadLink?: string,
+        selectedEmail?: string,
     ) => {
         if (!emailPendingOrder || !emailPendingStatus) return;
         setIsEmailSending(true);
@@ -232,6 +233,7 @@ export default function OrdersPage() {
                     customEmailMessage: message,
                     downloadLink,
                     sendEmail: true,
+                    selectedEmail,
                 } as UpdateStatusInput,
             }).unwrap();
             toast.success(
@@ -524,8 +526,7 @@ export default function OrdersPage() {
                 },
             }).unwrap();
             toast.success(
-                `Status updated to ${
-                    ORDER_STATUS_LABELS[pendingStatusChange.status]
+                `Status updated to ${ORDER_STATUS_LABELS[pendingStatusChange.status]
                 }`,
             );
             setIsStatusChangeDialogOpen(false);
@@ -1217,10 +1218,10 @@ export default function OrdersPage() {
                                                 key={order._id}
                                                 className={cn(
                                                     isSelectionMode &&
-                                                        selectedOrderIds.has(
-                                                            order._id,
-                                                        ) &&
-                                                        "bg-muted/50",
+                                                    selectedOrderIds.has(
+                                                        order._id,
+                                                    ) &&
+                                                    "bg-muted/50",
                                                 )}
                                             >
                                                 {isSelectionMode && (
@@ -1266,16 +1267,16 @@ export default function OrdersPage() {
                                                     {order.orderName}
                                                     {order.revisionCount >
                                                         0 && (
-                                                        <Badge
-                                                            variant="outline"
-                                                            className="ml-2 text-xs"
-                                                        >
-                                                            R
-                                                            {
-                                                                order.revisionCount
-                                                            }
-                                                        </Badge>
-                                                    )}
+                                                            <Badge
+                                                                variant="outline"
+                                                                className="ml-2 text-xs"
+                                                            >
+                                                                R
+                                                                {
+                                                                    order.revisionCount
+                                                                }
+                                                            </Badge>
+                                                        )}
                                                 </TableCell>
                                                 <TableCell className="border-r">
                                                     <DeadlineCountdown
@@ -1296,74 +1297,73 @@ export default function OrdersPage() {
                                                 </TableCell>
                                                 <TableCell className='border-r flex items-center justify-center w-auto'>
                                                     <Select
-                                                            value={order.status}
-                                                            onValueChange={(
-                                                                value,
-                                                            ) =>
-                                                                handleStatusChange(
-                                                                    order._id,
-                                                                    value as OrderStatus,
-                                                                )
-                                                            }
-                                                            disabled={
-                                                                isUpdatingStatus ||
-                                                                statusWorkflow[
-                                                                    order.status
-                                                                ].length === 0
-                                                            }
+                                                        value={order.status}
+                                                        onValueChange={(
+                                                            value,
+                                                        ) =>
+                                                            handleStatusChange(
+                                                                order._id,
+                                                                value as OrderStatus,
+                                                            )
+                                                        }
+                                                        disabled={
+                                                            isUpdatingStatus ||
+                                                            statusWorkflow[
+                                                                order.status
+                                                            ].length === 0
+                                                        }
+                                                    >
+                                                        <SelectTrigger
+                                                            className={cn(
+                                                                statusColors[
+                                                                order
+                                                                    .status
+                                                                ],
+                                                            )}
                                                         >
-                                                            <SelectTrigger
-                                                                className={cn(
-                                                                    statusColors[
-                                                                        order
-                                                                            .status
-                                                                    ],
-                                                                )}
-                                                            >
-                                                                <SelectValue />
-                                                            </SelectTrigger>
-                                                            <SelectContent>
-                                                                {Object.entries(
-                                                                    ORDER_STATUS_LABELS,
-                                                                ).map(
-                                                                    ([
-                                                                        value,
-                                                                        label,
-                                                                    ]) => (
-                                                                        <SelectItem
-                                                                            key={
-                                                                                value
-                                                                            }
-                                                                            value={
-                                                                                value
-                                                                            }
-                                                                            disabled={
-                                                                                !canTransitionTo(
-                                                                                    order.status,
-                                                                                    value as OrderStatus,
-                                                                                )
-                                                                            }
-                                                                        >
-                                                                            {
-                                                                                label
-                                                                            }
-                                                                        </SelectItem>
-                                                                    ),
-                                                                )}
-                                                            </SelectContent>
-                                                        </Select>
+                                                            <SelectValue />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            {Object.entries(
+                                                                ORDER_STATUS_LABELS,
+                                                            ).map(
+                                                                ([
+                                                                    value,
+                                                                    label,
+                                                                ]) => (
+                                                                    <SelectItem
+                                                                        key={
+                                                                            value
+                                                                        }
+                                                                        value={
+                                                                            value
+                                                                        }
+                                                                        disabled={
+                                                                            !canTransitionTo(
+                                                                                order.status,
+                                                                                value as OrderStatus,
+                                                                            )
+                                                                        }
+                                                                    >
+                                                                        {
+                                                                            label
+                                                                        }
+                                                                    </SelectItem>
+                                                                ),
+                                                            )}
+                                                        </SelectContent>
+                                                    </Select>
                                                 </TableCell>
                                                 <TableCell className="border-r">
                                                     <span
-                                                        className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                                            priorityColors[
-                                                                order.priority
+                                                        className={`px-2 py-1 rounded-full text-xs font-medium ${priorityColors[
+                                                            order.priority
                                                             ]
-                                                        }`}
+                                                            }`}
                                                     >
                                                         {
                                                             ORDER_PRIORITY_LABELS[
-                                                                order.priority
+                                                            order.priority
                                                             ]
                                                         }
                                                     </span>
@@ -1396,80 +1396,80 @@ export default function OrdersPage() {
                                                                     order
                                                                         .clientId
                                                                         ?.createdBy ===
-                                                                        session
-                                                                            ?.user
-                                                                            ?.id)) && (
-                                                                <>
-                                                                    <Tooltip>
-                                                                        <TooltipTrigger
-                                                                            asChild
-                                                                        >
-                                                                            <Button
-                                                                                variant="ghost"
-                                                                                size="icon"
-                                                                                onClick={() =>
-                                                                                    openEditDialog(
-                                                                                        order,
-                                                                                    )
-                                                                                }
+                                                                    session
+                                                                        ?.user
+                                                                        ?.id)) && (
+                                                                    <>
+                                                                        <Tooltip>
+                                                                            <TooltipTrigger
+                                                                                asChild
                                                                             >
-                                                                                <Edit2 className="h-4 w-4" />
-                                                                            </Button>
-                                                                        </TooltipTrigger>
-                                                                        <TooltipContent>
-                                                                            <p>
-                                                                                Edit
-                                                                            </p>
-                                                                        </TooltipContent>
-                                                                    </Tooltip>
-                                                                    <Tooltip>
-                                                                        <TooltipTrigger
-                                                                            asChild
-                                                                        >
-                                                                            <Button
-                                                                                variant="ghost"
-                                                                                size="icon"
-                                                                                onClick={() =>
-                                                                                    openExtendDialog(
-                                                                                        order,
-                                                                                    )
-                                                                                }
+                                                                                <Button
+                                                                                    variant="ghost"
+                                                                                    size="icon"
+                                                                                    onClick={() =>
+                                                                                        openEditDialog(
+                                                                                            order,
+                                                                                        )
+                                                                                    }
+                                                                                >
+                                                                                    <Edit2 className="h-4 w-4" />
+                                                                                </Button>
+                                                                            </TooltipTrigger>
+                                                                            <TooltipContent>
+                                                                                <p>
+                                                                                    Edit
+                                                                                </p>
+                                                                            </TooltipContent>
+                                                                        </Tooltip>
+                                                                        <Tooltip>
+                                                                            <TooltipTrigger
+                                                                                asChild
                                                                             >
-                                                                                <Calendar className="h-4 w-4" />
-                                                                            </Button>
-                                                                        </TooltipTrigger>
-                                                                        <TooltipContent>
-                                                                            <p>
-                                                                                Extend
-                                                                                Deadline
-                                                                            </p>
-                                                                        </TooltipContent>
-                                                                    </Tooltip>
-                                                                    <Tooltip>
-                                                                        <TooltipTrigger
-                                                                            asChild
-                                                                        >
-                                                                            <Button
-                                                                                variant="ghost"
-                                                                                size="icon"
-                                                                                onClick={() =>
-                                                                                    openRevisionDialog(
-                                                                                        order,
-                                                                                    )
-                                                                                }
+                                                                                <Button
+                                                                                    variant="ghost"
+                                                                                    size="icon"
+                                                                                    onClick={() =>
+                                                                                        openExtendDialog(
+                                                                                            order,
+                                                                                        )
+                                                                                    }
+                                                                                >
+                                                                                    <Calendar className="h-4 w-4" />
+                                                                                </Button>
+                                                                            </TooltipTrigger>
+                                                                            <TooltipContent>
+                                                                                <p>
+                                                                                    Extend
+                                                                                    Deadline
+                                                                                </p>
+                                                                            </TooltipContent>
+                                                                        </Tooltip>
+                                                                        <Tooltip>
+                                                                            <TooltipTrigger
+                                                                                asChild
                                                                             >
-                                                                                <RotateCcw className="h-4 w-4" />
-                                                                            </Button>
-                                                                        </TooltipTrigger>
-                                                                        <TooltipContent>
-                                                                            <p>
-                                                                                Add
-                                                                                Revision
-                                                                            </p>
-                                                                        </TooltipContent>
-                                                                    </Tooltip>
-                                                                </>
-                                                            )}
+                                                                                <Button
+                                                                                    variant="ghost"
+                                                                                    size="icon"
+                                                                                    onClick={() =>
+                                                                                        openRevisionDialog(
+                                                                                            order,
+                                                                                        )
+                                                                                    }
+                                                                                >
+                                                                                    <RotateCcw className="h-4 w-4" />
+                                                                                </Button>
+                                                                            </TooltipTrigger>
+                                                                            <TooltipContent>
+                                                                                <p>
+                                                                                    Add
+                                                                                    Revision
+                                                                                </p>
+                                                                            </TooltipContent>
+                                                                        </Tooltip>
+                                                                    </>
+                                                                )}
                                                             {!isTelemarketer && (
                                                                 <Tooltip>
                                                                     <TooltipTrigger
@@ -1669,7 +1669,7 @@ export default function OrdersPage() {
                                     >
                                         {
                                             ORDER_STATUS_LABELS[
-                                                selectedOrder.status
+                                            selectedOrder.status
                                             ]
                                         }
                                     </Badge>
@@ -1738,13 +1738,13 @@ export default function OrdersPage() {
                                     <Badge
                                         className={
                                             priorityColors[
-                                                selectedOrder.priority
+                                            selectedOrder.priority
                                             ]
                                         }
                                     >
                                         {
                                             ORDER_PRIORITY_LABELS[
-                                                selectedOrder.priority
+                                            selectedOrder.priority
                                             ]
                                         }
                                     </Badge>
@@ -1777,7 +1777,7 @@ export default function OrdersPage() {
                             )}
                             {selectedOrder.revisionInstructions &&
                                 selectedOrder.revisionInstructions.length >
-                                    0 && (
+                                0 && (
                                     <div>
                                         <p className="text-sm text-muted-foreground mb-2">
                                             Revision Instructions

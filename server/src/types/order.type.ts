@@ -55,21 +55,20 @@ export interface IOrder extends Document {
 }
 
 // Populated version for API responses
-export interface IOrderPopulated
-    extends Omit<
-        IOrder,
-        | 'clientId'
-        | 'services'
-        | 'returnFileFormat'
-        | 'assignedTo'
-        | 'revisionInstructions'
-        | 'timeline'
-    > {
+export interface IOrderPopulated extends Omit<
+    IOrder,
+    | 'clientId'
+    | 'services'
+    | 'returnFileFormat'
+    | 'assignedTo'
+    | 'revisionInstructions'
+    | 'timeline'
+> {
     clientId: {
         _id: Types.ObjectId;
         clientId: string;
         name: string;
-        email: string;
+        emails: string[];
     };
     services: {
         _id: Types.ObjectId;
