@@ -28,30 +28,23 @@ async function processEarningCommission(earningId: string, _changedBy: string) {
             throw new Error("Earning not found");
         }
 
-        // Only process paid earnings
-        if (earning.status !== "paid") {
-            await session.abortTransaction();
-            return null;
-        }
-
         const client = earning.clientId as any;
         if (!client || !client.createdBy) {
             await session.abortTransaction();
             return null;
         }
 
-        // 2. Check if commission was already processed for this earning
-        const existingTransaction = await WalletTransactionModel.findOne({
+        // 2. Calculate total commission already paid for this earning
+        const existingTransactions = await WalletTransactionModel.find({
             "metadata.earningId": earning._id,
             type: TransactionType.COMMISSION,
             status: "completed",
         }).session(session);
 
-        if (existingTransaction) {
-            // Commission already processed — skip (prevents duplicates)
-            await session.abortTransaction();
-            return null;
-        }
+        const alreadyPaidCommission = existingTransactions.reduce(
+            (sum, t) => sum + t.amount,
+            0,
+        );
 
         // 3. Find the staff member who created the client
         const staff = await StaffModel.findOne({
@@ -66,8 +59,9 @@ async function processEarningCommission(earningId: string, _changedBy: string) {
             return null;
         }
 
-        // 4. Calculate commission based on BDT amount
-        const commissionAmount = earning.amountInBDT * COMMISSION_RATE;
+        // 4. Calculate incremental commission (only pay the difference)
+        const totalExpectedCommission = earning.amountInBDT * COMMISSION_RATE;
+        const commissionAmount = totalExpectedCommission - alreadyPaidCommission;
 
         if (commissionAmount <= 0) {
             await session.abortTransaction();

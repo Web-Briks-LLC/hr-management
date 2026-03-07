@@ -215,7 +215,6 @@ async function withdrawEarning(
                 payments: paymentRecord,
             },
             $set: {
-                conversionRate: data.conversionRate, // Update latest rate
                 paidBy: new Types.ObjectId(data.paidBy),
             },
         },
@@ -223,6 +222,10 @@ async function withdrawEarning(
     );
 
     if (!updatedEarning) return null;
+
+    // Sync amountInBDT with paidAmountBDT for display consistency
+    updatedEarning.amountInBDT = updatedEarning.paidAmountBDT;
+    await updatedEarning.save();
 
     // Check if fully paid to update status and paidAt
     if (updatedEarning.paidAmount >= updatedEarning.totalAmount - 0.01) { // tiny margin for float precision
@@ -239,16 +242,6 @@ async function withdrawEarning(
             );
         }
 
-        // Trigger commission processing
-        try {
-            const { default: commissionService } = await import('./commission.service.js');
-            await commissionService.processEarningCommission(
-                updatedEarning._id.toString(),
-                data.paidBy,
-            );
-        } catch (commissionError) {
-            console.error('[Withdraw] Failed to process commission:', commissionError);
-        }
     } else if (data.invoiceNumber) {
         // If PARTIAL payment but linked to an invoice, mark THAT invoice's orders as paid
         try {
@@ -265,6 +258,17 @@ async function withdrawEarning(
         } catch (err) {
             console.error('[Withdraw] Failed to sync orders for invoice:', err);
         }
+    }
+
+    // Trigger commission processing for EVERY BDT-converted payment
+    try {
+        const { default: commissionService } = await import('./commission.service.js');
+        await commissionService.processEarningCommission(
+            updatedEarning._id.toString(),
+            data.paidBy,
+        );
+    } catch (commissionError) {
+        console.error('[Withdraw] Failed to process commission:', commissionError);
     }
 
     return updatedEarning.populate('clientId', 'clientId name email currency');
@@ -567,7 +571,13 @@ async function getEarningsWithDateFilter(params: EarningQueryParams): Promise<{
             .sort({ year: -1, month: -1 })
             .skip(skip)
             .limit(limit)
-            .lean(),
+            .lean()
+            .then((docs) =>
+                docs.map((doc) => ({
+                    ...doc,
+                    amountInBDT: doc.amountInBDT || doc.paidAmountBDT || 0,
+                })),
+            ),
         EarningModel.countDocuments(filter),
     ]);
 

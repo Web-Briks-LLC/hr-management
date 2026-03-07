@@ -1,7 +1,6 @@
 import type { Request, Response } from "express";
 import { Types } from "mongoose";
 import earningService from "../services/earning.service.js";
-import commissionService from "../services/commission.service.js";
 import { isTelemarketer } from "../utils/telemarketer.util.js";
 import { Role } from "../constants/role.js";
 import ClientModel from "../models/client.model.js";
@@ -226,14 +225,6 @@ async function toggleEarningStatus(req: Request, res: Response) {
 
         if (!earning) {
             return res.status(404).json({ message: "Earning not found" });
-        }
-
-        if (status === "paid") {
-            try {
-                await commissionService.processEarningCommission(id, userId);
-            } catch (commissionError) {
-                console.error("Failed to process commission:", commissionError);
-            }
         }
 
         return res.status(200).json({
