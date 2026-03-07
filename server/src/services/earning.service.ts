@@ -891,6 +891,45 @@ async function updateEarning(
         .lean() as Promise<IEarning | null>;
 }
 
+// Sync earning data with actual orders
+async function syncEarningFromOrders(id: string): Promise<IEarning | null> {
+    const earning = await EarningModel.findById(id);
+    if (!earning || earning.isLegacy) return earning;
+
+    const OrderModel = (await import('../models/order.model.js')).default;
+
+    // Find all orders for this client in the same month/year
+    const orders = await OrderModel.find({
+        clientId: earning.clientId,
+        $expr: {
+            $and: [
+                { $eq: [{ $month: '$orderDate' }, earning.month] },
+                { $eq: [{ $year: '$orderDate' }, earning.year] },
+            ],
+        },
+        status: { $ne: 'cancelled' },
+    });
+
+    const totalAmount = orders.reduce((sum, o) => sum + o.totalPrice, 0);
+    const imageQty = orders.reduce((sum, o) => sum + o.imageQuantity, 0);
+    const orderIds = orders.map((o) => o._id);
+
+    earning.totalAmount = totalAmount;
+    earning.imageQty = imageQty;
+    earning.orderIds = orderIds as any;
+    earning.netAmount = totalAmount - earning.fees - earning.tax;
+
+    // Correct the status if paidAmount doesn't match totalAmount
+    if (earning.paidAmount < earning.totalAmount - 0.01) {
+        earning.status = 'unpaid';
+    } else {
+        earning.status = 'paid';
+    }
+
+    const saved = await earning.save();
+    return saved.populate('clientId', 'clientId name email currency');
+}
+
 export default {
     createEarningForOrder,
     updateEarningForOrder,
@@ -906,4 +945,5 @@ export default {
     getEarningYearsFromDB,
     importLegacyEarning,
     updateEarning,
+    syncEarningFromOrders,
 };

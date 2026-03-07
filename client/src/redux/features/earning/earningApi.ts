@@ -145,6 +145,18 @@ const earningApi = apiSlice.injectEndpoints({
                 { type: 'Earning', id: 'STATS' },
             ],
         }),
+        // Sync earning with orders
+        syncEarning: builder.mutation<EarningResponse, string>({
+            query: (id) => ({
+                url: `/earnings/${id}/sync`,
+                method: 'PUT',
+            }),
+            invalidatesTags: (_result, _error, id) => [
+                { type: 'Earning', id },
+                { type: 'Earning', id: 'LIST' },
+                { type: 'Earning', id: 'STATS' },
+            ],
+        }),
     }),
     overrideExisting: false,
 });
@@ -160,5 +172,6 @@ export const {
     useToggleEarningStatusMutation,
     useDeleteEarningMutation,
     useUpdateEarningMutation,
+    useSyncEarningMutation,
     useLazyGetClientsWithEarningsQuery,
 } = earningApi;

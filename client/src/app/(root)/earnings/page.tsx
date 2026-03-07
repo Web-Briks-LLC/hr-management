@@ -46,7 +46,6 @@ import {
     DollarSign,
     TrendingUp,
     Wallet,
-    Calendar as CalendarIcon,
     Loader,
     ChevronLeft,
     ChevronRight,
@@ -56,7 +55,6 @@ import {
     Clock,
     CheckCircle2,
     XCircle,
-    AlertCircle,
     Filter,
     Download,
     Search,
@@ -67,6 +65,7 @@ import {
     Receipt,
     ArrowRight,
     History as HistoryIcon,
+    RefreshCcw,
 } from "lucide-react";
 import {
     Tooltip,
@@ -84,6 +83,7 @@ import {
     useLazyGetClientsWithEarningsQuery,
     useUpdateEarningMutation,
     useDeleteEarningMutation,
+    useSyncEarningMutation,
 } from "@/redux/features/earning/earningApi";
 import { useGetInvoicesQuery } from "@/redux/features/invoice/invoiceApi";
 import { useGetClientsQuery } from "@/redux/features/client/clientApi";
@@ -253,6 +253,7 @@ export default function EarningsPage() {
         useToggleEarningStatusMutation();
     const [deleteEarning, { isLoading: isDeleting }] =
         useDeleteEarningMutation();
+    const [syncEarning, { isLoading: isSyncing }] = useSyncEarningMutation();
 
     const earnings = earningsData?.data || [];
     const meta = earningsData?.meta;
@@ -402,6 +403,15 @@ export default function EarningsPage() {
                 console.error("Error toggling status:", error);
                 toast.error("Failed to update status");
             }
+        }
+    };
+
+    const handleSync = async (id: string) => {
+        try {
+            await syncEarning(id).unwrap();
+            toast.success("Earning synchronized with orders");
+        } catch (error: any) {
+            toast.error(error.data?.message || "Failed to synchronize");
         }
     };
 
@@ -1011,6 +1021,25 @@ export default function EarningsPage() {
                                                     <Button
                                                         variant="ghost"
                                                         size="icon"
+                                                        className="h-8 w-8 text-foreground/70 hover:text-blue-500"
+                                                        onClick={() =>
+                                                            handleSync(earning._id)
+                                                        }
+                                                        disabled={isSyncing}
+                                                        title="Sync with orders"
+                                                    >
+                                                        <RefreshCcw
+                                                            className={cn(
+                                                                "h-4 w-4",
+                                                                isSyncing &&
+                                                                "animate-spin",
+                                                            )}
+                                                        />
+                                                    </Button>
+
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
                                                         className="h-8 w-8 text-foreground/70 hover:text-destructive"
                                                         onClick={() => {
                                                             setSelectedEarning(
@@ -1257,7 +1286,7 @@ export default function EarningsPage() {
                                         value={withdrawMethod}
                                         onValueChange={setWithdrawMethod}
                                     >
-                                        <SelectTrigger className="h-9">
+                                        <SelectTrigger className="w-full">
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -1286,7 +1315,7 @@ export default function EarningsPage() {
                                             }
                                         }}
                                     >
-                                        <SelectTrigger className="h-9">
+                                        <SelectTrigger className="w-full">
                                             <SelectValue placeholder="Manual Entry" />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -1305,7 +1334,6 @@ export default function EarningsPage() {
                                         value={withdrawTransactionId}
                                         onChange={(e) => setWithdrawTransactionId(e.target.value)}
                                         placeholder="e.g. PayPal-998 or Manual-101"
-                                        className="h-9"
                                     />
                                 </div>
                             </div>
@@ -1321,11 +1349,7 @@ export default function EarningsPage() {
                                                 setWithdrawRate(e.target.value)
                                             }
                                             placeholder="e.g. 120"
-                                            className="pl-12 h-9"
                                         />
-                                        <span className="absolute left-2 top-2.5 text-muted-foreground text-[10px] font-medium border-r pr-1.5 leading-none h-4 flex items-center">
-                                            $ → BDT
-                                        </span>
                                     </div>
                                 </div>
                                 <div className="space-y-1.5">
@@ -1337,11 +1361,7 @@ export default function EarningsPage() {
                                             onChange={(e) =>
                                                 setWithdrawFees(e.target.value)
                                             }
-                                            className="pl-6 h-9"
                                         />
-                                        <span className="absolute left-2.5 top-2.5 text-muted-foreground text-xs">
-                                            $
-                                        </span>
                                     </div>
                                 </div>
                                 <div className="space-y-1.5">
@@ -1353,11 +1373,7 @@ export default function EarningsPage() {
                                             onChange={(e) =>
                                                 setWithdrawTax(e.target.value)
                                             }
-                                            className="pl-6 h-9"
                                         />
-                                        <span className="absolute left-2.5 top-2.5 text-muted-foreground text-xs">
-                                            $
-                                        </span>
                                     </div>
                                 </div>
                             </div>

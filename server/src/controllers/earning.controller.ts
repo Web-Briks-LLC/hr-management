@@ -383,11 +383,6 @@ async function deleteEarning(req: Request, res: Response) {
         }
 
         const deletedEarning = await earningService.deleteEarningFromDB(id);
-
-        if (!deletedEarning) {
-            return res.status(404).json({ message: "Earning not found" });
-        }
-
         return res.status(200).json({
             message: "Earning deleted successfully",
             data: deletedEarning,
@@ -398,6 +393,30 @@ async function deleteEarning(req: Request, res: Response) {
             message: error.message || "Internal server error",
             success: false,
         });
+    }
+}
+
+// Sync earning with orders
+async function syncEarning(req: Request, res: Response) {
+    try {
+        const id = req.params.id;
+        if (!id) {
+            return res.status(400).json({ message: "Earning ID is required" });
+        }
+
+        const earning = await earningService.syncEarningFromOrders(id);
+
+        if (!earning) {
+            return res.status(404).json({ message: "Earning not found" });
+        }
+
+        return res.status(200).json({
+            message: "Earning synchronized successfully",
+            data: earning,
+        });
+    } catch (error) {
+        console.error("Error syncing earning:", error);
+        return res.status(500).json({ message: "Internal server error" });
     }
 }
 
@@ -412,4 +431,5 @@ export {
     getClientsWithEarnings,
     updateEarning,
     deleteEarning,
+    syncEarning,
 };

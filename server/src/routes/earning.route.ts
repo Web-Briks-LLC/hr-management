@@ -10,6 +10,7 @@ import {
     getClientsWithEarnings,
     updateEarning,
     deleteEarning,
+    syncEarning,
 } from "../controllers/earning.controller.js";
 import { authorize } from "../middlewares/authorize.js";
 import { Role } from "../constants/role.js";
@@ -39,5 +40,6 @@ router.put(
     authorize(...allowedRoles),
     toggleEarningStatus,
 );
+router.put("/:id/sync", authorize(...allowedRoles), syncEarning);
 
 export { router as earningRoute };
