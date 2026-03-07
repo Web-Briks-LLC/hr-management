@@ -109,7 +109,7 @@ export interface WithdrawEarningData {
     transactionId?: string | undefined; // Optional: reference ID
     fees?: number | undefined;
     tax?: number | undefined;
-    conversionRate: number;
+    conversionRate?: number;
     notes?: string | undefined;
     paidBy: string;
 }

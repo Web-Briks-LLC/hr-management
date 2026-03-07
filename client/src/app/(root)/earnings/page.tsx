@@ -338,7 +338,9 @@ export default function EarningsPage() {
     };
 
     const handleWithdraw = (earning: IEarning) => {
-        const remaining = Math.max(0, earning.totalAmount - earning.paidAmount);
+        const isConversionOnly = earning.status === "paid" && (!earning.amountInBDT || earning.amountInBDT === 0);
+        const remaining = isConversionOnly ? earning.paidAmount : Math.max(0, earning.totalAmount - earning.paidAmount);
+
         setSelectedEarning(earning);
         setWithdrawAmount(remaining.toFixed(2));
         setWithdrawMethod("Cash");
@@ -391,7 +393,16 @@ export default function EarningsPage() {
         newStatus: EarningStatus,
     ) => {
         if (newStatus === "paid" && earning.status === "unpaid") {
-            handleWithdraw(earning);
+            try {
+                await toggleStatus({
+                    id: earning._id,
+                    data: { status: "paid" },
+                }).unwrap();
+                toast.success("Earning marked as paid");
+            } catch (error) {
+                console.error("Error toggling status:", error);
+                toast.error("Failed to mark as paid");
+            }
         } else if (newStatus === "unpaid" && earning.status === "paid") {
             try {
                 await toggleStatus({

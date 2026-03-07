@@ -192,7 +192,7 @@ async function toggleEarningStatus(req: Request, res: Response) {
             return res.status(400).json({ message: "Earning ID is required" });
         }
 
-        const { status, fees, tax, conversionRate, notes } = req.body;
+        const { status, fees, tax, notes } = req.body;
 
         if (!status || !["paid", "unpaid"].includes(status)) {
             return res
@@ -202,16 +202,10 @@ async function toggleEarningStatus(req: Request, res: Response) {
 
         let withdrawData: WithdrawEarningData | undefined;
         if (status === "paid") {
-            if (conversionRate === undefined || conversionRate <= 0) {
-                return res.status(400).json({
-                    message:
-                        "Valid conversion rate is required for paid status",
-                });
-            }
+            // Conversion rate is no longer required for just marking as paid
             withdrawData = {
                 fees: fees ?? 0,
                 tax: tax ?? 0,
-                conversionRate: conversionRate,
                 notes: notes,
                 paidBy: userId,
             };

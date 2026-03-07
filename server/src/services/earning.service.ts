@@ -185,11 +185,13 @@ async function withdrawEarning(
 
     const fees = data.fees ?? 0;
     const tax = data.tax ?? 0;
-    const amountToApply = data.amount ?? earning.totalAmount - earning.paidAmount;
+    const isConversionOnly = earning.status === 'paid' && earning.paidAmount >= earning.totalAmount && earning.paidAmountBDT === 0;
+    const amountToApply = data.amount ?? (isConversionOnly ? earning.paidAmount : earning.totalAmount - earning.paidAmount);
     
     // Net amount for THIS payment
-    const netAmountThisPayment = amountToApply - fees - tax;
-    const amountInBDTThisPayment = netAmountThisPayment * data.conversionRate;
+    const netAmountThisPayment = Math.max(0, amountToApply - fees - tax);
+    const conversionRate = data.conversionRate ?? 1;
+    const amountInBDTThisPayment = netAmountThisPayment * conversionRate;
 
     const paymentRecord = {
         invoiceNumber: data.invoiceNumber || `MANUAL-${new Date().getTime()}`,
@@ -198,19 +200,25 @@ async function withdrawEarning(
         method: data.method || 'Manual',
         transactionId: data.transactionId || `MAN-TXN-${new Date().getTime()}`,
         paidAt: new Date(),
-        conversionRate: data.conversionRate,
+        conversionRate: conversionRate,
     };
+
+    const incValues: any = {
+        paidAmountBDT: amountInBDTThisPayment,
+        fees: fees,
+        tax: tax,
+    };
+    
+    // Only increment paidAmount if we are not just converting an already-paid earning
+    if (!isConversionOnly) {
+        incValues.paidAmount = amountToApply;
+    }
 
     // Use atomic update to avoid race conditions
     const updatedEarning = await EarningModel.findByIdAndUpdate(
         earningId,
         {
-            $inc: {
-                paidAmount: amountToApply,
-                paidAmountBDT: amountInBDTThisPayment,
-                fees: fees,
-                tax: tax,
-            },
+            $inc: incValues,
             $push: {
                 payments: paymentRecord,
             },
@@ -283,8 +291,35 @@ async function toggleEarningStatus(
     const earning = await EarningModel.findById(earningId);
     if (!earning) return null;
 
-    if (newStatus === 'paid' && data) {
-        return withdrawEarning(earningId, data);
+    if (newStatus === 'paid') {
+        const updateData: any = {
+            status: 'paid',
+            paidAmount: earning.totalAmount, // Mark fully paid
+            paidAt: new Date(),
+        };
+        
+        if (data?.paidBy) {
+            updateData.paidBy = new Types.ObjectId(data.paidBy);
+        }
+
+        return EarningModel.findByIdAndUpdate(
+            earningId,
+            { $set: updateData },
+            { new: true },
+        )
+            .populate('clientId', 'clientId name email currency')
+            .lean()
+            .then(async (result: any) => {
+                if (result && result.orderIds && result.orderIds.length > 0) {
+                    const OrderModel = (await import('../models/order.model.js')).default;
+                    await OrderModel.updateMany(
+                        { _id: { $in: result.orderIds } },
+                        { $set: { isPaid: true } }
+                    );
+                }
+                return result;
+            }) as Promise<IEarning | null>;
+
     } else if (newStatus === 'unpaid') {
         // Reset withdrawal data
         return EarningModel.findByIdAndUpdate(
