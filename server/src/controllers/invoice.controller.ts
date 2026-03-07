@@ -128,6 +128,7 @@ export const recordInvoice = async (req: Request, res: Response) => {
             month,
             year,
             items,
+            clientEmail,
         } = req.body;
 
         if (
@@ -183,6 +184,7 @@ export const recordInvoice = async (req: Request, res: Response) => {
                 companyName: companyName || "N/A",
                 paymentStatus: "pending",
                 paymentToken: paymentToken,
+                clientEmail: clientEmail,
                 items,
             },
             { new: true, upsert: true },

@@ -1,4 +1,10 @@
-import type { HydratedDocument } from 'mongoose';
+import {
+    startOfDay,
+    endOfDay,
+    startOfWeek,
+    endOfWeek,
+} from 'date-fns';
+import { Types, type HydratedDocument } from 'mongoose';
 import EarningModel from '../models/earning.model.js';
 import ClientModel from '../models/client.model.js';
 import OrderModel from '../models/order.model.js';
@@ -242,11 +248,35 @@ async function toggleEarningStatus(
 }
 
 // Build date filter based on filterType
-function buildDateFilter(params: EarningQueryParams): Record<string, unknown> {
+async function buildDateFilter(
+    params: EarningQueryParams,
+): Promise<Record<string, unknown>> {
     const filter: Record<string, unknown> = {};
     const now = new Date();
 
     switch (params.filterType) {
+        case 'today': {
+            const start = startOfDay(now);
+            const end = endOfDay(now);
+            const query: any = { orderDate: { $gte: start, $lte: end } };
+            if (params.clientId) query.clientId = params.clientId;
+            if (params.clientIds) query.clientId = { $in: params.clientIds };
+
+            const orderIds = await OrderModel.find(query).distinct('_id');
+            filter.orderIds = { $in: orderIds };
+            break;
+        }
+        case 'week': {
+            const start = startOfWeek(now, { weekStartsOn: 1 }); // Monday
+            const end = endOfWeek(now, { weekStartsOn: 1 });
+            const query: any = { orderDate: { $gte: start, $lte: end } };
+            if (params.clientId) query.clientId = params.clientId;
+            if (params.clientIds) query.clientId = { $in: params.clientIds };
+
+            const orderIds = await OrderModel.find(query).distinct('_id');
+            filter.orderIds = { $in: orderIds };
+            break;
+        }
         case 'month':
             if (params.month && params.year) {
                 filter.month = params.month;
@@ -263,8 +293,6 @@ function buildDateFilter(params: EarningQueryParams): Record<string, unknown> {
                 filter.year = now.getFullYear();
             }
             break;
-        // For 'today', 'week', 'range' - these don't map well to monthly earnings
-        // We'll just show all or filter by year
     }
 
     return filter;
@@ -279,14 +307,159 @@ async function getEarningsWithDateFilter(params: EarningQueryParams): Promise<{
 }> {
     const { page = 1, limit = 20, clientId, status } = params;
     const skip = (page - 1) * limit;
+    const now = new Date();
 
+    // For today and week, we aggregate orders to show period-accurate data
+    if (params.filterType === 'today' || params.filterType === 'week') {
+        const orderMatch: Record<string, any> = {};
+        if (params.filterType === 'today') {
+            orderMatch.orderDate = { $gte: startOfDay(now), $lte: endOfDay(now) };
+        } else {
+            orderMatch.orderDate = {
+                $gte: startOfWeek(now, { weekStartsOn: 1 }),
+                $lte: endOfWeek(now, { weekStartsOn: 1 }),
+            };
+        }
+
+        if (clientId) orderMatch.clientId = new Types.ObjectId(clientId);
+        if (params.clientIds) {
+            orderMatch.clientId = {
+                $in: params.clientIds.map((id) => new Types.ObjectId(id)),
+            };
+        }
+
+        // Add status filter if provided
+        // Since status is on Earning, we'll need to join later and filter
+        const pipeline: any[] = [{ $match: orderMatch }];
+
+        pipeline.push(
+            {
+                $group: {
+                    _id: '$clientId',
+                    orderIds: { $push: '$_id' },
+                    imageQty: { $sum: '$imageQuantity' },
+                    totalAmount: { $sum: '$totalPrice' },
+                },
+            },
+            {
+                $lookup: {
+                    from: 'clients',
+                    localField: '_id',
+                    foreignField: '_id',
+                    as: 'client',
+                },
+            },
+            { $unwind: '$client' },
+            {
+                $lookup: {
+                    from: 'earnings',
+                    let: { clientId: '$_id' },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $and: [
+                                        { $eq: ['$clientId', '$$clientId'] },
+                                        { $eq: ['$month', now.getMonth() + 1] },
+                                        { $eq: ['$year', now.getFullYear()] },
+                                    ],
+                                },
+                            },
+                        },
+                    ],
+                    as: 'earningRecord',
+                },
+            },
+            {
+                $unwind: {
+                    path: '$earningRecord',
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+        );
+
+        // Filter by status if provided
+        if (status) {
+            pipeline.push({
+                $match: {
+                    $or: [
+                        { 'earningRecord.status': status },
+                        // If no earning record yet, we treat as 'unpaid'
+                        ...(status === 'unpaid'
+                            ? [{ earningRecord: { $exists: false } }]
+                            : []),
+                    ],
+                },
+            });
+        }
+
+        const totalResults = await OrderModel.aggregate([
+            ...pipeline,
+            { $count: 'count' },
+        ]);
+        const total = totalResults[0]?.count || 0;
+
+        const results = await OrderModel.aggregate([
+            ...pipeline,
+            { $sort: { totalAmount: -1 } },
+            { $skip: skip },
+            { $limit: limit },
+            {
+                $project: {
+                    _id: {
+                        $ifNull: [
+                            '$earningRecord._id',
+                            { $toString: '$_id' }, // Fallback ID for display
+                        ],
+                    },
+                    clientId: {
+                        _id: '$client._id',
+                        clientId: '$client.clientId',
+                        name: '$client.name',
+                        emails: '$client.emails',
+                        currency: '$client.currency',
+                    },
+                    month: { $literal: now.getMonth() + 1 },
+                    year: { $literal: now.getFullYear() },
+                    orderIds: '$orderIds',
+                    imageQty: '$imageQty',
+                    totalAmount: '$totalAmount',
+                    currency: { $ifNull: ['$client.currency', 'USD'] },
+                    fees: { $ifNull: ['$earningRecord.fees', 0] },
+                    tax: { $ifNull: ['$earningRecord.tax', 0] },
+                    conversionRate: {
+                        $ifNull: ['$earningRecord.conversionRate', 1],
+                    },
+                    netAmount: '$totalAmount', // For period view, net matches total unless withdrawn
+                    amountInBDT: {
+                        $multiply: [
+                            '$totalAmount',
+                            { $ifNull: ['$earningRecord.conversionRate', 1] },
+                        ],
+                    },
+                    status: { $ifNull: ['$earningRecord.status', 'unpaid'] },
+                    createdAt: {
+                        $ifNull: ['$earningRecord.createdAt', new Date()],
+                    },
+                },
+            },
+        ]);
+
+        return {
+            earnings: results as any,
+            total,
+            page,
+            totalPages: Math.ceil(total / limit),
+        };
+    }
+
+    // Default monthly Record lookup for month/year filters
     const filter: Record<string, unknown> = {};
-
     if (clientId) filter.clientId = clientId;
+    if (params.clientIds) filter.clientId = { $in: params.clientIds };
     if (status) filter.status = status;
 
-    // Add date filter
-    const dateFilter = buildDateFilter(params);
+    const dateFilter = await buildDateFilter(params);
     Object.assign(filter, dateFilter);
 
     const [earnings, total] = await Promise.all([
@@ -324,11 +497,95 @@ async function getEarningByIdFromDB(
 async function getEarningStatsWithFilter(
     params: EarningQueryParams,
 ): Promise<EarningStatsResult> {
-    const filter = buildDateFilter(params);
+    const now = new Date();
+    let periodPaid = { count: 0, totalAmount: 0, totalBDT: 0 };
+    let periodUnpaid = { count: 0, totalAmount: 0, totalBDT: 0 };
 
-    const [totalStats, filteredStats] = await Promise.all([
-        // All time stats
-        EarningModel.aggregate([
+    // 1. Determine period stats (today/week/month/year)
+    if (params.filterType === 'today' || params.filterType === 'week') {
+        const orderMatch: Record<string, any> = {};
+        if (params.filterType === 'today') {
+            orderMatch.orderDate = {
+                $gte: startOfDay(now),
+                $lte: endOfDay(now),
+            };
+        } else {
+            orderMatch.orderDate = {
+                $gte: startOfWeek(now, { weekStartsOn: 1 }),
+                $lte: endOfWeek(now, { weekStartsOn: 1 }),
+            };
+        }
+
+        if (params.clientId)
+            orderMatch.clientId = new Types.ObjectId(params.clientId);
+        if (params.clientIds) {
+            orderMatch.clientId = {
+                $in: params.clientIds.map((id) => new Types.ObjectId(id)),
+            };
+        }
+
+        const periodStats = await OrderModel.aggregate([
+            { $match: orderMatch },
+            {
+                $lookup: {
+                    from: 'earnings',
+                    localField: '_id',
+                    foreignField: 'orderIds',
+                    as: 'earning',
+                },
+            },
+            { $unwind: { path: '$earning', preserveNullAndEmptyArrays: true } },
+            {
+                $group: {
+                    _id: { $ifNull: ['$earning.status', 'unpaid'] },
+                    count: { $sum: 1 },
+                    totalAmount: { $sum: '$totalPrice' },
+                    totalBDT: {
+                        $sum: {
+                            $cond: [
+                                { $eq: ['$earning.status', 'paid'] },
+                                {
+                                    $multiply: [
+                                        '$totalPrice',
+                                        {
+                                            $ifNull: [
+                                                '$earning.conversionRate',
+                                                1,
+                                            ],
+                                        },
+                                    ],
+                                },
+                                0,
+                            ],
+                        },
+                    },
+                },
+            },
+        ]);
+
+        const unpaid = periodStats.find((s) => s._id === 'unpaid');
+        const paid = periodStats.find((s) => s._id === 'paid');
+        if (unpaid) periodUnpaid = unpaid;
+        if (paid) periodPaid = paid;
+    } else if (params.filterType === 'month' || params.filterType === 'year') {
+        const earningMatch: Record<string, any> = {};
+        if (params.filterType === 'month') {
+            earningMatch.month = params.month || now.getMonth() + 1;
+            earningMatch.year = params.year || now.getFullYear();
+        } else {
+            earningMatch.year = params.year || now.getFullYear();
+        }
+
+        if (params.clientId)
+            earningMatch.clientId = new Types.ObjectId(params.clientId);
+        if (params.clientIds) {
+            earningMatch.clientId = {
+                $in: params.clientIds.map((id) => new Types.ObjectId(id)),
+            };
+        }
+
+        const periodStats = await EarningModel.aggregate([
+            { $match: earningMatch },
             {
                 $group: {
                     _id: '$status',
@@ -337,26 +594,36 @@ async function getEarningStatsWithFilter(
                     totalBDT: { $sum: '$amountInBDT' },
                 },
             },
-        ]),
-        // Filtered stats
-        (async () => {
-            if (Object.keys(filter).length === 0) return null;
+        ]);
 
-            return EarningModel.aggregate([
-                { $match: filter },
-                {
-                    $group: {
-                        _id: '$status',
-                        count: { $sum: 1 },
-                        totalAmount: { $sum: '$totalAmount' },
-                        totalBDT: { $sum: '$amountInBDT' },
-                    },
-                },
-            ]);
-        })(),
+        const unpaid = periodStats.find((s) => s._id === 'unpaid');
+        const paid = periodStats.find((s) => s._id === 'paid');
+        if (unpaid) periodUnpaid = unpaid;
+        if (paid) periodPaid = paid;
+    }
+
+    // 2. Get total (all-time) stats as baseline
+    const totalMatch: Record<string, any> = {};
+    if (params.clientId)
+        totalMatch.clientId = new Types.ObjectId(params.clientId);
+    if (params.clientIds) {
+        totalMatch.clientId = {
+            $in: params.clientIds.map((id) => new Types.ObjectId(id)),
+        };
+    }
+
+    const totalStats = await EarningModel.aggregate([
+        ...(Object.keys(totalMatch).length > 0 ? [{ $match: totalMatch }] : []),
+        {
+            $group: {
+                _id: '$status',
+                count: { $sum: 1 },
+                totalAmount: { $sum: '$totalAmount' },
+                totalBDT: { $sum: '$amountInBDT' },
+            },
+        },
     ]);
 
-    // Process total stats
     const totalUnpaid = totalStats.find((s) => s._id === 'unpaid') || {
         count: 0,
         totalAmount: 0,
@@ -368,38 +635,18 @@ async function getEarningStatsWithFilter(
         totalBDT: 0,
     };
 
-    // Process filtered stats
-    let filteredUnpaid = { count: 0, totalAmount: 0, totalBDT: 0 };
-    let filteredPaid = { count: 0, totalAmount: 0, totalBDT: 0 };
-
-    if (filteredStats) {
-        filteredUnpaid = filteredStats.find((s) => s._id === 'unpaid') || {
-            count: 0,
-            totalAmount: 0,
-            totalBDT: 0,
-        };
-        filteredPaid = filteredStats.find((s) => s._id === 'paid') || {
-            count: 0,
-            totalAmount: 0,
-            totalBDT: 0,
-        };
-    } else {
-        // No filter applied, use total stats
-        filteredUnpaid = totalUnpaid;
-        filteredPaid = totalPaid;
-    }
-
     return {
         totalUnpaidCount: totalUnpaid.count,
         totalUnpaidAmount: totalUnpaid.totalAmount,
         totalPaidCount: totalPaid.count,
         totalPaidAmount: totalPaid.totalAmount,
         totalPaidBDT: totalPaid.totalBDT,
-        filteredUnpaidCount: filteredUnpaid.count,
-        filteredUnpaidAmount: filteredUnpaid.totalAmount,
-        filteredPaidCount: filteredPaid.count,
-        filteredPaidAmount: filteredPaid.totalAmount,
-        filteredPaidBDT: filteredPaid.totalBDT,
+
+        filteredUnpaidCount: periodUnpaid.count,
+        filteredUnpaidAmount: periodUnpaid.totalAmount,
+        filteredPaidCount: periodPaid.count,
+        filteredPaidAmount: periodPaid.totalAmount,
+        filteredPaidBDT: periodPaid.totalBDT,
     };
 }
 

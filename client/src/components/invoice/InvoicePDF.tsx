@@ -585,6 +585,7 @@ export default function InvoicePDF(props: InvoicePDFProps) {
                 ).toISOString(),
                 month: Number(props.month),
                 year: Number(props.year),
+                clientEmail: email,
                 items: props.orders.map((order) => ({
                     name: order.orderName,
                     price: order.perImagePrice * order.imageQuantity,

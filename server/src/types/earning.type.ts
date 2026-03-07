@@ -99,11 +99,10 @@ export interface EarningQueryParams {
     page?: number;
     limit?: number;
     clientId?: string;
+    clientIds?: string[];
     status?: EarningStatus;
     // Date filters
-    filterType?: 'today' | 'week' | 'month' | 'year' | 'range';
-    startDate?: string;
-    endDate?: string;
+    filterType?: 'today' | 'week' | 'month' | 'year';
     month?: number;
     year?: number;
 }

@@ -145,7 +145,7 @@ async function getMyShiftOffDates(userId: string) {
     }).lean();
 
     if (!assignment) {
-        throw new Error('No active shift assignment found');
+        return { dates: [], reason: null };
     }
 
     return getOffDates(assignment.shiftId.toString());

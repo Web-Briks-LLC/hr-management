@@ -51,9 +51,7 @@ export interface EarningFilters {
     limit?: number;
     clientId?: string;
     status?: EarningStatus;
-    filterType?: 'today' | 'week' | 'month' | 'year' | 'range';
-    startDate?: string;
-    endDate?: string;
+    filterType?: 'today' | 'week' | 'month' | 'year';
     month?: number;
     year?: number;
 }

@@ -2,6 +2,9 @@ import type { Request, Response } from "express";
 import { Types } from "mongoose";
 import earningService from "../services/earning.service.js";
 import commissionService from "../services/commission.service.js";
+import { isTelemarketer } from "../utils/telemarketer.util.js";
+import { Role } from "../constants/role.js";
+import ClientModel from "../models/client.model.js";
 import type {
     EarningQueryParams,
     WithdrawEarningData,
@@ -23,13 +26,26 @@ async function getAllEarnings(req: Request, res: Response) {
                 | "today"
                 | "week"
                 | "month"
-                | "year"
-                | "range";
-        if (req.query.startDate)
-            params.startDate = req.query.startDate as string;
-        if (req.query.endDate) params.endDate = req.query.endDate as string;
+                | "year";
         if (req.query.month) params.month = parseInt(req.query.month as string);
         if (req.query.year) params.year = parseInt(req.query.year as string);
+
+        // Security: Telemarketer ownership enforcement
+        if (
+            req.user &&
+            [Role.STAFF, Role.TEAM_LEADER].includes(req.user.role as Role)
+        ) {
+            const isTM = await isTelemarketer(req.user.id);
+            if (isTM) {
+                // Find all clients created by this telemarketer
+                const clients = await ClientModel.find({
+                    createdBy: req.user.id,
+                })
+                    .select("_id")
+                    .lean();
+                params.clientIds = clients.map((c) => c._id.toString());
+            }
+        }
 
         const result = await earningService.getEarningsWithDateFilter(params);
 
@@ -82,13 +98,26 @@ async function getEarningStats(req: Request, res: Response) {
                 | "today"
                 | "week"
                 | "month"
-                | "year"
-                | "range";
-        if (req.query.startDate)
-            params.startDate = req.query.startDate as string;
-        if (req.query.endDate) params.endDate = req.query.endDate as string;
+                | "year";
         if (req.query.month) params.month = parseInt(req.query.month as string);
         if (req.query.year) params.year = parseInt(req.query.year as string);
+        if (req.query.clientId) params.clientId = req.query.clientId as string;
+
+        // Security: Telemarketer ownership enforcement for stats
+        if (
+            req.user &&
+            [Role.STAFF, Role.TEAM_LEADER].includes(req.user.role as Role)
+        ) {
+            const isTM = await isTelemarketer(req.user.id);
+            if (isTM) {
+                const clients = await ClientModel.find({
+                    createdBy: req.user.id,
+                })
+                    .select("_id")
+                    .lean();
+                params.clientIds = clients.map((c) => c._id.toString());
+            }
+        }
 
         const stats = await earningService.getEarningStatsWithFilter(params);
 

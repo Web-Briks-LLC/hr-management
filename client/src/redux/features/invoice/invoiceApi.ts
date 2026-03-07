@@ -25,6 +25,7 @@ interface RecordInvoiceData {
     dateTo?: string;
     totalOrders?: number;
     companyName?: string;
+    clientEmail?: string;
     items: Array<{ name: string; price: number; quantity: number }>;
 }
 

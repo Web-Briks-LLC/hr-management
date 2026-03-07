@@ -42,12 +42,6 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-} from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
-import {
     Trash2,
     DollarSign,
     TrendingUp,
@@ -80,7 +74,6 @@ import {
     TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { toast } from "sonner";
-import { format } from "date-fns";
 import {
     useGetEarningsQuery,
     useGetEarningStatsQuery,
@@ -99,8 +92,9 @@ import type {
 } from "@/types/earning.type";
 import { CURRENCY_SYMBOLS, MONTHS } from "@/types/earning.type";
 import { cn } from "@/lib/utils";
+import { format } from "date-fns";
 
-type FilterType = "all" | "today" | "week" | "month" | "year" | "range";
+type FilterType = "all" | "today" | "week" | "month" | "year";
 
 // MONTHS moved to types file
 
@@ -120,7 +114,6 @@ export default function EarningsPage() {
         new Date().getMonth() + 1,
     );
     const [selectedYear, setSelectedYear] = useState(currentYear);
-    const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>({});
 
     // Dialog states
     const [isWithdrawDialogOpen, setIsWithdrawDialogOpen] = useState(false);
@@ -176,15 +169,6 @@ export default function EarningsPage() {
                 f.filterType = "year";
                 f.year = selectedYear;
                 break;
-            case "range":
-                if (dateRange.from) {
-                    f.filterType = "range";
-                    f.startDate = format(dateRange.from, "yyyy-MM-dd");
-                    if (dateRange.to) {
-                        f.endDate = format(dateRange.to, "yyyy-MM-dd");
-                    }
-                }
-                break;
         }
 
         if (clientFilter !== "all") f.clientId = clientFilter;
@@ -197,7 +181,6 @@ export default function EarningsPage() {
         clientFilter,
         selectedMonth,
         selectedYear,
-        dateRange,
     ]);
 
     // Queries
@@ -588,7 +571,6 @@ export default function EarningsPage() {
                                 <SelectItem value="week">This Week</SelectItem>
                                 <SelectItem value="month">Monthly</SelectItem>
                                 <SelectItem value="year">Yearly</SelectItem>
-                                <SelectItem value="range">Range</SelectItem>
                             </SelectContent>
                         </Select>
 
@@ -660,59 +642,6 @@ export default function EarningsPage() {
                                 </SelectContent>
                             </Select>
                         )}
-
-                        {filterType === "range" && (
-                            <Popover>
-                                <PopoverTrigger asChild>
-                                    <Button
-                                        variant="outline"
-                                        className="w-[240px] h-9 bg-background/60 justify-start text-left font-normal animate-in fade-in slide-in-from-left-2"
-                                    >
-                                        <CalendarIcon className=" h-4 w-4" />
-                                        {dateRange.from ? (
-                                            dateRange.to ? (
-                                                <>
-                                                    {format(
-                                                        dateRange.from,
-                                                        "MMM dd",
-                                                    )}{" "}
-                                                    -{" "}
-                                                    {format(
-                                                        dateRange.to,
-                                                        "MMM dd",
-                                                    )}
-                                                </>
-                                            ) : (
-                                                format(dateRange.from, "PPP")
-                                            )
-                                        ) : (
-                                            "Pick a date range"
-                                        )}
-                                    </Button>
-                                </PopoverTrigger>
-                                <PopoverContent
-                                    className="w-auto p-0"
-                                    align="start"
-                                >
-                                    <Calendar
-                                        mode="range"
-                                        selected={{
-                                            from: dateRange.from,
-                                            to: dateRange.to,
-                                        }}
-                                        onSelect={(range) =>
-                                            setDateRange({
-                                                from: range?.from,
-                                                to: range?.to,
-                                            })
-                                        }
-                                        numberOfMonths={2}
-                                    />
-                                </PopoverContent>
-                            </Popover>
-                        )}
-
-                        <div className="w-px h-6 bg-border mx-1" />
 
                         {/* Status Filter */}
                         <Select
@@ -892,22 +821,22 @@ export default function EarningsPage() {
                                                             earning.status ===
                                                                 "paid" &&
                                                                 earning.amountInBDT >
-                                                                    0
+                                                                0
                                                                 ? "text-green-600 font-medium hover:text-green-700"
                                                                 : earning.status ===
                                                                     "paid"
-                                                                  ? "text-orange-600 font-medium hover:text-orange-700"
-                                                                  : "text-orange-600 font-medium hover:text-orange-700",
+                                                                    ? "text-orange-600 font-medium hover:text-orange-700"
+                                                                    : "text-orange-600 font-medium hover:text-orange-700",
                                                         )}
                                                     >
                                                         <div className="flex items-center gap-1.5">
                                                             {earning.status ===
                                                                 "paid" &&
-                                                            earning.amountInBDT >
+                                                                earning.amountInBDT >
                                                                 0 ? (
                                                                 <CheckCircle2 className="h-4 w-4" />
                                                             ) : earning.status ===
-                                                              "paid" ? (
+                                                                "paid" ? (
                                                                 <AlertCircle className="h-4 w-4" />
                                                             ) : (
                                                                 <Clock className="h-4 w-4" />
@@ -935,14 +864,14 @@ export default function EarningsPage() {
                                             </TableCell>
                                             <TableCell className="text-right">
                                                 {earning.status === "paid" &&
-                                                earning.amountInBDT > 0 ? (
+                                                    earning.amountInBDT > 0 ? (
                                                     <span className="font-mono text-green-600/90 font-medium">
                                                         {formatCurrency(
                                                             earning.amountInBDT,
                                                         )}
                                                     </span>
                                                 ) : earning.status ===
-                                                  "paid" ? (
+                                                    "paid" ? (
                                                     <span className="text-orange-500/80 text-xs font-medium">
                                                         Pending
                                                     </span>
@@ -1004,20 +933,20 @@ export default function EarningsPage() {
                                                             "paid" &&
                                                             (!earning.amountInBDT ||
                                                                 earning.amountInBDT ===
-                                                                    0))) && (
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            className="h-8 w-8 text-foreground/70 hover:text-green-600"
-                                                            onClick={() =>
-                                                                handleWithdraw(
-                                                                    earning,
-                                                                )
-                                                            }
-                                                        >
-                                                            <Wallet className="h-4 w-4" />
-                                                        </Button>
-                                                    )}
+                                                                0))) && (
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="h-8 w-8 text-foreground/70 hover:text-green-600"
+                                                                onClick={() =>
+                                                                    handleWithdraw(
+                                                                        earning,
+                                                                    )
+                                                                }
+                                                            >
+                                                                <Wallet className="h-4 w-4" />
+                                                            </Button>
+                                                        )}
 
                                                     <Button
                                                         variant="ghost"
@@ -1431,7 +1360,7 @@ export default function EarningsPage() {
                                                     -
                                                     {formatCurrency(
                                                         selectedEarning.fees +
-                                                            selectedEarning.tax,
+                                                        selectedEarning.tax,
                                                         selectedEarning.currency,
                                                     )}
                                                 </div>
@@ -1465,11 +1394,11 @@ export default function EarningsPage() {
                                                 <div className="font-medium">
                                                     {selectedEarning.paidAt
                                                         ? format(
-                                                              new Date(
-                                                                  selectedEarning.paidAt,
-                                                              ),
-                                                              "P",
-                                                          )
+                                                            new Date(
+                                                                selectedEarning.paidAt,
+                                                            ),
+                                                            "P",
+                                                        )
                                                         : "-"}
                                                 </div>
                                             </div>
@@ -1712,7 +1641,7 @@ export default function EarningsPage() {
                                                 <span className="absolute left-3 top-2.5 text-muted-foreground text-sm font-medium">
                                                     {CURRENCY_SYMBOLS[
                                                         bulkOrdersData?.currency ||
-                                                            "USD"
+                                                        "USD"
                                                     ] || "$"}
                                                 </span>
                                                 <Input
@@ -1736,7 +1665,7 @@ export default function EarningsPage() {
                                                 <span className="absolute left-3 top-2.5 text-muted-foreground text-sm font-medium">
                                                     {CURRENCY_SYMBOLS[
                                                         bulkOrdersData?.currency ||
-                                                            "USD"
+                                                        "USD"
                                                     ] || "$"}
                                                 </span>
                                                 <Input

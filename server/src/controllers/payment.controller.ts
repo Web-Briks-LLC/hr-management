@@ -246,12 +246,15 @@ export const confirmPayment = async (
                 );
 
                 const order: any = await orderRes.json();
+                console.log(`[Payment] PayPal Order Status: ${order.status}`);
                 if (order.status === 'COMPLETED') {
                     // SECURITY: Verify PayPal paid amount matches invoice amount
                     const purchaseUnit = order.purchase_units?.[0];
                     const paidAmount = purchaseUnit?.amount?.value
                         ? parseFloat(purchaseUnit.amount.value)
                         : 0;
+
+                    console.log(`[Payment] Paid: ${paidAmount}, Expected: ${invoice.totalAmount}`);
 
                     if (paidAmount < invoice.totalAmount) {
                         console.error(
@@ -270,6 +273,8 @@ export const confirmPayment = async (
                     );
                     const reqInvoiceStr = String(invoiceNumber);
 
+                    console.log(`[Payment] RefID: ${referenceIdStr}, ReqInvoice: ${reqInvoiceStr}`);
+
                     if (referenceIdStr !== reqInvoiceStr) {
                         console.error(
                             `[Payment] PAYPAL INVOICE MISMATCH: Order ${paypalOrderId} ` +
@@ -283,11 +288,12 @@ export const confirmPayment = async (
                     verified = true;
                 } else {
                     console.warn(
-                        `[Payment] PayPal Order ${paypalOrderId} not completed: ${order.status}`,
+                        `[Payment] PayPal Order ${paypalOrderId} not completed: ${order.status}. Order data:`, JSON.stringify(order, null, 2)
                     );
                 }
             } catch (err) {
                 console.error('[Payment] Error verifying PayPal order:', err);
+                return res.status(500).json({ error: 'Internal server error during verification' });
             }
         }
 
@@ -416,14 +422,16 @@ export const confirmPayment = async (
                         }),
                     );
 
+                    const recipientEmail = (invoice.clientEmail || (client.emails[0] as string));
+
                     await sendMail({
-                        to: client.emails[0] as string,
+                        to: recipientEmail,
                         subject: `Receipt for Invoice #${invoice.invoiceNumber} - Web Briks`,
                         body: emailHtml,
                         fromName: 'Payment - Web Briks',
                     });
                     console.log(
-                        `[Payment] Receipt emailed to ${client.emails[0]}`,
+                        `[Payment] Receipt emailed to ${recipientEmail}`,
                     );
                 } catch (emailErr) {
                     console.error(

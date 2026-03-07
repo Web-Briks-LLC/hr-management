@@ -1,7 +1,6 @@
 import { endOfMonth, endOfYear } from 'date-fns';
 import EarningModel from '../models/earning.model.js';
 import ExpenseModel from '../models/expense.model.js';
-import OrderModel from '../models/order.model.js';
 import ProfitTransferModel from '../models/profit-transfer.model.js';
 import DebitModel, { DebitType } from '../models/Debit.js';
 import type {
@@ -57,22 +56,19 @@ async function getFinanceAnalytics(
     const year = params.year || now.getFullYear();
     const month = params.month; // Optional: 1-12
 
-    // Determine date range
+    // Determine date range for expense/transfer lookups
     let startDate: Date;
     let endDate: Date;
 
     if (month) {
-        // Specific Month
         startDate = new Date(year, month - 1, 1);
         endDate = endOfMonth(startDate);
     } else {
-        // Whole Year
         startDate = new Date(year, 0, 1);
         endDate = endOfYear(startDate);
     }
 
-    // Common Date Filters
-    // Earnings use 'year' and 'month' fields
+    // Common Date Filters for Earnings (uses year/month fields)
     const earningMatch: any = {
         status: 'paid',
         year: year,
@@ -85,33 +81,28 @@ async function getFinanceAnalytics(
     const expenseFilter: any = {
         date: { $gte: startDate, $lte: endDate },
     };
-    const orderFilter: any = {
-        status: 'delivered',
-        createdAt: { $gte: startDate, $lte: endDate },
-    };
 
     // Parallel fetch all data
     const [
         // Summary stats
         totalEarningsResult,
         totalExpensesResult,
-        totalOrdersResult,
-        deliveredOrdersResult,
-        unpaidOrdersResult,
-        unpaidByCurrencyResult,
         // Monthly trends
         monthlyEarnings,
         monthlyExpenses,
-        monthlyOrders,
+        monthlyOrdersResult,
         // Client breakdown
         clientEarnings,
-        clientOrders,
         // Expense categories
         expensesByCategory,
-        // Earnings by currency result
+        // Earnings by currency (Paid)
         earningsByCurrencyResult,
+        // Unpaid earnings by currency
+        unpaidByCurrencyResult,
+        // Total Billable (Summary)
+        totalBillableResult,
     ] = await Promise.all([
-        // Total earnings
+        // Total earnings (Paid)
         EarningModel.aggregate([
             { $match: earningMatch },
             { $group: { _id: null, total: { $sum: '$amountInBDT' } } },
@@ -121,31 +112,128 @@ async function getFinanceAnalytics(
             { $match: expenseFilter },
             { $group: { _id: null, total: { $sum: '$amount' } } },
         ]),
-        // Total orders (count only)
-        OrderModel.countDocuments({
-            createdAt: { $gte: startDate, $lte: endDate },
-        }),
-        // Delivered orders with revenue
-        OrderModel.aggregate([
-            { $match: orderFilter },
-            {
-                $group: {
-                    _id: null,
-                    count: { $sum: 1 },
-                    revenue: { $sum: '$totalPrice' },
-                },
-            },
-        ]),
-        // Unpaid earnings (from Earnings table directly)
+        // Monthly earnings (Full Year for Trends)
         EarningModel.aggregate([
             {
                 $match: {
-                    status: 'unpaid',
+                    status: 'paid',
+                    year: year,
+                },
+            },
+            {
+                $group: {
+                    _id: { month: '$month' },
+                    total: { $sum: '$amountInBDT' },
+                },
+            },
+        ]),
+        // Monthly expenses (Full Year)
+        ExpenseModel.aggregate([
+            {
+                $match: {
+                    date: {
+                        $gte: new Date(year, 0, 1),
+                        $lte: new Date(year, 11, 31, 23, 59, 59, 999),
+                    },
+                },
+            },
+            {
+                $group: {
+                    _id: { month: { $month: '$date' } },
+                    total: { $sum: '$amount' },
+                },
+            },
+        ]),
+        // Monthly orders (Full Year) - Based on Earning records for accurate billing counts
+        EarningModel.aggregate([
+            {
+                $match: {
+                    year: year,
+                },
+            },
+            {
+                $group: {
+                    _id: { month: '$month' },
+                    count: { $sum: { $size: { $ifNull: ['$orderIds', []] } } },
+                    revenue: { $sum: '$amountInBDT' },
+                },
+            },
+        ]),
+        // Client earnings (Filtered by selected period) - Includes all billing impact
+        EarningModel.aggregate([
+            {
+                $match: {
                     year: year,
                     ...(month && { month }),
                 },
             },
-            { $group: { _id: null, total: { $sum: '$amountInBDT' } } },
+            {
+                $group: {
+                    _id: '$clientId',
+                    paidEarnings: {
+                        $sum: {
+                            $cond: [
+                                { $eq: ['$status', 'paid'] },
+                                '$amountInBDT',
+                                0,
+                            ],
+                        },
+                    },
+                    unpaidRevenue: {
+                        $sum: {
+                            $cond: [
+                                { $eq: ['$status', 'unpaid'] },
+                                '$amountInBDT',
+                                0,
+                            ],
+                        },
+                    },
+                    totalOrders: {
+                        $sum: { $size: { $ifNull: ['$orderIds', []] } },
+                    },
+                },
+            },
+            {
+                $lookup: {
+                    from: 'clients',
+                    localField: '_id',
+                    foreignField: '_id',
+                    as: 'client',
+                },
+            },
+            { $unwind: { path: '$client', preserveNullAndEmptyArrays: true } },
+            {
+                $addFields: {
+                    totalRevenue: { $add: ['$paidEarnings', '$unpaidRevenue'] },
+                },
+            },
+            { $sort: { totalRevenue: -1 } },
+            { $limit: 10 },
+        ]),
+        // Expenses by category (Filtered by selected period)
+        ExpenseModel.aggregate([
+            { $match: expenseFilter },
+            {
+                $group: {
+                    _id: '$categoryId',
+                    total: { $sum: '$amount' },
+                },
+            },
+            {
+                $lookup: {
+                    from: 'expensecategories',
+                    localField: '_id',
+                    foreignField: '_id',
+                    as: 'category',
+                },
+            },
+            {
+                $unwind: {
+                    path: '$category',
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            { $sort: { total: -1 } },
         ]),
         // Earnings by currency (Paid)
         EarningModel.aggregate([
@@ -177,175 +265,68 @@ async function getFinanceAnalytics(
                 $group: {
                     _id: '$currency',
                     amount: { $sum: '$totalAmount' },
+                    totalBDT: { $sum: '$amountInBDT' },
                 },
             },
         ]),
-        // Monthly earnings (Full Year for Trends)
+        // Total Billable (Summary)
         EarningModel.aggregate([
             {
                 $match: {
-                    status: 'paid',
                     year: year,
+                    ...(month && { month }),
                 },
             },
             {
                 $group: {
-                    _id: {
-                        month: '$month',
-                        year: '$year',
-                    },
-                    total: { $sum: '$amountInBDT' },
-                },
-            },
-            { $sort: { '_id.month': 1 } },
-        ]),
-        // Monthly expenses (Full Year)
-        ExpenseModel.aggregate([
-            {
-                $match: {
-                    date: {
-                        $gte: new Date(year, 0, 1),
-                        $lte: new Date(year, 11, 31),
+                    _id: null,
+                    totalBDT: { $sum: '$amountInBDT' },
+                    totalOrders: {
+                        $sum: { $size: { $ifNull: ['$orderIds', []] } },
                     },
                 },
             },
-            {
-                $group: {
-                    _id: {
-                        month: { $month: '$date' },
-                        year: { $year: '$date' },
-                    },
-                    total: { $sum: '$amount' },
-                },
-            },
-            { $sort: { '_id.month': 1 } },
-        ]),
-        // Monthly orders (Full Year)
-        OrderModel.aggregate([
-            {
-                $match: {
-                    status: 'delivered',
-                    createdAt: {
-                        $gte: new Date(year, 0, 1),
-                        $lte: new Date(year, 11, 31),
-                    },
-                },
-            },
-            {
-                $group: {
-                    _id: {
-                        month: { $month: '$createdAt' },
-                        year: { $year: '$createdAt' },
-                    },
-                    count: { $sum: 1 },
-                    revenue: { $sum: '$totalPrice' },
-                },
-            },
-            { $sort: { '_id.month': 1 } },
-        ]),
-        // Client earnings (Filtered by selected period)
-        EarningModel.aggregate([
-            { $match: earningMatch },
-            {
-                $group: {
-                    _id: '$clientId',
-                    totalEarnings: { $sum: '$amountInBDT' },
-                },
-            },
-            {
-                $lookup: {
-                    from: 'clients',
-                    localField: '_id',
-                    foreignField: '_id',
-                    as: 'client',
-                },
-            },
-            { $unwind: { path: '$client', preserveNullAndEmptyArrays: true } },
-            { $sort: { totalEarnings: -1 } },
-            { $limit: 10 },
-        ]),
-        // Client orders (Filtered by selected period)
-        OrderModel.aggregate([
-            { $match: orderFilter },
-            {
-                $group: {
-                    _id: '$clientId',
-                    totalOrders: { $sum: 1 },
-                    totalRevenue: { $sum: '$totalPrice' },
-                },
-            },
-        ]),
-        // Expenses by category (Filtered by selected period)
-        ExpenseModel.aggregate([
-            { $match: expenseFilter },
-            {
-                $group: {
-                    _id: '$categoryId',
-                    total: { $sum: '$amount' },
-                },
-            },
-            {
-                $lookup: {
-                    from: 'expensecategories',
-                    localField: '_id',
-                    foreignField: '_id',
-                    as: 'category',
-                },
-            },
-            {
-                $unwind: {
-                    path: '$category',
-                    preserveNullAndEmptyArrays: true,
-                },
-            },
-            { $sort: { total: -1 } },
         ]),
     ]);
 
-    // Build summary
+    // Build summary calculations
     const totalEarnings = totalEarningsResult[0]?.total || 0;
     const totalExpenses = totalExpensesResult[0]?.total || 0;
-    const deliveredData = deliveredOrdersResult[0] || { count: 0, revenue: 0 };
-    const unpaidRevenue = unpaidOrdersResult[0]?.total || 0;
 
-    // Process unpaid by currency with approximate BDT rates
+    const totalRevenue = totalBillableResult[0]?.totalBDT || 0;
+    const deliveredOrdersCount = totalBillableResult[0]?.totalOrders || 0;
+
+    // Process unpaid and paid totals
+    const unpaidRevenue = (unpaidByCurrencyResult || []).reduce(
+        (sum: number, item: any) => sum + (item.totalBDT || 0),
+        0,
+    );
+
+    // Process earnings by currency
+    const earningsByCurrency = (earningsByCurrencyResult || []).map(
+        (item: any) => ({
+            currency: item._id || 'USD',
+            amount: item.amount || 0,
+            amountBDT: item.totalBDT || 0,
+        }),
+    );
+
+    const unpaidByCurrency = (unpaidByCurrencyResult || []).map(
+        (item: any) => ({
+            currency: item._id || 'USD',
+            amount: item.amount || 0,
+            amountBDT: item.totalBDT || 0,
+        }),
+    );
+
+    // Calculate profit
+    const totalProfit = totalEarnings - totalExpenses;
+
     const APPROX_RATES: Record<string, number> = {
         USD: 117,
         EUR: 127,
         GBP: 148,
     };
-    const unpaidByCurrency = (unpaidByCurrencyResult || []).map((item: any) => {
-        const currency = item._id || 'USD';
-        const rate = APPROX_RATES[currency] || 117;
-        return {
-            currency,
-            amount: item.amount || 0,
-            amountBDT: Math.round((item.amount || 0) * rate),
-        };
-    });
-
-    // Process earnings by currency
-    const earningsByCurrency = (earningsByCurrencyResult || []).map(
-        (item: any) => {
-            const currency = item._id || 'USD';
-            // Use stored aggregated BDT if available, otherwise fallback to rate calc
-            const storedBDT = item.totalBDT || 0;
-            const rate = APPROX_RATES[currency] || 117;
-
-            return {
-                currency,
-                amount: item.amount || 0,
-                amountBDT:
-                    storedBDT > 0
-                        ? storedBDT
-                        : Math.round((item.amount || 0) * rate),
-            };
-        },
-    );
-
-    // Calculate approximate Expenses and Profit in USD/EUR
-    // Base totals are in BDT
-    const totalProfit = totalEarnings - totalExpenses;
 
     const expensesByCurrency = Object.keys(APPROX_RATES).map((currency) => ({
         currency,
@@ -404,18 +385,14 @@ async function getFinanceAnalytics(
     const totalDebit = totalBorrow - totalReturn; // Net amount owed to us (All Time)
 
     // --- CUMULATIVE STATS FOR FINAL AMOUNT ---
-    // We want Final Amount to be: (All Time Earnings up to endDate) - (All Time Expenses up to endDate) - (All Time Shared up to endDate) + All Time Debit
-
-    // Cumulative Filters
+    // Final Amount = Cumulative Profit + All Time Debit up to selected year/month
     const cumulativeEarningMatch: any = { status: 'paid' };
     if (month) {
-        // Up to specific month of year: (year < selectedYear) OR (year == selectedYear AND month <= selectedMonth)
         cumulativeEarningMatch.$or = [
             { year: { $lt: year } },
             { year: year, month: { $lte: month } },
         ];
     } else {
-        // Up to end of selected year
         cumulativeEarningMatch.year = { $lte: year };
     }
 
@@ -453,8 +430,6 @@ async function getFinanceAnalytics(
         (cumTransfersResult[0]?.total || 0) +
         (cumDistributionsResult[0]?.total || 0);
 
-    // Final Amount = Cumulative Profit + All Time Debit
-    // Logic update: Only add Debit if year >= 2025
     let finalAmount = cumEarnings - cumExpenses - cumShared;
     if (year >= 2025) {
         finalAmount += totalDebit;
@@ -467,27 +442,25 @@ async function getFinanceAnalytics(
         expensesByCurrency,
         totalProfit,
         profitByCurrency,
-        totalRevenue: deliveredData.revenue,
+        totalRevenue,
         unpaidRevenue,
         unpaidByCurrency,
         totalShared,
         totalDebit,
         finalAmount,
-        totalOrders: totalOrdersResult,
-        deliveredOrders: deliveredData.count,
+        totalOrders: deliveredOrdersCount, // Using accurate billing orders
+        deliveredOrders: deliveredOrdersCount,
     };
 
     // Build monthly trends (12 months of the selected year)
-    // Note: If 'month' param was passed, this still returns full year trends to keep charts context,
-    // OR it could return just that one month.
-    // Decision: Return full year trends so charts look good (contextual).
     const monthlyTrends: IMonthlyFinance[] = [];
 
-    // Loop for 12 months of the requested year
     for (let m = 1; m <= 12; m++) {
         const earningData = monthlyEarnings.find((e: any) => e._id.month === m);
         const expenseData = monthlyExpenses.find((e: any) => e._id.month === m);
-        const orderData = monthlyOrders.find((o: any) => o._id.month === m);
+        const orderData = monthlyOrdersResult.find(
+            (o: any) => o._id.month === m,
+        );
 
         const earnings = earningData?.total || 0;
         const expenses = expenseData?.total || 0;
@@ -505,24 +478,14 @@ async function getFinanceAnalytics(
     }
 
     // Build client breakdown
-    const clientOrdersMap = new Map(
-        clientOrders.map((c: any) => [c._id?.toString(), c]),
-    );
-
-    const clientBreakdown: IClientFinance[] = clientEarnings.map((c: any) => {
-        const orderData = clientOrdersMap.get(c._id?.toString()) || {
-            totalOrders: 0,
-            totalRevenue: 0,
-        };
-        return {
-            clientId: c._id,
-            clientName: c.client?.name || 'Unknown',
-            totalEarnings: c.totalEarnings,
-            totalOrders: orderData.totalOrders,
-            totalRevenue: orderData.totalRevenue,
-            unpaidRevenue: 0,
-        };
-    });
+    const clientBreakdown: IClientFinance[] = clientEarnings.map((c: any) => ({
+        clientId: c._id,
+        clientName: c.client?.name || 'Unknown',
+        totalEarnings: c.paidEarnings,
+        totalOrders: c.totalOrders,
+        totalRevenue: c.totalRevenue,
+        unpaidRevenue: c.unpaidRevenue,
+    }));
 
     // Build expenses by category
     const expensesByCategoryFormatted = expensesByCategory.map((e: any) => ({

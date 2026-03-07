@@ -4,6 +4,8 @@ export interface IInvoiceRecord {
     invoiceNumber: string;
     clientName: string;
     clientId: string; // Add the string clientId for query purposes
+    clientEmail?: string; // The specific email the invoice was sent to
+
     clientAddress: string;
     totalAmount: number;
     currency: string;
@@ -31,6 +33,8 @@ const invoiceRecordSchema = new Schema<IInvoiceRecord>(
         invoiceNumber: { type: String, required: true, unique: true },
         clientName: { type: String, required: true },
         clientId: { type: String, required: true },
+        clientEmail: { type: String },
+
         clientAddress: { type: String, required: true },
         totalAmount: { type: Number, required: true },
         currency: { type: String, required: true, default: "USD" },
