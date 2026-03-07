@@ -20,6 +20,17 @@ export interface IEarning {
     conversionRate: number;
     netAmount: number;
     amountInBDT: number;
+    paidAmount: number;
+    paidAmountBDT: number;
+    payments: Array<{
+        invoiceNumber: string;
+        amount: number;
+        amountInBDT: number;
+        method: string;
+        transactionId: string;
+        paidAt: string;
+        conversionRate: number;
+    }>;
     status: EarningStatus;
     paidAt?: string;
     paidBy?: string;
@@ -32,6 +43,10 @@ export interface IEarning {
 }
 
 export interface WithdrawEarningInput {
+    amount?: number;
+    method?: string;
+    invoiceNumber?: string;
+    transactionId?: string;
     fees?: number;
     tax?: number;
     conversionRate: number;

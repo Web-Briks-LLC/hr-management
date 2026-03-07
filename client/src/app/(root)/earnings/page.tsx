@@ -66,6 +66,7 @@ import {
     Info,
     Receipt,
     ArrowRight,
+    History as HistoryIcon,
 } from "lucide-react";
 import {
     Tooltip,
@@ -84,6 +85,7 @@ import {
     useUpdateEarningMutation,
     useDeleteEarningMutation,
 } from "@/redux/features/earning/earningApi";
+import { useGetInvoicesQuery } from "@/redux/features/invoice/invoiceApi";
 import { useGetClientsQuery } from "@/redux/features/client/clientApi";
 import type {
     IEarning,
@@ -133,6 +135,8 @@ export default function EarningsPage() {
 
     // Withdraw form state
 
+    const [withdrawAmount, setWithdrawAmount] = useState("");
+    const [withdrawMethod, setWithdrawMethod] = useState("Cash");
     const [withdrawFees, setWithdrawFees] = useState("0");
     const [withdrawTax, setWithdrawTax] = useState("0");
     const [withdrawRate, setWithdrawRate] = useState("");
@@ -227,6 +231,21 @@ export default function EarningsPage() {
         getClientOrders,
     ]);
 
+    const [withdrawInvoiceNumber, setWithdrawInvoiceNumber] = useState("");
+    const [withdrawTransactionId, setWithdrawTransactionId] = useState("");
+
+    // Fetch invoices for selection in withdraw dialog
+    const { data: invoicesData } = useGetInvoicesQuery(
+        {
+            clientId: selectedEarning?.clientId?._id,
+            month: selectedEarning?.month,
+            year: selectedEarning?.year,
+            status: "pending",
+        },
+        { skip: !isWithdrawDialogOpen || !selectedEarning },
+    );
+    const pendingInvoices = invoicesData?.invoices || [];
+
     // Mutations
     const [withdrawEarning, { isLoading: isWithdrawing }] =
         useWithdrawEarningMutation();
@@ -241,12 +260,17 @@ export default function EarningsPage() {
     const clients = clientsData?.clients || [];
 
     // Withdraw calculations
+    const rawAmount = parseFloat(withdrawAmount);
+    const withdrawAmountNum = isNaN(rawAmount)
+        ? Math.max(0, (selectedEarning?.totalAmount || 0) - (selectedEarning?.paidAmount || 0))
+        : rawAmount;
+
     const withdrawFeesNum = parseFloat(withdrawFees) || 0;
     const withdrawTaxNum = parseFloat(withdrawTax) || 0;
-    const withdrawRateNum = parseFloat(withdrawRate) || 1;
-    const withdrawNetAmount =
-        (selectedEarning?.totalAmount || 0) - withdrawFeesNum - withdrawTaxNum;
-    const withdrawBDT = withdrawNetAmount * withdrawRateNum;
+    const withdrawRateNum = parseFloat(withdrawRate) || 0;
+
+    const withdrawNetAmount = Math.max(0, withdrawAmountNum - withdrawFeesNum - withdrawTaxNum);
+    const withdrawBDT = Math.round(withdrawNetAmount * withdrawRateNum);
 
     // Bulk withdraw calculations
     const bulkOrdersData = clientOrdersData?.data;
@@ -313,21 +337,34 @@ export default function EarningsPage() {
     };
 
     const handleWithdraw = (earning: IEarning) => {
+        const remaining = Math.max(0, earning.totalAmount - earning.paidAmount);
         setSelectedEarning(earning);
+        setWithdrawAmount(remaining.toFixed(2));
+        setWithdrawMethod("Cash");
         setWithdrawFees("0");
         setWithdrawTax("0");
-        setWithdrawRate("");
+        setWithdrawRate(earning.conversionRate > 0 ? earning.conversionRate.toString() : "");
         setWithdrawNotes("");
+        setWithdrawInvoiceNumber("manual");
+        setWithdrawTransactionId("");
         setIsWithdrawDialogOpen(true);
     };
 
     const handleConfirmWithdraw = async () => {
-        if (!selectedEarning) return;
+        if (!selectedEarning || !withdrawRateNum) return;
 
         try {
             await withdrawEarning({
                 id: selectedEarning._id,
                 data: {
+                    amount: withdrawAmountNum, // manual amount
+                    method: withdrawMethod,
+                    invoiceNumber:
+                        withdrawInvoiceNumber === "manual" ||
+                            !withdrawInvoiceNumber
+                            ? undefined
+                            : withdrawInvoiceNumber,
+                    transactionId: withdrawTransactionId || undefined,
                     fees: withdrawFeesNum,
                     tax: withdrawTaxNum,
                     conversionRate: withdrawRateNum,
@@ -335,12 +372,16 @@ export default function EarningsPage() {
                 },
             }).unwrap();
 
-            toast.success("Earning withdrawn successfully");
+            toast.success("Payment recorded successfully");
             setIsWithdrawDialogOpen(false);
-            setSelectedEarning(null);
-        } catch (error) {
-            console.error("Error withdrawing:", error);
-            toast.error("Failed to withdraw earning");
+            setWithdrawAmount("");
+            setWithdrawFees("0");
+            setWithdrawTax("0");
+            setWithdrawNotes("");
+            setWithdrawInvoiceNumber("");
+            setWithdrawTransactionId("");
+        } catch (error: any) {
+            toast.error(error.data?.message || "Failed to record payment");
         }
     };
 
@@ -799,10 +840,31 @@ export default function EarningsPage() {
                                                     "-"}
                                             </TableCell>
                                             <TableCell className="text-right font-medium">
-                                                {formatCurrency(
-                                                    earning.totalAmount,
-                                                    earning.currency,
-                                                )}
+                                                <div className="flex flex-col items-end gap-1">
+                                                    <span className={cn(
+                                                        "text-sm font-semibold",
+                                                        earning.status === "unpaid" && earning.paidAmount > 0 && "text-orange-600"
+                                                    )}>
+                                                        {formatCurrency(
+                                                            earning.totalAmount,
+                                                            earning.currency,
+                                                        )}
+                                                    </span>
+                                                    {earning.paidAmount > 0 && earning.status !== "paid" && (
+                                                        <div className="w-24 space-y-1">
+                                                            <div className="flex justify-between text-[10px] text-muted-foreground font-normal">
+                                                                <span>Paid</span>
+                                                                <span>{Math.round((earning.paidAmount / earning.totalAmount) * 100)}%</span>
+                                                            </div>
+                                                            <div className="h-1 w-full bg-muted rounded-full overflow-hidden">
+                                                                <div
+                                                                    className="h-full bg-orange-500 rounded-full"
+                                                                    style={{ width: `${(earning.paidAmount / earning.totalAmount) * 100}%` }}
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </TableCell>
                                             <TableCell>
                                                 <Select
@@ -817,32 +879,24 @@ export default function EarningsPage() {
                                                 >
                                                     <SelectTrigger
                                                         className={cn(
-                                                            "w-[110px] h-8 border-none focus:ring-0 focus:ring-offset-0",
-                                                            earning.status ===
-                                                                "paid" &&
-                                                                earning.amountInBDT >
-                                                                0
+                                                            "w-auto h-8 border-none focus:ring-0 focus:ring-offset-0",
+                                                            earning.status === "paid"
                                                                 ? "text-green-600 font-medium hover:text-green-700"
-                                                                : earning.status ===
-                                                                    "paid"
-                                                                    ? "text-orange-600 font-medium hover:text-orange-700"
+                                                                : earning.paidAmount > 0
+                                                                    ? "text-yellow-500 font-medium hover:text-yellow-600"
                                                                     : "text-orange-600 font-medium hover:text-orange-700",
                                                         )}
                                                     >
                                                         <div className="flex items-center gap-1.5">
-                                                            {earning.status ===
-                                                                "paid" &&
-                                                                earning.amountInBDT >
-                                                                0 ? (
+                                                            {earning.status === "paid" ? (
                                                                 <CheckCircle2 className="h-4 w-4" />
-                                                            ) : earning.status ===
-                                                                "paid" ? (
-                                                                <AlertCircle className="h-4 w-4" />
+                                                            ) : earning.paidAmount > 0 ? (
+                                                                <HistoryIcon className="h-4 w-4" />
                                                             ) : (
                                                                 <Clock className="h-4 w-4" />
                                                             )}
-                                                            <span className="capitalize">
-                                                                {earning.status}
+                                                            <span className="capitalize text-xs font-semibold">
+                                                                {earning.status === "unpaid" && earning.paidAmount > 0 ? "Partially Paid" : earning.status}
                                                             </span>
                                                         </div>
                                                     </SelectTrigger>
@@ -851,6 +905,12 @@ export default function EarningsPage() {
                                                             <span className="flex items-center gap-2 text-orange-600">
                                                                 <XCircle className="h-4 w-4" />{" "}
                                                                 Unpaid
+                                                            </span>
+                                                        </SelectItem>
+                                                        <SelectItem value="partialPaid">
+                                                            <span className="flex items-center gap-2 text-yellow-600">
+                                                                <HistoryIcon className="h-4 w-4" />{" "}
+                                                                Partially Paid
                                                             </span>
                                                         </SelectItem>
                                                         <SelectItem value="paid">
@@ -1148,44 +1208,43 @@ export default function EarningsPage() {
                     </DialogHeader>
                     {selectedEarning && (
                         <div className="space-y-4 pt-2">
-                            <div className="p-4 bg-muted/40 rounded-lg space-y-3">
-                                <div className="flex justify-between text-sm">
-                                    <span className="text-muted-foreground">
-                                        Total Amount
-                                    </span>
-                                    <span className="font-semibold">
+                            <div className="flex items-center justify-between p-4 bg-muted/40 rounded-xl border border-border/50">
+                                <div className="space-y-1">
+                                    <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                                        Total Balance
+                                    </div>
+                                    <div className="text-xl font-bold">
                                         {formatCurrency(
                                             selectedEarning.totalAmount,
                                             selectedEarning.currency,
                                         )}
-                                    </span>
+                                    </div>
                                 </div>
-                                <div className="border-t border-border/50 pt-3 flex items-center justify-between">
-                                    <span className="text-muted-foreground text-sm">
-                                        Net Rate (BDT)
-                                    </span>
-                                    <Input
-                                        type="number"
-                                        value={withdrawRate}
-                                        onChange={(e) =>
-                                            setWithdrawRate(e.target.value)
-                                        }
-                                        className="w-24 h-8 text-right font-mono"
-                                    />
+                                <div className="h-10 w-px bg-border/50" />
+                                <div className="space-y-1 text-right">
+                                    <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                                        Remaining
+                                    </div>
+                                    <div className="text-xl font-bold text-orange-600">
+                                        {formatCurrency(
+                                            Math.max(0, selectedEarning.totalAmount - selectedEarning.paidAmount),
+                                            selectedEarning.currency,
+                                        )}
+                                    </div>
                                 </div>
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-1.5">
-                                    <Label>Fees</Label>
+                                    <Label className="text-xs font-semibold">Amount to Pay</Label>
                                     <div className="relative">
                                         <Input
                                             type="number"
-                                            value={withdrawFees}
+                                            value={withdrawAmount}
                                             onChange={(e) =>
-                                                setWithdrawFees(e.target.value)
+                                                setWithdrawAmount(e.target.value)
                                             }
-                                            className="pl-6"
+                                            className="pl-6 h-9"
                                         />
                                         <span className="absolute left-2.5 top-2.5 text-muted-foreground text-xs">
                                             $
@@ -1193,7 +1252,100 @@ export default function EarningsPage() {
                                     </div>
                                 </div>
                                 <div className="space-y-1.5">
-                                    <Label>Tax</Label>
+                                    <Label className="text-xs font-semibold">Method</Label>
+                                    <Select
+                                        value={withdrawMethod}
+                                        onValueChange={setWithdrawMethod}
+                                    >
+                                        <SelectTrigger className="h-9">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="Cash">Cash</SelectItem>
+                                            <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                                            <SelectItem value="PayPal">PayPal (Manual)</SelectItem>
+                                            <SelectItem value="Stripe">Stripe (Manual)</SelectItem>
+                                            <SelectItem value="Check">Check</SelectItem>
+                                            <SelectItem value="Other">Other</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs font-semibold">Select Invoice (Optional)</Label>
+                                    <Select
+                                        value={withdrawInvoiceNumber}
+                                        onValueChange={(val) => {
+                                            setWithdrawInvoiceNumber(val);
+                                            // Auto-fill amount if an invoice is selected
+                                            const selectedInv = pendingInvoices.find((i: any) => i.invoiceNumber === val);
+                                            if (selectedInv) {
+                                                setWithdrawAmount(selectedInv.totalAmount.toString());
+                                            }
+                                        }}
+                                    >
+                                        <SelectTrigger className="h-9">
+                                            <SelectValue placeholder="Manual Entry" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="manual">None / Manual</SelectItem>
+                                            {pendingInvoices.map((inv: any) => (
+                                                <SelectItem key={inv.invoiceNumber} value={inv.invoiceNumber}>
+                                                    #{inv.invoiceNumber} - {formatCurrency(inv.totalAmount, inv.currency)}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs font-semibold">Reference ID / Inv #</Label>
+                                    <Input
+                                        value={withdrawTransactionId}
+                                        onChange={(e) => setWithdrawTransactionId(e.target.value)}
+                                        placeholder="e.g. PayPal-998 or Manual-101"
+                                        className="h-9"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-3 gap-4">
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs font-semibold">Conversion Rate</Label>
+                                    <div className="relative">
+                                        <Input
+                                            type="number"
+                                            value={withdrawRate}
+                                            onChange={(e) =>
+                                                setWithdrawRate(e.target.value)
+                                            }
+                                            placeholder="e.g. 120"
+                                            className="pl-12 h-9"
+                                        />
+                                        <span className="absolute left-2 top-2.5 text-muted-foreground text-[10px] font-medium border-r pr-1.5 leading-none h-4 flex items-center">
+                                            $ → BDT
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs font-semibold">Fees</Label>
+                                    <div className="relative">
+                                        <Input
+                                            type="number"
+                                            value={withdrawFees}
+                                            onChange={(e) =>
+                                                setWithdrawFees(e.target.value)
+                                            }
+                                            className="pl-6 h-9"
+                                        />
+                                        <span className="absolute left-2.5 top-2.5 text-muted-foreground text-xs">
+                                            $
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs font-semibold">Tax</Label>
                                     <div className="relative">
                                         <Input
                                             type="number"
@@ -1201,7 +1353,7 @@ export default function EarningsPage() {
                                             onChange={(e) =>
                                                 setWithdrawTax(e.target.value)
                                             }
-                                            className="pl-6"
+                                            className="pl-6 h-9"
                                         />
                                         <span className="absolute left-2.5 top-2.5 text-muted-foreground text-xs">
                                             $
@@ -1264,7 +1416,7 @@ export default function EarningsPage() {
                             {isWithdrawing && (
                                 <Loader className="h-4 w-4  animate-spin" />
                             )}
-                            Confirm Withdrawal
+                            Record Payment
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -1416,8 +1568,41 @@ export default function EarningsPage() {
                                     </>
                                 )}
 
+                                {selectedEarning.payments && selectedEarning.payments.length > 0 && (
+                                    <div className="space-y-2">
+                                        <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                                            <HistoryIcon className="h-3 w-3" />
+                                            Payment Ledger
+                                        </div>
+                                        <div className="rounded-lg border overflow-hidden">
+                                            <Table className="text-[11px]">
+                                                <TableHeader className="bg-muted/30">
+                                                    <TableRow className="h-8">
+                                                        <TableHead className="h-8">Invoice</TableHead>
+                                                        <TableHead className="h-8">Method</TableHead>
+                                                        <TableHead className="h-8 text-right">Amount</TableHead>
+                                                    </TableRow>
+                                                </TableHeader>
+                                                <TableBody>
+                                                    {selectedEarning.payments.map((payment, idx) => (
+                                                        <TableRow key={idx} className="h-8">
+                                                            <TableCell className="h-8 font-mono py-1">
+                                                                #{payment.invoiceNumber}
+                                                            </TableCell>
+                                                            <TableCell className="h-8 py-1">{payment.method}</TableCell>
+                                                            <TableCell className="h-8 text-right py-1 font-medium">
+                                                                {formatCurrency(payment.amount, selectedEarning.currency)}
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    ))}
+                                                </TableBody>
+                                            </Table>
+                                        </div>
+                                    </div>
+                                )}
+
                                 {selectedEarning.notes && (
-                                    <div className="text-sm bg-muted/20 p-3 rounded italic text-muted-foreground border border-border/50">
+                                    <div className="text-xs bg-muted/20 p-2.5 rounded italic text-muted-foreground border border-border/50">
                                         &quot;{selectedEarning.notes}&quot;
                                     </div>
                                 )}

@@ -155,6 +155,15 @@ const orderSchema = new Schema<IOrder>(
         deliveredAt: {
             type: Date,
         },
+        invoiceNumber: {
+            type: String,
+            index: true,
+        },
+        isPaid: {
+            type: Boolean,
+            default: false,
+            index: true,
+        },
         createdBy: {
             type: Schema.Types.ObjectId,
             ref: 'User',

@@ -79,6 +79,25 @@ const EarningSchema = new Schema<IEarning>(
             default: 'unpaid',
             index: true,
         },
+        paidAmount: {
+            type: Number,
+            default: 0,
+        },
+        paidAmountBDT: {
+            type: Number,
+            default: 0,
+        },
+        payments: [
+            {
+                invoiceNumber: String,
+                amount: Number,
+                amountInBDT: Number,
+                method: String,
+                transactionId: String,
+                paidAt: Date,
+                conversionRate: Number,
+            },
+        ],
         paidAt: {
             type: Date,
         },

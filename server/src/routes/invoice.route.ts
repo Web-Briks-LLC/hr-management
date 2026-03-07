@@ -5,6 +5,7 @@ import {
     sendInvoiceEmailHandler,
     recordInvoice,
     getInvoiceByNumber,
+    getInvoices,
 } from "../controllers/invoice.controller.js";
 import { upload } from "../middlewares/upload.middleware.js";
 
@@ -14,6 +15,7 @@ router.get("/next-number", getNextInvoiceNumber);
 router.get("/current-number", getCurrentInvoiceNumber);
 router.post("/send-email", upload.single("file"), sendInvoiceEmailHandler);
 router.post("/record", recordInvoice);
+router.get("/", getInvoices);
 router.get("/public/:invoiceNumber", getInvoiceByNumber);
 
 export default router;

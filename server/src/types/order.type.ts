@@ -49,6 +49,8 @@ export interface IOrder extends Document {
     timeline: ITimelineEntry[];
     completedAt?: Date;
     deliveredAt?: Date;
+    invoiceNumber?: string;
+    isPaid?: boolean;
     createdBy: Types.ObjectId;
     createdAt: Date;
     updatedAt: Date;

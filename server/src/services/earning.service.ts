@@ -185,28 +185,89 @@ async function withdrawEarning(
 
     const fees = data.fees ?? 0;
     const tax = data.tax ?? 0;
-    const netAmount = earning.totalAmount - fees - tax;
-    const amountInBDT = netAmount * data.conversionRate;
+    const amountToApply = data.amount ?? earning.totalAmount - earning.paidAmount;
+    
+    // Net amount for THIS payment
+    const netAmountThisPayment = amountToApply - fees - tax;
+    const amountInBDTThisPayment = netAmountThisPayment * data.conversionRate;
 
-    return EarningModel.findByIdAndUpdate(
+    const paymentRecord = {
+        invoiceNumber: data.invoiceNumber || `MANUAL-${new Date().getTime()}`,
+        amount: amountToApply,
+        amountInBDT: amountInBDTThisPayment,
+        method: data.method || 'Manual',
+        transactionId: data.transactionId || `MAN-TXN-${new Date().getTime()}`,
+        paidAt: new Date(),
+        conversionRate: data.conversionRate,
+    };
+
+    // Use atomic update to avoid race conditions
+    const updatedEarning = await EarningModel.findByIdAndUpdate(
         earningId,
         {
+            $inc: {
+                paidAmount: amountToApply,
+                paidAmountBDT: amountInBDTThisPayment,
+                fees: fees,
+                tax: tax,
+            },
+            $push: {
+                payments: paymentRecord,
+            },
             $set: {
-                fees,
-                tax,
-                conversionRate: data.conversionRate,
-                netAmount,
-                amountInBDT,
-                status: 'paid',
-                paidAt: new Date(),
-                paidBy: data.paidBy,
-                notes: data.notes,
+                conversionRate: data.conversionRate, // Update latest rate
+                paidBy: new Types.ObjectId(data.paidBy),
             },
         },
         { new: true },
-    )
-        .populate('clientId', 'clientId name email currency')
-        .lean() as Promise<IEarning | null>;
+    );
+
+    if (!updatedEarning) return null;
+
+    // Check if fully paid to update status and paidAt
+    if (updatedEarning.paidAmount >= updatedEarning.totalAmount - 0.01) { // tiny margin for float precision
+        updatedEarning.status = 'paid';
+        updatedEarning.paidAt = new Date();
+        await updatedEarning.save();
+
+        // Sync ALL linked orders if month is fully paid
+        if (updatedEarning.orderIds.length > 0) {
+            const OrderModel = (await import('../models/order.model.js')).default;
+            await OrderModel.updateMany(
+                { _id: { $in: updatedEarning.orderIds } },
+                { $set: { isPaid: true } },
+            );
+        }
+
+        // Trigger commission processing
+        try {
+            const { default: commissionService } = await import('./commission.service.js');
+            await commissionService.processEarningCommission(
+                updatedEarning._id.toString(),
+                data.paidBy,
+            );
+        } catch (commissionError) {
+            console.error('[Withdraw] Failed to process commission:', commissionError);
+        }
+    } else if (data.invoiceNumber) {
+        // If PARTIAL payment but linked to an invoice, mark THAT invoice's orders as paid
+        try {
+            const { InvoiceRecord } = await import('../models/invoice-record.model.js');
+            const invoice = await InvoiceRecord.findOne({ invoiceNumber: data.invoiceNumber });
+            if (invoice && invoice.orderIds && invoice.orderIds.length > 0) {
+                const OrderModel = (await import('../models/order.model.js')).default;
+                await OrderModel.updateMany(
+                    { _id: { $in: invoice.orderIds } },
+                    { $set: { isPaid: true } }
+                );
+                console.log(`[Withdraw] Partial payment: Marked ${invoice.orderIds.length} orders from invoice ${data.invoiceNumber} as PAID`);
+            }
+        } catch (err) {
+            console.error('[Withdraw] Failed to sync orders for invoice:', err);
+        }
+    }
+
+    return updatedEarning.populate('clientId', 'clientId name email currency');
 }
 
 // Toggle earning status (paid <-> unpaid)
@@ -229,9 +290,12 @@ async function toggleEarningStatus(
                     fees: 0,
                     tax: 0,
                     conversionRate: 1,
-                    netAmount: earning.totalAmount,
+                    netAmount: earning.totalAmount, // netAmount remains legacy total until paid
                     amountInBDT: 0,
                     status: 'unpaid',
+                    paidAmount: 0,
+                    paidAmountBDT: 0,
+                    payments: [],
                 },
                 $unset: {
                     paidAt: 1,
@@ -241,7 +305,17 @@ async function toggleEarningStatus(
             { new: true },
         )
             .populate('clientId', 'clientId name email currency')
-            .lean() as Promise<IEarning | null>;
+            .lean()
+            .then(async (result: any) => {
+                if (result && result.orderIds && result.orderIds.length > 0) {
+                    const OrderModel = (await import('../models/order.model.js')).default;
+                    await OrderModel.updateMany(
+                        { _id: { $in: result.orderIds } },
+                        { $set: { isPaid: false } }
+                    );
+                }
+                return result;
+            }) as Promise<IEarning | null>;
     }
 
     return null;
@@ -424,18 +498,43 @@ async function getEarningsWithDateFilter(params: EarningQueryParams): Promise<{
                     orderIds: '$orderIds',
                     imageQty: '$imageQty',
                     totalAmount: '$totalAmount',
+                    paidAmount: {
+                        $cond: [
+                            { $and: [
+                                { $eq: [{ $ifNull: ['$earningRecord.status', 'unpaid'] }, 'paid'] },
+                                { $eq: [{ $ifNull: ['$earningRecord.paidAmount', 0] }, 0] }
+                            ]},
+                            '$totalAmount',
+                            { $ifNull: ['$earningRecord.paidAmount', 0] }
+                        ]
+                    },
+                    paidAmountBDT: {
+                        $cond: [
+                            { $and: [
+                                { $eq: [{ $ifNull: ['$earningRecord.status', 'unpaid'] }, 'paid'] },
+                                { $eq: [{ $ifNull: ['$earningRecord.paidAmountBDT', 0] }, 0] }
+                            ]},
+                            { $multiply: ['$totalAmount', { $ifNull: ['$earningRecord.conversionRate', 120] }] },
+                            { $ifNull: ['$earningRecord.paidAmountBDT', 0] }
+                        ]
+                    },
+                    payments: { $ifNull: ['$earningRecord.payments', []] },
                     currency: { $ifNull: ['$client.currency', 'USD'] },
                     fees: { $ifNull: ['$earningRecord.fees', 0] },
                     tax: { $ifNull: ['$earningRecord.tax', 0] },
                     conversionRate: {
-                        $ifNull: ['$earningRecord.conversionRate', 1],
+                        $ifNull: ['$earningRecord.conversionRate', 120],
                     },
                     netAmount: '$totalAmount', // For period view, net matches total unless withdrawn
                     amountInBDT: {
-                        $multiply: [
-                            '$totalAmount',
-                            { $ifNull: ['$earningRecord.conversionRate', 1] },
-                        ],
+                        $cond: [
+                            { $and: [
+                                { $eq: [{ $ifNull: ['$earningRecord.status', 'unpaid'] }, 'paid'] },
+                                { $eq: [{ $ifNull: ['$earningRecord.paidAmountBDT', 0] }, 0] }
+                            ]},
+                            { $multiply: ['$totalAmount', { $ifNull: ['$earningRecord.conversionRate', 120] }] },
+                            { $ifNull: ['$earningRecord.paidAmountBDT', 0] }
+                        ]
                     },
                     status: { $ifNull: ['$earningRecord.status', 'unpaid'] },
                     createdAt: {
@@ -498,8 +597,8 @@ async function getEarningStatsWithFilter(
     params: EarningQueryParams,
 ): Promise<EarningStatsResult> {
     const now = new Date();
-    let periodPaid = { count: 0, totalAmount: 0, totalBDT: 0 };
-    let periodUnpaid = { count: 0, totalAmount: 0, totalBDT: 0 };
+    let periodPaid = { count: 0, totalAmount: 0, totalBDT: 0, paidAmount: 0 };
+    let periodUnpaid = { count: 0, totalAmount: 0, totalBDT: 0, paidAmount: 0 };
 
     // 1. Determine period stats (today/week/month/year)
     if (params.filterType === 'today' || params.filterType === 'week') {
@@ -540,25 +639,8 @@ async function getEarningStatsWithFilter(
                     _id: { $ifNull: ['$earning.status', 'unpaid'] },
                     count: { $sum: 1 },
                     totalAmount: { $sum: '$totalPrice' },
-                    totalBDT: {
-                        $sum: {
-                            $cond: [
-                                { $eq: ['$earning.status', 'paid'] },
-                                {
-                                    $multiply: [
-                                        '$totalPrice',
-                                        {
-                                            $ifNull: [
-                                                '$earning.conversionRate',
-                                                1,
-                                            ],
-                                        },
-                                    ],
-                                },
-                                0,
-                            ],
-                        },
-                    },
+                    paidAmount: { $sum: { $ifNull: ['$earning.paidAmount', 0] } },
+                    totalBDT: { $sum: { $ifNull: ['$earning.paidAmountBDT', 0] } },
                 },
             },
         ]);
@@ -591,7 +673,8 @@ async function getEarningStatsWithFilter(
                     _id: '$status',
                     count: { $sum: 1 },
                     totalAmount: { $sum: '$totalAmount' },
-                    totalBDT: { $sum: '$amountInBDT' },
+                    paidAmount: { $sum: '$paidAmount' },
+                    totalBDT: { $sum: '$paidAmountBDT' },
                 },
             },
         ]);
@@ -616,37 +699,56 @@ async function getEarningStatsWithFilter(
         ...(Object.keys(totalMatch).length > 0 ? [{ $match: totalMatch }] : []),
         {
             $group: {
-                _id: '$status',
-                count: { $sum: 1 },
+                _id: null,
                 totalAmount: { $sum: '$totalAmount' },
-                totalBDT: { $sum: '$amountInBDT' },
+                paidAmount: {
+                    $sum: {
+                        $cond: [
+                            { $and: [{ $eq: ['$status', 'paid'] }, { $eq: [{ $ifNull: ['$paidAmount', 0] }, 0] }] },
+                            '$totalAmount',
+                            { $ifNull: ['$paidAmount', 0] }
+                        ]
+                    },
+                },
+                paidAmountBDT: {
+                    $sum: {
+                        $cond: [
+                            { $and: [{ $eq: ['$status', 'paid'] }, { $eq: [{ $ifNull: ['$paidAmountBDT', 0] }, 0] }] },
+                            { $multiply: ['$totalAmount', { $ifNull: ['$conversionRate', 120] }] },
+                            { $ifNull: ['$paidAmountBDT', 0] }
+                        ]
+                    },
+                },
+                unpaidCount: {
+                    $sum: { $cond: [{ $eq: ['$status', 'unpaid'] }, 1, 0] },
+                },
+                paidCount: {
+                    $sum: { $cond: [{ $eq: ['$status', 'paid'] }, 1, 0] },
+                },
             },
         },
     ]);
 
-    const totalUnpaid = totalStats.find((s) => s._id === 'unpaid') || {
-        count: 0,
+    const stats = totalStats[0] || {
         totalAmount: 0,
-        totalBDT: 0,
-    };
-    const totalPaid = totalStats.find((s) => s._id === 'paid') || {
-        count: 0,
-        totalAmount: 0,
-        totalBDT: 0,
+        paidAmount: 0,
+        paidAmountBDT: 0,
+        unpaidCount: 0,
+        paidCount: 0,
     };
 
     return {
-        totalUnpaidCount: totalUnpaid.count,
-        totalUnpaidAmount: totalUnpaid.totalAmount,
-        totalPaidCount: totalPaid.count,
-        totalPaidAmount: totalPaid.totalAmount,
-        totalPaidBDT: totalPaid.totalBDT,
+        totalUnpaidCount: stats.unpaidCount,
+        totalUnpaidAmount: stats.totalAmount - stats.paidAmount,
+        totalPaidCount: stats.paidCount,
+        totalPaidAmount: stats.paidAmount,
+        totalPaidBDT: stats.paidAmountBDT,
 
         filteredUnpaidCount: periodUnpaid.count,
-        filteredUnpaidAmount: periodUnpaid.totalAmount,
+        filteredUnpaidAmount: periodUnpaid.totalAmount - (periodUnpaid.paidAmount || 0),
         filteredPaidCount: periodPaid.count,
-        filteredPaidAmount: periodPaid.totalAmount,
-        filteredPaidBDT: periodPaid.totalBDT,
+        filteredPaidAmount: periodPaid.paidAmount || 0,
+        filteredPaidBDT: periodPaid.totalBDT || 0,
     };
 }
 

@@ -94,6 +94,8 @@ export interface IOrder {
     timeline: ITimelineEntry[];
     completedAt?: string;
     deliveredAt?: string;
+    invoiceNumber?: string;
+    isPaid?: boolean;
     createdBy: string;
     createdAt: string;
     updatedAt: string;

@@ -2,6 +2,16 @@ import { Document, Types } from 'mongoose';
 
 export type EarningStatus = 'unpaid' | 'paid';
 
+export interface IPaymentLedger {
+    invoiceNumber: string;
+    amount: number;
+    amountInBDT: number;
+    method: 'Stripe' | 'PayPal' | 'Manual' | string;
+    transactionId: string;
+    paidAt: Date;
+    conversionRate: number;
+}
+
 export interface IEarning extends Document {
     clientId: Types.ObjectId;
     month: number;
@@ -24,6 +34,9 @@ export interface IEarning extends Document {
 
     // Status
     status: EarningStatus;
+    paidAmount: number;
+    paidAmountBDT: number;
+    payments: IPaymentLedger[];
     paidAt?: Date;
     paidBy?: Types.ObjectId;
 
@@ -58,6 +71,17 @@ export interface IEarningPopulated {
     netAmount: number;
     amountInBDT: number;
     status: EarningStatus;
+    paidAmount: number;
+    paidAmountBDT: number;
+    payments: Array<{
+        invoiceNumber: string;
+        amount: number;
+        amountInBDT: number;
+        method: string;
+        transactionId: string;
+        paidAt: string;
+        conversionRate: number;
+    }>;
     paidAt?: string;
     paidBy?: string;
     isLegacy: boolean;
@@ -79,10 +103,14 @@ export interface CreateEarningForOrderData {
 }
 
 export interface WithdrawEarningData {
-    fees?: number;
-    tax?: number;
+    amount?: number | undefined; // Optional: specify amount for partial payment
+    method?: string | undefined; // Optional: specify method
+    invoiceNumber?: string | undefined; // Optional: link to a specific invoice
+    transactionId?: string | undefined; // Optional: reference ID
+    fees?: number | undefined;
+    tax?: number | undefined;
     conversionRate: number;
-    notes?: string;
+    notes?: string | undefined;
     paidBy: string;
 }
 

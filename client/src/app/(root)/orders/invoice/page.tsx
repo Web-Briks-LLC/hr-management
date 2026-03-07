@@ -36,7 +36,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, FileText, Mail, Loader } from "lucide-react";
+import { ArrowLeft, FileText, Mail, Loader, CheckCircle2 } from "lucide-react";
 import { format } from "date-fns";
 import Link from "next/link";
 import type { IOrder, OrderStatus } from "@/types/order.type";
@@ -264,11 +264,13 @@ export default function InvoicePage() {
                     dateFrom: minDate,
                     dateTo: maxDate,
                     totalOrders: selectedOrdersList.length,
+                    clientEmail: selectedClient.emails[0],
                     items: selectedOrdersList.map((order) => ({
                         name: order.orderName,
                         price: order.perImagePrice * order.imageQuantity,
                         quantity: order.imageQuantity,
                     })),
+                    orderIds: Array.from(selectedOrders),
                 }).unwrap();
 
                 if (recordResult.success && recordResult.invoice) {
@@ -337,6 +339,7 @@ export default function InvoicePage() {
                         dateFrom: minDate,
                         dateTo: maxDate,
                         totalOrders: selectedOrdersList.length,
+                        clientEmail: email,
                         items: selectedOrdersList.map((order) => ({
                             name: order.orderName,
                             price: order.perImagePrice * order.imageQuantity,
@@ -743,8 +746,23 @@ export default function InvoicePage() {
                                                         }
                                                     />
                                                 </TableCell>
-                                                <TableCell className="font-medium border">
-                                                    {order.orderName}
+                                                <TableCell className="border">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-medium">
+                                                            {order.orderName}
+                                                        </span>
+                                                        {order.isPaid ? (
+                                                            <div className="flex items-center gap-1 w-fit bg-green-100 text-green-700 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase">
+                                                                <CheckCircle2 className="h-3 w-3" />
+                                                                Paid
+                                                            </div>
+                                                        ) : order.invoiceNumber ? (
+                                                            <div className="flex items-center gap-1 w-fit bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase">
+                                                                <FileText className="h-3 w-3" />
+                                                                Inv #{order.invoiceNumber}
+                                                            </div>
+                                                        ) : null}
+                                                    </div>
                                                 </TableCell>
                                                 <TableCell className="border">
                                                     {format(

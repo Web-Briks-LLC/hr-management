@@ -358,6 +358,8 @@ async function getAllOrdersFromDB(filters: GetOrdersFilters): Promise<{
                             timeline: 1,
                             completedAt: 1,
                             deliveredAt: 1,
+                            invoiceNumber: 1,
+                            isPaid: 1,
                             createdBy: 1,
                             earning: {
                                 _id: 1,

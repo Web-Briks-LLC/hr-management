@@ -310,82 +310,69 @@ export const confirmPayment = async (
                 ? await ClientModel.findOne({ clientId: invoice.clientId })
                 : null;
 
-            // 4. Update corresponding Earning record if billing period info exists
-            if (client && invoice.month && invoice.year) {
-                try {
-                    const conversionRate = 0;
-                    const amountInBDT = 0;
+            let finalAmountBDT = invoice.totalAmount * 120; // Default estimate
 
-                    const statusNotes =
-                        `Paid via Invoice #${invoiceNumber}` +
-                        (paymentIntentId
-                            ? ` | Stripe: ${paymentIntentId}`
-                            : '') +
-                        (paypalOrderId ? ` | PayPal: ${paypalOrderId}` : '');
 
-                    const updatedEarning = await EarningModel.findOneAndUpdate(
-                        {
-                            clientId: client._id,
-                            month: invoice.month,
-                            year: invoice.year,
-                        },
-                        {
-                            $set: {
-                                status: 'paid',
-                                paidAt: new Date(),
-                                notes: statusNotes,
+                    // 4. Update corresponding Earning record if billing period info exists
+                    if (client && invoice.month && invoice.year) {
+                        try {
+                            // 4a. Find or Create earning to ensure we have a record to update
+                            let earning = await EarningModel.findOne({
+                                clientId: client._id,
+                                month: invoice.month,
+                                year: invoice.year,
+                            });
+
+                            if (!earning) {
+                                // Create initial earning if missing
+                                earning = new EarningModel({
+                                    clientId: client._id,
+                                    month: invoice.month,
+                                    year: invoice.year,
+                                    totalAmount: invoice.totalAmount, // or 0? 
+                                    currency: invoice.currency,
+                                    status: 'unpaid',
+                                    isLegacy: false,
+                                    createdBy: client.createdBy || '659696956565656565656565',
+                                });
+                                await earning.save();
+                            }
+
+                            const conversionRate = earning?.conversionRate || 120;
+                            finalAmountBDT = invoice.totalAmount * conversionRate;
+
+                            const paymentGateway = paymentIntentId
+                                ? 'Stripe'
+                                : paypalOrderId
+                                ? 'PayPal'
+                                : 'Other';
+                            const transactionId =
+                                paymentIntentId || paypalOrderId || `WB-PAY-${Date.now()}`;
+
+                            // 4b. Use Unified Earning Service to record withdrawal
+                            const { default: earningService } = await import("../services/earning.service.js");
+                            
+                            await earningService.withdrawEarning(earning._id.toString(), {
+                                amount: invoice.totalAmount,
+                                method: paymentGateway,
+                                invoiceNumber: invoice.invoiceNumber,
+                                transactionId: transactionId,
                                 conversionRate: conversionRate,
-                                amountInBDT: amountInBDT,
-                            },
-                        },
-                        { new: true },
-                    );
+                                notes: `Automated ${paymentGateway} payment for Invoice ${invoice.invoiceNumber}`,
+                                paidBy: (client.createdBy || '659696956565656565656565').toString(),
+                            });
 
-                    if (updatedEarning) {
-                        console.log(
-                            `[Payment] Earning for client ${invoice.clientName} (${invoice.month}/${invoice.year}) updated with BDT ${amountInBDT}`,
-                        );
-                    } else {
-                        console.warn(
-                            `[Payment] No matching Earning record found for Invoice ${invoiceNumber}. Creating a new record.`,
-                        );
-                        const newEarning = new EarningModel({
-                            clientId: client._id,
-                            month: invoice.month,
-                            year: invoice.year,
-                            imageQty: invoice.totalImages || 0,
-                            totalAmount: invoice.totalAmount,
-                            currency: invoice.currency,
-                            fees: 0,
-                            tax: 0,
-                            conversionRate: conversionRate,
-                            netAmount: invoice.totalAmount,
-                            amountInBDT: amountInBDT,
-                            status: 'paid',
-                            paidAt: new Date(),
-                            notes:
-                                statusNotes + ' (Auto-generated from Payment)',
-                            isLegacy: false,
-                            createdBy: client.createdBy,
-                        });
-
-                        await newEarning.save();
-                        console.log(
-                            `[Payment] Created missing Earning for client ${invoice.clientName} (${invoice.month}/${invoice.year}) with BDT ${amountInBDT}`,
-                        );
+                            console.log(
+                                `[Payment] Earning for client ${invoice.clientName} (${invoice.month}/${invoice.year}) updated via Unified Service.`
+                            );
+                        } catch (err) {
+                            console.error('[Payment] Error in Earning update block:', err);
+                        }
                     }
-                } catch (err) {
-                    console.error(
-                        '[Payment] Error updating Earning record:',
-                        err,
-                    );
-                }
-            }
 
             // 5. Send Payment Receipt Email via React Email to the Client
-            if (client && client.emails?.length > 0) {
+            if (client && (invoice.clientEmail || client.emails?.length > 0)) {
                 try {
-                    const amountInBDT = invoice.totalAmount * 120; // Fallback estimate
                     const paymentGateway = paymentIntentId
                         ? 'Stripe'
                         : paypalOrderId
@@ -394,19 +381,8 @@ export const confirmPayment = async (
                     const referenceId =
                         paymentIntentId || paypalOrderId || 'WB-PAY-SUCCESS';
 
-                    let earning = null;
-                    if (invoice.month && invoice.year) {
-                        earning = await EarningModel.findOne({
-                            clientId: client._id,
-                            month: invoice.month as number,
-                            year: invoice.year as number,
-                        });
-                    }
-
-                    const finalAmountBDT = earning?.amountInBDT || amountInBDT;
-
                     console.log(
-                        `[Payment] Rendering Receipt Email for ${client.emails[0]}`,
+                        `[Payment] Rendering Receipt Email for ${invoice.clientEmail || client.emails[0]}`,
                     );
 
                     const emailHtml = await render(
@@ -423,6 +399,12 @@ export const confirmPayment = async (
                     );
 
                     const recipientEmail = (invoice.clientEmail || (client.emails[0] as string));
+                    
+                    if (invoice.clientEmail) {
+                        console.log(`[Payment] Sending receipt to recorded email: ${recipientEmail}`);
+                    } else {
+                        console.log(`[Payment] clientEmail not found on invoice, falling back to: ${recipientEmail}`);
+                    }
 
                     await sendMail({
                         to: recipientEmail,

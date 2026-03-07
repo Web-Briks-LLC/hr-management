@@ -129,6 +129,7 @@ export const recordInvoice = async (req: Request, res: Response) => {
             year,
             items,
             clientEmail,
+            orderIds,
         } = req.body;
 
         if (
@@ -186,9 +187,19 @@ export const recordInvoice = async (req: Request, res: Response) => {
                 paymentToken: paymentToken,
                 clientEmail: clientEmail,
                 items,
+                orderIds: orderIds || [],
             },
             { new: true, upsert: true },
         );
+        
+        // Link these orders to the invoiceNumber for visual tracking
+        if (orderIds && orderIds.length > 0) {
+            const { default: OrderModel } = await import("../models/order.model.js");
+            await OrderModel.updateMany(
+                { _id: { $in: orderIds } },
+                { $set: { invoiceNumber: String(invoiceNumber) } }
+            );
+        }
 
         console.log(`[Invoice Saved]: ${invoiceNumber}`);
         return res.status(200).json({ success: true, invoice });
@@ -217,6 +228,24 @@ export const getInvoiceByNumber = async (req: Request, res: Response) => {
         }
 
         return res.status(200).json({ success: true, invoice });
+    } catch (error: any) {
+        return res.status(500).json({ message: error.message });
+    }
+};
+
+export const getInvoices = async (req: Request, res: Response) => {
+    try {
+        const { clientId, month, year, status } = req.query;
+        const query: any = {};
+
+        if (clientId) query.clientId = clientId;
+        if (month) query.month = Number(month);
+        if (year) query.year = Number(year);
+        if (status) query.paymentStatus = status;
+
+        const invoices = await InvoiceRecord.find(query).sort({ createdAt: -1 });
+
+        return res.status(200).json({ success: true, invoices });
     } catch (error: any) {
         return res.status(500).json({ message: error.message });
     }

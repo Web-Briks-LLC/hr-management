@@ -144,7 +144,7 @@ async function withdrawEarning(req: Request, res: Response) {
             return res.status(400).json({ message: "Earning ID is required" });
         }
 
-        const { fees, tax, conversionRate, notes } = req.body;
+        const { fees, tax, conversionRate, notes, amount, method, invoiceNumber, transactionId } = req.body;
 
         if (conversionRate === undefined || conversionRate <= 0) {
             return res
@@ -153,10 +153,14 @@ async function withdrawEarning(req: Request, res: Response) {
         }
 
         const data: WithdrawEarningData = {
-            fees: fees ?? 0,
-            tax: tax ?? 0,
-            conversionRate,
-            notes,
+            amount: amount !== undefined ? Number(amount) : undefined,
+            method: method || "Manual",
+            invoiceNumber: invoiceNumber ? String(invoiceNumber) : undefined,
+            transactionId: transactionId ? String(transactionId) : undefined,
+            fees: fees !== undefined ? Number(fees) : 0,
+            tax: tax !== undefined ? Number(tax) : 0,
+            conversionRate: Number(conversionRate),
+            notes: notes ? String(notes) : undefined,
             paidBy: userId,
         };
 
@@ -164,14 +168,6 @@ async function withdrawEarning(req: Request, res: Response) {
 
         if (!earning) {
             return res.status(404).json({ message: "Earning not found" });
-        }
-
-        // Process commission via BDT conversion
-        try {
-            await commissionService.processEarningCommission(id, userId);
-        } catch (commissionError) {
-            console.error("Failed to process commission:", commissionError);
-            // Non-blocking error
         }
 
         return res.status(200).json({
@@ -216,8 +212,8 @@ async function toggleEarningStatus(req: Request, res: Response) {
             withdrawData = {
                 fees: fees ?? 0,
                 tax: tax ?? 0,
-                conversionRate,
-                notes,
+                conversionRate: conversionRate,
+                notes: notes,
                 paidBy: userId,
             };
         }

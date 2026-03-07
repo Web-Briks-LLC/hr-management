@@ -27,6 +27,7 @@ interface RecordInvoiceData {
     companyName?: string;
     clientEmail?: string;
     items: Array<{ name: string; price: number; quantity: number }>;
+    orderIds?: string[];
 }
 
 interface RecordInvoiceResponse {
@@ -59,6 +60,12 @@ export const invoiceApi = apiSlice.injectEndpoints({
                 body: data,
             }),
         }),
+        getInvoices: builder.query<{ success: boolean; invoices: any[] }, { clientId?: string; month?: number; year?: number; status?: string }>({
+            query: (params) => ({
+                url: "/invoices",
+                params,
+            }),
+        }),
     }),
 });
 
@@ -66,4 +73,5 @@ export const {
     useLazyGetNextInvoiceNumberQuery,
     useSendInvoiceEmailMutation,
     useRecordInvoiceMutation,
+    useGetInvoicesQuery,
 } = invoiceApi;

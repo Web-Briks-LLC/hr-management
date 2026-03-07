@@ -9,8 +9,7 @@
     "scripts": {
         "start": "node dist/server.js",
         "dev": "nodemon --exec tsx src/server.ts",
-        "build": "npx tsc",
-        "import-orders": "tsx src/scripts/import-orders.ts"
+        "build": "npx tsc"
     },
     "devDependencies": {
         "@types/bcrypt": "^6.0.0",

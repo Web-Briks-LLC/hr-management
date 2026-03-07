@@ -23,6 +23,7 @@ export interface IInvoiceRecord {
     dateFrom?: Date;
     dateTo?: Date;
     totalOrders?: number;
+    orderIds?: string[];
     companyName?: string;
     createdAt?: Date;
     updatedAt?: Date;
@@ -58,6 +59,7 @@ const invoiceRecordSchema = new Schema<IInvoiceRecord>(
         dateFrom: { type: Date },
         dateTo: { type: Date },
         totalOrders: { type: Number },
+        orderIds: [{ type: Schema.Types.ObjectId, ref: "Order" }],
         companyName: { type: String },
     },
     { timestamps: true },
