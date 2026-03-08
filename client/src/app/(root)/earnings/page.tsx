@@ -31,6 +31,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -233,6 +235,9 @@ export default function EarningsPage() {
 
     const [withdrawInvoiceNumber, setWithdrawInvoiceNumber] = useState("");
     const [withdrawTransactionId, setWithdrawTransactionId] = useState("");
+    const [isConversionMode, setIsConversionMode] = useState(false);
+    const [withdrawTab, setWithdrawTab] = useState<string>("payment");
+    const [selectedPaymentId, setSelectedPaymentId] = useState<string>("manual");
 
     // Fetch invoices for selection in withdraw dialog
     const { data: invoicesData } = useGetInvoicesQuery(
@@ -338,10 +343,21 @@ export default function EarningsPage() {
     };
 
     const handleWithdraw = (earning: IEarning) => {
-        const isConversionOnly = earning.status === "paid" && (!earning.amountInBDT || earning.amountInBDT === 0);
-        const remaining = isConversionOnly ? earning.paidAmount : Math.max(0, earning.totalAmount - earning.paidAmount);
+        const remaining = Math.max(0, earning.totalAmount - earning.paidAmount);
+        const paymentsTotal = earning.payments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
+        const gapAmount = earning.paidAmount - paymentsTotal;
+
+        const unconvertedPayments = earning.payments?.filter(p => !p.amountInBDT || p.amountInBDT <= p.amount + 0.01 || p.conversionRate <= 1.1) || [];
 
         setSelectedEarning(earning);
+
+        // Default Tab: if there's no remaining USD but there are unconverted payments (or a gap), go to conversion
+        if (remaining <= 0.01 && (unconvertedPayments.length > 0 || gapAmount > 0.01)) {
+            setWithdrawTab("conversion");
+        } else {
+            setWithdrawTab("payment");
+        }
+
         setWithdrawAmount(remaining.toFixed(2));
         setWithdrawMethod("Cash");
         setWithdrawFees("0");
@@ -350,6 +366,27 @@ export default function EarningsPage() {
         setWithdrawNotes("");
         setWithdrawInvoiceNumber("manual");
         setWithdrawTransactionId("");
+        setSelectedPaymentId("manual");
+
+        // If we have unconverted payments, auto-select the first one if we might convert
+        if (unconvertedPayments.length > 0) {
+            const firstP = unconvertedPayments[0];
+            setSelectedPaymentId((firstP as any)._id || "manual");
+            if (remaining <= 0.01) {
+                setWithdrawAmount(firstP.amount.toString());
+                setWithdrawInvoiceNumber(firstP.invoiceNumber || "manual");
+                setWithdrawTransactionId(firstP.transactionId || "");
+                setWithdrawMethod(firstP.method || "Cash");
+            }
+        } else if (gapAmount > 0.01) {
+            // If there's a gap, default to selecting the gap for conversion
+            setSelectedPaymentId("manual-gap");
+            setWithdrawAmount(gapAmount.toFixed(2));
+            setWithdrawInvoiceNumber("manual");
+            setWithdrawTransactionId("");
+            setWithdrawMethod("Cash");
+        }
+
         setIsWithdrawDialogOpen(true);
     };
 
@@ -360,18 +397,17 @@ export default function EarningsPage() {
             await withdrawEarning({
                 id: selectedEarning._id,
                 data: {
-                    amount: withdrawAmountNum, // manual amount
+                    amount: withdrawAmountNum,
                     method: withdrawMethod,
-                    invoiceNumber:
-                        withdrawInvoiceNumber === "manual" ||
-                            !withdrawInvoiceNumber
-                            ? undefined
-                            : withdrawInvoiceNumber,
+                    invoiceNumber: withdrawInvoiceNumber !== "manual" ? withdrawInvoiceNumber : undefined,
                     transactionId: withdrawTransactionId || undefined,
                     fees: withdrawFeesNum,
                     tax: withdrawTaxNum,
                     conversionRate: withdrawRateNum,
                     notes: withdrawNotes || undefined,
+                    isConversion: withdrawTab === "conversion",
+                    paymentId: withdrawTab === "conversion" && selectedPaymentId !== "manual" && selectedPaymentId !== "manual-gap" ? selectedPaymentId : undefined,
+                    isGapConversion: withdrawTab === "conversion" && selectedPaymentId === "manual-gap" ? true : undefined,
                 },
             }).unwrap();
 
@@ -1008,13 +1044,10 @@ export default function EarningsPage() {
                                                         </Tooltip>
                                                     </TooltipProvider>
 
-                                                    {(earning.status ===
-                                                        "unpaid" ||
-                                                        (earning.status ===
-                                                            "paid" &&
-                                                            (!earning.amountInBDT ||
-                                                                earning.amountInBDT ===
-                                                                0))) && (
+                                                    {(earning.status === "unpaid" ||
+                                                        earning.paidAmount < earning.totalAmount - 0.01 ||
+                                                        earning.payments?.some(p => !p.amountInBDT || p.amountInBDT <= p.amount + 0.01) ||
+                                                        (earning.paidAmount > (earning.payments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0) + 0.01)) && (
                                                             <Button
                                                                 variant="ghost"
                                                                 size="icon"
@@ -1247,182 +1280,280 @@ export default function EarningsPage() {
                         </DialogDescription>
                     </DialogHeader>
                     {selectedEarning && (
-                        <div className="space-y-4 pt-2">
-                            <div className="flex items-center justify-between p-4 bg-muted/40 rounded-xl border border-border/50">
-                                <div className="space-y-1">
-                                    <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                                        Total Balance
+                        <ScrollArea className="max-h-[75vh] pr-4 py-2">
+                            <div className="space-y-6">
+                                <div className="flex items-center justify-between p-4 bg-muted/40 rounded-xl border border-border/50">
+                                    <div className="space-y-1">
+                                        <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                                            Total Balance
+                                        </div>
+                                        <div className="text-xl font-bold">
+                                            {formatCurrency(
+                                                selectedEarning.totalAmount,
+                                                selectedEarning.currency,
+                                            )}
+                                        </div>
                                     </div>
-                                    <div className="text-xl font-bold">
-                                        {formatCurrency(
-                                            selectedEarning.totalAmount,
-                                            selectedEarning.currency,
-                                        )}
+                                    <div className="h-10 w-px bg-border/50" />
+                                    <div className="space-y-1 text-right">
+                                        <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                                            Remaining
+                                        </div>
+                                        <div className="text-xl font-bold text-orange-600">
+                                            {formatCurrency(
+                                                Math.max(0, selectedEarning.totalAmount - selectedEarning.paidAmount),
+                                                selectedEarning.currency,
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
-                                <div className="h-10 w-px bg-border/50" />
-                                <div className="space-y-1 text-right">
-                                    <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                                        Remaining
-                                    </div>
-                                    <div className="text-xl font-bold text-orange-600">
-                                        {formatCurrency(
-                                            Math.max(0, selectedEarning.totalAmount - selectedEarning.paidAmount),
-                                            selectedEarning.currency,
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-1.5">
-                                    <Label className="text-xs font-semibold">Amount to Pay</Label>
-                                    <div className="relative">
-                                        <Input
-                                            type="number"
-                                            value={withdrawAmount}
-                                            onChange={(e) =>
-                                                setWithdrawAmount(e.target.value)
+                                <Tabs value={withdrawTab} onValueChange={(val) => {
+                                    setWithdrawTab(val);
+                                    if (val === "payment") {
+                                        setWithdrawAmount(Math.max(0, selectedEarning.totalAmount - selectedEarning.paidAmount).toFixed(2));
+                                        setWithdrawInvoiceNumber("manual");
+                                        setWithdrawTransactionId("");
+                                        setWithdrawMethod("Cash");
+                                        setSelectedPaymentId("manual");
+                                    } else {
+                                        const unconverted = selectedEarning.payments?.filter(p => !p.amountInBDT || p.amountInBDT <= p.amount + 0.01 || p.conversionRate <= 1.1) || [];
+                                        const paymentsTotal = selectedEarning.payments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
+                                        const gap = selectedEarning.paidAmount - paymentsTotal;
+
+                                        if (unconverted.length > 0) {
+                                            const firstP = unconverted[0];
+                                            setSelectedPaymentId((firstP as any)._id || "manual");
+                                            setWithdrawAmount(firstP.amount.toString());
+                                            setWithdrawInvoiceNumber(firstP.invoiceNumber || "manual");
+                                            setWithdrawTransactionId(firstP.transactionId || "");
+                                            setWithdrawMethod(firstP.method || "Cash");
+                                        } else if (gap > 0.01) {
+                                            setSelectedPaymentId("manual-gap");
+                                            setWithdrawAmount(gap.toFixed(2));
+                                            setWithdrawInvoiceNumber("manual");
+                                            setWithdrawTransactionId("");
+                                            setWithdrawMethod("Cash");
+                                        }
+                                    }
+                                }}>
+                                    <TabsList className="grid w-full grid-cols-2 mb-6">
+                                        <TabsTrigger value="payment">New Payment</TabsTrigger>
+                                        <TabsTrigger
+                                            value="conversion"
+                                            disabled={(selectedEarning.payments?.filter(p => !p.amountInBDT || p.amountInBDT <= p.amount + 0.01 || p.conversionRate <= 1.1) || []).length === 0 &&
+                                                (selectedEarning.paidAmount - (selectedEarning.payments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0)) <= 0.01
                                             }
-                                            className="pl-6 h-9"
-                                        />
-                                        <span className="absolute left-2.5 top-2.5 text-muted-foreground text-xs">
-                                            $
-                                        </span>
-                                    </div>
-                                </div>
-                                <div className="space-y-1.5">
-                                    <Label className="text-xs font-semibold">Method</Label>
-                                    <Select
-                                        value={withdrawMethod}
-                                        onValueChange={setWithdrawMethod}
-                                    >
-                                        <SelectTrigger className="w-full">
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="Cash">Cash</SelectItem>
-                                            <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
-                                            <SelectItem value="PayPal">PayPal (Manual)</SelectItem>
-                                            <SelectItem value="Stripe">Stripe (Manual)</SelectItem>
-                                            <SelectItem value="Check">Check</SelectItem>
-                                            <SelectItem value="Other">Other</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                            </div>
+                                        >
+                                            Convert Existing
+                                        </TabsTrigger>
+                                    </TabsList>
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-1.5">
-                                    <Label className="text-xs font-semibold">Select Invoice (Optional)</Label>
-                                    <Select
-                                        value={withdrawInvoiceNumber}
-                                        onValueChange={(val) => {
-                                            setWithdrawInvoiceNumber(val);
-                                            // Auto-fill amount if an invoice is selected
-                                            const selectedInv = pendingInvoices.find((i: any) => i.invoiceNumber === val);
-                                            if (selectedInv) {
-                                                setWithdrawAmount(selectedInv.totalAmount.toString());
-                                            }
-                                        }}
-                                    >
-                                        <SelectTrigger className="w-full">
-                                            <SelectValue placeholder="Manual Entry" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="manual">None / Manual</SelectItem>
-                                            {pendingInvoices.map((inv: any) => (
-                                                <SelectItem key={inv.invoiceNumber} value={inv.invoiceNumber}>
-                                                    #{inv.invoiceNumber} - {formatCurrency(inv.totalAmount, inv.currency)}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div className="space-y-1.5">
-                                    <Label className="text-xs font-semibold">Reference ID / Inv #</Label>
-                                    <Input
-                                        value={withdrawTransactionId}
-                                        onChange={(e) => setWithdrawTransactionId(e.target.value)}
-                                        placeholder="e.g. PayPal-998 or Manual-101"
-                                    />
-                                </div>
-                            </div>
+                                    <TabsContent value="payment" className="space-y-4 pt-1 outline-none">
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-1.5">
+                                                <Label className="text-xs font-semibold">Amount to Pay</Label>
+                                                <div className="relative">
+                                                    <Input
+                                                        type="number"
+                                                        value={withdrawAmount}
+                                                        onChange={(e) => setWithdrawAmount(e.target.value)}
+                                                        className="pl-6 h-9"
+                                                    />
+                                                    <span className="absolute left-2.5 top-2.5 text-muted-foreground text-xs">$</span>
+                                                </div>
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <Label className="text-xs font-semibold">Method</Label>
+                                                <Select value={withdrawMethod} onValueChange={setWithdrawMethod}>
+                                                    <SelectTrigger className="w-full h-9">
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="Cash">Cash</SelectItem>
+                                                        <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                                                        <SelectItem value="PayPal">PayPal (Manual)</SelectItem>
+                                                        <SelectItem value="Stripe">Stripe (Manual)</SelectItem>
+                                                        <SelectItem value="Check">Check</SelectItem>
+                                                        <SelectItem value="Other">Other</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                        </div>
 
-                            <div className="grid grid-cols-3 gap-4">
-                                <div className="space-y-1.5">
-                                    <Label className="text-xs font-semibold">Conversion Rate</Label>
-                                    <div className="relative">
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-1.5">
+                                                <Label className="text-xs font-semibold">Select Invoice (Optional)</Label>
+                                                <Select
+                                                    value={withdrawInvoiceNumber}
+                                                    onValueChange={(val) => {
+                                                        setWithdrawInvoiceNumber(val);
+                                                        const selectedInv = pendingInvoices.find((i: any) => i.invoiceNumber === val);
+                                                        if (selectedInv) setWithdrawAmount(selectedInv.totalAmount.toString());
+                                                    }}
+                                                >
+                                                    <SelectTrigger className="w-full h-9">
+                                                        <SelectValue placeholder="Manual Entry" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="manual">None / Manual</SelectItem>
+                                                        {pendingInvoices.map((inv: any) => (
+                                                            <SelectItem key={inv.invoiceNumber} value={inv.invoiceNumber}>
+                                                                #{inv.invoiceNumber} - {formatCurrency(inv.totalAmount, inv.currency)}
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <Label className="text-xs font-semibold">Reference ID / Inv #</Label>
+                                                <Input
+                                                    value={withdrawTransactionId}
+                                                    onChange={(e) => setWithdrawTransactionId(e.target.value)}
+                                                    placeholder="e.g. PayPal-998"
+                                                    className="h-9"
+                                                />
+                                            </div>
+                                        </div>
+                                    </TabsContent>
+
+                                    <TabsContent value="conversion" className="space-y-4 pt-1 outline-none">
+                                        <div className="space-y-3">
+                                            <div className="space-y-1.5">
+                                                <Label className="text-xs font-semibold">Select Payment to Convert</Label>
+                                                <Select
+                                                    value={selectedPaymentId}
+                                                    onValueChange={(val) => {
+                                                        setSelectedPaymentId(val);
+                                                        if (val === "manual-gap") {
+                                                            const pTotal = selectedEarning.payments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
+                                                            const gap = selectedEarning.paidAmount - pTotal;
+                                                            setWithdrawAmount(gap.toFixed(2));
+                                                            setWithdrawInvoiceNumber("manual");
+                                                            setWithdrawTransactionId("");
+                                                            setWithdrawMethod("Cash");
+                                                        } else {
+                                                            const p = selectedEarning.payments?.find(p => (p as any)._id === val);
+                                                            if (p) {
+                                                                setWithdrawAmount(p.amount.toString());
+                                                                setWithdrawInvoiceNumber(p.invoiceNumber || "manual");
+                                                                setWithdrawTransactionId(p.transactionId || "");
+                                                                setWithdrawMethod(p.method || "Cash");
+                                                            }
+                                                        }
+                                                    }}
+                                                >
+                                                    <SelectTrigger className="w-full h-9">
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {selectedEarning.payments?.filter(p => !p.amountInBDT || p.amountInBDT <= p.amount + 0.01 || p.conversionRate <= 1.1).map((p: any) => (
+                                                            <SelectItem key={p._id} value={p._id}>
+                                                                {formatCurrency(p.amount, selectedEarning.currency)} via {p.method} ({p.invoiceNumber})
+                                                            </SelectItem>
+                                                        ))}
+                                                        {(() => {
+                                                            const pTotal = selectedEarning.payments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
+                                                            const gap = selectedEarning.paidAmount - pTotal;
+                                                            if (gap > 0.01) {
+                                                                return (
+                                                                    <SelectItem value="manual-gap">
+                                                                        {formatCurrency(gap, selectedEarning.currency)} (Manual/Marked Paid)
+                                                                    </SelectItem>
+                                                                );
+                                                            }
+                                                            return null;
+                                                        })()}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-4 bg-muted/30 p-4 rounded-xl border border-dashed border-border/60">
+                                                <div>
+                                                    <div className="text-[10px] text-muted-foreground uppercase font-bold mb-0.5">Amount</div>
+                                                    <div className="text-sm font-semibold">
+                                                        {selectedPaymentId === "manual-gap"
+                                                            ? formatCurrency(selectedEarning.paidAmount - (selectedEarning.payments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0), selectedEarning.currency)
+                                                            : formatCurrency(Number(withdrawAmount), selectedEarning.currency)}
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <div className="text-[10px] text-muted-foreground uppercase font-bold mb-0.5">Method</div>
+                                                    <div className="text-sm font-semibold">{withdrawMethod}</div>
+                                                </div>
+                                                <div>
+                                                    <div className="text-[10px] text-muted-foreground uppercase font-bold mb-0.5">Invoice</div>
+                                                    <div className="text-sm font-semibold truncate">#{withdrawInvoiceNumber}</div>
+                                                </div>
+                                                <div>
+                                                    <div className="text-[10px] text-muted-foreground uppercase font-bold mb-0.5">Reference</div>
+                                                    <div className="text-sm font-semibold truncate">{withdrawTransactionId || "N/A"}</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </TabsContent>
+                                </Tabs>
+
+                                <div className="grid grid-cols-3 gap-4 border-t border-border/50 pt-6">
+                                    <div className="space-y-1.5">
+                                        <Label className="text-xs font-semibold">Conversion Rate</Label>
                                         <Input
                                             type="number"
                                             value={withdrawRate}
-                                            onChange={(e) =>
-                                                setWithdrawRate(e.target.value)
-                                            }
+                                            onChange={(e) => setWithdrawRate(e.target.value)}
                                             placeholder="e.g. 120"
+                                            className="h-9"
                                         />
                                     </div>
-                                </div>
-                                <div className="space-y-1.5">
-                                    <Label className="text-xs font-semibold">Fees</Label>
-                                    <div className="relative">
+                                    <div className="space-y-1.5">
+                                        <Label className="text-xs font-semibold">Fees</Label>
                                         <Input
                                             type="number"
                                             value={withdrawFees}
-                                            onChange={(e) =>
-                                                setWithdrawFees(e.target.value)
-                                            }
+                                            onChange={(e) => setWithdrawFees(e.target.value)}
+                                            className="h-9"
                                         />
                                     </div>
-                                </div>
-                                <div className="space-y-1.5">
-                                    <Label className="text-xs font-semibold">Tax</Label>
-                                    <div className="relative">
+                                    <div className="space-y-1.5">
+                                        <Label className="text-xs font-semibold">Tax</Label>
                                         <Input
                                             type="number"
                                             value={withdrawTax}
-                                            onChange={(e) =>
-                                                setWithdrawTax(e.target.value)
-                                            }
+                                            onChange={(e) => setWithdrawTax(e.target.value)}
+                                            className="h-9"
                                         />
                                     </div>
                                 </div>
-                            </div>
 
-                            <div className="bg-green-500/5 border border-green-500/20 rounded-lg p-4">
-                                <div className="flex justify-between items-center mb-1">
-                                    <span className="text-sm font-medium text-green-700 dark:text-green-400">
-                                        Final Payout
-                                    </span>
-                                    <span className="text-xl font-bold text-green-700 dark:text-green-400">
-                                        {formatCurrency(withdrawBDT)}
-                                    </span>
+                                <div className="bg-green-500/5 border border-green-500/20 rounded-xl p-5">
+                                    <div className="flex justify-between items-center mb-1">
+                                        <span className="text-sm font-medium text-green-700 dark:text-green-400">
+                                            Final Payout
+                                        </span>
+                                        <span className="text-2xl font-black text-green-700 dark:text-green-400">
+                                            {formatCurrency(withdrawBDT)}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between text-xs text-muted-foreground">
+                                        <span>
+                                            Net: {formatCurrency(withdrawNetAmount, selectedEarning.currency)}
+                                        </span>
+                                        <span>Rate: {withdrawRateNum}</span>
+                                    </div>
                                 </div>
-                                <div className="flex justify-between text-xs text-muted-foreground">
-                                    <span>
-                                        Net:{" "}
-                                        {formatCurrency(
-                                            withdrawNetAmount,
-                                            selectedEarning.currency,
-                                        )}
-                                    </span>
-                                    <span>Rate: {withdrawRateNum}</span>
-                                </div>
-                            </div>
 
-                            <div className="space-y-1.5">
-                                <Label>Notes</Label>
-                                <Textarea
-                                    value={withdrawNotes}
-                                    onChange={(e) =>
-                                        setWithdrawNotes(e.target.value)
-                                    }
-                                    placeholder="Add any transaction details..."
-                                    rows={2}
-                                    className="resize-none"
-                                />
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs font-semibold">Internal Notes</Label>
+                                    <Textarea
+                                        value={withdrawNotes}
+                                        onChange={(e) => setWithdrawNotes(e.target.value)}
+                                        placeholder="Add any transaction details..."
+                                        rows={2}
+                                        className="resize-none"
+                                    />
+                                </div>
                             </div>
-                        </div>
+                        </ScrollArea>
                     )}
                     <DialogFooter className="gap-2 sm:gap-0">
                         <Button

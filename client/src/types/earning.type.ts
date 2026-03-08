@@ -30,6 +30,8 @@ export interface IEarning {
         transactionId: string;
         paidAt: string;
         conversionRate: number;
+        fees: number;
+        tax: number;
     }>;
     status: EarningStatus;
     paidAt?: string;
@@ -43,14 +45,17 @@ export interface IEarning {
 }
 
 export interface WithdrawEarningInput {
-    amount?: number;
-    method?: string;
-    invoiceNumber?: string;
-    transactionId?: string;
-    fees?: number;
-    tax?: number;
+    amount?: number | undefined;
+    method?: string | undefined;
+    invoiceNumber?: string | undefined;
+    transactionId?: string | undefined;
+    fees?: number | undefined;
+    tax?: number | undefined;
     conversionRate: number;
-    notes?: string;
+    notes?: string | undefined;
+    isConversion?: boolean | undefined;
+    paymentId?: string | undefined;
+    isGapConversion?: boolean;
 }
 
 export interface ToggleStatusInput {

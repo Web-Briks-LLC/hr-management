@@ -96,6 +96,8 @@ const EarningSchema = new Schema<IEarning>(
                 transactionId: String,
                 paidAt: Date,
                 conversionRate: Number,
+                fees: { type: Number, default: 0 },
+                tax: { type: Number, default: 0 },
             },
         ],
         paidAt: {

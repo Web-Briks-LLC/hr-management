@@ -36,7 +36,7 @@ async function processEarningCommission(earningId: string, _changedBy: string) {
 
         // 2. Calculate total commission already paid for this earning
         const existingTransactions = await WalletTransactionModel.find({
-            "metadata.earningId": earning._id,
+            "metadata.earningId": new mongoose.Types.ObjectId(earningId),
             type: TransactionType.COMMISSION,
             status: "completed",
         }).session(session);
@@ -59,29 +59,37 @@ async function processEarningCommission(earningId: string, _changedBy: string) {
             return null;
         }
 
-        // 4. Calculate incremental commission (only pay the difference)
-        const totalExpectedCommission = earning.amountInBDT * COMMISSION_RATE;
-        const commissionAmount = totalExpectedCommission - alreadyPaidCommission;
+        // 4. Calculate total GROSS BDT (sum of payment USD * rate, before fees/tax)
+        const totalGrossBDT = earning.payments.reduce((sum, p) => sum + ((p.amount || 0) * (p.conversionRate || 1)), 0);
 
-        if (commissionAmount <= 0) {
+        // 5. Calculate incremental commission (based on Gross BDT)
+        const totalExpectedCommission = Math.round(totalGrossBDT * COMMISSION_RATE * 100) / 100;
+        const commissionAmount = Math.round((totalExpectedCommission - alreadyPaidCommission) * 100) / 100;
+
+        if (commissionAmount < 0.01) {
             await session.abortTransaction();
             return null;
         }
 
-        // 5. Create wallet transaction record
+        // 6. Calculate the "Effective Gross" for THIS specific transaction to show in description
+        const incrementalGross = Math.round((commissionAmount / COMMISSION_RATE) * 100) / 100;
+
+        // 6. Create wallet transaction record
         await WalletTransactionModel.create(
             [
                 {
                     staffId: staff._id,
                     amount: commissionAmount,
                     type: TransactionType.COMMISSION,
-                    description: `5% commission from Client "${client.name}" Earning (${earning.month}/${earning.year}) - ৳${earning.amountInBDT.toLocaleString()}`,
+                    description: `5% commission on ৳${incrementalGross.toLocaleString()} Gross (Total ৳${totalGrossBDT.toLocaleString()}) - ${client.name} (${earning.month}/${earning.year})`,
                     status: "completed",
                     metadata: {
                         earningId: earning._id,
                         clientName: client.name,
-                        amountInBDT: earning.amountInBDT,
+                        incrementalGross: incrementalGross,
+                        totalGrossBDT: totalGrossBDT,
                         commissionRate: COMMISSION_RATE,
+                        isIncremental: alreadyPaidCommission > 0,
                     },
                 },
             ],
@@ -114,7 +122,58 @@ async function processEarningCommission(earningId: string, _changedBy: string) {
     }
 }
 
+/**
+ * Reverse all commissions associated with an earning.
+ * Used when a payment is marked as unpaid or deleted.
+ *
+ * @param earningId - The ID of the earning to reverse commissions for
+ */
+async function reverseEarningCommission(earningId: string) {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+        // 1. Find all completed commission transactions for this earning
+        const transactions = await WalletTransactionModel.find({
+            "metadata.earningId": new mongoose.Types.ObjectId(earningId),
+            type: TransactionType.COMMISSION,
+            status: "completed",
+        }).session(session);
+
+        if (transactions.length === 0) {
+            await session.abortTransaction();
+            return;
+        }
+
+        for (const transaction of transactions) {
+            // 2. Mark transaction as "cancelled" (or we could create a "refund" type)
+            transaction.status = "cancelled";
+            await transaction.save({ session });
+
+            // 3. Deduct amount from staff balance
+            await StaffModel.updateOne(
+                { _id: transaction.staffId },
+                { $inc: { balance: -transaction.amount } },
+                { session },
+            );
+
+            console.log(
+                `[Commission Reversal] ৳${transaction.amount} reversed from staff ${transaction.staffId} for Earning ${earningId}`,
+            );
+        }
+
+        await session.commitTransaction();
+    } catch (err) {
+        await session.abortTransaction();
+        console.error("[Commission Reversal] Failed:", err);
+        throw err;
+    } finally {
+        session.endSession();
+    }
+}
+
 export default {
     processEarningCommission,
+    reverseEarningCommission,
     COMMISSION_RATE,
 };

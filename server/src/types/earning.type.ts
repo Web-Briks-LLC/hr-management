@@ -10,6 +10,8 @@ export interface IPaymentLedger {
     transactionId: string;
     paidAt: Date;
     conversionRate: number;
+    fees?: number;
+    tax?: number;
 }
 
 export interface IEarning extends Document {
@@ -109,9 +111,12 @@ export interface WithdrawEarningData {
     transactionId?: string | undefined; // Optional: reference ID
     fees?: number | undefined;
     tax?: number | undefined;
-    conversionRate?: number;
+    conversionRate?: number | undefined;
     notes?: string | undefined;
     paidBy: string;
+    isConversion?: boolean | undefined;
+    paymentId?: string | undefined;
+    isGapConversion?: boolean | undefined;
 }
 
 export interface BulkWithdrawData {

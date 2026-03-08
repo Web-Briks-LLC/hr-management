@@ -161,6 +161,9 @@ async function withdrawEarning(req: Request, res: Response) {
             conversionRate: Number(conversionRate),
             notes: notes ? String(notes) : undefined,
             paidBy: userId,
+            isConversion: req.body.isConversion === true,
+            paymentId: req.body.paymentId ? String(req.body.paymentId) : undefined,
+            isGapConversion: req.body.isGapConversion === true,
         };
 
         const earning = await earningService.withdrawEarning(id, data);

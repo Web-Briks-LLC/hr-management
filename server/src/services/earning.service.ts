@@ -185,49 +185,83 @@ async function withdrawEarning(
 
     const fees = data.fees ?? 0;
     const tax = data.tax ?? 0;
-    const isConversionOnly = earning.status === 'paid' && earning.paidAmount >= earning.totalAmount && earning.paidAmountBDT === 0;
+    const isConversionOnly = data.isConversion || data.isGapConversion || (earning.status === 'paid' && earning.paidAmount >= earning.totalAmount && earning.paidAmountBDT === 0);
     const amountToApply = data.amount ?? (isConversionOnly ? earning.paidAmount : earning.totalAmount - earning.paidAmount);
     
     // Net amount for THIS payment
     const netAmountThisPayment = Math.max(0, amountToApply - fees - tax);
-    const conversionRate = data.conversionRate ?? 1;
+    const conversionRate = data.conversionRate ?? (await (await import('./currency-rate.service.js')).default.getRateForCurrency(
+        earning.month,
+        earning.year,
+        earning.currency
+    ));
     const amountInBDTThisPayment = netAmountThisPayment * conversionRate;
 
-    const paymentRecord = {
-        invoiceNumber: data.invoiceNumber || `MANUAL-${new Date().getTime()}`,
-        amount: amountToApply,
-        amountInBDT: amountInBDTThisPayment,
-        method: data.method || 'Manual',
-        transactionId: data.transactionId || `MAN-TXN-${new Date().getTime()}`,
-        paidAt: new Date(),
-        conversionRate: conversionRate,
-    };
+    let updatedEarning;
 
-    const incValues: any = {
-        paidAmountBDT: amountInBDTThisPayment,
-        fees: fees,
-        tax: tax,
-    };
-    
-    // Only increment paidAmount if we are not just converting an already-paid earning
-    if (!isConversionOnly) {
-        incValues.paidAmount = amountToApply;
+    if (data.paymentId) {
+        // 1. Find the specific payment in the array
+        const paymentToUpdate = earning.payments.find(p => (p as any)._id?.toString() === data.paymentId);
+        if (!paymentToUpdate) throw new Error("Payment record not found");
+
+        // 2. Update the subdocument using atomic array filter
+        updatedEarning = await EarningModel.findOneAndUpdate(
+            { _id: earningId, "payments._id": data.paymentId },
+            {
+                $set: {
+                    "payments.$.amountInBDT": amountInBDTThisPayment,
+                    "payments.$.conversionRate": conversionRate,
+                    "payments.$.fees": fees,
+                    "payments.$.tax": tax,
+                    "payments.$.paidAt": new Date(),
+                    paidBy: new Types.ObjectId(data.paidBy),
+                },
+                $inc: {
+                    paidAmountBDT: amountInBDTThisPayment,
+                    fees: fees,
+                    tax: tax,
+                }
+            },
+            { new: true }
+        );
+    } else {
+        // Standard flow: Pushes a new payment record
+        const paymentRecord = {
+            invoiceNumber: data.invoiceNumber || `MANUAL-${new Date().getTime()}`,
+            amount: amountToApply,
+            amountInBDT: amountInBDTThisPayment,
+            method: data.method || 'Manual',
+            transactionId: data.transactionId || `MAN-TXN-${new Date().getTime()}`,
+            paidAt: new Date(),
+            conversionRate: conversionRate,
+            fees: fees,
+            tax: tax,
+        };
+
+        const incValues: any = {
+            paidAmountBDT: amountInBDTThisPayment,
+            fees: fees,
+            tax: tax,
+        };
+        
+        if (!isConversionOnly) {
+            incValues.paidAmount = amountToApply;
+        }
+
+        updatedEarning = await EarningModel.findByIdAndUpdate(
+            earningId,
+            {
+                $inc: incValues,
+                $push: {
+                    payments: paymentRecord,
+                },
+                $set: {
+                    paidBy: new Types.ObjectId(data.paidBy),
+                },
+            },
+            { new: true },
+        );
     }
-
-    // Use atomic update to avoid race conditions
-    const updatedEarning = await EarningModel.findByIdAndUpdate(
-        earningId,
-        {
-            $inc: incValues,
-            $push: {
-                payments: paymentRecord,
-            },
-            $set: {
-                paidBy: new Types.ObjectId(data.paidBy),
-            },
-        },
-        { new: true },
-    );
 
     if (!updatedEarning) return null;
 
@@ -292,19 +326,36 @@ async function toggleEarningStatus(
     if (!earning) return null;
 
     if (newStatus === 'paid') {
+        const remainingAmount = earning.totalAmount - earning.paidAmount;
+        
         const updateData: any = {
             status: 'paid',
             paidAmount: earning.totalAmount, // Mark fully paid
             paidAt: new Date(),
         };
+
+        const paymentRecord = remainingAmount > 0 ? {
+            invoiceNumber: `STATUS-PAID-${new Date().getTime()}`,
+            amount: remainingAmount,
+            amountInBDT: 0,
+            method: 'Manual',
+            transactionId: `TXN-ST-${new Date().getTime()}`,
+            paidAt: new Date(),
+            conversionRate: 1,
+        } : null;
         
         if (data?.paidBy) {
             updateData.paidBy = new Types.ObjectId(data.paidBy);
         }
 
+        const updateQuery: any = { $set: updateData };
+        if (paymentRecord) {
+            updateQuery.$push = { payments: paymentRecord };
+        }
+
         return EarningModel.findByIdAndUpdate(
             earningId,
-            { $set: updateData },
+            updateQuery,
             { new: true },
         )
             .populate('clientId', 'clientId name email currency')
@@ -322,7 +373,7 @@ async function toggleEarningStatus(
 
     } else if (newStatus === 'unpaid') {
         // Reset withdrawal data
-        return EarningModel.findByIdAndUpdate(
+        const updated = await EarningModel.findByIdAndUpdate(
             earningId,
             {
                 $set: {
@@ -355,6 +406,16 @@ async function toggleEarningStatus(
                 }
                 return result;
             }) as Promise<IEarning | null>;
+
+        // Trigger commission reversal
+        try {
+            const { default: commissionService } = await import('./commission.service.js');
+            await commissionService.reverseEarningCommission(earningId);
+        } catch (err) {
+            console.error('[Earning Status Toggle] Failed to reverse commission:', err);
+        }
+
+        return updated;
     }
 
     return null;
