@@ -86,7 +86,7 @@ export default function BalancesClient() {
         isLoading: isAdminStaffLoading,
         isFetching: isAdminStaffFetching
     } = useGetStaffsQuery(
-        { page: staffPage, limit },
+        { page: staffPage, limit, designation: "telemarketer", hasBalance: true },
         { skip: !isAdmin }
     );
 

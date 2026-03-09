@@ -14,6 +14,7 @@ export type IStaffQueryParams = {
     status?: string;
     branchId?: string;
     excludeAdmins?: boolean;
+    hasBalance?: boolean;
 };
 
 async function getAllStaffsFromDB(query: IStaffQueryParams) {
@@ -27,6 +28,7 @@ async function getAllStaffsFromDB(query: IStaffQueryParams) {
         status,
         branchId,
         excludeAdmins,
+        hasBalance,
     } = query;
 
     const skip = (page - 1) * limit;
@@ -48,6 +50,7 @@ async function getAllStaffsFromDB(query: IStaffQueryParams) {
     if (department) matchStage.department = department;
     if (designation) matchStage.designation = designation;
     if (status) matchStage.status = status;
+    if (hasBalance) matchStage.balance = { $gt: 0 };
     if (branchId) matchStage.branchId = new Types.ObjectId(branchId);
 
     const pipeline: any[] = [

@@ -13,6 +13,7 @@ const getStaffs = async (req: Request, res: Response) => {
             status,
             branchId,
             excludeAdmins,
+            hasBalance,
         } = req.query;
 
         const result = await StaffServices.getAllStaffsFromDB({
@@ -25,6 +26,7 @@ const getStaffs = async (req: Request, res: Response) => {
             status: status as string,
             branchId: branchId as string,
             excludeAdmins: excludeAdmins === 'true',
+            hasBalance: hasBalance === 'true',
         });
 
         return res.json({ success: true, ...result });
