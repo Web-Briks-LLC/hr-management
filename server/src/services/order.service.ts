@@ -62,29 +62,31 @@ interface GetOrdersFilters {
 }
 
 async function createOrderInDB(data: CreateOrderData): Promise<IOrder> {
-    // Create order with initial timeline entry
-    const orderData = {
-        ...data,
-        revisionCount: 0,
-        revisionInstructions: [],
-        timeline: [
-            {
-                status: 'pending' as OrderStatus,
-                timestamp: new Date(),
-                changedBy: data.createdBy,
-                note: 'Order created',
-            },
-        ],
-    };
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
-    const order = await OrderModel.create(orderData as unknown as IOrder);
-
-    // Auto-create or update monthly earning for this order
     try {
-        // Get client to fetch currency
-        const client = await ClientModel.findById(data.clientId).lean();
-        const currency =
-            (client as { currency?: string } | null)?.currency || 'USD';
+        // Create order with initial timeline entry
+        const orderData = {
+            ...data,
+            revisionCount: 0,
+            revisionInstructions: [],
+            timeline: [
+                {
+                    status: 'pending' as OrderStatus,
+                    timestamp: new Date(),
+                    changedBy: data.createdBy,
+                    note: 'Order created',
+                },
+            ],
+        };
+
+        const orders = await (OrderModel as any).create([orderData], { session });
+        const order = orders[0];
+
+        // Auto-create or update monthly earning for this order
+        const client = await ClientModel.findById(data.clientId).session(session).lean();
+        const currency = (client as { currency?: string } | null)?.currency || 'USD';
 
         await earningService.createEarningForOrder({
             orderId: (order._id as mongoose.Types.ObjectId).toString(),
@@ -94,13 +96,17 @@ async function createOrderInDB(data: CreateOrderData): Promise<IOrder> {
             imageQty: data.imageQuantity,
             currency,
             createdBy: data.createdBy,
-        });
-    } catch (err) {
-        console.error('Error auto-creating earning for order:', err);
-        // Don't fail order creation if earning creation fails
-    }
+        }, session);
 
-    return order;
+        await session.commitTransaction();
+        return order;
+    } catch (error) {
+        await session.abortTransaction();
+        console.error('Error in createOrderInDB transaction:', error);
+        throw error;
+    } finally {
+        session.endSession();
+    }
 }
 
 async function getAllOrdersFromDB(filters: GetOrdersFilters): Promise<{
@@ -449,102 +455,103 @@ async function updateOrderInDB(
     id: string,
     data: UpdateOrderData,
 ): Promise<IOrder | null> {
-    // Handle status changes
-    if (data.status === 'completed' && !data.completedAt) {
-        data.completedAt = new Date();
-    }
-    if (data.status === 'delivered' && !data.deliveredAt) {
-        data.deliveredAt = new Date();
-    }
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
-    // IMPORTANT: Fetch old order data BEFORE updating, so we have the
-    // original values for the earning diff calculation.
-    let oldOrder: IOrder | null = null;
-    if (
-        data.totalPrice !== undefined ||
-        data.imageQuantity !== undefined ||
-        data.orderDate
-    ) {
-        oldOrder = (await OrderModel.findById(id).lean()) as IOrder | null;
-    }
+    try {
+        // Handle status changes
+        if (data.status === 'completed' && !data.completedAt) {
+            data.completedAt = new Date();
+        }
+        if (data.status === 'delivered' && !data.deliveredAt) {
+            data.deliveredAt = new Date();
+        }
 
-    const order = await OrderModel.findByIdAndUpdate(id, data, {
-        new: true,
-        runValidators: true,
-    })
-        .populate(
-            'clientId',
-            'clientId name email emails currency officeAddress address',
-        )
-        .populate('services', 'name')
-        .populate('returnFileFormat', 'name extension')
-        .populate({
-            path: 'assignedTo',
-            select: 'staffId userId',
-            populate: {
-                path: 'userId',
-                select: 'name',
-            },
+        // Fetch old order data BEFORE updating
+        let oldOrder: IOrder | null = null;
+        if (
+            data.totalPrice !== undefined ||
+            data.imageQuantity !== undefined ||
+            data.orderDate
+        ) {
+            oldOrder = (await OrderModel.findById(id).session(session).lean()) as IOrder | null;
+        }
+
+        const order = await OrderModel.findByIdAndUpdate(id, data, {
+            new: true,
+            runValidators: true,
+            session,
         })
-        .lean();
+            .populate(
+                'clientId',
+                'clientId name email emails currency officeAddress address',
+            )
+            .populate('services', 'name')
+            .populate('returnFileFormat', 'name extension')
+            .populate({
+                path: 'assignedTo',
+                select: 'staffId userId',
+                populate: {
+                    path: 'userId',
+                    select: 'name',
+                },
+            })
+            .lean();
 
-    // Update monthly earning if order amount, imageQty or date changes
-    if (order && oldOrder) {
-        try {
-            const updateData: {
-                orderAmount?: number;
-                imageQty?: number;
-                orderDate?: Date;
-                oldOrderAmount?: number;
-                oldImageQty?: number;
-                oldOrderDate?: Date;
-            } = {
-                // ALWAYS pass the amounts/quantities so the earning service can accurately
-                // move the correct amount if the month changes, even if only the date was edited.
-                orderAmount:
-                    data.totalPrice !== undefined
-                        ? data.totalPrice
-                        : order.totalPrice,
+        // Update monthly earning if order amount, imageQty or date changes
+        if (order && oldOrder) {
+            const updateData: any = {
+                orderAmount: data.totalPrice !== undefined ? data.totalPrice : order.totalPrice,
                 oldOrderAmount: oldOrder.totalPrice,
-                imageQty:
-                    data.imageQuantity !== undefined
-                        ? data.imageQuantity
-                        : order.imageQuantity,
+                imageQty: data.imageQuantity !== undefined ? data.imageQuantity : order.imageQuantity,
                 oldImageQty: oldOrder.imageQuantity,
-                orderDate:
-                    data.orderDate !== undefined
-                        ? data.orderDate
-                        : order.orderDate,
+                orderDate: data.orderDate !== undefined ? data.orderDate : order.orderDate,
                 oldOrderDate: oldOrder.orderDate,
             };
 
-            await earningService.updateEarningForOrder(id, updateData);
-        } catch (err) {
-            console.error('Error updating earning for order:', err);
+            await earningService.updateEarningForOrder(id, updateData, session);
         }
-    }
 
-    return order;
+        await session.commitTransaction();
+        return order as IOrder;
+    } catch (error) {
+        await session.abortTransaction();
+        console.error('Error in updateOrderInDB transaction:', error);
+        throw error;
+    } finally {
+        session.endSession();
+    }
 }
 
 async function deleteOrderFromDB(id: string): Promise<IOrder | null> {
-    // Get order data before deletion to update earning
-    const order = await OrderModel.findById(id).lean();
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
-    // Remove from monthly earning
-    if (order) {
-        try {
+    try {
+        // Get order data before deletion to update earning
+        const order = await OrderModel.findById(id).session(session).lean();
+
+        // Remove from monthly earning
+        if (order) {
             await earningService.deleteEarningForOrder(
                 id,
                 order.totalPrice,
                 order.imageQuantity,
+                session,
             );
-        } catch (err) {
-            console.error('Error removing order from earning:', err);
         }
-    }
 
-    return OrderModel.findByIdAndDelete(id).lean();
+        const deletedOrder = await OrderModel.findByIdAndDelete(id).session(session).lean();
+        
+        await session.commitTransaction();
+        return deletedOrder as IOrder;
+    } catch (error) {
+        await session.abortTransaction();
+        console.error('Error in deleteOrderFromDB transaction:', error);
+        throw error;
+    } finally {
+        session.endSession();
+    }
 }
 
 // Update status with timeline tracking

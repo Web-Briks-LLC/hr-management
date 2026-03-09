@@ -4,7 +4,7 @@ import {
     startOfWeek,
     endOfWeek,
 } from 'date-fns';
-import { Types, type HydratedDocument } from 'mongoose';
+import { Types, type HydratedDocument, type ClientSession } from 'mongoose';
 import EarningModel from '../models/earning.model.js';
 import ClientModel from '../models/client.model.js';
 import OrderModel from '../models/order.model.js';
@@ -18,11 +18,14 @@ import type {
     ClientOrdersForWithdraw,
     ImportLegacyEarningData,
 } from '../types/earning.type.js';
-// date-fns imports removed - no longer needed for monthly aggregation
+
+// Helper for currency rounding
+const roundAmount = (num: number): number => Math.round(num * 100) / 100;
 
 // Create or update monthly earning when order is created
 async function createEarningForOrder(
     data: CreateEarningForOrderData,
+    session?: ClientSession,
 ): Promise<HydratedDocument<IEarning>> {
     const orderDate = new Date(data.orderDate);
     const month = orderDate.getMonth() + 1; // 1-12
@@ -33,27 +36,28 @@ async function createEarningForOrder(
         clientId: data.clientId,
         month,
         year,
-    });
+    }).session(session || null);
 
     if (existingEarning) {
         // Update existing monthly earning
         existingEarning.orderIds.push(data.orderId as any);
-        existingEarning.totalAmount += data.orderAmount;
+        existingEarning.totalAmount = roundAmount(existingEarning.totalAmount + data.orderAmount);
         existingEarning.imageQty += data.imageQty;
-        existingEarning.netAmount =
+        existingEarning.netAmount = roundAmount(
             existingEarning.totalAmount -
             existingEarning.fees -
-            existingEarning.tax;
+            existingEarning.tax
+        );
 
         // Reset status if new orders make it underpaid
         if (
             existingEarning.status === 'paid' &&
-            existingEarning.totalAmount > existingEarning.paidAmount + 0.01
+            existingEarning.totalAmount > existingEarning.paidAmount + 0.005
         ) {
             existingEarning.status = 'unpaid';
         }
 
-        return existingEarning.save();
+        return (existingEarning as any).save({ session: session || null });
     }
 
     // Create new monthly earning
@@ -63,19 +67,22 @@ async function createEarningForOrder(
         year,
         orderIds: [data.orderId],
         imageQty: data.imageQty,
-        totalAmount: data.orderAmount,
+        totalAmount: roundAmount(data.orderAmount),
         currency: data.currency,
         fees: 0,
         tax: 0,
         conversionRate: 1,
-        netAmount: data.orderAmount,
+        netAmount: roundAmount(data.orderAmount),
         amountInBDT: 0,
         status: 'unpaid',
+        withdrawnAmount: 0,
+        paidAmount: 0,
+        paidAmountBDT: 0,
         isLegacy: false,
         createdBy: data.createdBy,
     });
 
-    return earning.save();
+    return (earning as any).save({ session: session || null });
 }
 
 // Update earning when order is updated
@@ -89,8 +96,8 @@ async function updateEarningForOrder(
         oldImageQty?: number;
         oldOrderDate?: Date;
     },
+    session?: ClientSession,
 ): Promise<IEarning | null> {
-    // If order date changed, we need to move the order to a different monthly earning
     if (data.orderDate && data.oldOrderDate) {
         const oldDate = new Date(data.oldOrderDate);
         const newDate = new Date(data.orderDate);
@@ -100,70 +107,49 @@ async function updateEarningForOrder(
         const newYear = newDate.getFullYear();
 
         if (oldMonth !== newMonth || oldYear !== newYear) {
-            // Remove from old monthly earning
-            const oldEarning = await EarningModel.findOne({
-                orderIds: orderId,
-            });
-
+            const oldEarning = await EarningModel.findOne({ orderIds: orderId }).session(session || null);
             if (oldEarning) {
-                oldEarning.orderIds = oldEarning.orderIds.filter(
-                    (id) => id.toString() !== orderId,
-                );
-                oldEarning.totalAmount -= data.oldOrderAmount || 0;
+                oldEarning.orderIds = oldEarning.orderIds.filter((id) => id.toString() !== orderId);
+                oldEarning.totalAmount = roundAmount(oldEarning.totalAmount - (data.oldOrderAmount || 0));
                 oldEarning.imageQty -= data.oldImageQty || 0;
-                oldEarning.netAmount =
-                    oldEarning.totalAmount - oldEarning.fees - oldEarning.tax;
-
+                oldEarning.netAmount = roundAmount(oldEarning.totalAmount - oldEarning.fees - oldEarning.tax);
                 if (oldEarning.orderIds.length === 0) {
-                    await EarningModel.deleteOne({ _id: oldEarning._id });
+                    await EarningModel.deleteOne({ _id: oldEarning._id }).session(session || null);
                 } else {
-                    await oldEarning.save();
+                    await (oldEarning as any).save({ session: session || null });
                 }
             }
-
-            // Add to new monthly earning - get order details
-            const order =
-                await OrderModel.findById(orderId).populate('clientId');
+            const order = await OrderModel.findById(orderId).populate('clientId').session(session || null);
             if (order) {
-                // @ts-ignore
-                const currency = order.clientId?.currency || 'USD';
+                const currency = (order.clientId as any)?.currency || 'USD';
                 return createEarningForOrder({
                     orderId,
-                    clientId: order.clientId._id.toString(),
+                    clientId: (order.clientId as any)._id.toString(),
                     orderDate: newDate,
                     orderAmount: data.orderAmount || order.totalPrice,
                     imageQty: data.imageQty || order.imageQuantity,
                     currency,
                     createdBy: order.createdBy.toString(),
-                }) as any;
+                }, session);
             }
         }
     }
 
-    // Just update the amounts in the same monthly earning
-    const earning = await EarningModel.findOne({ orderIds: orderId });
+    const earning = await EarningModel.findOne({ orderIds: orderId }).session(session || null);
     if (!earning) return null;
 
     if (data.orderAmount !== undefined && data.oldOrderAmount !== undefined) {
         const amountDiff = data.orderAmount - data.oldOrderAmount;
-        earning.totalAmount += amountDiff;
-        earning.netAmount = earning.totalAmount - earning.fees - earning.tax;
+        earning.totalAmount = roundAmount(earning.totalAmount + amountDiff);
+        earning.netAmount = roundAmount(earning.totalAmount - earning.fees - earning.tax);
     }
-
     if (data.imageQty !== undefined && data.oldImageQty !== undefined) {
-        const imageQtyDiff = data.imageQty - data.oldImageQty;
-        earning.imageQty += imageQtyDiff;
+        earning.imageQty += (data.imageQty - data.oldImageQty);
     }
-
-    // Reset status if new amount makes it underpaid
-    if (
-        earning.status === 'paid' &&
-        earning.totalAmount > earning.paidAmount + 0.01
-    ) {
+    if (earning.status === 'paid' && earning.totalAmount > earning.paidAmount + 0.005) {
         earning.status = 'unpaid';
     }
-
-    return earning.save();
+    return (earning as any).save({ session: session || null });
 }
 
 // Delete earning entry when order is deleted
@@ -171,33 +157,30 @@ async function deleteEarningForOrder(
     orderId: string,
     orderAmount: number,
     imageQty: number,
+    session?: ClientSession,
 ): Promise<IEarning | null> {
-    const earning = await EarningModel.findOne({ orderIds: orderId });
+    const earning = await EarningModel.findOne({ orderIds: orderId }).session(session || null);
     if (!earning) return null;
 
-    // Remove order from array
-    earning.orderIds = earning.orderIds.filter(
-        (id) => id.toString() !== orderId,
-    );
-    earning.totalAmount -= orderAmount;
+    earning.orderIds = earning.orderIds.filter((id) => id.toString() !== orderId);
+    earning.totalAmount = roundAmount(earning.totalAmount - orderAmount);
     earning.imageQty -= imageQty;
-    earning.netAmount = earning.totalAmount - earning.fees - earning.tax;
+    earning.netAmount = roundAmount(earning.totalAmount - earning.fees - earning.tax);
 
-    // If no more orders, delete the earning record
     if (earning.orderIds.length === 0 && !earning.isLegacy) {
-        await EarningModel.deleteOne({ _id: earning._id });
+        await EarningModel.deleteOne({ _id: earning._id }).session(session || null);
         return earning;
     }
-
-    return earning.save();
+    return (earning as any).save({ session: session || null });
 }
 
 // Withdraw earning (mark as paid)
 async function withdrawEarning(
     earningId: string,
     data: WithdrawEarningData,
+    session?: ClientSession,
 ): Promise<IEarning | null> {
-    const earning = await EarningModel.findById(earningId);
+    const earning = await EarningModel.findById(earningId).session(session || null);
     if (!earning) return null;
 
     const fees = data.fees ?? 0;
@@ -205,23 +188,13 @@ async function withdrawEarning(
     const isConversionOnly = data.isConversion || data.isGapConversion || (earning.status === 'paid' && earning.paidAmount >= earning.totalAmount && earning.paidAmountBDT === 0);
     const amountToApply = data.amount ?? (isConversionOnly ? earning.paidAmount : earning.totalAmount - earning.paidAmount);
     
-    // Net amount for THIS payment
     const netAmountThisPayment = Math.max(0, amountToApply - fees - tax);
-    const conversionRate = data.conversionRate ?? (await (await import('./currency-rate.service.js')).default.getRateForCurrency(
-        earning.month,
-        earning.year,
-        earning.currency
-    ));
-    const amountInBDTThisPayment = netAmountThisPayment * conversionRate;
+    const conversionRate = data.conversionRate ?? (await (await import('./currency-rate.service.js')).default.getRateForCurrency(earning.month, earning.year, earning.currency));
+    const amountInBDTThisPayment = roundAmount(netAmountThisPayment * conversionRate);
 
     let updatedEarning;
 
     if (data.paymentId) {
-        // 1. Find the specific payment in the array
-        const paymentToUpdate = earning.payments.find(p => (p as any)._id?.toString() === data.paymentId);
-        if (!paymentToUpdate) throw new Error("Payment record not found");
-
-        // 2. Update the subdocument using atomic array filter
         updatedEarning = await EarningModel.findOneAndUpdate(
             { _id: earningId, "payments._id": data.paymentId },
             {
@@ -239,10 +212,9 @@ async function withdrawEarning(
                     tax: tax,
                 }
             },
-            { new: true }
+            { new: true, session: session || null },
         );
     } else {
-        // Standard flow: Pushes a new payment record
         const paymentRecord = {
             invoiceNumber: data.invoiceNumber || `MANUAL-${new Date().getTime()}`,
             amount: amountToApply,
@@ -254,83 +226,52 @@ async function withdrawEarning(
             fees: fees,
             tax: tax,
         };
-
-        const incValues: any = {
-            paidAmountBDT: amountInBDTThisPayment,
-            fees: fees,
-            tax: tax,
-        };
-        
-        if (!isConversionOnly) {
-            incValues.paidAmount = amountToApply;
-        }
+        const incValues: any = { paidAmountBDT: amountInBDTThisPayment, fees: fees, tax: tax };
+        if (!isConversionOnly) incValues.paidAmount = amountToApply;
 
         updatedEarning = await EarningModel.findByIdAndUpdate(
             earningId,
-            {
-                $inc: incValues,
-                $push: {
-                    payments: paymentRecord,
-                },
-                $set: {
-                    paidBy: new Types.ObjectId(data.paidBy),
-                },
-            },
-            { new: true },
+            { $inc: incValues, $push: { payments: paymentRecord }, $set: { paidBy: new Types.ObjectId(data.paidBy) } },
+            { new: true, session: session || null },
         );
     }
 
     if (!updatedEarning) return null;
 
-    // Sync amountInBDT with paidAmountBDT for display consistency
-    updatedEarning.amountInBDT = updatedEarning.paidAmountBDT;
-    await updatedEarning.save();
+    (updatedEarning as any).amountInBDT = roundAmount((updatedEarning as any).paidAmountBDT || 0);
 
-    // Check if fully paid to update status and paidAt
-    if (updatedEarning.paidAmount >= updatedEarning.totalAmount - 0.01) { // tiny margin for float precision
-        updatedEarning.status = 'paid';
-        updatedEarning.paidAt = new Date();
-        await updatedEarning.save();
-
-        // Sync ALL linked orders if month is fully paid
-        if (updatedEarning.orderIds.length > 0) {
+    if ((updatedEarning as any).paidAmount >= (updatedEarning as any).totalAmount - 0.01) {
+        (updatedEarning as any).status = 'paid';
+        (updatedEarning as any).paidAt = new Date();
+        await (updatedEarning as any).save({ session: session || null });
+        if ((updatedEarning as any).orderIds.length > 0) {
             const OrderModel = (await import('../models/order.model.js')).default;
-            await OrderModel.updateMany(
-                { _id: { $in: updatedEarning.orderIds } },
+            await (OrderModel as any).updateMany(
+                { _id: { $in: (updatedEarning as any).orderIds } },
                 { $set: { isPaid: true } },
+                { session }
             );
         }
-
-    } else if (data.invoiceNumber) {
-        // If PARTIAL payment but linked to an invoice, mark THAT invoice's orders as paid
-        try {
-            const { InvoiceRecord } = await import('../models/invoice-record.model.js');
-            const invoice = await InvoiceRecord.findOne({ invoiceNumber: data.invoiceNumber });
-            if (invoice && invoice.orderIds && invoice.orderIds.length > 0) {
-                const OrderModel = (await import('../models/order.model.js')).default;
-                await OrderModel.updateMany(
-                    { _id: { $in: invoice.orderIds } },
-                    { $set: { isPaid: true } }
-                );
-                console.log(`[Withdraw] Partial payment: Marked ${invoice.orderIds.length} orders from invoice ${data.invoiceNumber} as PAID`);
-            }
-        } catch (err) {
-            console.error('[Withdraw] Failed to sync orders for invoice:', err);
+    } else {
+        await (updatedEarning as any).save({ session: session || null });
+        if (data.invoiceNumber) {
+            try {
+                const { InvoiceRecord } = await import('../models/invoice-record.model.js');
+                const invoice = await InvoiceRecord.findOne({ invoiceNumber: data.invoiceNumber }).session(session || null);
+                if (invoice && invoice.orderIds && invoice.orderIds.length > 0) {
+                    const OrderModel = (await import('../models/order.model.js')).default;
+                    await (OrderModel as any).updateMany({ _id: { $in: invoice.orderIds } }, { $set: { isPaid: true } }, { session });
+                }
+            } catch (err) { console.error('[Withdraw] Failed to sync orders:', err); }
         }
     }
 
-    // Trigger commission processing for EVERY BDT-converted payment
     try {
         const { default: commissionService } = await import('./commission.service.js');
-        await commissionService.processEarningCommission(
-            updatedEarning._id.toString(),
-            data.paidBy,
-        );
-    } catch (commissionError) {
-        console.error('[Withdraw] Failed to process commission:', commissionError);
-    }
+        await commissionService.processEarningCommission((updatedEarning as any)._id.toString(), data.paidBy, session);
+    } catch (err) { console.error('[Withdraw] Failed to process commission:', err); }
 
-    return updatedEarning.populate('clientId', 'clientId name email currency');
+    return (updatedEarning as any).populate('clientId', 'clientId name email currency');
 }
 
 // Toggle earning status (paid <-> unpaid)
@@ -338,104 +279,54 @@ async function toggleEarningStatus(
     earningId: string,
     newStatus: 'paid' | 'unpaid',
     data?: WithdrawEarningData,
+    session?: ClientSession,
 ): Promise<IEarning | null> {
-    const earning = await EarningModel.findById(earningId);
+    const earning = await EarningModel.findById(earningId).session(session || null);
     if (!earning) return null;
 
     if (newStatus === 'paid') {
         const remainingAmount = earning.totalAmount - earning.paidAmount;
-        
-        const updateData: any = {
-            status: 'paid',
-            paidAmount: earning.totalAmount, // Mark fully paid
-            paidAt: new Date(),
-        };
-
-        const paymentRecord = remainingAmount > 0 ? {
-            invoiceNumber: `STATUS-PAID-${new Date().getTime()}`,
-            amount: remainingAmount,
-            amountInBDT: 0,
-            method: 'Manual',
-            transactionId: `TXN-ST-${new Date().getTime()}`,
-            paidAt: new Date(),
-            conversionRate: 1,
-        } : null;
-        
-        if (data?.paidBy) {
-            updateData.paidBy = new Types.ObjectId(data.paidBy);
-        }
-
+        const updateData: any = { status: 'paid', paidAmount: earning.totalAmount, paidAt: new Date() };
+        if (data?.paidBy) updateData.paidBy = new Types.ObjectId(data.paidBy);
         const updateQuery: any = { $set: updateData };
-        if (paymentRecord) {
-            updateQuery.$push = { payments: paymentRecord };
+        if (remainingAmount > 0) {
+            updateQuery.$push = { payments: {
+                invoiceNumber: `STATUS-PAID-${new Date().getTime()}`,
+                amount: remainingAmount,
+                amountInBDT: 0,
+                method: 'Manual',
+                transactionId: `TXN-ST-${new Date().getTime()}`,
+                paidAt: new Date(),
+                conversionRate: 1,
+            } };
         }
-
-        return EarningModel.findByIdAndUpdate(
-            earningId,
-            updateQuery,
-            { new: true },
-        )
+        return EarningModel.findByIdAndUpdate(earningId, updateQuery, { new: true, session: session || null })
             .populate('clientId', 'clientId name email currency')
-            .lean()
             .then(async (result: any) => {
-                if (result && result.orderIds && result.orderIds.length > 0) {
+                if (result?.orderIds?.length > 0) {
                     const OrderModel = (await import('../models/order.model.js')).default;
-                    await OrderModel.updateMany(
-                        { _id: { $in: result.orderIds } },
-                        { $set: { isPaid: true } }
-                    );
+                    await (OrderModel as any).updateMany({ _id: { $in: result.orderIds } }, { $set: { isPaid: true } }, { session });
                 }
                 return result;
-            }) as Promise<IEarning | null>;
-
-    } else if (newStatus === 'unpaid') {
-        // Reset withdrawal data
+            }) as any;
+    } else {
         const updated = await EarningModel.findByIdAndUpdate(
             earningId,
-            {
-                $set: {
-                    fees: 0,
-                    tax: 0,
-                    conversionRate: 1,
-                    netAmount: earning.totalAmount, // netAmount remains legacy total until paid
-                    amountInBDT: 0,
-                    status: 'unpaid',
-                    paidAmount: 0,
-                    paidAmountBDT: 0,
-                    payments: [],
-                },
-                $unset: {
-                    paidAt: 1,
-                    paidBy: 1,
-                },
-            },
-            { new: true },
-        )
-            .populate('clientId', 'clientId name email currency')
-            .lean()
-            .then(async (result: any) => {
-                if (result && result.orderIds && result.orderIds.length > 0) {
-                    const OrderModel = (await import('../models/order.model.js')).default;
-                    await OrderModel.updateMany(
-                        { _id: { $in: result.orderIds } },
-                        { $set: { isPaid: false } }
-                    );
-                }
-                return result;
-            }) as Promise<IEarning | null>;
-
-        // Trigger commission reversal
+            { $set: { fees: 0, tax: 0, conversionRate: 1, amountInBDT: 0, status: 'unpaid', paidAmount: 0, paidAmountBDT: 0, payments: [] }, $unset: { paidAt: 1, paidBy: 1 } },
+            { new: true, session: session || null }
+        ).populate('clientId', 'clientId name email currency').then(async (result: any) => {
+            if (result?.orderIds?.length > 0) {
+                const OrderModel = (await import('../models/order.model.js')).default;
+                await (OrderModel as any).updateMany({ _id: { $in: result.orderIds } }, { $set: { isPaid: false } }, { session });
+            }
+            return result;
+        }) as any;
         try {
             const { default: commissionService } = await import('./commission.service.js');
-            await commissionService.reverseEarningCommission(earningId);
-        } catch (err) {
-            console.error('[Earning Status Toggle] Failed to reverse commission:', err);
-        }
-
+            await commissionService.reverseEarningCommission(earningId, session);
+        } catch (err) { console.error('[Toggle] Failed to reverse commission:', err); }
         return updated;
     }
-
-    return null;
 }
 
 // Build date filter based on filterType
@@ -919,22 +810,15 @@ async function getClientOrdersForBulkWithdraw(
 
 // Delete earning by ID
 async function deleteEarningFromDB(id: string): Promise<IEarning | null> {
-    return EarningModel.findByIdAndDelete(id).lean();
+    return EarningModel.findByIdAndDelete(id).lean() as any;
 }
 
 // Get unique years from earnings for filter dropdown
 async function getEarningYearsFromDB(): Promise<number[]> {
     const result = await EarningModel.aggregate([
-        {
-            $group: {
-                _id: '$year',
-            },
-        },
-        {
-            $sort: { _id: -1 },
-        },
+        { $group: { _id: '$year' } },
+        { $sort: { _id: -1 } },
     ]);
-
     return result.map((r) => r._id).filter((y) => y !== null);
 }
 
@@ -948,12 +832,8 @@ async function getClientsWithUnpaidEarnings(
         month,
         year,
     });
-
     if (clientIds.length === 0) return [];
-
-    return ClientModel.find({ _id: { $in: clientIds } })
-        .select('name clientId currency')
-        .lean();
+    return ClientModel.find({ _id: { $in: clientIds } }).select('name clientId currency').lean();
 }
 
 // Import legacy earning (for old data without orderIds)
@@ -978,7 +858,6 @@ async function importLegacyEarning(
         legacyClientCode: data.legacyClientCode,
         createdBy: data.createdBy,
     });
-
     return earning.save();
 }
 
@@ -987,31 +866,21 @@ async function updateEarning(
     id: string,
     updates: Partial<IEarning>,
 ): Promise<IEarning | null> {
-    // If clientId is being updated, check for duplicates
     if (updates.clientId) {
         const earning = await EarningModel.findById(id);
-        if (!earning) return null;
-
-        // Check if clientId actually changed
-        if (earning.clientId.toString() !== updates.clientId.toString()) {
+        if (earning && earning.clientId.toString() !== updates.clientId.toString()) {
             const duplicate = await EarningModel.findOne({
                 clientId: updates.clientId,
                 month: updates.month || earning.month,
                 year: updates.year || earning.year,
                 _id: { $ne: id },
             });
-
-            if (duplicate) {
-                throw new Error(
-                    'An earning record already exists for this client in this month/year.',
-                );
-            }
+            if (duplicate) throw new Error('An earning record already exists for this client in this month/year.');
         }
     }
-
     return EarningModel.findByIdAndUpdate(id, { $set: updates }, { new: true })
         .populate('clientId', 'clientId name email currency')
-        .lean() as Promise<IEarning | null>;
+        .lean() as any;
 }
 
 // Sync earning data with actual orders
@@ -1020,8 +889,6 @@ async function syncEarningFromOrders(id: string): Promise<IEarning | null> {
     if (!earning || earning.isLegacy) return earning;
 
     const OrderModel = (await import('../models/order.model.js')).default;
-
-    // Find all orders for this client in the same month/year
     const orders = await OrderModel.find({
         clientId: earning.clientId,
         $expr: {
@@ -1042,13 +909,11 @@ async function syncEarningFromOrders(id: string): Promise<IEarning | null> {
     earning.orderIds = orderIds as any;
     earning.netAmount = totalAmount - earning.fees - earning.tax;
 
-    // Correct the status if paidAmount doesn't match totalAmount
     if (earning.paidAmount < earning.totalAmount - 0.01) {
         earning.status = 'unpaid';
     } else {
         earning.status = 'paid';
     }
-
     const saved = await earning.save();
     return saved.populate('clientId', 'clientId name email currency');
 }

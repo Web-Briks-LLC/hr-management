@@ -1,22 +1,21 @@
+import mongoose from 'mongoose';
 import { type Request, type Response } from 'express';
 import Stripe from 'stripe';
 import { render } from '@react-email/render';
 import { sendMail } from '../lib/nodemailer.js';
-import emailService from '../services/email.service.js';
 import PaymentReceiptEmail from '../emails/PaymentReceipt.js';
 import { InvoiceRecord } from '../models/invoice-record.model.js';
 import EarningModel from '../models/earning.model.js';
 import ClientModel from '../models/client.model.js';
 import notificationService from '../services/notification.service.js';
 
-// Initialize Stripe gracefully, so the server doesn't crash if the key is missing in some environments
+// Initialize Stripe gracefully
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-    apiVersion: '2026-01-28.clover', // Use the latest compatible API version
+    apiVersion: '2026-01-28.clover' as any,
 });
 
 /**
- * Get a PayPal access token using client credentials.
- * Used for server-side order verification.
+ * Get a PayPal access token
  */
 const getPayPalAccessToken = async (): Promise<string> => {
     const clientId = process.env.PAYPAL_CLIENT_ID;
@@ -49,431 +48,203 @@ const getPayPalAccessToken = async (): Promise<string> => {
 };
 
 /**
- * Helper: Get the PayPal API base URL based on mode.
+ * Confirm Payment Controller with Atomic Transactions
  */
-const getPayPalBaseUrl = (): string =>
-    process.env.PAYPAL_MODE === 'live'
-        ? 'https://api-m.paypal.com'
-        : 'https://api-m.sandbox.paypal.com';
-
-/**
- * SECURITY FIX: createPaymentIntent now looks up the invoice amount from the database
- * instead of trusting the client-supplied amount.
- */
-export const createPaymentIntent = async (
-    req: Request,
-    res: Response,
-): Promise<any> => {
-    try {
-        const { invoiceNumber, currency } = req.body;
-
-        if (!invoiceNumber) {
-            return res
-                .status(400)
-                .json({ error: 'Invoice number is required' });
-        }
-
-        if (!process.env.STRIPE_SECRET_KEY) {
-            console.error('Stripe Secret Key is missing in server/.env');
-            return res
-                .status(500)
-                .json({ error: 'Payment gateway is not configured properly' });
-        }
-
-        // SECURITY: Look up the actual invoice amount from the database
-        const invoice = await InvoiceRecord.findOne({
-            invoiceNumber: String(invoiceNumber),
-        });
-
-        if (!invoice) {
-            return res.status(404).json({ error: 'Invoice not found' });
-        }
-
-        if (invoice.paymentStatus === 'paid') {
-            return res.status(400).json({
-                error: 'This invoice has already been paid',
-                alreadyPaid: true,
-            });
-        }
-
-        const amount = invoice.totalAmount;
-        const invoiceCurrency = currency || invoice.currency || 'USD';
-
-        if (!amount || amount <= 0) {
-            return res.status(400).json({ error: 'Invalid invoice amount' });
-        }
-
-        // Create a PaymentIntent with the VERIFIED amount from the database
-        // Stripe requires the amount to be in the smallest currency unit (e.g., cents)
-        const paymentIntent = await stripe.paymentIntents.create({
-            amount: Math.round(amount * 100), // Convert standard amount (e.g., 50.50) to integer cents (5050)
-            currency: invoiceCurrency.toLowerCase(),
-            automatic_payment_methods: {
-                enabled: true,
-            },
-            metadata: {
-                invoiceNumber: invoiceNumber,
-                clientName: invoice.clientName || 'N/A',
-                expectedAmount: String(amount), // Store expected amount for verification
-            },
-        });
-
-        // SECURITY: Store the payment intent ID on the invoice for later verification
-        await InvoiceRecord.findOneAndUpdate(
-            { invoiceNumber: String(invoiceNumber) },
-            { $set: { pendingPaymentIntentId: paymentIntent.id } },
-        );
-
-        res.status(200).json({
-            clientSecret: paymentIntent.client_secret,
-        });
-    } catch (error: any) {
-        console.error('Stripe Payment Intent Error:', error);
-        res.status(500).json({
-            error: error.message || 'Failed to create payment intent',
-        });
-    }
-};
-
 export const confirmPayment = async (
     req: Request,
     res: Response,
 ): Promise<any> => {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
     try {
         const { invoiceNumber, paymentIntentId, paypalOrderId } = req.body;
 
         if (!invoiceNumber) {
-            return res
-                .status(400)
-                .json({ error: 'Invoice number is required' });
+            await session.abortTransaction();
+            session.endSession();
+            return res.status(400).json({ error: 'Invoice number is required' });
         }
 
-        // Require at least one gateway reference
         if (!paymentIntentId && !paypalOrderId) {
-            return res
-                .status(400)
-                .json({ error: 'Payment gateway reference is required' });
+            await session.abortTransaction();
+            session.endSession();
+            return res.status(400).json({ error: 'Payment gateway reference is required' });
         }
 
-        console.log(
-            `[Payment] Confirming payment for Invoice: ${invoiceNumber}`,
-        );
+        console.log(`[Payment] Confirming payment for Invoice: ${invoiceNumber}`);
 
-        // 1. Find the invoice record
-        const invoice = await InvoiceRecord.findOne({ invoiceNumber });
+        // 1. Find the invoice with session
+        const invoice = await InvoiceRecord.findOne({ invoiceNumber }).session(session);
 
         if (!invoice) {
-            return res.status(404).json({ error: 'Invoice record not found' });
+            await session.abortTransaction();
+            session.endSession();
+            return res.status(404).json({ error: 'Invoice not found' });
         }
 
-        // 1b. DUPLICATE PAYMENT GUARD — prevent re-processing already-paid invoices
         if (invoice.paymentStatus === 'paid') {
-            console.log(
-                `[Payment] Invoice ${invoiceNumber} is already paid. Skipping.`,
-            );
-            return res.status(200).json({
-                success: true,
-                message: 'Invoice has already been paid',
-                alreadyPaid: true,
-            });
+            await session.abortTransaction();
+            session.endSession();
+            return res.status(400).json({ error: 'Invoice is already paid' });
         }
 
-        // 2. Perform server-side verification with the payment gateway
         let verified = false;
 
-        if (paymentIntentId && process.env.STRIPE_SECRET_KEY) {
+        // 2. Verify with gateway
+        if (paymentIntentId) {
             try {
-                const intent =
-                    await stripe.paymentIntents.retrieve(paymentIntentId);
-
-                if (intent.status === 'succeeded') {
-                    // SECURITY: Verify the paid amount matches the invoice amount
-                    const paidAmountCents = intent.amount;
-                    const expectedAmountCents = Math.round(
-                        invoice.totalAmount * 100,
-                    );
-
-                    if (paidAmountCents < expectedAmountCents) {
-                        console.error(
-                            `[Payment] AMOUNT MISMATCH for Invoice ${invoiceNumber}: ` +
-                                `Paid ${paidAmountCents} cents but expected ${expectedAmountCents} cents`,
-                        );
-                        return res.status(400).json({
-                            error: 'Payment amount does not match invoice amount',
-                        });
+                const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+                if (paymentIntent.status === 'succeeded') {
+                    // Check if intent belongs to this invoice
+                    if (paymentIntent.metadata.invoiceNumber !== invoiceNumber) {
+                        console.error(`[Payment] STRIPE INVOICE MISMATCH: ${paymentIntentId}`);
+                        await session.abortTransaction();
+                        session.endSession();
+                        return res.status(400).json({ error: 'Payment reference does not match this invoice' });
                     }
-
-                    // SECURITY: Verify the payment intent was created for THIS invoice
-                    // Must strictly match, do not allow bypass if metadata is missing
-                    const intentInvoiceStr = String(
-                        intent.metadata?.invoiceNumber || '',
-                    );
-                    const reqInvoiceStr = String(invoiceNumber);
-
-                    if (intentInvoiceStr !== reqInvoiceStr) {
-                        console.error(
-                            `[Payment] INVOICE MISMATCH: Intent ${paymentIntentId} was created for ` +
-                                `invoice '${intentInvoiceStr}' but confirm was called for '${reqInvoiceStr}'`,
-                        );
-                        return res.status(400).json({
-                            error: 'Payment reference does not match this invoice',
-                        });
-                    }
-
                     verified = true;
-                } else {
-                    console.warn(
-                        `[Payment] Stripe Intent ${paymentIntentId} not succeeded: ${intent.status}`,
-                    );
                 }
             } catch (err) {
-                console.error('[Payment] Error retrieving Stripe intent:', err);
+                console.error('[Payment] Stripe verification error:', err);
+                await session.abortTransaction();
+                session.endSession();
+                return res.status(500).json({ error: 'Stripe verification failed' });
             }
         } else if (paypalOrderId) {
-            // SERVER-SIDE PAYPAL VERIFICATION
             try {
                 const accessToken = await getPayPalAccessToken();
-                const baseUrl = getPayPalBaseUrl();
-
-                const orderRes = await fetch(
-                    `${baseUrl}/v2/checkout/orders/${paypalOrderId}`,
-                    {
-                        headers: {
-                            Authorization: `Bearer ${accessToken}`,
-                            'Content-Type': 'application/json',
-                        },
-                    },
-                );
-
+                const baseUrl = process.env.PAYPAL_MODE === 'live' ? 'https://api-m.paypal.com' : 'https://api-m.sandbox.paypal.com';
+                
+                const orderRes = await fetch(`${baseUrl}/v2/checkout/orders/${paypalOrderId}`, {
+                    headers: { Authorization: `Bearer ${accessToken}` }
+                });
                 const order: any = await orderRes.json();
-                console.log(`[Payment] PayPal Order Status: ${order.status}`);
+                
                 if (order.status === 'COMPLETED') {
-                    // SECURITY: Verify PayPal paid amount matches invoice amount
                     const purchaseUnit = order.purchase_units?.[0];
-                    const paidAmount = purchaseUnit?.amount?.value
-                        ? parseFloat(purchaseUnit.amount.value)
-                        : 0;
-
-                    console.log(`[Payment] Paid: ${paidAmount}, Expected: ${invoice.totalAmount}`);
-
-                    if (paidAmount < invoice.totalAmount) {
-                        console.error(
-                            `[Payment] PAYPAL AMOUNT MISMATCH for Invoice ${invoiceNumber}: ` +
-                                `Paid ${paidAmount} but expected ${invoice.totalAmount}`,
-                        );
-                        return res.status(400).json({
-                            error: 'Payment amount does not match invoice amount',
-                        });
+                    const paidAmount = purchaseUnit?.amount?.value ? parseFloat(purchaseUnit.amount.value) : 0;
+                    
+                    if (paidAmount < invoice.totalAmount - 0.01) {
+                        console.error(`[Payment] PAYPAL AMOUNT MISMATCH: Expected ${invoice.totalAmount}, got ${paidAmount}`);
+                        await session.abortTransaction();
+                        session.endSession();
+                        return res.status(400).json({ error: 'Payment amount mismatch' });
                     }
-
-                    // SECURITY: Verify the PayPal order was for THIS invoice
-                    // Must strictly match, do not allow bypass if reference_id is missing
-                    const referenceIdStr = String(
-                        purchaseUnit?.reference_id || '',
-                    );
-                    const reqInvoiceStr = String(invoiceNumber);
-
-                    console.log(`[Payment] RefID: ${referenceIdStr}, ReqInvoice: ${reqInvoiceStr}`);
-
-                    if (referenceIdStr !== reqInvoiceStr) {
-                        console.error(
-                            `[Payment] PAYPAL INVOICE MISMATCH: Order ${paypalOrderId} ` +
-                                `reference_id is '${referenceIdStr}' but expected '${reqInvoiceStr}'`,
-                        );
-                        return res.status(400).json({
-                            error: 'Payment reference does not match this invoice',
-                        });
+                    
+                    if (String(purchaseUnit?.reference_id) !== String(invoiceNumber)) {
+                        console.error(`[Payment] PAYPAL INVOICE MISMATCH: ${paypalOrderId}`);
+                        await session.abortTransaction();
+                        session.endSession();
+                        return res.status(400).json({ error: 'Payment reference mismatch' });
                     }
-
                     verified = true;
-                } else {
-                    console.warn(
-                        `[Payment] PayPal Order ${paypalOrderId} not completed: ${order.status}. Order data:`, JSON.stringify(order, null, 2)
-                    );
                 }
             } catch (err) {
-                console.error('[Payment] Error verifying PayPal order:', err);
-                return res.status(500).json({ error: 'Internal server error during verification' });
+                console.error('[Payment] PayPal verification error:', err);
+                await session.abortTransaction();
+                session.endSession();
+                return res.status(500).json({ error: 'PayPal verification failed' });
             }
         }
 
-        // 3. Update the database status
         if (verified) {
+            // 3. Mark Invoice as Paid
             invoice.paymentStatus = 'paid';
-            // Store gateway reference for audit trail
             invoice.paymentToken = paymentIntentId || paypalOrderId;
-            await invoice.save();
-            console.log(`[Payment] Invoice ${invoiceNumber} marked as PAID`);
+            await invoice.save({ session });
 
-            // Look up the client once and reuse across steps 4, 5, and 6
-            const client = invoice.clientId
-                ? await ClientModel.findOne({ clientId: invoice.clientId })
-                : null;
+            // 4. Update Earning Record
+            const client = invoice.clientId ? await ClientModel.findOne({ clientId: invoice.clientId }).session(session) : null;
+            
+            if (client && invoice.month && invoice.year) {
+                // Find or Create earning for that specific month/year (Strict Monthly Isolation)
+                let earning = await EarningModel.findOne({
+                    clientId: client._id,
+                    month: invoice.month,
+                    year: invoice.year,
+                }).session(session);
 
-            let finalAmountBDT = invoice.totalAmount * 120; // Default estimate
+                if (!earning) {
+                    earning = new EarningModel({
+                        clientId: client._id,
+                        month: invoice.month,
+                        year: invoice.year,
+                        totalAmount: invoice.totalAmount,
+                        currency: invoice.currency,
+                        status: 'unpaid',
+                        isLegacy: false,
+                        createdBy: client.createdBy || '659696956565656565656565',
+                    });
+                    await (earning as any).save({ session });
+                }
 
+                const conversionRate = (earning as any).conversionRate || 120;
+                const { default: earningService } = await import("../services/earning.service.js");
 
-                    // 4. Update corresponding Earning record if billing period info exists
-                    if (client && invoice.month && invoice.year) {
-                        try {
-                            // 4a. Find or Create earning to ensure we have a record to update
-                            let earning = await EarningModel.findOne({
-                                clientId: client._id,
-                                month: invoice.month,
-                                year: invoice.year,
-                            });
+                await earningService.withdrawEarning((earning as any)._id.toString(), {
+                    amount: invoice.totalAmount,
+                    method: paymentIntentId ? 'Stripe' : 'PayPal',
+                    invoiceNumber: invoice.invoiceNumber,
+                    transactionId: paymentIntentId || paypalOrderId || `WB-PAY-${Date.now()}`,
+                    conversionRate: conversionRate,
+                    notes: `Automated payment for Invoice ${invoice.invoiceNumber}`,
+                    paidBy: (client.createdBy || '659696956565656565656565').toString(),
+                }, session);
+            }
 
-                            if (!earning) {
-                                // Create initial earning if missing
-                                earning = new EarningModel({
-                                    clientId: client._id,
-                                    month: invoice.month,
-                                    year: invoice.year,
-                                    totalAmount: invoice.totalAmount, // or 0? 
-                                    currency: invoice.currency,
-                                    status: 'unpaid',
-                                    isLegacy: false,
-                                    createdBy: client.createdBy || '659696956565656565656565',
-                                });
-                                await earning.save();
-                            }
+            await session.commitTransaction();
+            session.endSession();
 
-                            const conversionRate = earning?.conversionRate || 120;
-                            finalAmountBDT = invoice.totalAmount * conversionRate;
-
-                            const paymentGateway = paymentIntentId
-                                ? 'Stripe'
-                                : paypalOrderId
-                                ? 'PayPal'
-                                : 'Other';
-                            const transactionId =
-                                paymentIntentId || paypalOrderId || `WB-PAY-${Date.now()}`;
-
-                            // 4b. Use Unified Earning Service to record withdrawal
-                            const { default: earningService } = await import("../services/earning.service.js");
-                            
-                            await earningService.withdrawEarning(earning._id.toString(), {
-                                amount: invoice.totalAmount,
-                                method: paymentGateway,
-                                invoiceNumber: invoice.invoiceNumber,
-                                transactionId: transactionId,
-                                conversionRate: conversionRate,
-                                notes: `Automated ${paymentGateway} payment for Invoice ${invoice.invoiceNumber}`,
-                                paidBy: (client.createdBy || '659696956565656565656565').toString(),
-                            });
-
-                            console.log(
-                                `[Payment] Earning for client ${invoice.clientName} (${invoice.month}/${invoice.year}) updated via Unified Service.`
-                            );
-                        } catch (err) {
-                            console.error('[Payment] Error in Earning update block:', err);
-                        }
-                    }
-
-            // 5. Send Payment Receipt Email via React Email to the Client
-            if (client && (invoice.clientEmail || client.emails?.length > 0)) {
+            // 5. Async Post-payment actions (Email/Notifications)
+            // Done outside of transaction since they are not reversible and shouldn't block DB success
+            (async () => {
                 try {
-                    const paymentGateway = paymentIntentId
-                        ? 'Stripe'
-                        : paypalOrderId
-                          ? 'PayPal'
-                          : 'Other';
-                    const referenceId =
-                        paymentIntentId || paypalOrderId || 'WB-PAY-SUCCESS';
-
-                    console.log(
-                        `[Payment] Rendering Receipt Email for ${invoice.clientEmail || client.emails[0]}`,
-                    );
-
-                    const emailHtml = await render(
-                        PaymentReceiptEmail({
+                    if (client && (invoice.clientEmail || client.emails?.length > 0)) {
+                        const recipient = invoice.clientEmail || client.emails[0];
+                        const emailHtml = await render(PaymentReceiptEmail({
                             clientName: client.name || invoice.clientName,
                             invoiceNumber: invoice.invoiceNumber,
                             amountPaidCurrency: invoice.currency,
                             amountPaidValue: invoice.totalAmount,
-                            amountPaidBDT: finalAmountBDT,
-                            referenceId: referenceId,
-                            paymentGateway: paymentGateway,
+                            amountPaidBDT: invoice.totalAmount * (invoice.currency === 'BDT' ? 1 : 120),
+                            referenceId: paymentIntentId || paypalOrderId || 'SUCCESS',
+                            paymentGateway: paymentIntentId ? 'Stripe' : 'PayPal',
                             date: new Date(),
-                        }),
-                    );
-
-                    const recipientEmail = (invoice.clientEmail || (client.emails[0] as string));
-                    
-                    if (invoice.clientEmail) {
-                        console.log(`[Payment] Sending receipt to recorded email: ${recipientEmail}`);
-                    } else {
-                        console.log(`[Payment] clientEmail not found on invoice, falling back to: ${recipientEmail}`);
+                        }));
+                        
+                        await sendMail({
+                            to: recipient as string,
+                            subject: `Receipt for Invoice #${invoice.invoiceNumber} - Web Briks`,
+                            body: emailHtml,
+                            fromName: 'Payment - Web Briks',
+                        });
                     }
-
-                    await sendMail({
-                        to: recipientEmail,
-                        subject: `Receipt for Invoice #${invoice.invoiceNumber} - Web Briks`,
-                        body: emailHtml,
-                        fromName: 'Payment - Web Briks',
-                    });
-                    console.log(
-                        `[Payment] Receipt emailed to ${recipientEmail}`,
-                    );
-                } catch (emailErr) {
-                    console.error(
-                        '[Payment] Failed to send receipt email:',
-                        emailErr,
-                    );
+                    
+                    if (client) {
+                        await notificationService.notifyAdminsPaymentReceived({
+                            clientName: invoice.clientName,
+                            invoiceNumber: invoice.invoiceNumber,
+                            amount: invoice.totalAmount,
+                            currency: invoice.currency,
+                            clientUserId: client._id,
+                        });
+                    }
+                } catch (err) {
+                    console.error('[Payment] Background tasks error:', err);
                 }
-            } else if (invoice.clientId) {
-                console.warn(
-                    `[Payment] Client ${invoice.clientId} has no email address. Skipping receipt.`,
-                );
-            }
+            })();
 
-            // 6. Notify Admins via In-App and Email
-            try {
-                if (client) {
-                    await notificationService.notifyAdminsPaymentReceived({
-                        clientName: invoice.clientName,
-                        invoiceNumber: invoice.invoiceNumber,
-                        amount: invoice.totalAmount,
-                        currency: invoice.currency,
-                        clientUserId: client._id,
-                    });
-                }
-
-                const adminEmail = process.env.SMTP_USER;
-
-                if (adminEmail) {
-                    await emailService.sendAdminPaymentEmail({
-                        to: adminEmail,
-                        clientName: invoice.clientName,
-                        invoiceNumber: invoice.invoiceNumber,
-                        amount: invoice.totalAmount,
-                        currency: invoice.currency,
-                        earningsUrl: `${process.env.CLIENT_URL || 'http://localhost:3000'}/earnings`,
-                    });
-                    console.log(
-                        `[Payment] Admin notification email sent to ${adminEmail}.`,
-                    );
-                }
-            } catch (adminNotifyErr) {
-                console.error(
-                    '[Payment] Failed to notify admins:',
-                    adminNotifyErr,
-                );
-            }
-
-            return res.status(200).json({
-                success: true,
-                message: 'Payment confirmed and records updated',
-            });
+            return res.status(200).json({ success: true, message: 'Payment confirmed' });
         } else {
-            return res.status(400).json({
-                error: 'Payment verification failed',
-            });
+            await session.abortTransaction();
+            session.endSession();
+            return res.status(400).json({ error: 'Payment verification failed' });
         }
     } catch (error: any) {
-        console.error('Payment Confirmation Error:', error);
-        res.status(500).json({
-            error: error.message || 'Failed to confirm payment',
-        });
+        if (session.inTransaction()) await session.abortTransaction();
+        session.endSession();
+        console.error('[Payment] Fatal Error:', error);
+        return res.status(500).json({ error: 'Internal server error' });
     }
 };

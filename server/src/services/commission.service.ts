@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+import mongoose, { type ClientSession } from "mongoose";
 import StaffModel from "../models/staff.model.js";
 import WalletTransactionModel, {
     TransactionType,
@@ -14,9 +14,9 @@ const COMMISSION_RATE = 0.05; // 5%
  * @param earningId - The ID of the earning that was paid/withdrawn
  * @param changedBy - The userId who triggered the conversion (for audit)
  */
-async function processEarningCommission(earningId: string, _changedBy: string) {
-    const session = await mongoose.startSession();
-    session.startTransaction();
+async function processEarningCommission(earningId: string, _changedBy: string, parentSession?: ClientSession) {
+    const session = parentSession || (await mongoose.startSession());
+    if (!parentSession) session.startTransaction();
 
     try {
         // 1. Fetch the earning and its associated client
@@ -109,7 +109,9 @@ async function processEarningCommission(earningId: string, _changedBy: string) {
             { session },
         );
 
-        await session.commitTransaction();
+        if (!parentSession) {
+            await session.commitTransaction();
+        }
 
         console.log(
             `[Commission] ৳${commissionAmount} credited to ${staff.staffId} for Earning ${earning._id}`,
@@ -121,10 +123,10 @@ async function processEarningCommission(earningId: string, _changedBy: string) {
             earningId: earning._id,
         };
     } catch (err) {
-        await session.abortTransaction();
+        if (!parentSession) await session.abortTransaction();
         throw err;
     } finally {
-        session.endSession();
+        if (!parentSession) session.endSession();
     }
 }
 
@@ -134,9 +136,9 @@ async function processEarningCommission(earningId: string, _changedBy: string) {
  *
  * @param earningId - The ID of the earning to reverse commissions for
  */
-async function reverseEarningCommission(earningId: string) {
-    const session = await mongoose.startSession();
-    session.startTransaction();
+async function reverseEarningCommission(earningId: string, parentSession?: ClientSession) {
+    const session = parentSession || (await mongoose.startSession());
+    if (!parentSession) session.startTransaction();
 
     try {
         // 1. Find all completed commission transactions for this earning
@@ -168,13 +170,13 @@ async function reverseEarningCommission(earningId: string) {
             );
         }
 
-        await session.commitTransaction();
+        if (!parentSession) await session.commitTransaction();
     } catch (err) {
-        await session.abortTransaction();
+        if (!parentSession) await session.abortTransaction();
         console.error("[Commission Reversal] Failed:", err);
         throw err;
     } finally {
-        session.endSession();
+        if (!parentSession) session.endSession();
     }
 }
 
