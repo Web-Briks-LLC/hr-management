@@ -44,6 +44,15 @@ async function createEarningForOrder(
             existingEarning.totalAmount -
             existingEarning.fees -
             existingEarning.tax;
+
+        // Reset status if new orders make it underpaid
+        if (
+            existingEarning.status === 'paid' &&
+            existingEarning.totalAmount > existingEarning.paidAmount + 0.01
+        ) {
+            existingEarning.status = 'unpaid';
+        }
+
         return existingEarning.save();
     }
 
@@ -144,6 +153,14 @@ async function updateEarningForOrder(
     if (data.imageQty !== undefined && data.oldImageQty !== undefined) {
         const imageQtyDiff = data.imageQty - data.oldImageQty;
         earning.imageQty += imageQtyDiff;
+    }
+
+    // Reset status if new amount makes it underpaid
+    if (
+        earning.status === 'paid' &&
+        earning.totalAmount > earning.paidAmount + 0.01
+    ) {
+        earning.status = 'unpaid';
     }
 
     return earning.save();
