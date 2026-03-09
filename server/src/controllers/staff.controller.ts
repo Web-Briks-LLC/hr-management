@@ -71,7 +71,16 @@ async function getStaff(req: Request, res: Response) {
 
         // Return success with null staff if no profile exists yet
         // This is a valid state for new users or admin users without staff profiles
-        return res.json({ success: true, staff: staff || null });
+        return res.json({ 
+            success: true, 
+            staff: staff || null,
+            user: {
+                id: userId,
+                role: req.user?.role,
+                name: req.user?.name,
+                email: req.user?.email
+            }
+        });
     } catch (err) {
         return res
             .status(500)

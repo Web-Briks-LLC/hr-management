@@ -78,7 +78,7 @@ export default function BalancesClient() {
         type: typeFilter === "all" ? undefined : typeFilter
     });
 
-    const isAdmin = ["admin", "super_admin", "owner"].includes(meData?.user?.role);
+    const isAdmin = ["admin", "super_admin", "owner"].includes(meData?.user?.role || meData?.staff?.user?.role);
 
     // Staff Balances (Admin only)
     const {
@@ -141,150 +141,152 @@ export default function BalancesClient() {
                 <h2 className="text-3xl font-bold tracking-tight">Balances</h2>
             </div>
 
-            <Tabs defaultValue="my-balance" className="w-full">
+            <Tabs defaultValue={isAdmin ? "staff-balances" : "my-balance"} className="w-full">
                 <TabsList className={isAdmin ? "" : "hidden"}>
-                    <TabsTrigger value="my-balance">My Balance</TabsTrigger>
+                    {!isAdmin && <TabsTrigger value="my-balance">My Balance</TabsTrigger>}
                     <TabsTrigger value="staff-balances">Staff Balances</TabsTrigger>
                     <TabsTrigger value="all-transactions">All Transactions</TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="my-balance" className="space-y-4">
-                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                        <Card className="bg-gradient-to-br from-blue-500/10 to-indigo-500/10 border-blue-500/20 shadow-sm">
-                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">Available Balance</CardTitle>
-                                <Wallet className="h-4 w-4 text-blue-500" />
+                {!isAdmin && (
+                    <TabsContent value="my-balance" className="space-y-4">
+                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                            <Card className="bg-gradient-to-br from-blue-500/10 to-indigo-500/10 border-blue-500/20 shadow-sm">
+                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                    <CardTitle className="text-sm font-medium">Available Balance</CardTitle>
+                                    <Wallet className="h-4 w-4 text-blue-500" />
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="text-2xl font-bold">৳{calculatedBalance.toLocaleString()}</div>
+                                    <p className="text-muted-foreground mt-1">Calculated from transaction logs</p>
+                                </CardContent>
+                            </Card>
+
+                            <Card className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 border-green-500/20 shadow-sm">
+                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                    <CardTitle className="text-sm font-medium">Total Earned</CardTitle>
+                                    <TrendingUp className="h-4 w-4 text-green-500" />
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="text-2xl font-bold text-green-600 dark:text-green-400">৳{totalEarned.toLocaleString()}</div>
+                                    <p className="text-muted-foreground mt-1">Sum of all earnings & rewards</p>
+                                </CardContent>
+                            </Card>
+
+                            <Card className="bg-gradient-to-br from-orange-500/10 to-red-500/10 border-orange-500/20 shadow-sm">
+                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                    <CardTitle className="text-sm font-medium">Total Withdrawn</CardTitle>
+                                    <ArrowDownCircle className="h-4 w-4 text-orange-500" />
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">৳{totalWithdrawn.toLocaleString()}</div>
+                                    <p className="text-muted-foreground mt-1">Sum of all payouts processed</p>
+                                </CardContent>
+                            </Card>
+                        </div>
+
+                        <Card>
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0">
+                                <div>
+                                    <CardTitle>Transaction History</CardTitle>
+                                    <CardDescription>View your latest commissions and withdrawals.</CardDescription>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+                                    <Select value={typeFilter} onValueChange={(val) => { setTypeFilter(val); setMyTxPage(1); }}>
+                                        <SelectTrigger className="w-[140px] h-8">
+                                            <SelectValue placeholder="Filter type" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">All Types</SelectItem>
+                                            <SelectItem value="commission">Commissions</SelectItem>
+                                            <SelectItem value="withdrawal">Withdrawals</SelectItem>
+                                            <SelectItem value="reward">Rewards</SelectItem>
+                                            <SelectItem value="adjustment">Adjustments</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
                             </CardHeader>
                             <CardContent>
-                                <div className="text-2xl font-bold">৳{calculatedBalance.toLocaleString()}</div>
-                                <p className="text-[10px] text-muted-foreground mt-1">Calculated from transaction logs</p>
-                            </CardContent>
-                        </Card>
-
-                        <Card className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 border-green-500/20 shadow-sm">
-                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">Total Earned</CardTitle>
-                                <TrendingUp className="h-4 w-4 text-green-500" />
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-2xl font-bold text-green-600 dark:text-green-400">৳{totalEarned.toLocaleString()}</div>
-                                <p className="text-[10px] text-muted-foreground mt-1">Sum of all earnings & rewards</p>
-                            </CardContent>
-                        </Card>
-
-                        <Card className="bg-gradient-to-br from-orange-500/10 to-red-500/10 border-orange-500/20 shadow-sm">
-                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">Total Withdrawn</CardTitle>
-                                <ArrowDownCircle className="h-4 w-4 text-orange-500" />
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">৳{totalWithdrawn.toLocaleString()}</div>
-                                <p className="text-[10px] text-muted-foreground mt-1">Sum of all payouts processed</p>
-                            </CardContent>
-                        </Card>
-                    </div>
-
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0">
-                            <div>
-                                <CardTitle>Transaction History</CardTitle>
-                                <CardDescription>View your latest commissions and withdrawals.</CardDescription>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <Filter className="h-3.5 w-3.5 text-muted-foreground" />
-                                <Select value={typeFilter} onValueChange={(val) => { setTypeFilter(val); setMyTxPage(1); }}>
-                                    <SelectTrigger className="w-[140px] h-8 text-xs">
-                                        <SelectValue placeholder="Filter type" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">All Types</SelectItem>
-                                        <SelectItem value="commission">Commissions</SelectItem>
-                                        <SelectItem value="withdrawal">Withdrawals</SelectItem>
-                                        <SelectItem value="reward">Rewards</SelectItem>
-                                        <SelectItem value="adjustment">Adjustments</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="rounded-md border overflow-hidden">
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow className="bg-muted/50">
-                                            <TableHead className="w-[120px]">Date</TableHead>
-                                            <TableHead>Description</TableHead>
-                                            <TableHead className="w-[100px]">Type</TableHead>
-                                            <TableHead className="w-[100px]">Status</TableHead>
-                                            <TableHead className="text-right w-[150px]">Amount</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {isTxFetching && transactions.length === 0 ? (
-                                            <TableRow>
-                                                <TableCell colSpan={5} className="h-24 text-center">
-                                                    <div className="flex items-center justify-center gap-2">
-                                                        <Skeleton className="h-4 w-4 rounded-full animate-pulse" />
-                                                        Loading...
-                                                    </div>
-                                                </TableCell>
+                                <div className="rounded-md border overflow-hidden">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow className="bg-muted/50">
+                                                <TableHead className="w-[120px]">Date</TableHead>
+                                                <TableHead>Description</TableHead>
+                                                <TableHead className="w-[100px]">Type</TableHead>
+                                                <TableHead className="w-[100px]">Status</TableHead>
+                                                <TableHead className="text-right w-[150px]">Amount</TableHead>
                                             </TableRow>
-                                        ) : transactions.length === 0 ? (
-                                            <TableRow>
-                                                <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
-                                                    No transactions found.
-                                                </TableCell>
-                                            </TableRow>
-                                        ) : (
-                                            transactions.map((tx: any) => (
-                                                <TableRow key={tx._id} className="hover:bg-muted/30 transition-colors">
-                                                    <TableCell className="font-medium text-xs">
-                                                        {format(new Date(tx.createdAt), "dd MMM, yyyy")}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <div className="flex flex-col">
-                                                            <span className="text-xs font-medium">{tx.description}</span>
-                                                            {tx.metadata?.clientName && (
-                                                                <span className="text-[9px] text-muted-foreground uppercase tracking-tight">Client: {tx.metadata.clientName}</span>
-                                                            )}
+                                        </TableHeader>
+                                        <TableBody>
+                                            {isTxFetching && transactions.length === 0 ? (
+                                                <TableRow>
+                                                    <TableCell colSpan={5} className="h-24 text-center">
+                                                        <div className="flex items-center justify-center gap-2">
+                                                            <Skeleton className="h-4 w-4 rounded-full animate-pulse" />
+                                                            Loading...
                                                         </div>
                                                     </TableCell>
-                                                    <TableCell>
-                                                        <Badge variant="outline" className="capitalize text-[9px] py-0 font-normal">
-                                                            {tx.type}
-                                                        </Badge>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <Badge
-                                                            variant={tx.status === "completed" ? "default" : "secondary"}
-                                                            className="text-[9px] px-1.5 font-normal"
-                                                        >
-                                                            {tx.status}
-                                                        </Badge>
-                                                    </TableCell>
-                                                    <TableCell className={`text-right text-xs font-bold ${tx.type === 'withdrawal' ? 'text-red-500' : 'text-green-600 dark:text-green-400'}`}>
-                                                        {tx.type === 'withdrawal' ? '-' : '+'}৳{tx.amount.toLocaleString()}
+                                                </TableRow>
+                                            ) : transactions.length === 0 ? (
+                                                <TableRow>
+                                                    <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                                                        No transactions found.
                                                     </TableCell>
                                                 </TableRow>
-                                            ))
-                                        )}
-                                    </TableBody>
-                                </Table>
-                            </div>
-
-                            {myTxMeta && myTxMeta.totalPages > 1 && (
-                                <div className="flex items-center justify-end space-x-2 py-4">
-                                    <span className="text-xs text-muted-foreground mr-2">Page {myTxMeta.page} of {myTxMeta.totalPages}</span>
-                                    <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => setMyTxPage(p => Math.max(1, p - 1))} disabled={myTxPage === 1 || isTxFetching}>
-                                        <ChevronLeft className="h-4 w-4" />
-                                    </Button>
-                                    <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => setMyTxPage(p => Math.min(myTxMeta.totalPages || p, p + 1))} disabled={myTxPage === myTxMeta.totalPages || isTxFetching}>
-                                        <ChevronRight className="h-4 w-4" />
-                                    </Button>
+                                            ) : (
+                                                transactions.map((tx: any) => (
+                                                    <TableRow key={tx._id} className="hover:bg-muted/30 transition-colors">
+                                                        <TableCell className="font-medium">
+                                                            {format(new Date(tx.createdAt), "dd MMM, yyyy")}
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <div className="flex flex-col">
+                                                                <span className="font-medium">{tx.description}</span>
+                                                                {tx.metadata?.clientName && (
+                                                                    <span className="text-muted-foreground uppercase tracking-tight">Client: {tx.metadata.clientName}</span>
+                                                                )}
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Badge variant="outline" className="capitalize font-normal">
+                                                                {tx.type}
+                                                            </Badge>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Badge
+                                                                variant={tx.status === "completed" ? "default" : "secondary"}
+                                                                className="px-1.5 font-normal"
+                                                            >
+                                                                {tx.status}
+                                                            </Badge>
+                                                        </TableCell>
+                                                        <TableCell className={`text-right font-bold ${tx.type === 'withdrawal' ? 'text-red-500' : 'text-green-600 dark:text-green-400'}`}>
+                                                            {tx.type === 'withdrawal' ? '-' : '+'}৳{tx.amount.toLocaleString()}
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))
+                                            )}
+                                        </TableBody>
+                                    </Table>
                                 </div>
-                            )}
-                        </CardContent>
-                    </Card>
-                </TabsContent>
+
+                                {myTxMeta && myTxMeta.totalPages > 1 && (
+                                    <div className="flex items-center justify-end space-x-2 py-4">
+                                        <span className="text-muted-foreground mr-2">Page {myTxMeta.page} of {myTxMeta.totalPages}</span>
+                                        <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => setMyTxPage(p => Math.max(1, p - 1))} disabled={myTxPage === 1 || isTxFetching}>
+                                            <ChevronLeft className="h-4 w-4" />
+                                        </Button>
+                                        <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => setMyTxPage(p => Math.min(myTxMeta.totalPages || p, p + 1))} disabled={myTxPage === myTxMeta.totalPages || isTxFetching}>
+                                            <ChevronRight className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+                )}
 
                 <TabsContent value="staff-balances" className="space-y-4">
                     <Card>
@@ -296,7 +298,7 @@ export default function BalancesClient() {
                             <div className="rounded-md border overflow-hidden">
                                 <Table>
                                     <TableHeader>
-                                        <TableRow className="bg-muted/50 text-xs">
+                                        <TableRow className="bg-muted/50">
                                             <TableHead>Staff Member</TableHead>
                                             <TableHead>Staff ID</TableHead>
                                             <TableHead>Designation</TableHead>
@@ -310,16 +312,16 @@ export default function BalancesClient() {
                                                 <TableCell colSpan={5} className="h-24 text-center">Loading...</TableCell>
                                             </TableRow>
                                         ) : adminStaffData?.staffs?.map((staff: any) => (
-                                            <TableRow key={staff._id} className="text-sm">
+                                            <TableRow key={staff._id}>
                                                 <TableCell>
                                                     <div className="flex flex-col">
-                                                        <span className="font-medium text-xs">{staff.user?.name}</span>
-                                                        <span className="text-[10px] text-muted-foreground">{staff.phone}</span>
+                                                        <span className="font-medium">{staff.user?.name}</span>
+                                                        <span className="text-muted-foreground">{staff.phone}</span>
                                                     </div>
                                                 </TableCell>
-                                                <TableCell className="text-xs">{staff.staffId}</TableCell>
-                                                <TableCell className="capitalize text-xs">{staff.designation}</TableCell>
-                                                <TableCell className="text-right font-bold text-blue-600 text-xs">৳{staff.balance?.toLocaleString() || 0}</TableCell>
+                                                <TableCell>{staff.staffId}</TableCell>
+                                                <TableCell className="capitalize">{staff.designation}</TableCell>
+                                                <TableCell className="text-right font-bold text-blue-600">৳{staff.balance?.toLocaleString() || 0}</TableCell>
                                                 <TableCell className="text-right">
                                                     <WithdrawDialog staff={staff} onWithdraw={handleWithdraw} />
                                                 </TableCell>
@@ -331,7 +333,7 @@ export default function BalancesClient() {
 
                             {adminStaffData?.meta && adminStaffData.meta.totalPages > 1 && (
                                 <div className="flex items-center justify-end space-x-2 py-4">
-                                    <span className="text-xs text-muted-foreground mr-2">Page {adminStaffData.meta.page} of {adminStaffData.meta.totalPages}</span>
+                                    <span className="text-muted-foreground mr-2">Page {adminStaffData.meta.page} of {adminStaffData.meta.totalPages}</span>
                                     <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => setStaffPage(p => Math.max(1, p - 1))} disabled={staffPage === 1 || isAdminStaffFetching}>
                                         <ChevronLeft className="h-4 w-4" />
                                     </Button>
@@ -354,7 +356,7 @@ export default function BalancesClient() {
                             <div className="rounded-md border overflow-hidden">
                                 <Table>
                                     <TableHeader>
-                                        <TableRow className="bg-muted/50 text-xs">
+                                        <TableRow className="bg-muted/50">
                                             <TableHead>Date & Time</TableHead>
                                             <TableHead>Staff Name</TableHead>
                                             <TableHead>Activity</TableHead>
@@ -366,12 +368,12 @@ export default function BalancesClient() {
                                         {isAllTxFetching && (!allTxData || allTxPage > 1) ? (
                                             <TableRow><TableCell colSpan={5} className="text-center h-24">Loading audit log...</TableCell></TableRow>
                                         ) : allTxData?.data?.map((tx: any) => (
-                                            <TableRow key={tx._id} className="text-xs">
-                                                <TableCell className="text-[10px]">{format(new Date(tx.createdAt), "dd MMM HH:mm")}</TableCell>
-                                                <TableCell className="font-medium text-[10px]">{tx.staffId?.userId?.name || 'Deleted Staff'}</TableCell>
-                                                <TableCell className="text-[10px]">{tx.description}</TableCell>
-                                                <TableCell><Badge variant="outline" className="text-[9px] uppercase py-0 leading-none h-4">{tx.type}</Badge></TableCell>
-                                                <TableCell className={`text-right font-bold text-[10px] ${tx.type === 'withdrawal' ? 'text-red-500' : 'text-green-600'}`}>
+                                            <TableRow key={tx._id}>
+                                                <TableCell>{format(new Date(tx.createdAt), "dd MMM HH:mm")}</TableCell>
+                                                <TableCell className="font-medium">{tx.staffId?.userId?.name || 'Deleted Staff'}</TableCell>
+                                                <TableCell>{tx.description}</TableCell>
+                                                <TableCell><Badge variant="outline" className="uppercase py-0 leading-none h-4">{tx.type}</Badge></TableCell>
+                                                <TableCell className={`text-right font-bold ${tx.type === 'withdrawal' ? 'text-red-500' : 'text-green-600'}`}>
                                                     {tx.type === 'withdrawal' ? '-' : '+'}৳{tx.amount.toLocaleString()}
                                                 </TableCell>
                                             </TableRow>
@@ -382,7 +384,7 @@ export default function BalancesClient() {
 
                             {allTxData?.meta && allTxData.meta.totalPages > 1 && (
                                 <div className="flex items-center justify-end space-x-2 py-4">
-                                    <span className="text-xs text-muted-foreground mr-2">Page {allTxData.meta.page} of {allTxData.meta.totalPages}</span>
+                                    <span className="text-muted-foreground mr-2">Page {allTxData.meta.page} of {allTxData.meta.totalPages}</span>
                                     <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => setAllTxPage(p => Math.max(1, p - 1))} disabled={allTxPage === 1 || isAllTxFetching}>
                                         <ChevronLeft className="h-4 w-4" />
                                     </Button>
@@ -426,7 +428,7 @@ function WithdrawDialog({ staff, onWithdraw }: { staff: any, onWithdraw: any }) 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button size="xs" variant="outline" className="h-7 text-[10px]" disabled={staff.balance <= 0}>Process Payout</Button>
+                <Button variant="outline" disabled={staff.balance <= 0}>Process Payout</Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
@@ -437,16 +439,16 @@ function WithdrawDialog({ staff, onWithdraw }: { staff: any, onWithdraw: any }) 
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
                     <div className="grid grid-cols-4 items-center gap-4">
-                        <Label className="text-right text-xs">Available</Label>
+                        <Label className="text-right">Available</Label>
                         <div className="col-span-3 font-bold text-blue-600">৳{staff.balance?.toLocaleString()}</div>
                     </div>
                     <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="amount" className="text-right text-xs">Amount (৳)</Label>
-                        <Input id="amount" type="number" value={amount} onChange={(e) => setAmount(e.target.value)} className="col-span-3 h-8 text-sm" placeholder="0.00" />
+                        <Label htmlFor="amount" className="text-right">Amount (৳)</Label>
+                        <Input id="amount" type="number" value={amount} onChange={(e) => setAmount(e.target.value)} className="col-span-3 h-8" placeholder="0.00" />
                     </div>
                     <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="desc" className="text-right text-xs">Notes</Label>
-                        <Input id="desc" value={description} onChange={(e) => setDescription(e.target.value)} className="col-span-3 h-8 text-sm" placeholder="Cash payment, bank transfer, etc." />
+                        <Label htmlFor="desc" className="text-right">Notes</Label>
+                        <Input id="desc" value={description} onChange={(e) => setDescription(e.target.value)} className="col-span-3 h-8" placeholder="Cash payment, bank transfer, etc." />
                     </div>
                 </div>
                 <DialogFooter className="flex-row justify-end gap-2">
