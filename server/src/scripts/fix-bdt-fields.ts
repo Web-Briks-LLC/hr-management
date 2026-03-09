@@ -8,6 +8,7 @@ async function migrate() {
         console.log('Connected.');
 
         const db = mongoose.connection.db;
+        if (!db) throw new Error('Database connection failed');
         const Collection = db.collection('earnings');
 
         // Find records where paidAmountBDT > 0 but amountInBDT is 0 or missing

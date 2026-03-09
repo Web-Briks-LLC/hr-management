@@ -22,7 +22,7 @@ router.get(
 );
 router.post(
     "/wallet-transactions/withdraw",
-    authorize(Role.ADMIN, Role.SUPER_ADMIN, Role.OWNER),
+    authorize(Role.ADMIN, Role.SUPER_ADMIN),
     adminWithdraw
 );
 
