@@ -1,6 +1,10 @@
 import { Router } from "express";
 import StaffController from "../controllers/staff.controller.js";
-import { getMyTransactions } from "../controllers/wallet-transaction.controller.js";
+import { 
+    getMyTransactions, 
+    getAllTransactions, 
+    adminWithdraw 
+} from "../controllers/wallet-transaction.controller.js";
 import { authorize } from "../middlewares/authorize.js";
 import { Role } from "../constants/role.js";
 
@@ -8,7 +12,20 @@ const router: Router = Router();
 
 router.get("/", StaffController.getStaffs);
 router.get("/me", StaffController.getStaff);
+
+// Wallet Transactions
 router.get("/wallet-transactions/me", getMyTransactions);
+router.get(
+    "/wallet-transactions/all",
+    authorize(Role.HR_MANAGER, Role.ADMIN, Role.SUPER_ADMIN),
+    getAllTransactions
+);
+router.post(
+    "/wallet-transactions/withdraw",
+    authorize(Role.ADMIN, Role.SUPER_ADMIN, Role.OWNER),
+    adminWithdraw
+);
+
 router.get(
     "/:id",
     authorize(Role.HR_MANAGER, Role.ADMIN, Role.SUPER_ADMIN),

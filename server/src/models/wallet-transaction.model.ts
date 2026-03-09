@@ -16,6 +16,7 @@ export interface IWalletTransaction {
     description: string;
     status: "pending" | "completed" | "failed" | "cancelled";
     metadata?: any;
+    createdBy?: Types.ObjectId | string;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -55,6 +56,10 @@ const WalletTransactionSchema = new Schema<IWalletTransaction>(
         },
         metadata: {
             type: Schema.Types.Mixed,
+        },
+        createdBy: {
+            type: Schema.Types.ObjectId,
+            ref: "User",
         },
     },
     {

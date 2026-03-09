@@ -110,6 +110,22 @@ export const staffApi = apiSlice.injectEndpoints({
                 body: { token, pin },
             }),
         }),
+        getAllTransactions: builder.query({
+            query: (params) => ({
+                url: "/staffs/wallet-transactions/all",
+                method: "GET",
+                params,
+            }),
+            providesTags: ["WalletTransaction"],
+        }),
+        adminWithdraw: builder.mutation({
+            query: (body) => ({
+                url: "/staffs/wallet-transactions/withdraw",
+                method: "POST",
+                body,
+            }),
+            invalidatesTags: ["Staff", "WalletTransaction"],
+        }),
     }),
 });
 
@@ -118,6 +134,8 @@ export const {
     useGetStaffByIdQuery,
     useGetMeQuery,
     useGetMyWalletTransactionsQuery,
+    useGetAllTransactionsQuery,
+    useAdminWithdrawMutation,
     useCreateStaffMutation,
     useCompleteProfileMutation,
     useUpdateProfileMutation,
