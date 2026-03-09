@@ -3,6 +3,7 @@ import { type Request, type Response } from 'express';
 import Stripe from 'stripe';
 import { render } from '@react-email/render';
 import { sendMail } from '../lib/nodemailer.js';
+import emailService from '../services/email.service.js';
 import PaymentReceiptEmail from '../emails/PaymentReceipt.js';
 import { InvoiceRecord } from '../models/invoice-record.model.js';
 import EarningModel from '../models/earning.model.js';
@@ -48,6 +49,84 @@ const getPayPalAccessToken = async (): Promise<string> => {
 };
 
 /**
+ * SECURITY FIX: createPaymentIntent now looks up the invoice amount from the database
+ * instead of trusting the client-supplied amount.
+ */
+export const createPaymentIntent = async (
+    req: Request,
+    res: Response,
+): Promise<any> => {
+    try {
+        const { invoiceNumber, currency } = req.body;
+
+        if (!invoiceNumber) {
+            return res
+                .status(400)
+                .json({ error: 'Invoice number is required' });
+        }
+
+        if (!process.env.STRIPE_SECRET_KEY) {
+            console.error('Stripe Secret Key is missing in server/.env');
+            return res
+                .status(500)
+                .json({ error: 'Payment gateway is not configured properly' });
+        }
+
+        // SECURITY: Look up the actual invoice amount from the database
+        const invoice = await InvoiceRecord.findOne({
+            invoiceNumber: String(invoiceNumber),
+        });
+
+        if (!invoice) {
+            return res.status(404).json({ error: 'Invoice not found' });
+        }
+
+        if (invoice.paymentStatus === 'paid') {
+            return res.status(400).json({
+                error: 'This invoice has already been paid',
+                alreadyPaid: true,
+            });
+        }
+
+        const amount = invoice.totalAmount;
+        const invoiceCurrency = currency || invoice.currency || 'USD';
+
+        if (!amount || amount <= 0) {
+            return res.status(400).json({ error: 'Invalid invoice amount' });
+        }
+
+        // Create a PaymentIntent with the VERIFIED amount from the database
+        const paymentIntent = await stripe.paymentIntents.create({
+            amount: Math.round(amount * 100), // Convert to cents
+            currency: invoiceCurrency.toLowerCase(),
+            automatic_payment_methods: {
+                enabled: true,
+            },
+            metadata: {
+                invoiceNumber: invoiceNumber,
+                clientName: invoice.clientName || 'N/A',
+                expectedAmount: String(amount),
+            },
+        });
+
+        // SECURITY: Store the payment intent ID on the invoice for later verification
+        await InvoiceRecord.findOneAndUpdate(
+            { invoiceNumber: String(invoiceNumber) },
+            { $set: { pendingPaymentIntentId: paymentIntent.id } },
+        );
+
+        res.status(200).json({
+            clientSecret: paymentIntent.client_secret,
+        });
+    } catch (error: any) {
+        console.error('Stripe Payment Intent Error:', error);
+        res.status(500).json({
+            error: error.message || 'Failed to create payment intent',
+        });
+    }
+};
+
+/**
  * Confirm Payment Controller with Atomic Transactions
  */
 export const confirmPayment = async (
@@ -86,7 +165,11 @@ export const confirmPayment = async (
         if (invoice.paymentStatus === 'paid') {
             await session.abortTransaction();
             session.endSession();
-            return res.status(400).json({ error: 'Invoice is already paid' });
+            return res.status(200).json({
+                success: true,
+                message: 'Invoice has already been paid',
+                alreadyPaid: true,
+            });
         }
 
         let verified = false;
@@ -197,9 +280,9 @@ export const confirmPayment = async (
             session.endSession();
 
             // 5. Async Post-payment actions (Email/Notifications)
-            // Done outside of transaction since they are not reversible and shouldn't block DB success
             (async () => {
                 try {
+                    // Client receipt
                     if (client && (invoice.clientEmail || client.emails?.length > 0)) {
                         const recipient = invoice.clientEmail || client.emails[0];
                         const emailHtml = await render(PaymentReceiptEmail({
@@ -221,6 +304,7 @@ export const confirmPayment = async (
                         });
                     }
                     
+                    // Admin notifications
                     if (client) {
                         await notificationService.notifyAdminsPaymentReceived({
                             clientName: invoice.clientName,
@@ -229,6 +313,18 @@ export const confirmPayment = async (
                             currency: invoice.currency,
                             clientUserId: client._id,
                         });
+
+                        const adminEmail = process.env.SMTP_USER;
+                        if (adminEmail) {
+                            await emailService.sendAdminPaymentEmail({
+                                to: adminEmail,
+                                clientName: invoice.clientName,
+                                invoiceNumber: invoice.invoiceNumber,
+                                amount: invoice.totalAmount,
+                                currency: invoice.currency,
+                                earningsUrl: `${process.env.CLIENT_URL || 'http://localhost:3000'}/earnings`,
+                            });
+                        }
                     }
                 } catch (err) {
                     console.error('[Payment] Background tasks error:', err);
