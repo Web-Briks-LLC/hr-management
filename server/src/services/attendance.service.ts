@@ -311,6 +311,30 @@ async function checkOutInDB({
                     attendanceDay.status = "early_exit";
                 }
             }
+            if (attendanceDay.otMinutes > 30) {
+                try {
+                    await OvertimeModel.findOneAndUpdate(
+                        {
+                            staffId,
+                            date: dayStart,
+                            type: "post_shift",
+                        },
+                        {
+                            $set: {
+                                shiftId: attendanceDay.shiftId,
+                                startTime: shiftEnd,
+                                endTime: now,
+                                durationMinutes: attendanceDay.otMinutes,
+                                status: "pending",
+                                reason: `Auto-generated from checkout at ${now.toLocaleTimeString()}`,
+                            },
+                        },
+                        { upsert: true, new: true },
+                    );
+                } catch (otError) {
+                    console.error("[OT Auto-Create Error]", otError);
+                }
+            }
         }
     }
 
@@ -318,33 +342,6 @@ async function checkOutInDB({
         (now.getTime() - attendanceDay.checkInAt.getTime()) / 60000,
     );
     attendanceDay.totalMinutes = totalMinutes;
-
-    // ── Integrated Overtime Flow ──────────────────────────────────
-    // If OT minutes > 30, create a pending OT record for approval
-    if (attendanceDay.otMinutes > 30) {
-        try {
-            await OvertimeModel.findOneAndUpdate(
-                {
-                    staffId,
-                    date: dayStart,
-                    type: "post_shift",
-                },
-                {
-                    $set: {
-                        shiftId: attendanceDay.shiftId,
-                        startTime: shiftEnd,
-                        endTime: now,
-                        durationMinutes: attendanceDay.otMinutes,
-                        status: "pending",
-                        reason: `Auto-generated from checkout at ${now.toLocaleTimeString()}`,
-                    },
-                },
-                { upsert: true, new: true },
-            );
-        } catch (otError) {
-            console.error("[OT Auto-Create Error]", otError);
-        }
-    }
 
     await attendanceDay.save();
 
