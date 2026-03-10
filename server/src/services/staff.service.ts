@@ -651,14 +651,19 @@ async function updateSalaryInDB(payload: {
         const SalaryHistoryModel = (
             await import("../models/salary-history.model.js")
         ).default;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await (SalaryHistoryModel.create as any)({
-            staffId,
-            previousSalary: staff.salary,
-            newSalary: salary,
-            changedBy,
-            reason,
-        });
+        await (SalaryHistoryModel.create as any)(
+            [
+                {
+                    staffId,
+                    previousSalary: staff.salary,
+                    newSalary: salary,
+                    changedBy,
+                    reason: reason || "Salary Adjustment",
+                    effectiveDate: new Date(),
+                },
+            ],
+            { session: (staff as any).$session() }
+        );
     }
 
     const updateData: any = {};

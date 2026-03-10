@@ -1,6 +1,7 @@
 import AttendanceEventModel from "../models/attendance-event.model.js";
 import ShiftAssignmentModel from "../models/shift-assignment.model.js";
 import AttendanceDayModel from "../models/attendance-day.model.js";
+import OvertimeModel from "../models/overtime.model.js";
 import type { IShift } from "../types/shift.type.js";
 import StaffModel from "../models/staff.model.js";
 import ShiftOffDateService from "./shift-off-date.service.js";
@@ -317,6 +318,33 @@ async function checkOutInDB({
         (now.getTime() - attendanceDay.checkInAt.getTime()) / 60000,
     );
     attendanceDay.totalMinutes = totalMinutes;
+
+    // ── Integrated Overtime Flow ──────────────────────────────────
+    // If OT minutes > 30, create a pending OT record for approval
+    if (attendanceDay.otMinutes > 30) {
+        try {
+            await OvertimeModel.findOneAndUpdate(
+                {
+                    staffId,
+                    date: dayStart,
+                    type: "post_shift",
+                },
+                {
+                    $set: {
+                        shiftId: attendanceDay.shiftId,
+                        startTime: shiftEnd,
+                        endTime: now,
+                        durationMinutes: attendanceDay.otMinutes,
+                        status: "pending",
+                        reason: `Auto-generated from checkout at ${now.toLocaleTimeString()}`,
+                    },
+                },
+                { upsert: true, new: true },
+            );
+        } catch (otError) {
+            console.error("[OT Auto-Create Error]", otError);
+        }
+    }
 
     await attendanceDay.save();
 

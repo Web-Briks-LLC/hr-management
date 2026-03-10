@@ -205,25 +205,24 @@ export default function PayrollTable({
 
     return (
         <div className="space-y-4">
-            {/* Search Bar */}
-            <div className="relative">
+            {/* Search Bar Simplified */}
+            <div className="relative max-w-sm">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                    placeholder="Search by name, designation, or staff ID..."
+                    placeholder="Search staff..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-9 h-9"
+                    className="pl-9 h-10"
                 />
             </div>
 
-            {/* Bulk Action Bar */}
+            {/* Bulk Action Bar Simplified */}
             {selectedStaffIds.length > 0 && isSelectMode && !isLocked && (
-                <div className="bg-primary/10 border border-primary/20 rounded-md p-3 flex items-center justify-between animate-in fade-in slide-in-from-top-2">
-                    <div className="text-sm font-medium">
+                <div className="bg-muted border rounded-lg p-3 flex items-center justify-between animate-in fade-in duration-300">
+                    <div className="text-sm font-semibold">
                         {selectedStaffIds.length} staff selected
-                        <span className="mx-2 text-muted-foreground">•</span>
-                        Total Payable: ৳{" "}
-                        {totalPayableWithAdjustments.toLocaleString()}
+                        <span className="mx-2 opacity-30">|</span>
+                        Payable: <span className="text-primary">৳ {totalPayableWithAdjustments.toLocaleString()}</span>
                     </div>
                     <Button
                         size="sm"
@@ -235,10 +234,10 @@ export default function PayrollTable({
                 </div>
             )}
 
-            <div className="border rounded-md overflow-hidden">
+            <div className="border rounded-md overflow-hidden bg-background">
                 <Table>
-                    <TableHeader className="bg-muted/40">
-                        <TableRow>
+                    <TableHeader className="bg-muted/50">
+                        <TableRow className="hover:bg-transparent">
                             {isSelectMode && (
                                 <TableHead className="w-[40px]">
                                     <Checkbox
@@ -249,26 +248,14 @@ export default function PayrollTable({
                                     />
                                 </TableHead>
                             )}
-                            <TableHead>Staff Info</TableHead>
-                            <TableHead className="text-center">
-                                Work Days
-                            </TableHead>
-                            <TableHead className="text-center">
-                                Present
-                            </TableHead>
-                            <TableHead className="text-center">
-                                Absent
-                            </TableHead>
-                            <TableHead className="text-center">Late</TableHead>
-                            <TableHead className="text-right">
-                                Per Day
-                            </TableHead>
-                            <TableHead className="text-right">
-                                Payable
-                            </TableHead>
-                            <TableHead className="text-center">
-                                Action
-                            </TableHead>
+                            <TableHead className="py-3 font-semibold">Staff Info</TableHead>
+                            <TableHead className="text-center py-3 font-semibold">Work Days</TableHead>
+                            <TableHead className="text-center py-3 font-semibold">Present</TableHead>
+                            <TableHead className="text-center py-3 font-semibold">Absent</TableHead>
+                            <TableHead className="text-center py-3 font-semibold">Late</TableHead>
+                            <TableHead className="text-right py-3 font-semibold">Per Day</TableHead>
+                            <TableHead className="text-right py-3 font-semibold">Payable</TableHead>
+                            <TableHead className="text-center py-3 font-semibold">Action</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -293,7 +280,7 @@ export default function PayrollTable({
                                         adj.deduction > 0 ||
                                         (adj.baseAmount !== undefined &&
                                             adj.baseAmount !==
-                                                row.payableSalary));
+                                            row.payableSalary));
                                 const finalAmount = isPaid
                                     ? row.paidAmount
                                     : getFinalAmount(row);
@@ -531,7 +518,7 @@ export default function PayrollTable({
                     onSave={
                         editParams.mode === "pay"
                             ? (data) =>
-                                  handleSaveAdjustment(editParams.staffId, data)
+                                handleSaveAdjustment(editParams.staffId, data)
                             : undefined
                     }
                 />

@@ -188,118 +188,121 @@ export default function OvertimeTable({
 
     return (
         <div className="space-y-4">
-            <div className="flex items-center justify-between">
-                <div className="text-sm text-muted-foreground">
-                    {selectedStaffIds.length} selected
-                </div>
-                <Dialog open={isReviewOpen} onOpenChange={setIsReviewOpen}>
-                    <DialogTrigger asChild>
-                        <Button
-                            disabled={
-                                selectedStaffIds.length === 0 ||
-                                isBulkProcessing ||
-                                isLocked
-                            }
-                        >
-                            Review & Pay
-                        </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-2xl">
-                        <DialogHeader>
-                            <DialogTitle>Review Overtime Payments</DialogTitle>
-                            <DialogDescription>
-                                Review the selected staff and amounts before
-                                processing payment.
-                            </DialogDescription>
-                        </DialogHeader>
-                        <div className="max-h-[300px] overflow-y-auto border rounded-md p-2">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Staff</TableHead>
-                                        <TableHead className="text-right">
-                                            Hours
-                                        </TableHead>
-                                        <TableHead className="text-right">
-                                            Amount
-                                        </TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {pendingStaff
-                                        .filter((s) =>
-                                            selectedStaffIds.includes(s._id),
-                                        )
-                                        .map((s) => (
-                                            <TableRow key={s._id}>
-                                                <TableCell>{s.name}</TableCell>
-                                                <TableCell className="text-right">
-                                                    {formatDuration(
-                                                        s.otMinutes,
-                                                    )}
-                                                </TableCell>
-                                                <TableCell className="text-right font-bold">
-                                                    {s.otPayable}
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
-                                </TableBody>
-                            </Table>
-                        </div>
-                        <div className="flex justify-end items-center gap-4 py-4 border-t">
-                            <div className="text-lg font-bold">
-                                Total: {selectedTotalAmount}
-                            </div>
-                        </div>
-                        <DialogFooter>
-                            <Button
-                                variant="outline"
-                                onClick={() => setIsReviewOpen(false)}
-                            >
-                                Cancel
-                            </Button>
-                            <Button
-                                onClick={handleBulkPay}
-                                disabled={isBulkProcessing}
-                            >
-                                {isBulkProcessing && (
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                )}
-                                Confirm Payment
-                            </Button>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
-            </div>
+            {selectedStaffIds.length > 0 && (
+                <div className="bg-indigo-50 border border-indigo-100 rounded-lg p-3 flex items-center justify-between animate-in fade-in duration-300">
+                    <div className="text-sm font-semibold text-indigo-900">
+                        {selectedStaffIds.length} staff selected for OT
+                    </div>
 
-            <div className="border rounded-md overflow-hidden">
+                    <Dialog open={isReviewOpen} onOpenChange={setIsReviewOpen}>
+                        <DialogTrigger asChild>
+                            <Button
+                                size="sm"
+                                className="bg-indigo-600 hover:bg-indigo-700"
+                                disabled={
+                                    selectedStaffIds.length === 0 ||
+                                    isBulkProcessing ||
+                                    isLocked
+                                }
+                            >
+                                Review & Pay
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-xl">
+                            <DialogHeader>
+                                <DialogTitle>Review Overtime Payments</DialogTitle>
+                                <DialogDescription>
+                                    Verify the selected overtime disbursements.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <div className="max-h-[300px] overflow-y-auto border rounded-lg">
+                                <Table>
+                                    <TableHeader className="bg-muted/50">
+                                        <TableRow>
+                                            <TableHead className="py-3 font-semibold">Staff</TableHead>
+                                            <TableHead className="text-right py-3 font-semibold">Hours</TableHead>
+                                            <TableHead className="text-right py-3 font-semibold">Amount</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {pendingStaff
+                                            .filter((s) =>
+                                                selectedStaffIds.includes(s._id),
+                                            )
+                                            .map((s) => (
+                                                <TableRow key={s._id}>
+                                                    <TableCell className="font-medium">{s.name}</TableCell>
+                                                    <TableCell className="text-right font-mono text-xs">
+                                                        {formatDuration(
+                                                            s.otMinutes,
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell className="text-right font-bold">
+                                                        ৳{s.otPayable.toLocaleString()}
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                            <div className="flex justify-between items-center py-4 border-t">
+                                <span className="text-sm font-semibold opacity-60">Grand Total</span>
+                                <div className="text-xl font-bold">
+                                    ৳{selectedTotalAmount.toLocaleString()}
+                                </div>
+                            </div>
+                            <DialogFooter>
+                                <Button
+                                    variant="outline"
+                                    onClick={() => setIsReviewOpen(false)}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    className="bg-indigo-600 hover:bg-indigo-700"
+                                    onClick={handleBulkPay}
+                                    disabled={isBulkProcessing}
+                                >
+                                    {isBulkProcessing && (
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    )}
+                                    Confirm Payment
+                                </Button>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
+                </div>
+            )}
+
+            <div className="border rounded-md overflow-hidden bg-background">
                 <Table>
-                    <TableHeader className="bg-muted/40">
-                        <TableRow>
-                            <TableHead className="w-[50px]">
+                    <TableHeader className="bg-muted/30">
+                        <TableRow className="hover:bg-transparent border-b border-border/40">
+                            <TableHead className="w-[50px] py-5">
                                 <Checkbox
                                     checked={
                                         pendingStaff.length > 0 &&
                                         selectedStaffIds.length ===
-                                            pendingStaff.length
+                                        pendingStaff.length
                                     }
                                     onCheckedChange={(checked) =>
                                         handleSelectAll(checked as boolean)
                                     }
                                     disabled={pendingStaff.length === 0}
+                                    className="rounded-md border-muted-foreground/30 data-[state=checked]:bg-indigo-500 data-[state=checked]:border-indigo-500"
                                 />
                             </TableHead>
-                            <TableHead>Staff Info</TableHead>
-                            <TableHead className="text-center">
+                            <TableHead className="py-4 font-semibold">Staff Info</TableHead>
+                            <TableHead className="text-center py-4 font-semibold">
                                 Total OT Time
                             </TableHead>
-                            <TableHead className="text-right">
+                            <TableHead className="text-right py-4 font-semibold">
                                 Payable Amount
                             </TableHead>
-                            <TableHead className="text-center">
+                            <TableHead className="text-center py-4 font-semibold">
                                 Status
                             </TableHead>
-                            <TableHead className="text-center">
+                            <TableHead className="text-center py-4 font-semibold">
                                 Action
                             </TableHead>
                         </TableRow>
@@ -444,7 +447,7 @@ export default function OvertimeTable({
                                                             isRowProcessing ||
                                                             isProcessing ||
                                                             row.otPayable <=
-                                                                0 ||
+                                                            0 ||
                                                             isLocked
                                                         }
                                                     >

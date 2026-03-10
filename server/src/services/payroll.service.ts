@@ -6,6 +6,7 @@ import ExpenseModel from '../models/expense.model.js';
 import ExpenseCategoryModel from '../models/expense-category.model.js';
 import OvertimeModel from '../models/overtime.model.js';
 import { PayrollLockModel } from '../models/payroll-lock.model.js';
+import SalaryAdjustmentLogModel from '../models/salary-adjustment-log.model.js';
 import mongoose, { Types } from 'mongoose';
 
 // ── Helpers ────────────────────────────────────────────────────────────
@@ -282,12 +283,36 @@ const getPayrollPreview = async ({
         };
     });
 
-    return staffs.map((staff) => {
+    const results = staffs.map((staff) => {
         const stat = stats.find(
             (s) => s.staffId.toString() === staff._id.toString(),
         );
         return { ...staff, ...stat };
     });
+
+    // 4. Proactive Monitoring & Lock Suggestion
+    const alerts = staffs
+        .filter((s) => {
+            const hasShift = shiftAssignments.some(
+                (sa) => sa.staffId.toString() === s._id.toString(),
+            );
+            return !hasShift;
+        })
+        .map((s) => ({
+            staffId: s._id,
+            staffName: s.name,
+            type: 'missing_shift',
+            message: `No active shift assignment found for ${s.name} this month. Stats will show 0.`,
+        }));
+
+    const allPaid = results.every((r) => r.status === 'paid');
+    const suggestLock = results.length > 0 && allPaid;
+
+    return {
+        staffs: results,
+        alerts,
+        suggestLock,
+    };
 };
 
 // ── Process Single Payment ─────────────────────────────────────────────
@@ -499,6 +524,40 @@ const processPayroll = async ({
 
         if (!createdExpense) {
             throw new Error('Failed to create/update expense record');
+        }
+
+        // ── Log Adjustment (Audit Trail) ──────────────────────────────────
+        if (paymentType === 'salary' && (bonus || deduction)) {
+            const existingLog = await SalaryAdjustmentLogModel.findOne({
+                staffId: staff._id,
+                month,
+            }).session(session);
+
+            if (existingLog) {
+                existingLog.previousBonus = existingLog.bonus;
+                existingLog.previousDeduction = existingLog.deduction;
+                existingLog.bonus = bonus;
+                existingLog.deduction = deduction;
+                if (note) existingLog.note = note;
+                existingLog.performedBy = new Types.ObjectId(createdBy);
+                existingLog.expenseId = createdExpense._id;
+                await existingLog.save({ session });
+            } else {
+                await SalaryAdjustmentLogModel.create(
+                    [
+                        {
+                            staffId: staff._id,
+                            month,
+                            bonus,
+                            deduction,
+                            ...(note ? { note } : {}),
+                            performedBy: new Types.ObjectId(createdBy),
+                            expenseId: createdExpense._id,
+                        },
+                    ],
+                    { session }
+                );
+            }
         }
 
         await session.commitTransaction();

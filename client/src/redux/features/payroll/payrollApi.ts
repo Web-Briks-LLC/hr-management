@@ -41,7 +41,7 @@ export const payrollApi = apiSlice.injectEndpoints({
                         "getPayrollPreview",
                         { month: arg.month, branchId: arg.branchId },
                         (draft: any) => {
-                            const data = draft?.data || draft;
+                            const data = draft?.data?.staffs || draft?.data || draft;
                             if (!Array.isArray(data)) return;
                             const item = data.find(
                                 (s: any) =>
@@ -96,7 +96,7 @@ export const payrollApi = apiSlice.injectEndpoints({
                         "getPayrollPreview",
                         { month: arg.month, branchId: arg.branchId },
                         (draft: any) => {
-                            const data = draft?.data || draft;
+                            const data = draft?.data?.staffs || draft?.data || draft;
                             if (!Array.isArray(data)) return;
                             arg.payments.forEach((payment) => {
                                 const item = data.find(
@@ -145,7 +145,7 @@ export const payrollApi = apiSlice.injectEndpoints({
                         "getPayrollPreview",
                         { month: arg.month, branchId: arg.branchId },
                         (draft: any) => {
-                            const data = draft?.data || draft;
+                            const data = draft?.data?.staffs || draft?.data || draft;
                             if (!Array.isArray(data)) return;
                             const item = data.find(
                                 (s: any) =>
