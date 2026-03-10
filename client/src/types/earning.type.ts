@@ -91,6 +91,16 @@ export interface EarningResponse {
     data: IEarning;
 }
 
+export interface CurrencyStat {
+    currency: string;
+    totalAmount: number;
+    paidAmount: number;
+    unpaidAmount: number;
+    paidCount: number;
+    unpaidCount: number;
+    paidAmountBDT: number;
+}
+
 export interface EarningStats {
     totalUnpaidCount: number;
     totalUnpaidAmount: number;
@@ -102,6 +112,8 @@ export interface EarningStats {
     filteredPaidCount: number;
     filteredPaidAmount: number;
     filteredPaidBDT: number;
+    currencyStats?: CurrencyStat[];
+    filteredCurrencyStats?: CurrencyStat[];
 }
 
 export interface EarningStatsResponse {

@@ -15,6 +15,7 @@ import type {
     WithdrawEarningData,
     EarningQueryParams,
     EarningStatsResult,
+    CurrencyStat,
     ClientOrdersForWithdraw,
     ImportLegacyEarningData,
 } from '../types/earning.type.js';
@@ -611,17 +612,51 @@ async function getEarningStatsWithFilter(
     params: EarningQueryParams,
 ): Promise<EarningStatsResult> {
     const now = new Date();
-    let periodPaid = { count: 0, totalAmount: 0, totalBDT: 0, paidAmount: 0 };
-    let periodUnpaid = { count: 0, totalAmount: 0, totalBDT: 0, paidAmount: 0 };
+    
+    // Helper to process grouped data into CurrencyStat[]
+    const processStats = (data: any[]) => {
+        const statsMap = new Map<string, CurrencyStat>();
+        data.forEach(item => {
+            const currency = item._id.currency || 'USD';
+            const status = item._id.status;
+            
+            if (!statsMap.has(currency)) {
+                statsMap.set(currency, {
+                    currency,
+                    totalAmount: 0,
+                    paidAmount: 0,
+                    unpaidAmount: 0,
+                    paidCount: 0,
+                    unpaidCount: 0,
+                    paidAmountBDT: 0
+                });
+            }
+            
+            const stat = statsMap.get(currency)!;
+            const itemTotal = item.totalAmount || 0;
+            const itemPaid = item.paidAmount || 0;
+            const itemBDT = item.totalBDT || 0;
+            
+            stat.totalAmount += itemTotal;
+            stat.paidAmount += itemPaid;
+            stat.unpaidAmount += Math.max(0, itemTotal - itemPaid);
+            stat.paidAmountBDT += itemBDT;
+            
+            if (status === 'paid') {
+                stat.paidCount += item.count || 0;
+            } else {
+                stat.unpaidCount += item.count || 0;
+            }
+        });
+        return Array.from(statsMap.values());
+    };
 
     // 1. Determine period stats (today/week/month/year)
+    let filteredCurrencyGrouped: any[] = [];
     if (params.filterType === 'today' || params.filterType === 'week') {
         const orderMatch: Record<string, any> = {};
         if (params.filterType === 'today') {
-            orderMatch.orderDate = {
-                $gte: startOfDay(now),
-                $lte: endOfDay(now),
-            };
+            orderMatch.orderDate = { $gte: startOfDay(now), $lte: endOfDay(now) };
         } else {
             orderMatch.orderDate = {
                 $gte: startOfWeek(now, { weekStartsOn: 1 }),
@@ -629,16 +664,22 @@ async function getEarningStatsWithFilter(
             };
         }
 
-        if (params.clientId)
-            orderMatch.clientId = new Types.ObjectId(params.clientId);
+        if (params.clientId) orderMatch.clientId = new Types.ObjectId(params.clientId);
         if (params.clientIds) {
-            orderMatch.clientId = {
-                $in: params.clientIds.map((id) => new Types.ObjectId(id)),
-            };
+            orderMatch.clientId = { $in: params.clientIds.map((id) => new Types.ObjectId(id)) };
         }
 
-        const periodStats = await OrderModel.aggregate([
+        filteredCurrencyGrouped = await OrderModel.aggregate([
             { $match: orderMatch },
+            {
+                $lookup: {
+                    from: 'clients',
+                    localField: 'clientId',
+                    foreignField: '_id',
+                    as: 'client',
+                },
+            },
+            { $unwind: '$client' },
             {
                 $lookup: {
                     from: 'earnings',
@@ -650,81 +691,92 @@ async function getEarningStatsWithFilter(
             { $unwind: { path: '$earning', preserveNullAndEmptyArrays: true } },
             {
                 $group: {
-                    _id: { $ifNull: ['$earning.status', 'unpaid'] },
+                    _id: { 
+                        currency: { $ifNull: ['$client.currency', 'USD'] }, 
+                        status: { $ifNull: ['$earning.status', 'unpaid'] } 
+                    },
                     count: { $sum: 1 },
                     totalAmount: { $sum: '$totalPrice' },
-                    paidAmount: { $sum: { $ifNull: ['$earning.paidAmount', 0] } },
+                    paidAmount: { 
+                        $sum: { 
+                            $cond: [
+                                { $eq: [{ $ifNull: ['$earning.status', 'unpaid'] }, 'paid'] },
+                                { $ifNull: ['$earning.paidAmount', '$totalPrice'] }, // Use totalPrice if paidAmount is 0/null but status is paid
+                                { $ifNull: ['$earning.paidAmount', 0] }
+                            ]
+                        } 
+                    },
                     totalBDT: { $sum: { $ifNull: ['$earning.paidAmountBDT', 0] } },
                 },
             },
         ]);
-
-        const unpaid = periodStats.find((s) => s._id === 'unpaid');
-        const paid = periodStats.find((s) => s._id === 'paid');
-        if (unpaid) periodUnpaid = unpaid;
-        if (paid) periodPaid = paid;
-    } else if (params.filterType === 'month' || params.filterType === 'year') {
+    } else {
         const earningMatch: Record<string, any> = {};
         if (params.filterType === 'month') {
             earningMatch.month = params.month || now.getMonth() + 1;
             earningMatch.year = params.year || now.getFullYear();
-        } else {
+        } else if (params.filterType === 'year') {
             earningMatch.year = params.year || now.getFullYear();
         }
 
-        if (params.clientId)
-            earningMatch.clientId = new Types.ObjectId(params.clientId);
+        if (params.clientId) earningMatch.clientId = new Types.ObjectId(params.clientId);
         if (params.clientIds) {
-            earningMatch.clientId = {
-                $in: params.clientIds.map((id) => new Types.ObjectId(id)),
-            };
+            earningMatch.clientId = { $in: params.clientIds.map((id) => new Types.ObjectId(id)) };
         }
 
-        const periodStats = await EarningModel.aggregate([
+        filteredCurrencyGrouped = await EarningModel.aggregate([
             { $match: earningMatch },
             {
                 $group: {
-                    _id: '$status',
+                    _id: { currency: '$currency', status: '$status' },
                     count: { $sum: 1 },
                     totalAmount: { $sum: '$totalAmount' },
-                    paidAmount: { $sum: '$paidAmount' },
+                    paidAmount: { 
+                        $sum: { 
+                            $cond: [
+                                { $eq: ['$status', 'paid'] },
+                                { $ifNull: ['$paidAmount', '$totalAmount'] },
+                                { $ifNull: ['$paidAmount', 0] }
+                            ]
+                        } 
+                    },
                     totalBDT: { $sum: '$paidAmountBDT' },
                 },
             },
         ]);
-
-        const unpaid = periodStats.find((s) => s._id === 'unpaid');
-        const paid = periodStats.find((s) => s._id === 'paid');
-        if (unpaid) periodUnpaid = unpaid;
-        if (paid) periodPaid = paid;
     }
 
-    // 2. Get total (all-time) stats as baseline
+    const filteredCurrencyStats = processStats(filteredCurrencyGrouped);
+    const filteredPaidBDT = filteredCurrencyGrouped.reduce((sum, item) => sum + (item.totalBDT || 0), 0);
+    const filteredPaidAmount = filteredCurrencyStats.reduce((sum, s) => sum + s.paidAmount, 0);
+    const filteredUnpaidAmount = filteredCurrencyStats.reduce((sum, s) => sum + s.unpaidAmount, 0);
+    const filteredPaidCount = filteredCurrencyStats.reduce((sum, s) => sum + s.paidCount, 0);
+    const filteredUnpaidCount = filteredCurrencyStats.reduce((sum, s) => sum + s.unpaidCount, 0);
+
+    // 2. Get total (all-time) stats
     const totalMatch: Record<string, any> = {};
-    if (params.clientId)
-        totalMatch.clientId = new Types.ObjectId(params.clientId);
+    if (params.clientId) totalMatch.clientId = new Types.ObjectId(params.clientId);
     if (params.clientIds) {
-        totalMatch.clientId = {
-            $in: params.clientIds.map((id) => new Types.ObjectId(id)),
-        };
+        totalMatch.clientId = { $in: params.clientIds.map((id) => new Types.ObjectId(id)) };
     }
 
-    const totalStats = await EarningModel.aggregate([
+    const totalCurrencyGrouped = await EarningModel.aggregate([
         ...(Object.keys(totalMatch).length > 0 ? [{ $match: totalMatch }] : []),
         {
             $group: {
-                _id: null,
+                _id: { currency: '$currency', status: '$status' },
+                count: { $sum: 1 },
                 totalAmount: { $sum: '$totalAmount' },
                 paidAmount: {
                     $sum: {
                         $cond: [
-                            { $and: [{ $eq: ['$status', 'paid'] }, { $eq: [{ $ifNull: ['$paidAmount', 0] }, 0] }] },
-                            '$totalAmount',
+                            { $eq: ['$status', 'paid'] },
+                            { $ifNull: ['$paidAmount', '$totalAmount'] },
                             { $ifNull: ['$paidAmount', 0] }
                         ]
                     },
                 },
-                paidAmountBDT: {
+                totalBDT: {
                     $sum: {
                         $cond: [
                             { $and: [{ $eq: ['$status', 'paid'] }, { $eq: [{ $ifNull: ['$paidAmountBDT', 0] }, 0] }] },
@@ -733,36 +785,30 @@ async function getEarningStatsWithFilter(
                         ]
                     },
                 },
-                unpaidCount: {
-                    $sum: { $cond: [{ $eq: ['$status', 'unpaid'] }, 1, 0] },
-                },
-                paidCount: {
-                    $sum: { $cond: [{ $eq: ['$status', 'paid'] }, 1, 0] },
-                },
             },
         },
     ]);
 
-    const stats = totalStats[0] || {
-        totalAmount: 0,
-        paidAmount: 0,
-        paidAmountBDT: 0,
-        unpaidCount: 0,
-        paidCount: 0,
-    };
+    const currencyStats = processStats(totalCurrencyGrouped);
+    const totalPaidBDT = totalCurrencyGrouped.reduce((sum, item) => sum + (item.totalBDT || 0), 0);
+    const totalPaidAmount = currencyStats.reduce((sum, s) => sum + s.paidAmount, 0);
+    const totalUnpaidAmount = currencyStats.reduce((sum, s) => sum + s.unpaidAmount, 0);
+    const totalPaidCount = currencyStats.reduce((sum, s) => sum + s.paidCount, 0);
+    const totalUnpaidCount = currencyStats.reduce((sum, s) => sum + s.unpaidCount, 0);
 
     return {
-        totalUnpaidCount: stats.unpaidCount,
-        totalUnpaidAmount: stats.totalAmount - stats.paidAmount,
-        totalPaidCount: stats.paidCount,
-        totalPaidAmount: stats.paidAmount,
-        totalPaidBDT: stats.paidAmountBDT,
-
-        filteredUnpaidCount: periodUnpaid.count,
-        filteredUnpaidAmount: periodUnpaid.totalAmount - (periodUnpaid.paidAmount || 0),
-        filteredPaidCount: periodPaid.count,
-        filteredPaidAmount: periodPaid.paidAmount || 0,
-        filteredPaidBDT: periodPaid.totalBDT || 0,
+        totalUnpaidCount,
+        totalUnpaidAmount,
+        totalPaidCount,
+        totalPaidAmount,
+        totalPaidBDT,
+        filteredUnpaidCount,
+        filteredUnpaidAmount,
+        filteredPaidCount,
+        filteredPaidAmount,
+        filteredPaidBDT,
+        currencyStats,
+        filteredCurrencyStats,
     };
 }
 

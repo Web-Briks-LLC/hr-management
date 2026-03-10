@@ -512,7 +512,7 @@ export default function EarningsPage() {
                     </p>
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     {/* Total Earnings Card */}
                     <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-slate-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-slate-500/5 hover:border-slate-500/30">
                         <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-slate-500/10 blur-2xl transition-all duration-300 group-hover:bg-slate-500/20" />
@@ -521,16 +521,31 @@ export default function EarningsPage() {
                                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-500/10 text-slate-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-slate-500/20">
                                     <DollarSign className="h-5 w-5" />
                                 </div>
+                                {!isLoadingStats && (
+                                    <Badge variant="outline" className="text-[10px] font-medium opacity-70 group-hover:opacity-100">
+                                        Total
+                                    </Badge>
+                                )}
                             </div>
                             {isLoadingStats ? (
                                 <Skeleton className="h-8 w-20" />
                             ) : (
-                                <h3 className="text-3xl font-bold tracking-tight text-slate-600 dark:text-slate-300">
-                                    {(stats?.filteredPaidCount || 0) +
-                                        (stats?.filteredUnpaidCount || 0)}
-                                </h3>
+                                <div>
+                                    <h3 className="text-3xl font-bold tracking-tight text-slate-600 dark:text-slate-300">
+                                        {(stats?.filteredPaidCount || 0) +
+                                            (stats?.filteredUnpaidCount || 0)}
+                                    </h3>
+                                    <div className="mt-2 space-y-1">
+                                        {stats?.filteredCurrencyStats?.map((curr) => (
+                                            <div key={curr.currency} className="flex items-center justify-between text-[11px]">
+                                                <span className="text-muted-foreground font-medium">{curr.currency} ({curr.paidCount + curr.unpaidCount}):</span>
+                                                <span className="font-semibold">{formatCurrency(curr.totalAmount, curr.currency)}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
                             )}
-                            <p className="text-xs text-muted-foreground mt-1">
+                            <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-slate-500/10 font-medium">
                                 Total Earnings
                             </p>
                         </div>
@@ -544,24 +559,33 @@ export default function EarningsPage() {
                                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-500/10 text-orange-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-orange-500/20">
                                     <Clock className="h-5 w-5" />
                                 </div>
+                                {!isLoadingStats && (
+                                    <Badge variant="outline" className="text-[10px] font-medium bg-orange-500/5 text-orange-500 border-orange-500/20 px-1.5 py-0 h-5">
+                                        Pending
+                                    </Badge>
+                                )}
                             </div>
                             {isLoadingStats ? (
                                 <Skeleton className="h-8 w-24" />
                             ) : (
-                                <>
+                                <div>
                                     <h3 className="text-3xl font-bold tracking-tight text-orange-600 dark:text-orange-400">
                                         {stats?.filteredUnpaidCount || 0}
                                     </h3>
-                                    <p className="text-sm font-medium text-orange-600/80 dark:text-orange-400/80 mt-0.5">
-                                        {formatCurrency(
-                                            stats?.filteredUnpaidAmount || 0,
-                                            "USD",
-                                        )}
-                                    </p>
-                                </>
+                                    <div className="mt-2 space-y-1">
+                                        {stats?.filteredCurrencyStats?.map((curr) => (
+                                            <div key={curr.currency} className="flex items-center justify-between text-[11px]">
+                                                <span className="text-muted-foreground font-medium">{curr.currency} ({curr.unpaidCount}):</span>
+                                                <span className="font-semibold text-orange-600/90 dark:text-orange-400/90">
+                                                    {formatCurrency(curr.unpaidAmount, curr.currency)}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
                             )}
-                            <p className="text-xs text-muted-foreground mt-1">
-                                Unpaid
+                            <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-orange-500/10 font-medium">
+                                Unpaid Stats
                             </p>
                         </div>
                     </div>
@@ -574,24 +598,33 @@ export default function EarningsPage() {
                                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-500/10 text-green-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-green-500/20">
                                     <CheckCircle2 className="h-5 w-5" />
                                 </div>
+                                {!isLoadingStats && (
+                                    <Badge variant="outline" className="text-[10px] font-medium bg-green-500/5 text-green-500 border-green-500/20 px-1.5 py-0 h-5">
+                                        Success
+                                    </Badge>
+                                )}
                             </div>
                             {isLoadingStats ? (
                                 <Skeleton className="h-8 w-24" />
                             ) : (
-                                <>
+                                <div>
                                     <h3 className="text-3xl font-bold tracking-tight text-green-600 dark:text-green-400">
                                         {stats?.filteredPaidCount || 0}
                                     </h3>
-                                    <p className="text-sm font-medium text-green-600/80 dark:text-green-400/80 mt-0.5">
-                                        {formatCurrency(
-                                            stats?.filteredPaidAmount || 0,
-                                            "USD",
-                                        )}
-                                    </p>
-                                </>
+                                    <div className="mt-2 space-y-1">
+                                        {stats?.filteredCurrencyStats?.map((curr) => (
+                                            <div key={curr.currency} className="flex items-center justify-between text-[11px]">
+                                                <span className="text-muted-foreground font-medium">{curr.currency} ({curr.paidCount}):</span>
+                                                <span className="font-semibold text-green-600/90 dark:text-green-400/90">
+                                                    {formatCurrency(curr.paidAmount, curr.currency)}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
                             )}
-                            <p className="text-xs text-muted-foreground mt-1">
-                                Paid
+                            <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-green-500/10 font-medium">
+                                Paid Stats
                             </p>
                         </div>
                     </div>
@@ -604,18 +637,35 @@ export default function EarningsPage() {
                                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/10 text-blue-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-blue-500/20">
                                     <TrendingUp className="h-5 w-5" />
                                 </div>
+                                {!isLoadingStats && (
+                                    <Badge variant="outline" className="text-[10px] font-medium bg-blue-500/5 text-blue-500 border-blue-500/20 px-1.5 py-0 h-5">
+                                        BDT
+                                    </Badge>
+                                )}
                             </div>
                             {isLoadingStats ? (
                                 <Skeleton className="h-8 w-28" />
                             ) : (
-                                <h3 className="text-3xl font-bold tracking-tight text-blue-600 dark:text-blue-400">
-                                    {formatCurrency(
-                                        stats?.filteredPaidBDT || 0,
-                                    )}
-                                </h3>
+                                <div>
+                                    <h3 className="text-3xl font-bold tracking-tight text-blue-600 dark:text-blue-400">
+                                        {formatCurrency(
+                                            stats?.filteredPaidBDT || 0,
+                                        )}
+                                    </h3>
+                                    <div className="mt-2 space-y-1">
+                                        {stats?.filteredCurrencyStats?.map((curr) => (
+                                            <div key={curr.currency} className="flex items-center justify-between text-[11px]">
+                                                <span className="text-muted-foreground font-medium">{curr.currency}:</span>
+                                                <span className="font-semibold text-blue-600/90 dark:text-blue-400/90">
+                                                    {formatCurrency(curr.paidAmountBDT, "BDT")}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
                             )}
-                            <p className="text-xs text-muted-foreground mt-1">
-                                Paid BDT
+                            <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-blue-500/10 font-medium">
+                                Paid BDT (Converted)
                             </p>
                         </div>
                     </div>

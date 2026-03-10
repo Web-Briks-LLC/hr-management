@@ -140,6 +140,16 @@ export interface EarningQueryParams {
     year?: number;
 }
 
+export interface CurrencyStat {
+    currency: string;
+    totalAmount: number;
+    paidAmount: number;
+    unpaidAmount: number;
+    paidCount: number;
+    unpaidCount: number;
+    paidAmountBDT: number;
+}
+
 export interface EarningStatsResult {
     totalUnpaidCount: number;
     totalUnpaidAmount: number;
@@ -151,6 +161,8 @@ export interface EarningStatsResult {
     filteredPaidCount: number;
     filteredPaidAmount: number;
     filteredPaidBDT: number;
+    currencyStats: CurrencyStat[];
+    filteredCurrencyStats: CurrencyStat[];
 }
 
 export interface ClientOrdersForWithdraw {
