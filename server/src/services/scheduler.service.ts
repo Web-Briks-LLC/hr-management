@@ -1,4 +1,4 @@
-import { startOfDay, endOfDay } from 'date-fns';
+// import { startOfDay, endOfDay } from 'date-fns';
 import AttendanceDayModel from '../models/attendance-day.model.js';
 import OvertimeModel from '../models/overtime.model.js';
 import LeaveApplicationModel from '../models/leave_application.model.js';
@@ -12,8 +12,12 @@ import notificationService from './notification.service.js';
 
 async function processAttendanceCheck() {
     const now = new Date();
-    const todayStart = startOfDay(now);
-    const todayEnd = endOfDay(now);
+    const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    const todayEnd = new Date(todayStart);
+    todayEnd.setUTCHours(23, 59, 59, 999);
+    
+    // For day of week, we might still want to use local time as shifts are usually local
+    // but we need to stay consistent with how the system views "today"
     const currentDayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
 
     let lateCount = 0;

@@ -359,7 +359,7 @@ const processPayroll = async ({
             const expectedWorkDates: Date[] = [];
             if (shift) {
                 daysInMonth.forEach((day) => {
-                    if (shift.workDays.includes(day.getDay())) {
+                    if (shift.workDays.includes(day.getUTCDay())) {
                         expectedWorkDates.push(day);
                     }
                 });
@@ -373,8 +373,9 @@ const processPayroll = async ({
             const exitDate = staff.exitDate ? new Date(staff.exitDate) : null;
 
             daysInMonth.forEach((day) => {
-                const isBeforeJoin = joinDate && day < joinDate;
-                const isAfterExit = exitDate && day > exitDate;
+                const dayTime = day.getTime();
+                const isBeforeJoin = joinDate && dayTime < joinDate.getTime();
+                const isAfterExit = exitDate && dayTime > exitDate.getTime();
                 if (isBeforeJoin || isAfterExit) {
                     unemployedDays++;
                 }
@@ -391,10 +392,11 @@ const processPayroll = async ({
 
             if (shift) {
                 missingPunches = expectedWorkDates.filter((day) => {
-                    if (day > todayUTC) return false;
+                    if (day.getTime() > todayUTC.getTime()) return false;
 
-                    const isBeforeJoin = joinDate && day < joinDate;
-                    const isAfterExit = exitDate && day > exitDate;
+                    const dayTime = day.getTime();
+                    const isBeforeJoin = joinDate && dayTime < joinDate.getTime();
+                    const isAfterExit = exitDate && dayTime > exitDate.getTime();
                     if (isBeforeJoin || isAfterExit) return false;
 
                     const hasRecord = allAttendance.some(

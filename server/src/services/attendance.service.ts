@@ -1,4 +1,3 @@
-import { endOfDay, startOfDay } from "date-fns";
 import AttendanceEventModel from "../models/attendance-event.model.js";
 import ShiftAssignmentModel from "../models/shift-assignment.model.js";
 import AttendanceDayModel from "../models/attendance-day.model.js";
@@ -22,8 +21,9 @@ const checkInInDB = async ({
     // Debug log
     console.log(`[CheckIn] Attempt for user ${userId} at ${now.toISOString()}`);
 
-    const dayStart = startOfDay(now);
-    const dayEnd = endOfDay(now);
+    const dayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    const dayEnd = new Date(dayStart);
+    dayEnd.setUTCHours(23, 59, 59, 999);
 
     const staff = await StaffModel.findOne({ userId }).lean();
     if (!staff) {
@@ -206,8 +206,9 @@ async function checkOutInDB({
 }) {
     const now = new Date();
 
-    const dayStart = startOfDay(now);
-    const dayEnd = endOfDay(now);
+    const dayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    const dayEnd = new Date(dayStart);
+    dayEnd.setUTCHours(23, 59, 59, 999);
 
     const staff = await StaffModel.findOne({ userId }).lean();
     if (!staff) {
@@ -328,8 +329,9 @@ async function checkOutInDB({
 async function getTodayAttendanceFromDB(userId: string) {
     const now = new Date();
 
-    const dayStart = startOfDay(now);
-    const dayEnd = endOfDay(now);
+    const dayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    const dayEnd = new Date(dayStart);
+    dayEnd.setUTCHours(23, 59, 59, 999);
 
     const staff = await StaffModel.findOne({ userId }).lean();
     if (!staff) {
@@ -361,16 +363,8 @@ async function getTodayAttendanceFromDB(userId: string) {
 
 async function getMonthlyStatsInDB(userId: string) {
     const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const endOfMonth = new Date(
-        now.getFullYear(),
-        now.getMonth() + 1,
-        0,
-        23,
-        59,
-        59,
-        999,
-    );
+    const startOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0));
+    const endOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0, 23, 59, 59, 999));
 
     const staff = await StaffModel.findOne({ userId }).lean();
     if (!staff) {
@@ -459,12 +453,12 @@ async function getMyAttendanceHistoryInDB(userId: string, days: number = 7) {
     const staffId = staff._id;
 
     // Calculate date range
-    const endDate = new Date();
-    endDate.setHours(23, 59, 59, 999);
-
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - (days - 1));
-    startDate.setHours(0, 0, 0, 0);
+    // Calculate date range in UTC midnights
+    const nowForHistory = new Date();
+    const endDate = new Date(Date.UTC(nowForHistory.getUTCFullYear(), nowForHistory.getUTCMonth(), nowForHistory.getUTCDate(), 23, 59, 59, 999));
+    
+    const startDate = new Date(Date.UTC(nowForHistory.getUTCFullYear(), nowForHistory.getUTCMonth(), nowForHistory.getUTCDate(), 0, 0, 0, 0));
+    startDate.setUTCDate(startDate.getUTCDate() - (days - 1));
 
     // Find attendance days with shift details
     const attendanceDays = await AttendanceDayModel.find({
@@ -539,13 +533,17 @@ async function getAllAttendanceFromDB({
             const startStr = startDate.includes("T")
                 ? startDate
                 : `${startDate}T00:00:00`;
-            query.date.$gte = startOfDay(new Date(startStr));
+            const sDate = new Date(startStr);
+            query.date.$gte = new Date(Date.UTC(sDate.getUTCFullYear(), sDate.getUTCMonth(), sDate.getUTCDate()));
         }
         if (endDate) {
             const endStr = endDate.includes("T")
                 ? endDate
                 : `${endDate}T00:00:00`;
-            query.date.$lte = endOfDay(new Date(endStr));
+            const eDate = new Date(endStr);
+            const utcMidnight = new Date(Date.UTC(eDate.getUTCFullYear(), eDate.getUTCMonth(), eDate.getUTCDate()));
+            utcMidnight.setUTCHours(23, 59, 59, 999);
+            query.date.$lte = utcMidnight;
         }
     }
 
