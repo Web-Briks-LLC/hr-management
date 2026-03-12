@@ -82,16 +82,16 @@ const bulkProcessPayment = async (req: Request, res: Response) => {
 
 const graceAttendance = async (req: Request, res: Response) => {
     try {
-        const { staffId, date, note } = req.body;
+        const { staffId, dates, note } = req.body;
 
         const result = await payrollService.graceAttendance(
             staffId,
-            date,
+            dates,
             note,
         );
         return res.status(200).json({
             success: true,
-            message: "Attendance processed as Grace",
+            message: `Attendance processed as Grace for ${dates.length} day(s)`,
             data: result,
         });
     } catch (error: any) {

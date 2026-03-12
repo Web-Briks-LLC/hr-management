@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
+import { useState } from "react";
 import {
     Dialog,
     DialogContent,
@@ -8,17 +8,16 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Textarea } from '@/components/ui/textarea';
-import { Loader2 } from 'lucide-react';
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Loader2 } from "lucide-react";
 import {
     useGetAbsentDatesQuery,
     useGraceAttendanceMutation,
-} from '@/redux/features/payroll/payrollApi';
-import { format } from 'date-fns';
-import { toast } from 'sonner';
+} from "@/redux/features/payroll/payrollApi";
+import { format } from "date-fns";
+import { toast } from "sonner";
 
 interface GraceDialogProps {
     open: boolean;
@@ -35,8 +34,8 @@ export default function GraceDialog({
     staffName,
     month,
 }: GraceDialogProps) {
-    const [selectedDate, setSelectedDate] = useState<string | null>(null);
-    const [note, setNote] = useState('');
+    const [selectedDates, setSelectedDates] = useState<string[]>([]);
+    const [note, setNote] = useState("");
 
     const { data: absentData, isLoading: isLoadingDates } =
         useGetAbsentDatesQuery({ staffId, month }, { skip: !open || !staffId });
@@ -46,25 +45,34 @@ export default function GraceDialog({
 
     const absentDates = absentData?.data || [];
 
+    const toggleDate = (date: string) => {
+        setSelectedDates((prev) =>
+            prev.includes(date)
+                ? prev.filter((d) => d !== date)
+                : [...prev, date],
+        );
+    };
+
     const handleGrace = async () => {
-        if (!selectedDate) return;
+        if (selectedDates.length === 0) return;
 
         try {
             await graceAttendance({
                 staffId,
-                date: selectedDate,
-                note: note || 'Admin Graced via Payroll',
+                dates: selectedDates,
+                note: note || "Admin Graced via Payroll",
             }).unwrap();
 
-            toast.success('Attendance Corrected', {
-                description: 'The absent day has been marked as present.',
+            toast.success("Attendance Corrected", {
+                description: `(${selectedDates.length}) absent day(s) have been marked as present.`,
             });
             onOpenChange(false);
-            setSelectedDate(null);
-            setNote('');
-        } catch (error: any) {
-            toast.error('Error', {
-                description: error.data?.message || 'Failed to process grace.',
+            setSelectedDates([]);
+            setNote("");
+        } catch (error) {
+            toast.error("Error", {
+                description:
+                    (error as Error).message || "Failed to process grace.",
             });
         }
     };
@@ -75,7 +83,7 @@ export default function GraceDialog({
                 <DialogHeader>
                     <DialogTitle>Grace Absence - {staffName}</DialogTitle>
                     <DialogDescription>
-                        Select an absent day to convert it to
+                        Select one or more absent days to convert them to
                         &apos;Present&apos;.
                     </DialogDescription>
                 </DialogHeader>
@@ -91,34 +99,39 @@ export default function GraceDialog({
                         </div>
                     ) : (
                         <div className="grid grid-cols-3 gap-2">
-                            {absentDates.map((record: any) => (
-                                <div
-                                    key={record.date}
-                                    onClick={() => setSelectedDate(record.date)}
-                                    className={`
+                            {absentDates.map(
+                                (record: { date: string; status?: string }) => (
+                                    <div
+                                        key={record.date}
+                                        onClick={() => toggleDate(record.date)}
+                                        className={`
                                         cursor-pointer border rounded-md p-2 text-center text-sm transition-all
                                         ${
-                                            selectedDate === record.date
-                                                ? 'bg-primary text-primary-foreground border-primary ring-2 ring-primary ring-offset-1'
-                                                : 'hover:bg-muted'
+                                            selectedDates.includes(record.date)
+                                                ? "bg-primary text-primary-foreground border-primary ring-2 ring-primary ring-offset-1"
+                                                : "hover:bg-muted"
                                         }
                                     `}
-                                >
-                                    <div className="font-semibold">
-                                        {format(
-                                            new Date(record.date),
-                                            'dd MMM',
-                                        )}
+                                    >
+                                        <div className="font-semibold">
+                                            {format(
+                                                new Date(record.date),
+                                                "dd MMM",
+                                            )}
+                                        </div>
+                                        <div className="text-xs opacity-80">
+                                            {format(
+                                                new Date(record.date),
+                                                "EEE",
+                                            )}
+                                        </div>
                                     </div>
-                                    <div className="text-xs opacity-80">
-                                        {format(new Date(record.date), 'EEE')}
-                                    </div>
-                                </div>
-                            ))}
+                                ),
+                            )}
                         </div>
                     )}
 
-                    {selectedDate && (
+                    {selectedDates.length > 0 && (
                         <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
                             <label className="text-sm font-medium">
                                 Correction Note (Optional)
@@ -143,12 +156,12 @@ export default function GraceDialog({
                     </Button>
                     <Button
                         onClick={handleGrace}
-                        disabled={!selectedDate || isGracing}
+                        disabled={selectedDates.length === 0 || isGracing}
                     >
                         {isGracing && (
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         )}
-                        Apply Grace
+                        Apply Grace ({selectedDates.length})
                     </Button>
                 </DialogFooter>
             </DialogContent>

@@ -24,7 +24,11 @@ const getAllClients = async (req: Request, res: Response) => {
         // Ownership filtering: Telemarketers only see their own clients
         if (userId) {
             const tmStaff = await getTelemarketerStaff(userId);
-            if (tmStaff) {
+            if (
+                tmStaff &&
+                req.user &&
+                ["staff", "team leader"].includes(req.user.role)
+            ) {
                 params.createdBy = userId;
             }
         }

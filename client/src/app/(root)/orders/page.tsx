@@ -1295,61 +1295,80 @@ export default function OrdersPage() {
                                                     )}
                                                 </TableCell>
                                                 <TableCell className="border-r flex items-center justify-center w-auto">
-                                                    <Select
-                                                        value={order.status}
-                                                        onValueChange={(
-                                                            value,
-                                                        ) =>
-                                                            handleStatusChange(
-                                                                order._id,
-                                                                value as OrderStatus,
-                                                            )
-                                                        }
-                                                        disabled={
-                                                            isUpdatingStatus ||
-                                                            isTelemarketer ||
-                                                            statusWorkflow[
-                                                                order.status
-                                                            ].length === 0
-                                                        }
-                                                    >
-                                                        <SelectTrigger
+                                                    {isTelemarketer ? (
+                                                        <Badge
                                                             className={cn(
                                                                 statusColors[
                                                                     order.status
                                                                 ],
+                                                                "pointer-events-none select-none",
                                                             )}
                                                         >
-                                                            <SelectValue />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            {Object.entries(
-                                                                ORDER_STATUS_LABELS,
-                                                            ).map(
-                                                                ([
-                                                                    value,
-                                                                    label,
-                                                                ]) => (
-                                                                    <SelectItem
-                                                                        key={
-                                                                            value
-                                                                        }
-                                                                        value={
-                                                                            value
-                                                                        }
-                                                                        disabled={
-                                                                            !canTransitionTo(
-                                                                                order.status,
-                                                                                value as OrderStatus,
-                                                                            )
-                                                                        }
-                                                                    >
-                                                                        {label}
-                                                                    </SelectItem>
-                                                                ),
-                                                            )}
-                                                        </SelectContent>
-                                                    </Select>
+                                                            {
+                                                                ORDER_STATUS_LABELS[
+                                                                    order.status
+                                                                ]
+                                                            }
+                                                        </Badge>
+                                                    ) : (
+                                                        <Select
+                                                            value={order.status}
+                                                            onValueChange={(
+                                                                value,
+                                                            ) =>
+                                                                handleStatusChange(
+                                                                    order._id,
+                                                                    value as OrderStatus,
+                                                                )
+                                                            }
+                                                            disabled={
+                                                                isUpdatingStatus ||
+                                                                statusWorkflow[
+                                                                    order.status
+                                                                ].length === 0
+                                                            }
+                                                        >
+                                                            <SelectTrigger
+                                                                className={cn(
+                                                                    statusColors[
+                                                                        order
+                                                                            .status
+                                                                    ],
+                                                                )}
+                                                            >
+                                                                <SelectValue />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                {Object.entries(
+                                                                    ORDER_STATUS_LABELS,
+                                                                ).map(
+                                                                    ([
+                                                                        value,
+                                                                        label,
+                                                                    ]) => (
+                                                                        <SelectItem
+                                                                            key={
+                                                                                value
+                                                                            }
+                                                                            value={
+                                                                                value
+                                                                            }
+                                                                            disabled={
+                                                                                !canTransitionTo(
+                                                                                    order.status,
+                                                                                    value as OrderStatus,
+                                                                                )
+                                                                            }
+                                                                        >
+                                                                            {
+                                                                                label
+                                                                            }
+                                                                        </SelectItem>
+                                                                    ),
+                                                                )}
+                                                            </SelectContent>
+                                                        </Select>
+                                                    )}
                                                 </TableCell>
                                                 <TableCell className="border-r">
                                                     <span

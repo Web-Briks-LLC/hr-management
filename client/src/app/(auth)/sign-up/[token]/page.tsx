@@ -1,23 +1,23 @@
-'use client';
+"use client";
 
-import { useParams, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useParams, useRouter } from "next/navigation";
+import { useState } from "react";
 import {
     useValidateTokenQuery,
     useAcceptInvitationMutation,
-} from '@/redux/features/invitation/invitationApi';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+} from "@/redux/features/invitation/invitationApi";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
     Card,
     CardContent,
     CardDescription,
     CardHeader,
     CardTitle,
-} from '@/components/ui/card';
-import { Loader } from 'lucide-react';
-import { toast } from 'sonner';
+} from "@/components/ui/card";
+import { Loader } from "lucide-react";
+import { toast } from "sonner";
 
 export default function SignupPage() {
     const params = useParams();
@@ -29,18 +29,18 @@ export default function SignupPage() {
         useAcceptInvitationMutation();
 
     const [formData, setFormData] = useState({
-        name: '',
-        password: '',
-        confirmPassword: '',
-        phone: '',
-        address: '',
+        name: "",
+        password: "",
+        confirmPassword: "",
+        phone: "",
+        address: "",
     });
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
         if (formData.password !== formData.confirmPassword) {
-            toast.error('Passwords do not match');
+            toast.error("Passwords do not match");
             return;
         }
 
@@ -55,10 +55,12 @@ export default function SignupPage() {
                 },
             }).unwrap();
 
-            toast.success('Account created successfully! Please login.');
-            router.push('/login');
-        } catch (err: any) {
-            toast.error(err?.data?.message || 'Failed to create account');
+            toast.success(
+                "Account created successfully! Please verify your email before logging in.",
+            );
+            router.push("/login");
+        } catch (err) {
+            toast.error((err as Error).message || "Failed to create account");
         }
     };
 
@@ -71,17 +73,17 @@ export default function SignupPage() {
     }
 
     if (error || !data?.success) {
-        let errorMessage = 'This invitation link is invalid or has expired.';
+        let errorMessage = "This invitation link is invalid or has expired.";
 
         if (error) {
             if (
-                'data' in error &&
-                typeof error.data === 'object' &&
+                "data" in error &&
+                typeof error.data === "object" &&
                 error.data &&
-                'message' in error.data
+                "message" in error.data
             ) {
-                errorMessage = (error.data as any).message;
-            } else if ('message' in error) {
+                errorMessage = (error.data as { message: string }).message;
+            } else if ("message" in error) {
                 errorMessage = error.message as string; // SerializedError
             }
         }
@@ -110,7 +112,8 @@ export default function SignupPage() {
                 <CardHeader>
                     <CardTitle>Complete Your Registration</CardTitle>
                     <CardDescription>
-                        You've been invited to join as {invitation.designation}
+                        You&apos;ve been invited to join as{" "}
+                        {invitation.designation}
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -118,17 +121,17 @@ export default function SignupPage() {
                         <h3 className="font-semibold mb-2">Position Details</h3>
                         <div className="space-y-1 text-sm">
                             <p>
-                                <span className="font-medium">Role:</span>{' '}
+                                <span className="font-medium">Role:</span>{" "}
                                 {invitation.role}
                             </p>
                             <p>
-                                <span className="font-medium">Department:</span>{' '}
-                                {invitation.department || 'N/A'}
+                                <span className="font-medium">Department:</span>{" "}
+                                {invitation.department || "N/A"}
                             </p>
                             <p>
                                 <span className="font-medium">
                                     Designation:
-                                </span>{' '}
+                                </span>{" "}
                                 {invitation.designation}
                             </p>
                             <p>
@@ -228,7 +231,7 @@ export default function SignupPage() {
                                     Creating Account...
                                 </>
                             ) : (
-                                'Create Account'
+                                "Create Account"
                             )}
                         </Button>
                     </form>

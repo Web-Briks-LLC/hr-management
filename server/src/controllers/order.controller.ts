@@ -2,7 +2,6 @@ import type { Request, Response } from "express";
 import orderService from "../services/order.service.js";
 import emailService from "../services/email.service.js";
 import { getTelemarketerStaff } from "../utils/telemarketer.util.js";
-import ClientModel from "../models/client.model.js";
 import type { OrderStatus, OrderPriority } from "../types/order.type.js";
 import mongoose from "mongoose";
 
@@ -98,6 +97,7 @@ async function getAllOrders(req: Request, res: Response) {
             search?: string;
             page: number;
             limit: number;
+            createdBy?: string;
         } = {
             page: page ? parseInt(page as string) : 1,
             limit: limit ? parseInt(limit as string) : 20,
@@ -113,19 +113,15 @@ async function getAllOrders(req: Request, res: Response) {
         if (year) filters.year = parseInt(year as string);
         if (search) filters.search = (search as string).trim();
 
-        // Ownership filtering: Telemarketers only see orders for their own clients
+        // Ownership filtering: Telemarketers only see their own created orders
         if (userId) {
             const tmStaff = await getTelemarketerStaff(userId);
-            if (tmStaff) {
-                const ownClients = await ClientModel.find({
-                    createdBy: new mongoose.Types.ObjectId(userId),
-                }).select("_id");
-                if (ownClients.length > 0) {
-                    filters.clientIds = ownClients.map((c) => c._id.toString());
-                } else {
-                    // Telemarketer with no clients → show zero orders
-                    filters.clientIds = ["000000000000000000000000"];
-                }
+            if (
+                tmStaff &&
+                req.user &&
+                ["staff", "team leader"].includes(req.user.role)
+            ) {
+                filters.createdBy = userId;
             }
         }
 

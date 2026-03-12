@@ -51,7 +51,9 @@ export const bulkProcessSchema = z.object({
 
 export const graceSchema = z.object({
     staffId: objectId,
-    date: z.string().datetime({ offset: true }).or(z.string().date()),
+    dates: z
+        .array(z.string().datetime({ offset: true }).or(z.string().date()))
+        .min(1, "At least one date is required"),
     note: z.string().max(500).optional(),
 });
 

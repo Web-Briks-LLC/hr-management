@@ -177,7 +177,7 @@ export const payrollApi = apiSlice.injectEndpoints({
             any,
             {
                 staffId: string;
-                date: string;
+                dates: string[];
                 note?: string;
             }
         >({

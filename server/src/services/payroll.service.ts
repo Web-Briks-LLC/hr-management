@@ -472,34 +472,41 @@ const bulkProcessPayment = async ({
 
 const graceAttendance = async (
     staffId: string,
-    date: string,
+    dates: string[],
     note?: string,
 ) => {
-    const targetDate = new Date(date);
-    const y = targetDate.getUTCFullYear();
-    const m = targetDate.getUTCMonth();
-    const d = targetDate.getUTCDate();
-    const start = new Date(Date.UTC(y, m, d, 0, 0, 0, 0));
-    const end = new Date(Date.UTC(y, m, d, 23, 59, 59, 999));
+    const updatedRecords = [];
 
-    const attendance = await AttendanceDayModel.findOne({
-        staffId,
-        date: { $gte: start, $lte: end },
-        status: "absent",
-    });
+    for (const date of dates) {
+        const targetDate = new Date(date);
+        const y = targetDate.getUTCFullYear();
+        const m = targetDate.getUTCMonth();
+        const d = targetDate.getUTCDate();
+        const start = new Date(Date.UTC(y, m, d, 0, 0, 0, 0));
+        const end = new Date(Date.UTC(y, m, d, 23, 59, 59, 999));
 
-    if (!attendance) {
-        throw new Error("No absent record found for this date");
+        const attendance = await AttendanceDayModel.findOne({
+            staffId,
+            date: { $gte: start, $lte: end },
+            status: "absent",
+        });
+
+        if (attendance) {
+            attendance.status = "present";
+            attendance.notes = note
+                ? `${attendance.notes || ""} [Grace: ${note}]`
+                : (attendance.notes ?? null);
+            attendance.isManual = true;
+            await attendance.save();
+            updatedRecords.push(attendance);
+        }
     }
 
-    attendance.status = "present";
-    attendance.notes = note
-        ? `${attendance.notes || ""} [Grace: ${note}]`
-        : (attendance.notes ?? null);
-    attendance.isManual = true;
-    await attendance.save();
+    if (updatedRecords.length === 0) {
+        throw new Error("No absent records found for the provided dates");
+    }
 
-    return attendance;
+    return updatedRecords;
 };
 
 // ── Absent Dates (UTC-safe) ────────────────────────────────────────────

@@ -1,5 +1,5 @@
-import type { Request, Response } from 'express';
-import InvitationService from '../services/invitation.service.js';
+import type { Request, Response } from "express";
+import InvitationService from "../services/invitation.service.js";
 
 const createInvitation = async (req: Request, res: Response) => {
     try {
@@ -8,19 +8,19 @@ const createInvitation = async (req: Request, res: Response) => {
         if (!createdBy) {
             return res.status(401).json({
                 success: false,
-                message: 'Unauthorized',
+                message: "Unauthorized",
             });
         }
 
         const invitation = await InvitationService.createInvitation({
             ...req.body,
             createdBy,
-            currentUserRole: req.user?.role || '',
+            currentUserRole: req.user?.role || "",
         });
 
         return res.status(201).json({
             success: true,
-            message: 'Invitation sent successfully',
+            message: "Invitation sent successfully",
             data: invitation,
         });
     } catch (error) {
@@ -38,7 +38,7 @@ const validateToken = async (req: Request, res: Response) => {
         if (!token) {
             return res.status(400).json({
                 success: false,
-                message: 'Token is required',
+                message: "Token is required",
             });
         }
 
@@ -67,13 +67,14 @@ const acceptInvitation = async (req: Request, res: Response) => {
 
         return res.status(200).json({
             success: true,
-            message: 'Account created successfully',
+            message: "Account created successfully",
             data: result,
         });
     } catch (error) {
+        console.error("acceptInvitation error:", error);
         return res.status(400).json({
             success: false,
-            message: (error as Error).message,
+            message: (error as Error).message || "An unknown error occurred",
         });
     }
 };
@@ -83,7 +84,7 @@ const getInvitations = async (req: Request, res: Response) => {
         const { isUsed, email } = req.query;
 
         const filters: any = {};
-        if (isUsed !== undefined) filters.isUsed = isUsed === 'true';
+        if (isUsed !== undefined) filters.isUsed = isUsed === "true";
         if (email) filters.email = email as string;
 
         const invitations = await InvitationService.getInvitations(filters);
@@ -107,7 +108,7 @@ const resendInvitation = async (req: Request, res: Response) => {
         if (!id) {
             return res.status(400).json({
                 success: false,
-                message: 'Invitation ID is required',
+                message: "Invitation ID is required",
             });
         }
 
@@ -115,7 +116,7 @@ const resendInvitation = async (req: Request, res: Response) => {
 
         return res.status(200).json({
             success: true,
-            message: 'Invitation resent successfully',
+            message: "Invitation resent successfully",
             data: invitation,
         });
     } catch (error) {
@@ -133,7 +134,7 @@ const cancelInvitation = async (req: Request, res: Response) => {
         if (!id) {
             return res.status(400).json({
                 success: false,
-                message: 'Invitation ID is required',
+                message: "Invitation ID is required",
             });
         }
 
@@ -158,7 +159,7 @@ const createBulkInvitations = async (req: Request, res: Response) => {
         if (!createdBy) {
             return res.status(401).json({
                 success: false,
-                message: 'Unauthorized',
+                message: "Unauthorized",
             });
         }
 
@@ -167,7 +168,7 @@ const createBulkInvitations = async (req: Request, res: Response) => {
         if (!Array.isArray(invitations) || invitations.length === 0) {
             return res.status(400).json({
                 success: false,
-                message: 'Invitations array is required',
+                message: "Invitations array is required",
             });
         }
 
@@ -178,7 +179,7 @@ const createBulkInvitations = async (req: Request, res: Response) => {
         }));
 
         const results = await InvitationService.createBulkInvitations(
-            invitationsWithCreator
+            invitationsWithCreator,
         );
 
         return res.status(200).json({

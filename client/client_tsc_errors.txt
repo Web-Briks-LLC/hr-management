@@ -1,7 +1,0 @@
-src/app/(root)/orders/invoice/page.tsx(45,21): error TS2307: Cannot find module '@react-pdf/renderer' or its corresponding type declarations.
-src/components/expense/ExpenseReportPDF.tsx(8,8): error TS2307: Cannot find module '@react-pdf/renderer' or its corresponding type declarations.
-src/components/expense/ExportExpenseDialog.tsx(24,21): error TS2307: Cannot find module '@react-pdf/renderer' or its corresponding type declarations.
-src/components/invoice/InvoicePDF.tsx(15,8): error TS2307: Cannot find module '@react-pdf/renderer' or its corresponding type declarations.
-src/components/invoice/InvoicePDF.tsx(530,32): error TS7031: Binding element 'pageNumber' implicitly has an 'any' type.
-src/components/invoice/InvoicePDF.tsx(530,44): error TS7031: Binding element 'totalPages' implicitly has an 'any' type.
-src/components/invoice/InvoicePDF.tsx(624,25): error TS7031: Binding element 'loading' implicitly has an 'any' type.

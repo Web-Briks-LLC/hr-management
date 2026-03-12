@@ -58,6 +58,7 @@ interface GetOrdersFilters {
     search?: string;
     page?: number;
     limit?: number;
+    createdBy?: string;
 }
 
 async function createOrderInDB(data: CreateOrderData): Promise<IOrder> {
@@ -120,12 +121,17 @@ async function getAllOrdersFromDB(filters: GetOrdersFilters): Promise<{
         search,
         page = 1,
         limit = 20,
+        createdBy,
     } = filters;
 
     const pipeline: any[] = [];
 
     // Match stage construction
     const matchStage: Record<string, unknown> = {};
+
+    if (createdBy) {
+        matchStage.createdBy = new mongoose.Types.ObjectId(createdBy);
+    }
 
     if (clientId) {
         matchStage.clientId = new mongoose.Types.ObjectId(clientId);

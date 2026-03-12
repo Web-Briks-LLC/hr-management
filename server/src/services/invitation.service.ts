@@ -1,28 +1,28 @@
-import crypto from 'crypto';
-import { Types } from 'mongoose';
-import InvitationModel from '../models/invitation.model.js';
-import StaffModel from '../models/staff.model.js';
-import { sendMail } from '../lib/nodemailer.js';
-import envConfig from '../config/env.config.js';
+import crypto from "crypto";
+import { Types } from "mongoose";
+import InvitationModel from "../models/invitation.model.js";
+import StaffModel from "../models/staff.model.js";
+import { sendMail } from "../lib/nodemailer.js";
+import envConfig from "../config/env.config.js";
 import type {
     IInvitationCreate,
     IAcceptInvitation,
-} from '../types/invitation.type.js';
+} from "../types/invitation.type.js";
 
 const createInvitation = async (data: IInvitationCreate) => {
     const { expiryHours = 48, currentUserRole } = data;
 
     // Permission check: only super_admin can invite super_admin
-    if (data.role === 'super_admin' && currentUserRole !== 'super_admin') {
-        throw new Error('Only Super Admins can invite other Super Admins');
+    if (data.role === "super_admin" && currentUserRole !== "super_admin") {
+        throw new Error("Only Super Admins can invite other Super Admins");
     }
 
     // Permission check: only super_admin or admin can invite admin roles
     if (
-        ['admin', 'hr_manager'].includes(data.role) &&
-        !['super_admin', 'admin'].includes(currentUserRole)
+        ["admin", "hr_manager"].includes(data.role) &&
+        !["super_admin", "admin"].includes(currentUserRole)
     ) {
-        throw new Error('Only Admins can invite Admin roles');
+        throw new Error("Only Admins can invite Admin roles");
     }
 
     // Check if email already has pending invitation
@@ -33,23 +33,23 @@ const createInvitation = async (data: IInvitationCreate) => {
     });
 
     if (existingInvitation) {
-        throw new Error('An active invitation already exists for this email');
+        throw new Error("An active invitation already exists for this email");
     }
 
     // Check if user already exists
-    const db = (await import('../lib/db.js')).client;
+    const db = (await import("../lib/db.js")).client;
     const mongoClient = await db();
     const database = mongoClient.db(envConfig.db_name);
     const existingUser = await database
-        .collection('user')
+        .collection("user")
         .findOne({ email: data.email });
 
     if (existingUser) {
-        throw new Error('User with this email already exists');
+        throw new Error("User with this email already exists");
     }
 
     // Generate unique token
-    const token = crypto.randomBytes(32).toString('hex');
+    const token = crypto.randomBytes(32).toString("hex");
 
     // Set expiry
     const expiresAt = new Date();
@@ -85,10 +85,10 @@ const createInvitation = async (data: IInvitationCreate) => {
                     <h3 style="margin-top: 0;">Position Details:</h3>
                     <ul style="list-style: none; padding: 0;">
                         <li><strong>Role:</strong> ${
-                            data.role === 'staff' ? 'Staff' : 'Team Leader'
+                            data.role === "staff" ? "Staff" : "Team Leader"
                         }</li>
                         <li><strong>Department:</strong> ${
-                            data.department || 'N/A'
+                            data.department || "N/A"
                         }</li>
                         <li><strong>Designation:</strong> ${
                             data.designation
@@ -113,19 +113,19 @@ const createInvitation = async (data: IInvitationCreate) => {
 
 const validateToken = async (token: string) => {
     const invitation = await InvitationModel.findOne({ token })
-        .populate('branchId')
-        .populate('shiftId');
+        .populate("branchId")
+        .populate("shiftId");
 
     if (!invitation) {
-        throw new Error('Invalid invitation token');
+        throw new Error("Invalid invitation token");
     }
 
     if (invitation.isUsed) {
-        throw new Error('This invitation has already been used');
+        throw new Error("This invitation has already been used");
     }
 
     if (invitation.expiresAt < new Date()) {
-        throw new Error('This invitation has expired');
+        throw new Error("This invitation has expired");
     }
 
     return invitation;
@@ -138,74 +138,102 @@ const acceptInvitation = async (data: IAcceptInvitation) => {
     const invitation = await validateToken(token);
 
     // Create user account using Better Auth
-    const { auth } = await import('../lib/auth.js');
-
-    const newUser = await auth.api.signUpEmail({
-        body: {
-            email: invitation.email,
-            password: userData.password,
-            name: userData.name,
-            role: invitation.role || 'staff',
-        },
-    });
-
-    if (!newUser || !newUser.user) {
-        throw new Error('Failed to create user account');
-    }
-
-    const userId = newUser.user.id;
-
-    // Manually set emailVerified to true and theme to system since we trust the invitation
-    const db = (await import('../lib/db.js')).client;
+    const { auth } = await import("../lib/auth.js");
+    const db = (await import("../lib/db.js")).client;
     const mongoClient = await db();
     const database = mongoClient.db(envConfig.db_name);
 
-    await database.collection('user').updateOne(
-        { _id: new Types.ObjectId(userId) },
-        {
-            $set: {
-                emailVerified: true,
-                theme: 'system',
+    let userId: string | null = null;
+
+    try {
+        const newUser = await auth.api.signUpEmail({
+            body: {
+                email: invitation.email,
+                password: userData.password,
+                name: userData.name,
+                role: invitation.role || "staff",
             },
+        });
+
+        if (!newUser || !newUser.user) {
+            throw new Error("Failed to create user account");
         }
-    );
 
-    // Generate staff ID
-    const staffCount = await StaffModel.countDocuments();
-    const staffId = `EMP${String(staffCount + 1).padStart(4, '0')}`;
+        userId = newUser.user.id;
 
-    // Create staff profile with proper type conversion
-    const staff = await (StaffModel.create as any)({
-        userId: userId as any,
-        staffId,
-        phone: userData.phone,
-        branchId: invitation.branchId as any,
-        department: invitation.department,
-        designation: invitation.designation,
-        joinDate: new Date(),
-        status: 'active' as const,
-        salary: invitation.salary,
-        salaryVisibleToEmployee: true,
-        dateOfBirth: userData.dateOfBirth,
-        bloodGroup: userData.bloodGroup as any,
-        nationalId: userData.nationalId,
-        address: userData.address,
-        emergencyContact: userData.emergencyContact,
-        fathersName: userData.fathersName,
-        mothersName: userData.mothersName,
-        spouseName: userData.spouseName,
-        profileCompleted: true,
-    });
+        // Set theme to system
+        await database.collection("user").updateOne(
+            { _id: new Types.ObjectId(userId) },
+            {
+                $set: {
+                    theme: "system",
+                },
+            },
+        );
 
-    // Mark invitation as used
-    invitation.isUsed = true;
-    invitation.usedAt = new Date();
-    await invitation.save();
+        // Generate staff ID reliably
+        const lastStaff = await StaffModel.findOne({ staffId: /^EMP/ })
+            .sort({ staffId: -1 })
+            .select("staffId");
 
-    return {
-        user: { _id: userId, email: invitation.email, name: userData.name },
-        staff,
-    };
+        let nextNum = 1;
+        if (lastStaff && lastStaff.staffId) {
+            const lastNum = parseInt(lastStaff.staffId.replace("EMP", ""), 10);
+            if (!isNaN(lastNum)) {
+                nextNum = lastNum + 1;
+            }
+        }
+        const staffId = `EMP${String(nextNum).padStart(4, "0")}`;
+
+        // Create staff profile with proper type conversion
+        const staffPayload: any = {
+            userId: userId as any,
+            staffId,
+            phone: userData.phone,
+            branchId: invitation.branchId as any,
+            department: invitation.department,
+            designation: invitation.designation,
+            joinDate: new Date(),
+            status: "active" as const,
+            salary: invitation.salary,
+            salaryVisibleToEmployee: true,
+            profileCompleted: true,
+        };
+
+        if (userData.dateOfBirth)
+            staffPayload.dateOfBirth = userData.dateOfBirth;
+        if (userData.bloodGroup) staffPayload.bloodGroup = userData.bloodGroup;
+        if (userData.nationalId) staffPayload.nationalId = userData.nationalId;
+        if (userData.address) staffPayload.address = userData.address;
+        if (userData.emergencyContact)
+            staffPayload.emergencyContact = userData.emergencyContact;
+        if (userData.fathersName)
+            staffPayload.fathersName = userData.fathersName;
+        if (userData.mothersName)
+            staffPayload.mothersName = userData.mothersName;
+        if (userData.spouseName) staffPayload.spouseName = userData.spouseName;
+
+        const staff = await StaffModel.create(staffPayload);
+
+        // Mark invitation as used
+        invitation.isUsed = true;
+        invitation.usedAt = new Date();
+        await invitation.save();
+
+        return {
+            user: { _id: userId, email: invitation.email, name: userData.name },
+            staff,
+        };
+    } catch (error) {
+        // Rollback user creation
+        if (userId) {
+            await database
+                .collection("user")
+                .deleteOne({ _id: new Types.ObjectId(userId) });
+            await database.collection("account").deleteMany({ userId });
+        }
+        throw error;
+    }
 };
 
 const getInvitations = async (filters?: {
@@ -219,12 +247,12 @@ const getInvitations = async (filters?: {
     }
 
     if (filters?.email) {
-        query.email = new RegExp(filters.email, 'i');
+        query.email = new RegExp(filters.email, "i");
     }
 
     return await InvitationModel.find(query)
-        .populate('branchId', 'name')
-        .populate('shiftId', 'name')
+        .populate("branchId", "name")
+        .populate("shiftId", "name")
         .sort({ createdAt: -1 });
 };
 
@@ -232,11 +260,11 @@ const resendInvitation = async (invitationId: string) => {
     const invitation = await InvitationModel.findById(invitationId);
 
     if (!invitation) {
-        throw new Error('Invitation not found');
+        throw new Error("Invitation not found");
     }
 
     if (invitation.isUsed) {
-        throw new Error('Cannot resend used invitation');
+        throw new Error("Cannot resend used invitation");
     }
 
     // Extend expiry by 48 hours
@@ -247,7 +275,7 @@ const resendInvitation = async (invitationId: string) => {
     const signupUrl = `${envConfig.client_url}/sign-up/${invitation.token}`;
     await sendMail({
         to: invitation.email,
-        subject: 'Reminder: Complete Your Registration',
+        subject: "Reminder: Complete Your Registration",
         body: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
                 <h1 style="color: #333;">Reminder: Join Our Team</h1>
@@ -269,16 +297,16 @@ const cancelInvitation = async (invitationId: string) => {
     const invitation = await InvitationModel.findById(invitationId);
 
     if (!invitation) {
-        throw new Error('Invitation not found');
+        throw new Error("Invitation not found");
     }
 
     if (invitation.isUsed) {
-        throw new Error('Cannot cancel used invitation');
+        throw new Error("Cannot cancel used invitation");
     }
 
     await InvitationModel.deleteOne({ _id: invitationId });
 
-    return { message: 'Invitation cancelled successfully' };
+    return { message: "Invitation cancelled successfully" };
 };
 
 const createBulkInvitations = async (invitations: IInvitationCreate[]) => {
