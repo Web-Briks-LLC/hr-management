@@ -1,35 +1,39 @@
-import path from "path";
-import dotenv from "dotenv";
+import path from 'path';
+import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 dotenv.config({
-    path: path.join(process.cwd(), ".env"),
+    path: path.join(__dirname, '../../.env'),
 });
 
 // Validate required environment variables at startup
 const requiredVars = [
-    "MONGO_URI",
-    "DB_NAME",
-    "BETTER_AUTH_SECRET",
-    "BETTER_AUTH_URL",
-    "TRUSTED_ORIGINS",
-    "PORT",
-    "NODE_ENV",
-    "SMTP_USER",
-    "SMTP_PASS",
-    "SMTP_HOST",
-    "SMTP_PORT",
-    "SMTP_SECURE",
-    "CLOUDINARY_NAME",
-    "CLOUDINARY_API_KEY",
-    "CLOUDINARY_API_SECRET",
-    "CLOUDINARY_UPLOAD_PATH",
+    'MONGO_URI',
+    'DB_NAME',
+    'BETTER_AUTH_SECRET',
+    'BETTER_AUTH_URL',
+    'TRUSTED_ORIGINS',
+    'PORT',
+    'NODE_ENV',
+    'SMTP_USER',
+    'SMTP_PASS',
+    'SMTP_HOST',
+    'SMTP_PORT',
+    'SMTP_SECURE',
+    'CLOUDINARY_NAME',
+    'CLOUDINARY_API_KEY',
+    'CLOUDINARY_API_SECRET',
+    'CLOUDINARY_UPLOAD_PATH',
 ] as const;
 
 const missing = requiredVars.filter((key) => !process.env[key]);
 if (missing.length > 0) {
     throw new Error(
-        `Missing required environment variables: ${missing.join(", ")}. ` +
-            "Check your .env file.",
+        `Missing required environment variables: ${missing.join(', ')}. ` +
+            'Check your .env file.',
     );
 }
 
@@ -46,7 +50,7 @@ const envConfig = {
     trusted_origins: process.env.TRUSTED_ORIGINS!,
 
     // client
-    client_url: process.env.CLIENT_URL || "http://localhost:3000",
+    client_url: process.env.CLIENT_URL || 'http://localhost:3000',
 
     // nodemailer
     smtp_user: process.env.SMTP_USER!,
