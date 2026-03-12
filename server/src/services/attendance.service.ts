@@ -6,6 +6,7 @@ import type { IShift } from "../types/shift.type.js";
 import StaffModel from "../models/staff.model.js";
 import ShiftOffDateService from "./shift-off-date.service.js";
 import { escapeRegex } from "../lib/sanitize.js";
+import { getBDNow, getBDStartOfDay, formatBD, getBDEndOfDay, getBDMonthRange } from "../utils/date.util.js";
 
 const checkInInDB = async ({
     userId,
@@ -18,13 +19,13 @@ const checkInInDB = async ({
     userAgent: string;
     source?: "web" | "mobile" | "manual";
 }) => {
-    const now = new Date();
+    const now = getBDNow();
     // Debug log
-    console.log(`[CheckIn] Attempt for user ${userId} at ${now.toISOString()}`);
+    console.log(`[CheckIn] Attempt for user ${userId} at ${formatBD(now)}`);
 
-    const dayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    const dayStart = getBDStartOfDay(now);
     const dayEnd = new Date(dayStart);
-    dayEnd.setUTCHours(23, 59, 59, 999);
+    dayEnd.setHours(23, 59, 59, 999);
 
     const staff = await StaffModel.findOne({ userId }).lean();
     if (!staff) {
@@ -205,11 +206,11 @@ async function checkOutInDB({
     userAgent: string;
     source?: "web" | "mobile" | "manual";
 }) {
-    const now = new Date();
+    const now = getBDNow();
 
-    const dayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    const dayStart = getBDStartOfDay(now);
     const dayEnd = new Date(dayStart);
-    dayEnd.setUTCHours(23, 59, 59, 999);
+    dayEnd.setHours(23, 59, 59, 999);
 
     const staff = await StaffModel.findOne({ userId }).lean();
     if (!staff) {
@@ -352,11 +353,11 @@ async function checkOutInDB({
 }
 
 async function getTodayAttendanceFromDB(userId: string) {
-    const now = new Date();
+    const now = getBDNow();
 
-    const dayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    const dayStart = getBDStartOfDay(now);
     const dayEnd = new Date(dayStart);
-    dayEnd.setUTCHours(23, 59, 59, 999);
+    dayEnd.setHours(23, 59, 59, 999);
 
     const staff = await StaffModel.findOne({ userId }).lean();
     if (!staff) {
@@ -387,9 +388,8 @@ async function getTodayAttendanceFromDB(userId: string) {
 // }
 
 async function getMonthlyStatsInDB(userId: string) {
-    const now = new Date();
-    const startOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0));
-    const endOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0, 23, 59, 59, 999));
+    const now = getBDNow();
+    const { startDate, endDate } = getBDMonthRange(`${now.getUTCFullYear()}-${(now.getUTCMonth() + 1).toString().padStart(2, '0')}`);
 
     const staff = await StaffModel.findOne({ userId }).lean();
     if (!staff) {
@@ -479,10 +479,10 @@ async function getMyAttendanceHistoryInDB(userId: string, days: number = 7) {
 
     // Calculate date range
     // Calculate date range in UTC midnights
-    const nowForHistory = new Date();
-    const endDate = new Date(Date.UTC(nowForHistory.getUTCFullYear(), nowForHistory.getUTCMonth(), nowForHistory.getUTCDate(), 23, 59, 59, 999));
+    const nowForHistory = getBDNow();
+    const endDate = getBDEndOfDay(nowForHistory);
     
-    const startDate = new Date(Date.UTC(nowForHistory.getUTCFullYear(), nowForHistory.getUTCMonth(), nowForHistory.getUTCDate(), 0, 0, 0, 0));
+    const startDate = getBDStartOfDay(nowForHistory);
     startDate.setUTCDate(startDate.getUTCDate() - (days - 1));
 
     // Find attendance days with shift details
@@ -559,16 +559,14 @@ async function getAllAttendanceFromDB({
                 ? startDate
                 : `${startDate}T00:00:00`;
             const sDate = new Date(startStr);
-            query.date.$gte = new Date(Date.UTC(sDate.getUTCFullYear(), sDate.getUTCMonth(), sDate.getUTCDate()));
+            query.date.$gte = getBDStartOfDay(sDate);
         }
         if (endDate) {
             const endStr = endDate.includes("T")
                 ? endDate
                 : `${endDate}T00:00:00`;
             const eDate = new Date(endStr);
-            const utcMidnight = new Date(Date.UTC(eDate.getUTCFullYear(), eDate.getUTCMonth(), eDate.getUTCDate()));
-            utcMidnight.setUTCHours(23, 59, 59, 999);
-            query.date.$lte = utcMidnight;
+            query.date.$lte = getBDEndOfDay(eDate);
         }
     }
 

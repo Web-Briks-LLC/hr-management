@@ -8,17 +8,13 @@ import OvertimeModel from '../models/overtime.model.js';
 import { PayrollLockModel } from '../models/payroll-lock.model.js';
 import SalaryAdjustmentLogModel from '../models/salary-adjustment-log.model.js';
 import mongoose, { Types } from 'mongoose';
+import { getBDMonthRange, getBDStartOfDay, getBDNow, getBDWeekDay } from '../utils/date.util.js';
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
 /** Parse "YYYY-MM" into UTC start/end of month */
 function parseMonthRange(month: string) {
-    const [yearStr, monthStr] = month.split('-');
-    const year = parseInt(yearStr!, 10);
-    const monthNum = parseInt(monthStr!, 10);
-    const startDate = new Date(Date.UTC(year, monthNum - 1, 1, 0, 0, 0, 0));
-    const endDate = new Date(Date.UTC(year, monthNum, 0, 23, 59, 59, 999));
-    return { year, monthNum, startDate, endDate };
+    return getBDMonthRange(month);
 }
 
 /** Get human-readable month name from YYYY-MM */
@@ -208,10 +204,10 @@ const getPayrollPreview = async ({
         let missingPunches = 0;
 
         if (shift) {
-            const todayUTCStr = new Date().toISOString().split('T')[0]!;
+            const todayBDStr = getBDNow().toISOString().split('T')[0]!;
             missingPunches = expectedWorkDates.filter((day) => {
                 const dayStr = day.toISOString().split('T')[0]!;
-                if (dayStr >= todayUTCStr) return false;
+                if (dayStr >= todayBDStr) return false;
 
                 if (joinStr && dayStr < joinStr) return false;
                 if (exitStr && dayStr > exitStr) return false;
@@ -230,8 +226,8 @@ const getPayrollPreview = async ({
         const staffSalary = staff.salary || 0;
         const perDaySalary = staffSalary / 30;
 
-        // Deduction formula: Absent days + Unemployed days
-        const totalDeductionUnits = absentDays + unemployedDays;
+        // Deduction formula: Absent days + Unemployed days + (Half days * 0.5)
+        const totalDeductionUnits = absentDays + unemployedDays + (halfDayDays * 0.5);
         const deduction = totalDeductionUnits * perDaySalary;
         const payableSalary = Math.max(0, staffSalary - deduction);
 
@@ -376,6 +372,10 @@ const processPayroll = async ({
                 (a) => a.status === 'absent',
             ).length;
 
+            const halfDayDays = allAttendance.filter(
+                (a) => a.status === 'half_day',
+            ).length;
+
             const daysInMonth = eachDayOfInterval({
                 start: startDate,
                 end: endDate,
@@ -407,17 +407,11 @@ const processPayroll = async ({
             });
 
             let missingPunches = 0;
-            const todayUTC = new Date(
-                Date.UTC(
-                    new Date().getUTCFullYear(),
-                    new Date().getUTCMonth(),
-                    new Date().getUTCDate(),
-                ),
-            );
+            const todayBD = getBDStartOfDay();
 
             if (shift) {
                 missingPunches = expectedWorkDates.filter((day) => {
-                    if (day.getTime() > todayUTC.getTime()) return false;
+                    if (day.getTime() > todayBD.getTime()) return false;
 
                     const dayTime = day.getTime();
                     const isBeforeJoin = joinDate && dayTime < joinDate.getTime();
@@ -433,7 +427,7 @@ const processPayroll = async ({
 
             const absentDays = literalAbsentDays + missingPunches;
             const serverDeduction =
-                (absentDays + unemployedDays) * perDaySalary;
+                (absentDays + unemployedDays + (halfDayDays * 0.5)) * perDaySalary;
             const serverPayable = Math.max(0, staffSalary - serverDeduction);
             const expectedAmount = Math.round(
                 serverPayable + bonus - deduction,
@@ -726,7 +720,7 @@ const getAbsentDates = async (staffId: string, month: string) => {
             end: endDate,
         });
         daysInMonth.forEach((day) => {
-            if (shift.workDays.includes(day.getDay())) {
+            if (shift.workDays.includes(getBDWeekDay(day))) {
                 expectedWorkDates.push(day);
             }
         });
@@ -735,17 +729,11 @@ const getAbsentDates = async (staffId: string, month: string) => {
     const missingPunches: { date: Date; status: string }[] = [];
     const joinDate = staff.joinDate ? new Date(staff.joinDate) : null;
     const exitDate = staff.exitDate ? new Date(staff.exitDate) : null;
-    const todayUTC = new Date(
-        Date.UTC(
-            new Date().getUTCFullYear(),
-            new Date().getUTCMonth(),
-            new Date().getUTCDate(),
-        ),
-    );
+    const todayBD = getBDStartOfDay();
 
     if (shift) {
         expectedWorkDates.forEach((day) => {
-            if (day > todayUTC) return;
+            if (day > todayBD) return;
 
             const isBeforeJoin = joinDate && day < joinDate;
             const isAfterExit = exitDate && day > exitDate;
