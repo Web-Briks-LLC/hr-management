@@ -1,3 +1,23 @@
+export interface ICalendarDay {
+    date: string; // YYYY-MM-DD
+    status:
+        | "present"
+        | "late"
+        | "absent"
+        | "half_day"
+        | "early_exit"
+        | "on_leave"
+        | "holiday"
+        | "off_day"
+        | "unemployed"
+        | "future"
+        | "weekend";
+    shiftStart?: string | null;  // "09:00"
+    shiftEnd?: string | null;    // "18:00"
+    checkInAt?: string | null;   // ISO string
+    checkOutAt?: string | null;  // ISO string
+}
+
 export interface IPayrollItem {
     _id: string;
     name: string;
@@ -37,4 +57,7 @@ export interface IPayrollItem {
         routingNumber?: string;
     };
     branchId?: string;
+
+    // Calendar
+    calendar?: ICalendarDay[];
 }

@@ -232,6 +232,99 @@ export const payrollApi = apiSlice.injectEndpoints({
                 { type: "PayrollLock" as any, id: month },
             ],
         }),
+
+        setAttendance: builder.mutation<
+            any,
+            {
+                staffId: string;
+                date: string;
+                status: string;
+                month: string;
+                branchId?: string;
+            }
+        >({
+            query: ({ staffId, date, status }) => ({
+                url: "/payroll/set-attendance",
+                method: "POST",
+                body: { staffId, date, status },
+            }),
+            async onQueryStarted(
+                { staffId, date, status, month, branchId },
+                { dispatch, queryFulfilled },
+            ) {
+                const cacheKey = {
+                    month,
+                    branchId: branchId || "all",
+                };
+                // Optimistic update: patch calendar cell + recalculate counts
+                const patchResult = dispatch(
+                    payrollApi.util.updateQueryData(
+                        "getPayrollPreview",
+                        cacheKey,
+                        (draft: any) => {
+                            const staffs =
+                                draft?.data?.staffs || draft?.data || draft;
+                            if (!Array.isArray(staffs)) return;
+                            const staff = staffs.find(
+                                (s: any) =>
+                                    (s._id || s.staffId)?.toString() ===
+                                    staffId,
+                            );
+                            if (!staff?.calendar) return;
+
+                            // Patch the day cell
+                            const day = staff.calendar.find(
+                                (d: any) => d.date === date,
+                            );
+                            if (day) {
+                                day.status = status;
+                            }
+
+                            // Recalculate counts from calendar
+                            let present = 0,
+                                absent = 0,
+                                late = 0;
+                            for (const d of staff.calendar) {
+                                if (
+                                    d.status === "present" ||
+                                    d.status === "early_exit"
+                                )
+                                    present++;
+                                else if (d.status === "late") late++;
+                                else if (d.status === "absent") absent++;
+                            }
+                            staff.present = present + late; // late counts as present for payment
+                            staff.absent = absent;
+                            staff.late = late;
+
+                            // Recalculate payable salary
+                            if (staff.workDays > 0) {
+                                const perDay =
+                                    staff.perDaySalary ||
+                                    Math.round(
+                                        (staff.payableSalary + absent * (staff.perDaySalary || 0)) /
+                                            staff.workDays,
+                                    );
+                                staff.payableSalary = Math.round(
+                                    perDay * (staff.workDays - absent),
+                                );
+                            }
+                        },
+                    ),
+                );
+                try {
+                    await queryFulfilled;
+                } catch {
+                    patchResult.undo();
+                }
+            },
+            invalidatesTags: (_result, _error, { month, branchId }) => [
+                {
+                    type: "Payroll" as any,
+                    id: `${month}-${branchId || "all"}`,
+                },
+            ],
+        }),
     }),
 });
 
@@ -245,4 +338,5 @@ export const {
     useGetLockStatusQuery,
     useLockMonthMutation,
     useUnlockMonthMutation,
+    useSetAttendanceMutation,
 } = payrollApi;

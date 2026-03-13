@@ -1,11 +1,11 @@
 import { useState, useMemo } from "react";
 import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -13,21 +13,23 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import {
-    Ban,
-    Banknote,
-    Loader2,
-    User,
-    CheckCheck,
-    Pencil,
-    RefreshCcw,
-    Search,
+  Ban,
+  Banknote,
+  Loader2,
+  User,
+  CheckCheck,
+  Pencil,
+  RefreshCcw,
+  Search,
+  CalendarDays,
 } from "lucide-react";
 import GraceDialog from "./grace-dialog";
 import EditSalaryDialog from "./edit-salary-dialog";
 import BulkReviewDialog from "./bulk-review-dialog";
+import AttendanceCalendar from "./attendance-calendar";
 import {
-    useBulkProcessPaymentMutation,
-    useUndoPaymentMutation,
+  useBulkProcessPaymentMutation,
+  useUndoPaymentMutation,
 } from "@/redux/features/payroll/payrollApi";
 import { useSession } from "@/lib/auth-client";
 import { toast } from "sonner";
@@ -35,504 +37,503 @@ import { cn } from "@/lib/utils";
 import { IPayrollItem } from "@/types/payroll.type";
 
 interface PayrollTableProps {
-    data: IPayrollItem[];
-    month: string;
-    isSelectMode: boolean;
-    isLocked?: boolean;
+  data: IPayrollItem[];
+  month: string;
+  isSelectMode: boolean;
+  isLocked?: boolean;
+  branchId?: string;
 }
 
 type Adjustment = {
-    baseAmount?: number;
-    bonus: number;
-    deduction: number;
-    note: string;
+  baseAmount?: number;
+  bonus: number;
+  deduction: number;
+  note: string;
 };
 
 export default function PayrollTable({
-    data,
-    month,
-    isSelectMode,
-    isLocked = false,
+  data,
+  month,
+  isSelectMode,
+  isLocked = false,
+  branchId,
 }: PayrollTableProps) {
-    const { data: session } = useSession();
-    const [selectedStaffIds, setSelectedStaffIds] = useState<string[]>([]);
-    const [searchQuery, setSearchQuery] = useState("");
-    const [processingId, setProcessingId] = useState<string | null>(null);
+  const { data: session } = useSession();
+  const [selectedStaffIds, setSelectedStaffIds] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [processingId, setProcessingId] = useState<string | null>(null);
+  const [calendarStaff, setCalendarStaff] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
 
-    // Local state to store adjustments before payment
-    const [adjustments, setAdjustments] = useState<Record<string, Adjustment>>(
-        {},
+  // Derive live calendar data from the current data prop (auto-updates on refetch)
+  const liveCalendar = useMemo(() => {
+    if (!calendarStaff) return null;
+    const staff = data.find((s) => s._id === calendarStaff.id);
+    return staff?.calendar || null;
+  }, [calendarStaff, data]);
+
+  // Local state to store adjustments before payment
+  const [adjustments, setAdjustments] = useState<Record<string, Adjustment>>(
+    {},
+  );
+
+  // Dialog States
+  const [graceParams, setGraceParams] = useState<{
+    open: boolean;
+    staffId: string;
+    staffName: string;
+  }>({ open: false, staffId: "", staffName: "" });
+
+  const [editParams, setEditParams] = useState<{
+    open: boolean;
+    staffId: string;
+    staffName: string;
+    baseAmount: number;
+    mode: "pay" | "edit";
+  } | null>(null);
+
+  const [bulkReviewOpen, setBulkReviewOpen] = useState(false);
+
+  const [bulkPay, { isLoading: isBulkPaying }] =
+    useBulkProcessPaymentMutation();
+  const [undoPayment] = useUndoPaymentMutation();
+
+  // Filtered data by search
+  const filteredData = useMemo(() => {
+    if (!searchQuery.trim()) return data;
+    const q = searchQuery.toLowerCase();
+    return data.filter(
+      (d) =>
+        d.name?.toLowerCase().includes(q) ||
+        d.designation?.toLowerCase().includes(q) ||
+        d.staffId?.toLowerCase().includes(q),
     );
+  }, [data, searchQuery]);
 
-    // Dialog States
-    const [graceParams, setGraceParams] = useState<{
-        open: boolean;
-        staffId: string;
-        staffName: string;
-    }>({ open: false, staffId: "", staffName: "" });
+  // Selection Logic
+  const unpaidData = filteredData.filter((d) => d.status !== "paid");
+  const isAllSelected =
+    unpaidData.length > 0 &&
+    unpaidData.every((d) => selectedStaffIds.includes(d._id));
 
-    const [editParams, setEditParams] = useState<{
-        open: boolean;
-        staffId: string;
-        staffName: string;
-        baseAmount: number;
-        mode: "pay" | "edit";
-    } | null>(null);
+  const toggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedStaffIds([]);
+    } else {
+      setSelectedStaffIds(unpaidData.map((d) => d._id));
+    }
+  };
 
-    const [bulkReviewOpen, setBulkReviewOpen] = useState(false);
+  const toggleSelect = (id: string) => {
+    if (selectedStaffIds.includes(id)) {
+      setSelectedStaffIds((prev) => prev.filter((i) => i !== id));
+    } else {
+      setSelectedStaffIds((prev) => [...prev, id]);
+    }
+  };
 
-    const [bulkPay, { isLoading: isBulkPaying }] =
-        useBulkProcessPaymentMutation();
-    const [undoPayment] = useUndoPaymentMutation();
+  const handleSaveAdjustment = (id: string, adj: Adjustment) => {
+    setAdjustments((prev) => ({
+      ...prev,
+      [id]: adj,
+    }));
+  };
 
-    // Filtered data by search
-    const filteredData = useMemo(() => {
-        if (!searchQuery.trim()) return data;
-        const q = searchQuery.toLowerCase();
-        return data.filter(
-            (d) =>
-                d.name?.toLowerCase().includes(q) ||
-                d.designation?.toLowerCase().includes(q) ||
-                d.staffId?.toLowerCase().includes(q),
-        );
-    }, [data, searchQuery]);
+  const handleUndoPayment = async (staff: IPayrollItem) => {
+    setProcessingId(staff._id);
+    try {
+      await undoPayment({
+        staffId: staff._id,
+        month,
+        paymentType: "salary",
+        branchId: staff.branchId,
+      }).unwrap();
+      toast.success("Payment undone successfully");
+    } catch (error) {
+      toast.error((error as Error).message || "Failed to undo payment");
+    } finally {
+      setProcessingId(null);
+    }
+  };
 
-    // Selection Logic
-    const unpaidData = filteredData.filter((d) => d.status !== "paid");
-    const isAllSelected =
-        unpaidData.length > 0 &&
-        unpaidData.every((d) => selectedStaffIds.includes(d._id));
+  const getFinalAmount = useMemo(
+    () => (staff: IPayrollItem) => {
+      const adj = adjustments[staff._id] || { bonus: 0, deduction: 0 };
+      const base =
+        adj.baseAmount !== undefined
+          ? adj.baseAmount
+          : staff.payableSalary || 0;
+      return base + adj.bonus - adj.deduction;
+    },
+    [adjustments],
+  );
 
-    const toggleSelectAll = () => {
-        if (isAllSelected) {
-            setSelectedStaffIds([]);
-        } else {
-            setSelectedStaffIds(unpaidData.map((d) => d._id));
-        }
-    };
+  // Bulk Pay
+  const handleBulkConfirm = async () => {
+    const payments = selectedStaffIds.map((id) => {
+      const staff = data.find((d) => d._id === id);
+      const adj = adjustments[id] || { bonus: 0, deduction: 0, note: "" };
+      const amount = getFinalAmount(staff!);
+      return {
+        staffId: id,
+        amount,
+        bonus: adj.bonus,
+        deduction: adj.deduction,
+        note: adj.note,
+      };
+    });
 
-    const toggleSelect = (id: string) => {
-        if (selectedStaffIds.includes(id)) {
-            setSelectedStaffIds((prev) => prev.filter((i) => i !== id));
-        } else {
-            setSelectedStaffIds((prev) => [...prev, id]);
-        }
-    };
+    // Determine branchId from first staff for cache key
+    const firstStaff = data.find((d) => d._id === selectedStaffIds[0]);
 
-    const handleSaveAdjustment = (id: string, adj: Adjustment) => {
-        setAdjustments((prev) => ({
-            ...prev,
-            [id]: adj,
-        }));
-    };
+    try {
+      await bulkPay({
+        month,
+        paymentMethod: "cash",
+        payments,
+        paymentType: "salary",
+        createdBy: session?.user?.id || "",
+        branchId: firstStaff?.branchId,
+      }).unwrap();
 
-    const handleUndoPayment = async (staff: IPayrollItem) => {
-        setProcessingId(staff._id);
-        try {
-            await undoPayment({
-                staffId: staff._id,
-                month,
-                paymentType: "salary",
-                branchId: staff.branchId,
-            }).unwrap();
-            toast.success("Payment undone successfully");
-        } catch (error: any) {
-            toast.error(error?.data?.message || "Failed to undo payment");
-        } finally {
-            setProcessingId(null);
-        }
-    };
+      toast.success("Bulk Payment Successful", {
+        description: `Processed payments for ${payments.length} staff members.`,
+      });
+      setSelectedStaffIds([]);
+      setBulkReviewOpen(false);
+      setAdjustments({});
+    } catch (error) {
+      toast.error("Bulk Payment Failed", {
+        description: (error as Error).message || "Failed to process payments",
+      });
+    }
+  };
 
-    const getFinalAmount = useMemo(
-        () => (staff: IPayrollItem) => {
-            const adj = adjustments[staff._id] || { bonus: 0, deduction: 0 };
-            const base =
-                adj.baseAmount !== undefined
-                    ? adj.baseAmount
-                    : staff.payableSalary || 0;
-            return base + adj.bonus - adj.deduction;
-        },
-        [adjustments],
-    );
+  const totalPayableWithAdjustments = useMemo(() => {
+    return data
+      .filter((d) => selectedStaffIds.includes(d._id))
+      .reduce((sum, d) => sum + getFinalAmount(d), 0);
+  }, [data, selectedStaffIds, getFinalAmount]);
 
-    // Bulk Pay
-    const handleBulkConfirm = async () => {
-        const payments = selectedStaffIds.map((id) => {
-            const staff = data.find((d) => d._id === id);
-            const adj = adjustments[id] || { bonus: 0, deduction: 0, note: "" };
-            const amount = getFinalAmount(staff!);
-            return {
-                staffId: id,
-                amount,
-                bonus: adj.bonus,
-                deduction: adj.deduction,
-                note: adj.note,
-            };
-        });
+  return (
+    <div className="space-y-4">
+      {/* Search Bar Simplified */}
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Search staff..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-9 h-10"
+        />
+      </div>
 
-        // Determine branchId from first staff for cache key
-        const firstStaff = data.find((d) => d._id === selectedStaffIds[0]);
-
-        try {
-            await bulkPay({
-                month,
-                paymentMethod: "cash",
-                payments,
-                paymentType: "salary",
-                createdBy: session?.user?.id || "",
-                branchId: firstStaff?.branchId,
-            }).unwrap();
-
-            toast.success("Bulk Payment Successful", {
-                description: `Processed payments for ${payments.length} staff members.`,
-            });
-            setSelectedStaffIds([]);
-            setBulkReviewOpen(false);
-            setAdjustments({});
-        } catch (error: any) {
-            toast.error("Bulk Payment Failed", {
-                description:
-                    error?.data?.message || "Failed to process payments",
-            });
-        }
-    };
-
-    const totalPayableWithAdjustments = useMemo(() => {
-        return data
-            .filter((d) => selectedStaffIds.includes(d._id))
-            .reduce((sum, d) => sum + getFinalAmount(d), 0);
-    }, [data, selectedStaffIds, getFinalAmount]);
-
-    return (
-        <div className="space-y-4">
-            {/* Search Bar Simplified */}
-            <div className="relative max-w-sm">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                    placeholder="Search staff..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-9 h-10"
-                />
-            </div>
-
-            {/* Bulk Action Bar Simplified */}
-            {selectedStaffIds.length > 0 && isSelectMode && !isLocked && (
-                <div className="bg-muted border rounded-lg p-3 flex items-center justify-between animate-in fade-in duration-300">
-                    <div className="text-sm font-semibold">
-                        {selectedStaffIds.length} staff selected
-                        <span className="mx-2 opacity-30">|</span>
-                        Payable: <span className="text-primary">৳ {totalPayableWithAdjustments.toLocaleString()}</span>
-                    </div>
-                    <Button
-                        size="sm"
-                        onClick={() => setBulkReviewOpen(true)}
-                        disabled={isBulkPaying}
-                    >
-                        Review & Pay
-                    </Button>
-                </div>
-            )}
-
-            <div className="border rounded-md overflow-hidden bg-background">
-                <Table>
-                    <TableHeader className="bg-muted/50">
-                        <TableRow className="hover:bg-transparent">
-                            {isSelectMode && (
-                                <TableHead className="w-[40px]">
-                                    <Checkbox
-                                        checked={isAllSelected}
-                                        onCheckedChange={toggleSelectAll}
-                                        aria-label="Select all"
-                                        disabled={isLocked}
-                                    />
-                                </TableHead>
-                            )}
-                            <TableHead className="py-3 font-semibold">Staff Info</TableHead>
-                            <TableHead className="text-center py-3 font-semibold">Work Days</TableHead>
-                            <TableHead className="text-center py-3 font-semibold">Present</TableHead>
-                            <TableHead className="text-center py-3 font-semibold">Absent</TableHead>
-                            <TableHead className="text-center py-3 font-semibold">Late</TableHead>
-                            <TableHead className="text-right py-3 font-semibold">Per Day</TableHead>
-                            <TableHead className="text-right py-3 font-semibold">Payable</TableHead>
-                            <TableHead className="text-center py-3 font-semibold">Action</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {filteredData.length === 0 ? (
-                            <TableRow>
-                                <TableCell
-                                    colSpan={isSelectMode ? 9 : 8}
-                                    className="h-24 text-center"
-                                >
-                                    {searchQuery
-                                        ? "No staff match your search."
-                                        : "No payroll data found for this month."}
-                                </TableCell>
-                            </TableRow>
-                        ) : (
-                            filteredData.map((row) => {
-                                const isPaid = row.status === "paid";
-                                const adj = adjustments[row._id];
-                                const hasAdjustment =
-                                    adj &&
-                                    (adj.bonus > 0 ||
-                                        adj.deduction > 0 ||
-                                        (adj.baseAmount !== undefined &&
-                                            adj.baseAmount !==
-                                            row.payableSalary));
-                                const finalAmount = isPaid
-                                    ? row.paidAmount
-                                    : getFinalAmount(row);
-                                const isProcessing = processingId === row._id;
-
-                                return (
-                                    <TableRow
-                                        key={row._id}
-                                        className={cn(
-                                            selectedStaffIds.includes(row._id)
-                                                ? "bg-muted/30"
-                                                : "",
-                                        )}
-                                    >
-                                        {isSelectMode && (
-                                            <TableCell>
-                                                <Checkbox
-                                                    checked={selectedStaffIds.includes(
-                                                        row._id,
-                                                    )}
-                                                    onCheckedChange={() =>
-                                                        toggleSelect(row._id)
-                                                    }
-                                                    disabled={
-                                                        isPaid || isLocked
-                                                    }
-                                                />
-                                            </TableCell>
-                                        )}
-                                        <TableCell>
-                                            <div className="flex items-center gap-3">
-                                                <Avatar className="h-9 w-9 border">
-                                                    <AvatarImage
-                                                        src={row.image}
-                                                        alt={row.name}
-                                                    />
-                                                    <AvatarFallback>
-                                                        <User className="h-4 w-4" />
-                                                    </AvatarFallback>
-                                                </Avatar>
-                                                <div>
-                                                    <div className="font-medium">
-                                                        {row.name}
-                                                    </div>
-                                                    <div className="text-xs text-muted-foreground">
-                                                        {row.bankName || "N/A"}{" "}
-                                                        - {row.branch || "N/A"}
-                                                    </div>
-                                                    <div className="text-[10px] text-muted-foreground font-mono bg-muted/60 px-1.5 py-0.5 rounded w-fit mt-1">
-                                                        {row.bank
-                                                            ?.accountNumber ||
-                                                            "N/A"}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </TableCell>
-                                        <TableCell className="text-center">
-                                            {row.workDays}
-                                        </TableCell>
-                                        <TableCell className="text-center text-green-600 font-medium">
-                                            {row.present}
-                                        </TableCell>
-                                        <TableCell className="text-center text-red-600 font-medium">
-                                            {row.absent}
-                                        </TableCell>
-                                        <TableCell className="text-center text-yellow-600">
-                                            {row.late}
-                                        </TableCell>
-                                        <TableCell className="text-right font-mono text-xs">
-                                            {row.perDaySalary}
-                                        </TableCell>
-                                        <TableCell className="text-right group relative">
-                                            <div className="flex flex-col items-end">
-                                                <div className="flex items-center gap-2">
-                                                    {!isPaid && !isLocked && (
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                setEditParams({
-                                                                    open: true,
-                                                                    staffId:
-                                                                        row._id,
-                                                                    staffName:
-                                                                        row.name,
-                                                                    baseAmount:
-                                                                        adjustments[
-                                                                            row
-                                                                                ._id
-                                                                        ]
-                                                                            ?.baseAmount ??
-                                                                        row.payableSalary,
-                                                                    mode: "pay",
-                                                                });
-                                                            }}
-                                                            className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-muted rounded text-muted-foreground hover:text-foreground"
-                                                            title="Adjust Salary"
-                                                        >
-                                                            <Pencil className="h-3 w-3" />
-                                                        </button>
-                                                    )}
-                                                    <span
-                                                        className={cn(
-                                                            "font-bold font-mono",
-                                                            hasAdjustment
-                                                                ? "text-blue-600"
-                                                                : "",
-                                                        )}
-                                                    >
-                                                        {finalAmount}
-                                                    </span>
-                                                </div>
-                                                {hasAdjustment && !isPaid && (
-                                                    <span className="text-[10px] text-blue-500 font-mono">
-                                                        {adj.bonus > 0 &&
-                                                            `+${adj.bonus}`}
-                                                        {adj.deduction > 0 &&
-                                                            ` -${adj.deduction}`}
-                                                    </span>
-                                                )}
-                                                <span className="text-[10px] text-muted-foreground">
-                                                    / {row.salary}
-                                                </span>
-                                            </div>
-                                        </TableCell>
-                                        <TableCell className="text-center">
-                                            <div className="flex justify-center gap-2">
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    className="h-8 w-8 p-0"
-                                                    onClick={() =>
-                                                        setGraceParams({
-                                                            open: true,
-                                                            staffId: row._id,
-                                                            staffName: row.name,
-                                                        })
-                                                    }
-                                                    title="Grace"
-                                                    disabled={
-                                                        isPaid || isLocked
-                                                    }
-                                                >
-                                                    <Ban className="h-3.5 w-3.5 text-muted-foreground" />
-                                                </Button>
-
-                                                {isPaid ? (
-                                                    <div className="flex items-center gap-2">
-                                                        <Badge
-                                                            variant="outline"
-                                                            className="h-8 px-3 text-xs gap-1.5 border-green-200 bg-green-50 text-green-700"
-                                                        >
-                                                            <CheckCheck className="h-3.5 w-3.5" />
-                                                            Paid
-                                                        </Badge>
-                                                        <Button
-                                                            size="sm"
-                                                            variant="ghost"
-                                                            className="h-8 w-8 p-0 text-muted-foreground hover:text-red-600"
-                                                            onClick={() =>
-                                                                handleUndoPayment(
-                                                                    row,
-                                                                )
-                                                            }
-                                                            disabled={
-                                                                isProcessing ||
-                                                                isLocked
-                                                            }
-                                                            title="Undo Payment"
-                                                        >
-                                                            {isProcessing ? (
-                                                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                                            ) : (
-                                                                <RefreshCcw className="h-3.5 w-3.5" />
-                                                            )}
-                                                        </Button>
-                                                    </div>
-                                                ) : (
-                                                    <Button
-                                                        size="sm"
-                                                        className="h-8 px-3 text-xs gap-1.5 bg-green-600 hover:bg-green-700"
-                                                        disabled={isLocked}
-                                                        onClick={() =>
-                                                            setEditParams({
-                                                                open: true,
-                                                                staffId:
-                                                                    row._id,
-                                                                staffName:
-                                                                    row.name,
-                                                                baseAmount:
-                                                                    adjustments[
-                                                                        row._id
-                                                                    ]
-                                                                        ?.baseAmount ??
-                                                                    row.payableSalary,
-                                                                mode: "pay",
-                                                            })
-                                                        }
-                                                    >
-                                                        <Banknote className="h-3.5 w-3.5" />
-                                                        Pay
-                                                    </Button>
-                                                )}
-                                            </div>
-                                        </TableCell>
-                                    </TableRow>
-                                );
-                            })
-                        )}
-                    </TableBody>
-                </Table>
-            </div>
-
-            <GraceDialog
-                open={graceParams.open}
-                onOpenChange={(open) => setGraceParams((p) => ({ ...p, open }))}
-                staffId={graceParams.staffId}
-                staffName={graceParams.staffName}
-                month={month}
-            />
-
-            {editParams && (
-                <EditSalaryDialog
-                    open={editParams.open}
-                    onOpenChange={(open) => !open && setEditParams(null)}
-                    staffId={editParams.staffId}
-                    staffName={editParams.staffName}
-                    month={month}
-                    baseAmount={editParams.baseAmount}
-                    mode={editParams.mode}
-                    initialBonus={adjustments[editParams.staffId]?.bonus}
-                    initialDeduction={
-                        adjustments[editParams.staffId]?.deduction
-                    }
-                    initialNote={adjustments[editParams.staffId]?.note}
-                    onSave={
-                        editParams.mode === "pay"
-                            ? (data) =>
-                                handleSaveAdjustment(editParams.staffId, data)
-                            : undefined
-                    }
-                />
-            )}
-
-            <BulkReviewDialog
-                open={bulkReviewOpen}
-                onOpenChange={setBulkReviewOpen}
-                selectedCount={selectedStaffIds.length}
-                totalAmount={totalPayableWithAdjustments}
-                month={month}
-                onConfirm={handleBulkConfirm}
-                isProcessing={isBulkPaying}
-            />
+      {/* Bulk Action Bar Simplified */}
+      {selectedStaffIds.length > 0 && isSelectMode && !isLocked && (
+        <div className="bg-muted border rounded-lg p-3 flex items-center justify-between animate-in fade-in duration-300">
+          <div className="text-sm font-semibold">
+            {selectedStaffIds.length} staff selected
+            <span className="mx-2 opacity-30">|</span>
+            Payable:{" "}
+            <span className="text-primary">
+              ৳ {totalPayableWithAdjustments.toLocaleString()}
+            </span>
+          </div>
+          <Button
+            size="sm"
+            onClick={() => setBulkReviewOpen(true)}
+            disabled={isBulkPaying}
+          >
+            Review & Pay
+          </Button>
         </div>
-    );
+      )}
+
+      <div className="border rounded-md overflow-hidden bg-background">
+        <Table>
+          <TableHeader className="bg-muted/50">
+            <TableRow className="hover:bg-transparent">
+              {isSelectMode && (
+                <TableHead className="w-[40px]">
+                  <Checkbox
+                    checked={isAllSelected}
+                    onCheckedChange={toggleSelectAll}
+                    aria-label="Select all"
+                    disabled={isLocked}
+                  />
+                </TableHead>
+              )}
+              <TableHead className="py-3 font-semibold">Staff Info</TableHead>
+              <TableHead className="text-center py-3 font-semibold">
+                Work Days
+              </TableHead>
+              <TableHead className="text-center py-3 font-semibold">
+                Present
+              </TableHead>
+              <TableHead className="text-center py-3 font-semibold">
+                Absent
+              </TableHead>
+              <TableHead className="text-right py-3 font-semibold">
+                Per Day
+              </TableHead>
+              <TableHead className="text-right py-3 font-semibold">
+                Payable
+              </TableHead>
+              <TableHead className="text-center py-3 font-semibold">
+                Action
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredData.length === 0 ? (
+              <TableRow>
+                <TableCell
+                  colSpan={isSelectMode ? 8 : 7}
+                  className="h-24 text-center"
+                >
+                  {searchQuery
+                    ? "No staff match your search."
+                    : "No payroll data found for this month."}
+                </TableCell>
+              </TableRow>
+            ) : (
+              filteredData.map((row) => {
+                const isPaid = row.status === "paid";
+                const adj = adjustments[row._id];
+                const hasAdjustment =
+                  adj &&
+                  (adj.bonus > 0 ||
+                    adj.deduction > 0 ||
+                    (adj.baseAmount !== undefined &&
+                      adj.baseAmount !== row.payableSalary));
+                const finalAmount = isPaid
+                  ? row.paidAmount
+                  : getFinalAmount(row);
+                const isProcessing = processingId === row._id;
+
+                return (
+                  <TableRow
+                    key={row._id}
+                    className={cn(
+                      "cursor-pointer transition-colors hover:bg-muted/20",
+                      selectedStaffIds.includes(row._id) ? "bg-muted/30" : "",
+                    )}
+                    onClick={() =>
+                      setCalendarStaff({
+                        id: row._id,
+                        name: row.name,
+                      })
+                    }
+                  >
+                    {isSelectMode && (
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedStaffIds.includes(row._id)}
+                          onCheckedChange={() => toggleSelect(row._id)}
+                          disabled={isPaid || isLocked}
+                        />
+                      </TableCell>
+                    )}
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                        <Avatar className="h-9 w-9 border">
+                          <AvatarImage src={row.image} alt={row.name} />
+                          <AvatarFallback>
+                            <User className="h-4 w-4" />
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <div className="font-medium">{row.name}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {row.bankName || "N/A"} - {row.branch || "N/A"}
+                          </div>
+                          <div className="text-[10px] text-muted-foreground font-mono bg-muted/60 px-1.5 py-0.5 rounded w-fit mt-1">
+                            {row.bank?.accountNumber || "N/A"}
+                          </div>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {row.workDays}
+                    </TableCell>
+                    <TableCell className="text-center text-green-600 font-medium">
+                      {row.present}
+                    </TableCell>
+                    <TableCell className="text-center text-red-600 font-medium">
+                      {row.absent}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-xs">
+                      {row.perDaySalary}
+                    </TableCell>
+                    <TableCell className="text-right group relative">
+                      <div className="flex flex-col items-end">
+                        <div className="flex items-center gap-2">
+                          {!isPaid && !isLocked && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditParams({
+                                  open: true,
+                                  staffId: row._id,
+                                  staffName: row.name,
+                                  baseAmount:
+                                    adjustments[row._id]?.baseAmount ??
+                                    row.payableSalary,
+                                  mode: "pay",
+                                });
+                              }}
+                              className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-muted rounded text-muted-foreground hover:text-foreground"
+                              title="Adjust Salary"
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </button>
+                          )}
+                          <span
+                            className={cn(
+                              "font-bold font-mono",
+                              hasAdjustment ? "text-blue-600" : "",
+                            )}
+                          >
+                            {finalAmount}
+                          </span>
+                        </div>
+                        {hasAdjustment && !isPaid && (
+                          <span className="text-[10px] text-blue-500 font-mono">
+                            {adj.bonus > 0 && `+${adj.bonus}`}
+                            {adj.deduction > 0 && ` -${adj.deduction}`}
+                          </span>
+                        )}
+                        <span className="text-[10px] text-muted-foreground">
+                          / {row.salary}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <div className="flex justify-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 w-8 p-0"
+                          onClick={() =>
+                            setGraceParams({
+                              open: true,
+                              staffId: row._id,
+                              staffName: row.name,
+                            })
+                          }
+                          title="Grace"
+                          disabled={isPaid || isLocked}
+                        >
+                          <Ban className="h-3.5 w-3.5 text-muted-foreground" />
+                        </Button>
+
+                        {isPaid ? (
+                          <div className="flex items-center gap-2">
+                            <Badge
+                              variant="outline"
+                              className="h-8 px-3 text-xs gap-1.5 border-green-200 bg-green-50 text-green-700"
+                            >
+                              <CheckCheck className="h-3.5 w-3.5" />
+                              Paid
+                            </Badge>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 w-8 p-0 text-muted-foreground hover:text-red-600"
+                              onClick={() => handleUndoPayment(row)}
+                              disabled={isProcessing || isLocked}
+                              title="Undo Payment"
+                            >
+                              {isProcessing ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <RefreshCcw className="h-3.5 w-3.5" />
+                              )}
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button
+                            size="sm"
+                            className="h-8 px-3 text-xs gap-1.5 bg-green-600 hover:bg-green-700"
+                            disabled={isLocked}
+                            onClick={() =>
+                              setEditParams({
+                                open: true,
+                                staffId: row._id,
+                                staffName: row.name,
+                                baseAmount:
+                                  adjustments[row._id]?.baseAmount ??
+                                  row.payableSalary,
+                                mode: "pay",
+                              })
+                            }
+                          >
+                            <Banknote className="h-3.5 w-3.5" />
+                            Pay
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      <GraceDialog
+        open={graceParams.open}
+        onOpenChange={(open) => setGraceParams((p) => ({ ...p, open }))}
+        staffId={graceParams.staffId}
+        staffName={graceParams.staffName}
+        month={month}
+      />
+
+      {editParams && (
+        <EditSalaryDialog
+          open={editParams.open}
+          onOpenChange={(open) => !open && setEditParams(null)}
+          staffId={editParams.staffId}
+          staffName={editParams.staffName}
+          month={month}
+          baseAmount={editParams.baseAmount}
+          mode={editParams.mode}
+          initialBonus={adjustments[editParams.staffId]?.bonus}
+          initialDeduction={adjustments[editParams.staffId]?.deduction}
+          initialNote={adjustments[editParams.staffId]?.note}
+          onSave={
+            editParams.mode === "pay"
+              ? (data) => handleSaveAdjustment(editParams.staffId, data)
+              : undefined
+          }
+        />
+      )}
+
+      <BulkReviewDialog
+        open={bulkReviewOpen}
+        onOpenChange={setBulkReviewOpen}
+        selectedCount={selectedStaffIds.length}
+        totalAmount={totalPayableWithAdjustments}
+        month={month}
+        onConfirm={handleBulkConfirm}
+        isProcessing={isBulkPaying}
+      />
+
+      {calendarStaff && liveCalendar && (
+        <AttendanceCalendar
+          open={!!calendarStaff}
+          onOpenChange={(open) => !open && setCalendarStaff(null)}
+          staffId={calendarStaff.id}
+          staffName={calendarStaff.name}
+          calendar={liveCalendar}
+          month={month}
+          branchId={branchId}
+        />
+      )}
+    </div>
+  );
 }

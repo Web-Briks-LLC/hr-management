@@ -552,6 +552,7 @@ export default function PayrollPage() {
                                         month={formattedMonth}
                                         isSelectMode={isSelectMode}
                                         isLocked={isLocked}
+                                        branchId={branchId}
                                     />
                                 )}
                             </div>

@@ -84,4 +84,11 @@ router.post(
     payrollController.unlockMonth,
 );
 
+// Set attendance from calendar
+router.post(
+    "/set-attendance",
+    writeAccess,
+    payrollController.setAttendance,
+);
+
 export const payrollRoute = router;

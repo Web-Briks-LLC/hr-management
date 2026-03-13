@@ -235,8 +235,9 @@ const getPayrollPreview = async ({
         const staffSalary = staff.salary || 0;
         const perDaySalary = staffSalary / 30;
 
-        // Deduction formula: Absent days + Unemployed days + (Half days * 0.5)
-        const totalDeductionUnits = absentDays + unemployedDays + (halfDayDays * 0.5);
+        // Deduction formula: Absent days + Unemployed days only
+        // Half-day and late count as present with full payment
+        const totalDeductionUnits = absentDays + unemployedDays;
         const deduction = totalDeductionUnits * perDaySalary;
         const payableSalary = Math.max(0, staffSalary - deduction);
 
@@ -266,6 +267,61 @@ const getPayrollPreview = async ({
                 e.categoryId.toString() === overtimeCategory._id.toString(),
         );
 
+        // F. Build daily attendance calendar with shift & check-in/out info
+        const calendar = daysInMonth.map((day: Date) => {
+            const dayStr = getBDDateString(day);
+
+            // Resolve shift for this day
+            const dayAssignment = (staffShiftAssignments as any[]).find(
+                (sa) => {
+                    const s = getBDDateString(sa.startDate);
+                    const e = sa.endDate
+                        ? getBDDateString(sa.endDate)
+                        : '9999-12-31';
+                    return dayStr >= s && dayStr <= e!;
+                },
+            );
+            const shift: any = dayAssignment?.shiftId;
+            const shiftStart = shift?.startTime || null;
+            const shiftEnd = shift?.endTime || null;
+
+            // Unemployed
+            const isBeforeJoin = joinStr && dayStr < joinStr;
+            const isAfterExit = exitStr && dayStr > exitStr;
+            if (isBeforeJoin || isAfterExit) {
+                return { date: dayStr, status: 'unemployed', shiftStart, shiftEnd, checkInAt: null, checkOutAt: null };
+            }
+
+            // Future day
+            if (dayStr > todayBDStr) {
+                return { date: dayStr, status: 'future', shiftStart, shiftEnd, checkInAt: null, checkOutAt: null };
+            }
+
+            // Check attendance record
+            const record = staffAttendance.find((a: any) => {
+                const aStr = getBDDateString(new Date(a.date));
+                return aStr === dayStr;
+            });
+
+            if (record) {
+                return {
+                    date: dayStr,
+                    status: record.status,
+                    shiftStart,
+                    shiftEnd,
+                    checkInAt: (record as any).checkInAt || null,
+                    checkOutAt: (record as any).checkOutAt || null,
+                };
+            }
+
+            // No record — work day = absent, else off_day
+            if (shift && shift.workDays.includes(getBDWeekDay(day))) {
+                return { date: dayStr, status: 'absent', shiftStart, shiftEnd, checkInAt: null, checkOutAt: null };
+            }
+
+            return { date: dayStr, status: 'off_day', shiftStart, shiftEnd, checkInAt: null, checkOutAt: null };
+        });
+
         return {
             staffId: staff._id,
             workDays: workDaysCount,
@@ -285,6 +341,7 @@ const getPayrollPreview = async ({
             otPayable: Math.round(otPayable),
             otStatus: otExpense ? 'paid' : 'pending',
             otPaidAmount: otExpense?.amount || 0,
+            calendar,
         };
     });
 
@@ -448,8 +505,9 @@ const processPayroll = async ({
             }
 
             const absentDays = literalAbsentDays + missingPunches;
+            // Half-day and late count as present with full payment
             const serverDeduction =
-                (absentDays + unemployedDays + (halfDayDays * 0.5)) * perDaySalary;
+                (absentDays + unemployedDays) * perDaySalary;
             const serverPayable = Math.max(0, staffSalary - serverDeduction);
             const expectedAmount = Math.round(
                 serverPayable + bonus - deduction,
@@ -877,6 +935,64 @@ const unlockMonth = async (month: string) => {
     return result;
 };
 
+// ── Set / Create Attendance from Calendar ──────────────────────────────
+
+const setAttendance = async ({
+    staffId,
+    date,
+    status,
+}: {
+    staffId: string;
+    date: string; // YYYY-MM-DD
+    status: string;
+}) => {
+    // 1. Find shift assignment for this staff on this date
+    const assignment = await ShiftAssignmentModel.findOne({
+        staffId: new Types.ObjectId(staffId),
+        startDate: { $lte: new Date(date + 'T23:59:59+06:00') },
+        $or: [
+            { endDate: null },
+            { endDate: { $gte: new Date(date + 'T00:00:00+06:00') } },
+        ],
+    }).populate('shiftId');
+
+    if (!assignment) {
+        throw new Error('This staff is not assigned to any shift');
+    }
+
+    // 2. Build the date range for this specific day
+    const dayStart = new Date(date + 'T00:00:00+06:00');
+    const dayEnd = new Date(date + 'T23:59:59.999+06:00');
+
+    // 3. Upsert attendance record
+    const existing = await AttendanceDayModel.findOne({
+        staffId: new Types.ObjectId(staffId),
+        date: { $gte: dayStart, $lte: dayEnd },
+    });
+
+    if (existing) {
+        existing.status = status as any;
+        existing.isManual = true;
+        existing.notes = (existing.notes || '') + ' | Manually updated via Payroll Calendar';
+        existing.processedAt = getBDNow();
+        await existing.save();
+        return existing;
+    }
+
+    // Create new
+    const newRecord = await AttendanceDayModel.create({
+        staffId: new Types.ObjectId(staffId),
+        shiftId: assignment.shiftId,
+        date: dayStart,
+        status,
+        isManual: true,
+        notes: 'Created via Payroll Calendar',
+        processedAt: getBDNow(),
+    });
+
+    return newRecord;
+};
+
 export default {
     getPayrollPreview,
     processPayroll,
@@ -887,4 +1003,5 @@ export default {
     getLockStatus,
     lockMonth,
     unlockMonth,
+    setAttendance,
 };

@@ -187,6 +187,36 @@ const unlockMonth = async (req: Request, res: Response) => {
     }
 };
 
+const setAttendance = async (req: Request, res: Response) => {
+    try {
+        const { staffId, date, status } = req.body;
+
+        if (!staffId || !date || !status) {
+            return res.status(400).json({
+                success: false,
+                message: "staffId, date, and status are required",
+            });
+        }
+
+        const result = await payrollService.setAttendance({
+            staffId,
+            date,
+            status,
+        });
+
+        return res.status(200).json({
+            success: true,
+            message: "Attendance updated successfully",
+            data: result,
+        });
+    } catch (error: any) {
+        const statusCode = error.message.includes("not assigned") ? 400 : 500;
+        return res
+            .status(statusCode)
+            .json({ success: false, message: error.message });
+    }
+};
+
 export default {
     getPayrollPreview,
     processPayment,
@@ -197,4 +227,5 @@ export default {
     getLockStatus,
     lockMonth,
     unlockMonth,
+    setAttendance,
 };
