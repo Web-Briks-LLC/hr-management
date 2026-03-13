@@ -25,6 +25,7 @@ interface GraceDialogProps {
     staffId: string;
     staffName: string;
     month: string;
+    branchId?: string;
 }
 
 export default function GraceDialog({
@@ -33,6 +34,7 @@ export default function GraceDialog({
     staffId,
     staffName,
     month,
+    branchId,
 }: GraceDialogProps) {
     const [selectedDates, setSelectedDates] = useState<string[]>([]);
     const [note, setNote] = useState("");
@@ -61,6 +63,8 @@ export default function GraceDialog({
                 staffId,
                 dates: selectedDates,
                 note: note || "Admin Graced via Payroll",
+                month,
+                branchId,
             }).unwrap();
 
             toast.success("Attendance Corrected", {

@@ -491,6 +491,7 @@ export default function PayrollTable({
         staffId={graceParams.staffId}
         staffName={graceParams.staffName}
         month={month}
+        branchId={branchId}
       />
 
       {editParams && (

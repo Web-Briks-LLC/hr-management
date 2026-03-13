@@ -43,6 +43,10 @@ export interface IPayrollItem {
     present: number;
     absent: number;
     late: number;
+    onLeave: number;
+    holiday: number;
+    halfDay: number;
+    unemployedDays: number;
 
     // Overtime Data
     otMinutes: number;
@@ -82,4 +86,11 @@ export interface IAttendanceRecord {
     isManual: boolean;
     notes?: string;
     processedAt: string;
+}
+
+export interface IPayrollAlert {
+    staffId: string;
+    staffName: string;
+    type: string;
+    message: string;
 }

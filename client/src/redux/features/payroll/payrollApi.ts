@@ -1,10 +1,12 @@
 import { apiSlice } from "@/redux/api/apiSlice";
-import { IPayrollItem, IPayrollLock, IAttendanceRecord } from "@/types/payroll.type";
+import { IPayrollItem, IPayrollLock, IAttendanceRecord, IPayrollAlert } from "@/types/payroll.type";
 
 export interface IPayrollPreviewResponse {
     success: boolean;
     data: {
         staffs: IPayrollItem[];
+        alerts: IPayrollAlert[];
+        suggestLock: boolean;
     };
 }
 
@@ -216,7 +218,7 @@ export const payrollApi = apiSlice.injectEndpoints({
         }),
 
         getAbsentDates: builder.query<
-            { success: boolean; data: string[] },
+            { success: boolean; data: { date: string; status: string }[] },
             { staffId: string; month: string }
         >({
             query: ({ staffId, month }) => ({

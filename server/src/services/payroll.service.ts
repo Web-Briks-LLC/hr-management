@@ -38,7 +38,16 @@ const getPayrollPreview = async ({
 }: IPayrollPreviewParams) => {
     const { startDate, endDate } = parseMonthRange(month);
 
-    const matchStage: any = { status: 'active' };
+    const matchStage: any = {
+        status: 'active',
+        joinDate: { $lte: endDate },
+        $or: [
+            { exitDate: { $exists: false } },
+            { exitDate: null },
+            { exitDate: { $gte: startDate } },
+        ],
+    };
+
     if (branchId && branchId !== 'all') {
         matchStage.branchId = new Types.ObjectId(branchId);
     }
@@ -437,10 +446,6 @@ const processPayroll = async ({
                 (a) => a.status === 'absent',
             ).length;
 
-            const halfDayDays = allAttendance.filter(
-                (a) => a.status === 'half_day',
-            ).length;
-
             const daysInMonth = eachDayOfInterval({
                 start: startDate,
                 end: endDate,
@@ -490,7 +495,7 @@ const processPayroll = async ({
                     // 4. Missing punch
                     if (dayStr < todayBDStr) {
                         const hasRecord = allAttendance.some((a: any) => {
-                            const aStr = new Date(a.date).toISOString().split('T')[0]!;
+                            const aStr = getBDDateString(a.date);
                             return aStr === dayStr;
                         });
                         if (!hasRecord) {
@@ -752,10 +757,10 @@ const graceAttendance = async (
         } else {
             // Find shift for this specific day
             const dayAssignment = (allAssignments as any[]).find((sa) => {
-                const s = new Date(sa.startDate).toISOString().split('T')[0]!;
+                const s = getBDDateString(sa.startDate);
                 const saEnd = sa.endDate;
                 const e = saEnd
-                    ? new Date(saEnd).toISOString().split('T')[0]
+                    ? getBDDateString(saEnd)
                     : '9999-12-31';
                 return dayStr >= s && dayStr <= e!;
             });
@@ -834,13 +839,13 @@ const getAbsentDates = async (staffId: string, month: string) => {
         .map((a: any) => ({ date: a.date, status: 'absent' }));
 
     const missingPunches: { date: Date; status: string }[] = [];
-    const todayBDStr = getBDNow().toISOString().split('T')[0]!;
+    const todayBDStr = getBDDateString(getBDNow());
     
     const joinStr = staff.joinDate
-        ? new Date(staff.joinDate).toISOString().split('T')[0]
+        ? getBDDateString(staff.joinDate)
         : null;
     const exitStr = staff.exitDate
-        ? new Date(staff.exitDate).toISOString().split('T')[0]
+        ? getBDDateString(staff.exitDate)
         : null;
 
     expectedWorkDates.forEach((day: Date) => {

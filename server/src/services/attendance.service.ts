@@ -1,7 +1,6 @@
 import AttendanceEventModel from "../models/attendance-event.model.js";
 import ShiftAssignmentModel from "../models/shift-assignment.model.js";
 import AttendanceDayModel from "../models/attendance-day.model.js";
-import OvertimeModel from "../models/overtime.model.js";
 import type { IShift } from "../types/shift.type.js";
 import StaffModel from "../models/staff.model.js";
 import ShiftOffDateService from "./shift-off-date.service.js";
@@ -304,41 +303,11 @@ async function checkOutInDB({
       if (earlyExitMinutes >= shiftData.halfDayAfterMinutes) {
         attendanceDay.status = "half_day";
       } else if (earlyExitMinutes > 0) {
-        // Only set to early_exit if it was previously present/late,
-        // otherwise keep as half_day if check-in already triggered it.
-        // However, usually we might want to flag it.
-        // For now, let's stick to the requested consistency: if early exit > 0, status could be 'early_exit'
-        // OR we can leave it as 'present' with earlyExitMinutes > 0.
-        // But typically 'early_exit' is a status.
         if (
           attendanceDay.status === "present" ||
           attendanceDay.status === "late"
         ) {
           attendanceDay.status = "early_exit";
-        }
-      }
-      if (attendanceDay.otMinutes > 30) {
-        try {
-          await OvertimeModel.findOneAndUpdate(
-            {
-              staffId,
-              date: dayStart,
-              type: "post_shift",
-            },
-            {
-              $set: {
-                shiftId: attendanceDay.shiftId,
-                startTime: shiftEnd,
-                endTime: now,
-                durationMinutes: attendanceDay.otMinutes,
-                status: "pending",
-                reason: `Auto-generated from checkout at ${now.toLocaleTimeString()}`,
-              },
-            },
-            { upsert: true, new: true },
-          );
-        } catch (otError) {
-          console.error("[OT Auto-Create Error]", otError);
         }
       }
     }
