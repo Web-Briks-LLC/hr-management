@@ -322,17 +322,11 @@ export const payrollApi = apiSlice.injectEndpoints({
                             staff.late = late;
 
                             // Recalculate payable salary
-                            if (staff.workDays > 0) {
-                                const perDay =
-                                    staff.perDaySalary ||
-                                    Math.round(
-                                        (staff.payableSalary + absent * (staff.perDaySalary || 0)) /
-                                            staff.workDays,
-                                    );
-                                staff.payableSalary = Math.round(
-                                    perDay * (staff.workDays - absent),
-                                );
-                            }
+                            const grossSalary = staff.salary || 0;
+                            const perDaySalary = grossSalary / 30; // Fixed divider
+                            staff.payableSalary = Math.round(
+                                Math.max(0, grossSalary - (absent * perDaySalary))
+                            );
                         },
                     ),
                 );
