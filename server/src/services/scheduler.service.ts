@@ -1,24 +1,27 @@
-// import { startOfDay, endOfDay } from 'date-fns';
 import AttendanceDayModel from '../models/attendance-day.model.js';
 import OvertimeModel from '../models/overtime.model.js';
 import LeaveApplicationModel from '../models/leave_application.model.js';
 import ShiftAssignmentModel from '../models/shift-assignment.model.js';
 import StaffModel from '../models/staff.model.js';
 import notificationService from './notification.service.js';
+import {
+    getBDNow,
+    getBDStartOfDay,
+    getBDEndOfDay,
+    getBDWeekDay,
+} from '../utils/date.util.js';
 
 // ============================================
-// ATTENDANCE AUTO-CHECK (Every 30 minutes)
+// ATTENDANCE AUTO-CHECK (Every 10 minutes)
 // ============================================
 
 async function processAttendanceCheck() {
-    const now = new Date();
-    const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-    const todayEnd = new Date(todayStart);
-    todayEnd.setUTCHours(23, 59, 59, 999);
+    const now = getBDNow();
+    const todayStart = getBDStartOfDay(now);
+    const todayEnd = getBDEndOfDay(now);
     
-    // For day of week, we might still want to use local time as shifts are usually local
-    // but we need to stay consistent with how the system views "today"
-    const currentDayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
+    // Day of week in Bangladesh
+    const currentDayOfWeek = getBDWeekDay(now);
 
     let lateCount = 0;
     let absentCount = 0;
@@ -104,7 +107,8 @@ async function processAttendanceCheck() {
                         const [shiftHour, shiftMinute] = assignment.startTime
                             .split(':')
                             .map(Number);
-                        const shiftStartTime = new Date(now);
+                        
+                        const shiftStartTime = getBDStartOfDay(now);
                         shiftStartTime.setHours(shiftHour, shiftMinute, 0, 0);
 
                         const absentThreshold = new Date(
@@ -146,7 +150,8 @@ async function processAttendanceCheck() {
                 const [shiftHour, shiftMinute] = assignment.startTime
                     .split(':')
                     .map(Number);
-                const shiftStartTime = new Date(now);
+                
+                const shiftStartTime = getBDStartOfDay(now);
                 shiftStartTime.setHours(shiftHour, shiftMinute, 0, 0);
 
                 // Calculate thresholds
@@ -222,11 +227,11 @@ async function processAttendanceCheck() {
 }
 
 // ============================================
-// OVERTIME AUTO-CLOSE (Every 30 minutes)
+// OVERTIME AUTO-CLOSE (Every 10 minutes)
 // ============================================
 
 async function processOvertimeAutoClose() {
-    const now = new Date();
+    const now = getBDNow();
     const twelveHoursAgo = new Date(now.getTime() - 12 * 60 * 60 * 1000);
     let closedCount = 0;
 
@@ -316,7 +321,7 @@ async function processOvertimeAutoClose() {
 // ============================================
 
 async function processLeaveExpiry() {
-    const now = new Date();
+    const now = getBDNow();
     let expiredCount = 0;
     let notificationCount = 0;
 
@@ -456,7 +461,7 @@ async function processLeaveExpiry() {
 // SCHEDULER MANAGER
 // ============================================
 
-const THIRTY_MINUTES = 30 * 60 * 1000;
+const TEN_MINUTES = 10 * 60 * 1000;
 const ONE_MINUTE = 60 * 1000;
 
 let attendanceInterval: NodeJS.Timeout | null = null;
@@ -466,23 +471,23 @@ let leaveExpiryInterval: NodeJS.Timeout | null = null;
 function startAllSchedulers() {
     console.log('[Scheduler] Starting all schedulers...');
 
-    // Attendance check - every 30 minutes
+    // Attendance check - every 10 minutes
     processAttendanceCheck().catch(console.error);
     attendanceInterval = setInterval(() => {
         processAttendanceCheck().catch(console.error);
-    }, THIRTY_MINUTES);
-    console.log('[Scheduler] Attendance check: Running every 30 minutes');
+    }, TEN_MINUTES);
+    console.log('[Scheduler] Attendance check: Running every 10 minutes');
 
-    // Overtime auto-close - every 30 minutes
+    // Overtime auto-close - every 10 minutes
     processOvertimeAutoClose().catch(console.error);
     overtimeInterval = setInterval(() => {
         processOvertimeAutoClose().catch(console.error);
-    }, THIRTY_MINUTES);
-    console.log('[Scheduler] Overtime auto-close: Running every 30 minutes');
+    }, TEN_MINUTES);
+    console.log('[Scheduler] Overtime auto-close: Running every 10 minutes');
 
     // Leave expiry - check every minute, but only run at 11:59 PM
     const runLeaveExpiryIfTime = () => {
-        const now = new Date();
+        const now = getBDNow();
         if (now.getHours() === 23 && now.getMinutes() === 59) {
             processLeaveExpiry().catch(console.error);
         }

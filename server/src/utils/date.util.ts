@@ -61,24 +61,17 @@ export function getBDMonthRange(monthYear: string) {
 }
 
 /**
- * Returns the day of the week (0-6) in Bangladesh Time
+ * Returns the day of the week (0-6) in Bangladesh Time.
+ * 0 = Sunday, 1 = Monday, ..., 6 = Saturday
  */
 export function getBDWeekDay(date: Date): number {
-    const parts = new Intl.DateTimeFormat('en-US', {
+    const weekday = new Intl.DateTimeFormat('en-US', {
         timeZone: BD_TIMEZONE,
-        year: 'numeric',
-        month: 'numeric',
-        day: 'numeric',
-    }).formatToParts(date);
+        weekday: 'long',
+    }).format(date);
 
-    const year = Number(parts.find(p => p.type === 'year')?.value);
-    const month = Number(parts.find(p => p.type === 'month')?.value);
-    const day = Number(parts.find(p => p.type === 'day')?.value);
-
-    // This local date (server local) will have the same Y/M/D as BD
-    // and its .getDay() will be correct as long as we don't cross midnights in the server local time.
-    // Actually, just creating a date with Y, M-1, D in local time is safest for getDay().
-    return new Date(year, month - 1, day).getDay();
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    return days.indexOf(weekday);
 }
 
 /**
@@ -95,4 +88,23 @@ export function formatBD(date: Date): string {
         second: '2-digit',
         hour12: true
     }).format(date);
+}
+
+/**
+ * Returns a YYYY-MM-DD string for the given date in Bangladesh Time.
+ */
+export function getBDDateString(date: Date | string | number): string {
+    const d = typeof date === 'string' || typeof date === 'number' ? new Date(date) : date;
+    const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: BD_TIMEZONE,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+    }).formatToParts(d);
+
+    const year = parts.find(p => p.type === 'year')?.value;
+    const month = parts.find(p => p.type === 'month')?.value;
+    const day = parts.find(p => p.type === 'day')?.value;
+
+    return `${year}-${month}-${day}`;
 }

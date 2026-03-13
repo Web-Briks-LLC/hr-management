@@ -8,7 +8,7 @@ import OvertimeModel from '../models/overtime.model.js';
 import { PayrollLockModel } from '../models/payroll-lock.model.js';
 import SalaryAdjustmentLogModel from '../models/salary-adjustment-log.model.js';
 import mongoose, { Types } from 'mongoose';
-import { getBDMonthRange, getBDStartOfDay, getBDNow, getBDWeekDay } from '../utils/date.util.js';
+import { getBDMonthRange, getBDNow, getBDWeekDay, getBDStartOfDay, getBDDateString } from '../utils/date.util.js';
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
@@ -172,29 +172,17 @@ const getPayrollPreview = async ({
         let missingPunches = 0;
         let unemployedDays = 0;
 
-<<<<<<< HEAD
-        if (shift) {
-            const todayBDStr = getBDNow().toISOString().split('T')[0]!;
-            missingPunches = expectedWorkDates.filter((day) => {
-                const dayStr = day.toISOString().split('T')[0]!;
-                if (dayStr >= todayBDStr) return false;
-=======
-        const todayRef = new Date();
-        const todayUTCStr = `${todayRef.getFullYear()}-${String(todayRef.getMonth() + 1).padStart(2, '0')}-${String(todayRef.getDate()).padStart(2, '0')}`;
->>>>>>> 216aa1f5d0c1476d84e92cbbfc1e630b9688085a
+        const todayBDStr = getBDDateString(getBDNow());
 
         const joinStr = staff.joinDate
-            ? `${new Date(staff.joinDate).getFullYear()}-${String(new Date(staff.joinDate).getMonth() + 1).padStart(2, '0')}-${String(new Date(staff.joinDate).getDate()).padStart(2, '0')}`
+            ? getBDDateString(staff.joinDate)
             : null;
         const exitStr = staff.exitDate
-            ? `${new Date(staff.exitDate).getFullYear()}-${String(new Date(staff.exitDate).getMonth() + 1).padStart(2, '0')}-${String(new Date(staff.exitDate).getDate()).padStart(2, '0')}`
+            ? getBDDateString(staff.exitDate)
             : null;
 
         daysInMonth.forEach((day: Date) => {
-            const localYear = day.getFullYear();
-            const localMonth = String(day.getMonth() + 1).padStart(2, '0');
-            const localDate = String(day.getDate()).padStart(2, '0');
-            const dayStr = `${localYear}-${localMonth}-${localDate}`;
+            const dayStr = getBDDateString(day);
 
             // 1. Check if unemployed (strictly before join or after exit)
             const isBeforeJoin = joinStr && dayStr < joinStr;
@@ -207,13 +195,11 @@ const getPayrollPreview = async ({
             // 2. Resolve shift for this specific day
             const dayAssignment = (staffShiftAssignments as any[]).find(
                 (sa) => {
-                    const sD = new Date(sa.startDate);
-                    const s = `${sD.getFullYear()}-${String(sD.getMonth() + 1).padStart(2, '0')}-${String(sD.getDate()).padStart(2, '0')}`;
-                    const eD = sa.endDate ? new Date(sa.endDate) : null;
-                    const e = eD
-                        ? `${eD.getFullYear()}-${String(eD.getMonth() + 1).padStart(2, '0')}-${String(eD.getDate()).padStart(2, '0')}`
+                    const s = getBDDateString(sa.startDate);
+                    const e = sa.endDate
+                        ? getBDDateString(sa.endDate)
                         : '9999-12-31';
-                    return dayStr >= s && dayStr <= e;
+                    return dayStr >= s && dayStr <= e!;
                 },
             );
 
@@ -221,15 +207,14 @@ const getPayrollPreview = async ({
             if (!shift) return;
 
             // 3. Check if it's a work day
-            if (shift.workDays.includes(day.getDay())) {
+            if (shift.workDays.includes(getBDWeekDay(day))) {
                 workDaysCount++;
                 expectedWorkDates.push(day);
 
                 // 4. Check for missing punch
-                if (dayStr < todayUTCStr) {
+                if (dayStr < todayBDStr) {
                     const hasRecord = staffAttendance.some((a: any) => {
-                        const aD = new Date(a.date);
-                        const aStr = `${aD.getFullYear()}-${String(aD.getMonth() + 1).padStart(2, '0')}-${String(aD.getDate()).padStart(2, '0')}`;
+                        const aStr = new Date(a.date).toISOString().split('T')[0]!;
                         return aStr === dayStr;
                     });
                     if (!hasRecord) {
@@ -414,35 +399,15 @@ const processPayroll = async ({
             let workDaysCount = 0;
             let unemployedDays = 0;
             let missingPunches = 0;
-<<<<<<< HEAD
-            const todayBD = getBDStartOfDay();
-
-            if (shift) {
-                missingPunches = expectedWorkDates.filter((day) => {
-                    if (day.getTime() > todayBD.getTime()) return false;
-=======
-
-            const todayUTC = new Date(
-                Date.UTC(
-                    new Date().getUTCFullYear(),
-                    new Date().getUTCMonth(),
-                    new Date().getUTCDate(),
-                ),
-            );
-            const todayUTCStr = todayUTC.toISOString().split('T')[0]!;
+            
+            const todayBDStr = getBDDateString(getBDNow());
 
             daysInMonth.forEach((day: Date) => {
-                const localYear = day.getFullYear();
-                const localMonth = String(day.getMonth() + 1).padStart(2, '0');
-                const localDate = String(day.getDate()).padStart(2, '0');
-                const dayStr = `${localYear}-${localMonth}-${localDate}`;
->>>>>>> 216aa1f5d0c1476d84e92cbbfc1e630b9688085a
+                const dayStr = getBDDateString(day);
 
                 // 1. Check unemployed
-                const isBeforeJoin =
-                    joinDate && day.getTime() < joinDate.getTime();
-                const isAfterExit =
-                    exitDate && day.getTime() > exitDate.getTime();
+                const isBeforeJoin = joinDate && dayStr < getBDDateString(joinDate);
+                const isAfterExit = exitDate && dayStr > getBDDateString(exitDate);
                 if (isBeforeJoin || isAfterExit) {
                     unemployedDays++;
                     return;
@@ -450,9 +415,9 @@ const processPayroll = async ({
 
                 // 2. Resolve shift
                 const dayAssignment = (allAssignments as any[]).find((sa) => {
-                    const s = sa.startDate.toISOString().split('T')[0]!;
+                    const s = getBDDateString(sa.startDate);
                     const e = sa.endDate
-                        ? sa.endDate.toISOString().split('T')[0]
+                        ? getBDDateString(sa.endDate)
                         : '9999-12-31';
                     return dayStr >= s && dayStr <= e;
                 });
@@ -461,15 +426,14 @@ const processPayroll = async ({
                 if (!shift) return;
 
                 // 3. Work day
-                if (shift.workDays.includes(day.getDay())) {
+                if (shift.workDays.includes(getBDWeekDay(day))) {
                     workDaysCount++;
                     expectedWorkDates.push(day);
 
                     // 4. Missing punch
-                    if (dayStr < todayUTCStr) {
+                    if (dayStr < todayBDStr) {
                         const hasRecord = allAttendance.some((a: any) => {
-                            const aD = new Date(a.date);
-                            const aStr = `${aD.getFullYear()}-${String(aD.getMonth() + 1).padStart(2, '0')}-${String(aD.getDate()).padStart(2, '0')}`;
+                            const aStr = new Date(a.date).toISOString().split('T')[0]!;
                             return aStr === dayStr;
                         });
                         if (!hasRecord) {
@@ -695,22 +659,24 @@ const graceAttendance = async (
 ) => {
     const updatedRecords = [];
 
-    const shiftAssignment = await ShiftAssignmentModel.findOne({
-        staffId,
-        isActive: true,
-    });
+    // Parse month from first date to get relevant shift assignments
+    if (!dates || dates.length === 0) return [];
+    const firstDate = new Date(dates[0]!);
+    const monthStr = getBDDateString(firstDate).split('-').slice(0, 2).join('-');
+    const { startDate, endDate } = parseMonthRange(monthStr);
 
-    if (!shiftAssignment) {
-        throw new Error('Staff does not have an active shift assignment.');
-    }
+    const allAssignments = await ShiftAssignmentModel.find({
+        staffId,
+        $or: [{ endDate: null }, { endDate: { $gte: startDate } }],
+        startDate: { $lte: endDate },
+    }).populate('shiftId').lean();
 
     for (const date of dates) {
         const targetDate = new Date(date);
-        const y = targetDate.getUTCFullYear();
-        const m = targetDate.getUTCMonth();
-        const d = targetDate.getUTCDate();
-        const start = new Date(Date.UTC(y, m, d, 0, 0, 0, 0));
-        const end = new Date(Date.UTC(y, m, d, 23, 59, 59, 999));
+        const dayStr = getBDDateString(targetDate);
+        const start = getBDStartOfDay(targetDate);
+        const end = new Date(start);
+        end.setHours(23, 59, 59, 999);
 
         const attendance = await AttendanceDayModel.findOne({
             staffId,
@@ -726,10 +692,24 @@ const graceAttendance = async (
             await attendance.save();
             updatedRecords.push(attendance);
         } else {
-            // Missing punch record -> upsert
+            // Find shift for this specific day
+            const dayAssignment = (allAssignments as any[]).find((sa) => {
+                const s = new Date(sa.startDate).toISOString().split('T')[0]!;
+                const saEnd = sa.endDate;
+                const e = saEnd
+                    ? new Date(saEnd).toISOString().split('T')[0]
+                    : '9999-12-31';
+                return dayStr >= s && dayStr <= e!;
+            });
+
+            if (!dayAssignment) {
+                // Skip if no shift found
+                continue; 
+            }
+
             const newAttendance = await AttendanceDayModel.create({
                 staffId: new Types.ObjectId(staffId),
-                shiftId: shiftAssignment.shiftId,
+                shiftId: dayAssignment.shiftId,
                 date: start,
                 status: 'present',
                 totalMinutes: 0,
@@ -767,20 +747,18 @@ const getAbsentDates = async (staffId: string, month: string) => {
     const expectedWorkDates: Date[] = [];
 
     daysInMonth.forEach((day: Date) => {
-        const localYear = day.getFullYear();
-        const localMonth = String(day.getMonth() + 1).padStart(2, '0');
-        const localDate = String(day.getDate()).padStart(2, '0');
-        const dayStr = `${localYear}-${localMonth}-${localDate}`;
+        const dayStr = getBDDateString(day);
         const dayAssignment = (allAssignments as any[]).find((sa) => {
-            const s = sa.startDate.toISOString().split('T')[0]!;
-            const e = sa.endDate
-                ? sa.endDate.toISOString().split('T')[0]
+            const s = getBDDateString(sa.startDate);
+            const saEnd = sa.endDate;
+            const e = saEnd
+                ? getBDDateString(saEnd)
                 : '9999-12-31';
-            return dayStr >= s && dayStr <= e;
+            return dayStr >= s && dayStr <= e!;
         });
 
         const shift: any = dayAssignment?.shiftId;
-        if (shift && shift.workDays.includes(day.getDay())) {
+        if (shift && shift.workDays.includes(getBDWeekDay(day))) {
             expectedWorkDates.push(day);
         }
     });
@@ -795,42 +773,11 @@ const getAbsentDates = async (staffId: string, month: string) => {
 
     const literalAbsents = allAttendance
         .filter((a) => a.status === 'absent')
-<<<<<<< HEAD
-        .map((a) => ({ date: a.date, status: 'absent' }));
-
-    const expectedWorkDates: Date[] = [];
-    if (shift) {
-        const daysInMonth = eachDayOfInterval({
-            start: startDate,
-            end: endDate,
-        });
-        daysInMonth.forEach((day) => {
-            if (shift.workDays.includes(getBDWeekDay(day))) {
-                expectedWorkDates.push(day);
-            }
-        });
-    }
-
-    const missingPunches: { date: Date; status: string }[] = [];
-    const joinDate = staff.joinDate ? new Date(staff.joinDate) : null;
-    const exitDate = staff.exitDate ? new Date(staff.exitDate) : null;
-    const todayBD = getBDStartOfDay();
-
-    if (shift) {
-        expectedWorkDates.forEach((day) => {
-            if (day > todayBD) return;
-=======
         .map((a: any) => ({ date: a.date, status: 'absent' }));
 
     const missingPunches: { date: Date; status: string }[] = [];
-    const todayUTC = new Date(
-        Date.UTC(
-            new Date().getUTCFullYear(),
-            new Date().getUTCMonth(),
-            new Date().getUTCDate(),
-        ),
-    );
-    const todayUTCStr = todayUTC.toISOString().split('T')[0]!;
+    const todayBDStr = getBDNow().toISOString().split('T')[0]!;
+    
     const joinStr = staff.joinDate
         ? new Date(staff.joinDate).toISOString().split('T')[0]
         : null;
@@ -839,19 +786,15 @@ const getAbsentDates = async (staffId: string, month: string) => {
         : null;
 
     expectedWorkDates.forEach((day: Date) => {
-        const localYear = day.getFullYear();
-        const localMonth = String(day.getMonth() + 1).padStart(2, '0');
-        const localDate = String(day.getDate()).padStart(2, '0');
-        const dayStr = `${localYear}-${localMonth}-${localDate}`;
-        if (dayStr >= todayUTCStr) return;
->>>>>>> 216aa1f5d0c1476d84e92cbbfc1e630b9688085a
+        const dayStr = getBDDateString(day);
+        if (dayStr >= todayBDStr) return;
 
         const isBeforeJoin = joinStr && dayStr < joinStr;
         const isAfterExit = exitStr && dayStr > exitStr;
         if (isBeforeJoin || isAfterExit) return;
 
         const hasRecord = allAttendance.some(
-            (a: any) => new Date(a.date).toISOString().split('T')[0] === dayStr,
+            (a: any) => getBDDateString(a.date) === dayStr,
         );
 
         if (!hasRecord) {
