@@ -11,7 +11,8 @@ export interface ICalendarDay {
         | "off_day"
         | "unemployed"
         | "future"
-        | "weekend";
+        | "weekend"
+        | string;
     shiftStart?: string | null;  // "09:00"
     shiftEnd?: string | null;    // "18:00"
     checkInAt?: string | null;   // ISO string
@@ -26,14 +27,16 @@ export interface IPayrollItem {
     image: string;
 
     // Statuses
-    status: "paid" | "pending" | "partially_paid";
-    otStatus: "paid" | "pending";
+    status: "paid" | "pending" | "partially_paid" | string;
+    otStatus: "paid" | "pending" | string;
 
     // Salary Data
     salary: number;
     payableSalary: number;
     paidAmount: number;
     perDaySalary: number;
+    expenseId?: string | null;
+    paidDate?: string | null;
 
     // Attendance Data
     workDays: number;
@@ -60,4 +63,23 @@ export interface IPayrollItem {
 
     // Calendar
     calendar?: ICalendarDay[];
+}
+
+export interface IPayrollLock {
+    _id: string;
+    month: string;
+    lockedBy: string | { name: string; _id: string };
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface IAttendanceRecord {
+    _id: string;
+    staffId: string;
+    shiftId: string;
+    date: string;
+    status: string;
+    isManual: boolean;
+    notes?: string;
+    processedAt: string;
 }

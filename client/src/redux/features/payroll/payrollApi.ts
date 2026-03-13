@@ -1,9 +1,60 @@
 import { apiSlice } from "@/redux/api/apiSlice";
+import { IPayrollItem, IPayrollLock, IAttendanceRecord } from "@/types/payroll.type";
+
+export interface IPayrollPreviewResponse {
+    success: boolean;
+    data: {
+        staffs: IPayrollItem[];
+    };
+}
+
+export interface IProcessPaymentRequest {
+    staffId: string;
+    month: string;
+    amount: number;
+    paymentMethod: string;
+    paymentType: string;
+    branchId?: string;
+    note?: string;
+    bonus?: number;
+    deduction?: number;
+    createdBy: string;
+}
+
+export interface IBulkProcessPaymentRequest {
+    month: string;
+    payments: {
+        staffId: string;
+        amount: number;
+        bonus?: number;
+        deduction?: number;
+        note?: string;
+    }[];
+    paymentMethod: string;
+    paymentType: string;
+    createdBy: string;
+    branchId?: string;
+}
+
+export interface IUndoPaymentRequest {
+    staffId: string;
+    month: string;
+    paymentType: string;
+    branchId?: string;
+}
+
+export interface ISetAttendanceRequest {
+    staffId: string;
+    date: string;
+    status: string;
+    month: string;
+    branchId?: string;
+}
 
 export const payrollApi = apiSlice.injectEndpoints({
     endpoints: (builder) => ({
         getPayrollPreview: builder.query<
-            any,
+            IPayrollPreviewResponse,
             { month: string; branchId?: string }
         >({
             query: ({ month, branchId }) => ({
@@ -11,24 +62,13 @@ export const payrollApi = apiSlice.injectEndpoints({
                 params: { month, branchId: branchId || "all" },
             }),
             providesTags: (_result, _error, { month, branchId }) => [
-                { type: "Payroll" as any, id: `${month}-${branchId || "all"}` },
+                { type: "Payroll", id: `${month}-${branchId || "all"}` },
             ],
         }),
 
         processPayment: builder.mutation<
-            any,
-            {
-                staffId: string;
-                month: string;
-                amount: number;
-                paymentMethod: string;
-                paymentType: string;
-                branchId?: string;
-                note?: string;
-                bonus?: number;
-                deduction?: number;
-                createdBy: string;
-            }
+            { success: boolean; message: string },
+            IProcessPaymentRequest
         >({
             query: (data) => ({
                 url: "/payroll/process",
@@ -40,11 +80,11 @@ export const payrollApi = apiSlice.injectEndpoints({
                     payrollApi.util.updateQueryData(
                         "getPayrollPreview",
                         { month: arg.month, branchId: arg.branchId },
-                        (draft: any) => {
-                            const data = draft?.data?.staffs || draft?.data || draft;
-                            if (!Array.isArray(data)) return;
-                            const item = data.find(
-                                (s: any) =>
+                        (draft) => {
+                            const staffs = draft?.data?.staffs;
+                            if (!Array.isArray(staffs)) return;
+                            const item = staffs.find(
+                                (s) =>
                                     (s._id || s.staffId)?.toString() ===
                                     arg.staffId,
                             );
@@ -69,21 +109,8 @@ export const payrollApi = apiSlice.injectEndpoints({
         }),
 
         bulkProcessPayment: builder.mutation<
-            any,
-            {
-                month: string;
-                payments: {
-                    staffId: string;
-                    amount: number;
-                    bonus?: number;
-                    deduction?: number;
-                    note?: string;
-                }[];
-                paymentMethod: string;
-                paymentType: string;
-                createdBy: string;
-                branchId?: string;
-            }
+            { success: boolean; message: string },
+            IBulkProcessPaymentRequest
         >({
             query: (data) => ({
                 url: "/payroll/bulk-process",
@@ -95,12 +122,12 @@ export const payrollApi = apiSlice.injectEndpoints({
                     payrollApi.util.updateQueryData(
                         "getPayrollPreview",
                         { month: arg.month, branchId: arg.branchId },
-                        (draft: any) => {
-                            const data = draft?.data?.staffs || draft?.data || draft;
-                            if (!Array.isArray(data)) return;
+                        (draft) => {
+                            const staffs = draft?.data?.staffs;
+                            if (!Array.isArray(staffs)) return;
                             arg.payments.forEach((payment) => {
-                                const item = data.find(
-                                    (s: any) =>
+                                const item = staffs.find(
+                                    (s) =>
                                         (s._id || s.staffId)?.toString() ===
                                         payment.staffId,
                                 );
@@ -126,13 +153,8 @@ export const payrollApi = apiSlice.injectEndpoints({
         }),
 
         undoPayment: builder.mutation<
-            any,
-            {
-                staffId: string;
-                month: string;
-                paymentType: string;
-                branchId?: string;
-            }
+            { success: boolean; message: string },
+            IUndoPaymentRequest
         >({
             query: (data) => ({
                 url: "/payroll/undo",
@@ -144,11 +166,11 @@ export const payrollApi = apiSlice.injectEndpoints({
                     payrollApi.util.updateQueryData(
                         "getPayrollPreview",
                         { month: arg.month, branchId: arg.branchId },
-                        (draft: any) => {
-                            const data = draft?.data?.staffs || draft?.data || draft;
-                            if (!Array.isArray(data)) return;
-                            const item = data.find(
-                                (s: any) =>
+                        (draft) => {
+                            const staffs = draft?.data?.staffs;
+                            if (!Array.isArray(staffs)) return;
+                            const item = staffs.find(
+                                (s) =>
                                     (s._id || s.staffId)?.toString() ===
                                     arg.staffId,
                             );
@@ -174,22 +196,29 @@ export const payrollApi = apiSlice.injectEndpoints({
         }),
 
         graceAttendance: builder.mutation<
-            any,
+            { success: boolean; message: string },
             {
                 staffId: string;
                 dates: string[];
                 note?: string;
+                month: string;
+                branchId?: string;
             }
         >({
             query: (data) => ({
                 url: "/payroll/grace",
                 method: "POST",
-                body: data,
+                body: { staffId: data.staffId, dates: data.dates, note: data.note },
             }),
-            invalidatesTags: ["Payroll" as any],
+            invalidatesTags: (_result, _error, { month, branchId }) => [
+                { type: "Payroll", id: `${month}-${branchId || "all"}` },
+            ],
         }),
 
-        getAbsentDates: builder.query<any, { staffId: string; month: string }>({
+        getAbsentDates: builder.query<
+            { success: boolean; data: string[] },
+            { staffId: string; month: string }
+        >({
             query: ({ staffId, month }) => ({
                 url: "/payroll/absent-dates",
                 params: { staffId, month },
@@ -199,7 +228,7 @@ export const payrollApi = apiSlice.injectEndpoints({
         // ─── Payroll Lock ────────────────────────────────────────────
 
         getLockStatus: builder.query<
-            { success: boolean; data: { isLocked: boolean; lock: any } },
+            { success: boolean; data: { isLocked: boolean; lock: IPayrollLock | null } },
             { month: string }
         >({
             query: ({ month }) => ({
@@ -207,41 +236,37 @@ export const payrollApi = apiSlice.injectEndpoints({
                 params: { month },
             }),
             providesTags: (_result, _error, { month }) => [
-                { type: "PayrollLock" as any, id: month },
+                { type: "PayrollLock", id: month },
             ],
         }),
 
-        lockMonth: builder.mutation<any, { month: string }>({
+        lockMonth: builder.mutation<{ success: boolean; data: IPayrollLock }, { month: string }>({
             query: (data) => ({
                 url: "/payroll/lock",
                 method: "POST",
                 body: data,
             }),
             invalidatesTags: (_result, _error, { month }) => [
-                { type: "PayrollLock" as any, id: month },
+                { type: "PayrollLock", id: month },
+                { type: "Payroll" },
             ],
         }),
 
-        unlockMonth: builder.mutation<any, { month: string }>({
+        unlockMonth: builder.mutation<{ success: boolean; data: IPayrollLock }, { month: string }>({
             query: (data) => ({
                 url: "/payroll/unlock",
                 method: "POST",
                 body: data,
             }),
             invalidatesTags: (_result, _error, { month }) => [
-                { type: "PayrollLock" as any, id: month },
+                { type: "PayrollLock", id: month },
+                { type: "Payroll" },
             ],
         }),
 
         setAttendance: builder.mutation<
-            any,
-            {
-                staffId: string;
-                date: string;
-                status: string;
-                month: string;
-                branchId?: string;
-            }
+            { success: boolean; data: IAttendanceRecord },
+            ISetAttendanceRequest
         >({
             query: ({ staffId, date, status }) => ({
                 url: "/payroll/set-attendance",
@@ -261,12 +286,11 @@ export const payrollApi = apiSlice.injectEndpoints({
                     payrollApi.util.updateQueryData(
                         "getPayrollPreview",
                         cacheKey,
-                        (draft: any) => {
-                            const staffs =
-                                draft?.data?.staffs || draft?.data || draft;
+                        (draft) => {
+                            const staffs = draft?.data?.staffs;
                             if (!Array.isArray(staffs)) return;
                             const staff = staffs.find(
-                                (s: any) =>
+                                (s) =>
                                     (s._id || s.staffId)?.toString() ===
                                     staffId,
                             );
@@ -274,7 +298,7 @@ export const payrollApi = apiSlice.injectEndpoints({
 
                             // Patch the day cell
                             const day = staff.calendar.find(
-                                (d: any) => d.date === date,
+                                (d) => d.date === date,
                             );
                             if (day) {
                                 day.status = status;
@@ -320,7 +344,7 @@ export const payrollApi = apiSlice.injectEndpoints({
             },
             invalidatesTags: (_result, _error, { month, branchId }) => [
                 {
-                    type: "Payroll" as any,
+                    type: "Payroll",
                     id: `${month}-${branchId || "all"}`,
                 },
             ],

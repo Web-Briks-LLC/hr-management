@@ -214,7 +214,7 @@ const getPayrollPreview = async ({
                 // 4. Check for missing punch
                 if (dayStr < todayBDStr) {
                     const hasRecord = staffAttendance.some((a: any) => {
-                        const aStr = new Date(a.date).toISOString().split('T')[0]!;
+                        const aStr = getBDDateString(new Date(a.date));
                         return aStr === dayStr;
                     });
                     if (!hasRecord) {
