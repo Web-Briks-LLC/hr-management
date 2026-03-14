@@ -76,6 +76,22 @@ interface IStaffListItem {
     };
 }
 
+interface IAttendanceRecord {
+    _id: string;
+    staffId: {
+        _id: string;
+        staffId: string;
+        name: string;
+        designation: string;
+        department: string;
+        userId: string;
+    };
+    date: string;
+    status: string;
+    checkInAt?: string;
+    checkOutAt?: string;
+}
+
 const statusOptions = [
     {
         value: "all",
@@ -309,20 +325,23 @@ export default function AttendancePage() {
             page: 1,
             limit: 1000,
         });
-    const { data: attendanceableData, isLoading: isAttendanceableLoading } =
-        useGetStaffsQuery({
-            page: 1,
-            limit: 1000,
-            status: "active",
-            excludeAdmins: true,
-        });
 
     const totalMembers =
         totalMembersData?.meta?.total || totalMembersData?.staffs?.length || 0;
-    const attendanceableStaffs = attendanceableData?.staffs || [];
-    const attendanceableCount =
-        attendanceableData?.meta?.total || attendanceableStaffs.length || 0;
     const allStaffs = totalMembersData?.staffs || [];
+
+    // Today's attendance for Checked-in Staffs tab
+    const { data: todayAttendanceData, isLoading: isTodayAttendanceLoading } =
+        useGetAllAttendanceQuery({
+            startDate: format(new Date(), "yyyy-MM-dd"),
+            endDate: format(new Date(), "yyyy-MM-dd"),
+            limit: 1000,
+        });
+
+    const todayRecords = (todayAttendanceData?.data?.records ||
+        []) as IAttendanceRecord[];
+    const checkedInStaffs = todayRecords.filter((r) => r.checkInAt);
+    const checkedInCount = checkedInStaffs.length;
 
     return (
         <div className="p-6 space-y-6">
@@ -371,28 +390,28 @@ export default function AttendancePage() {
                             </Badge>
                         </TabsTrigger>
                         <TabsTrigger
-                            value="attendanceable-staffs"
+                            value="headcount"
                             className={cn(
                                 "flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium transition-all duration-200",
-                                activeTab === "attendanceable-staffs"
+                                activeTab === "headcount"
                                     ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-700 dark:text-emerald-300"
                                     : "bg-muted/50 border-border/60 hover:bg-muted",
                             )}
                         >
                             <UserCheck className="h-4 w-4" />
-                            Attendanceable Staffs
+                            Headcount
                             <Badge
                                 variant="secondary"
                                 className={cn(
                                     "font-mono text-[10px] px-1.5 py-0 h-4",
-                                    activeTab === "attendanceable-staffs"
+                                    activeTab === "headcount"
                                         ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300"
                                         : "bg-muted-foreground/10",
                                 )}
                             >
-                                {isAttendanceableLoading
+                                {isTodayAttendanceLoading
                                     ? "..."
-                                    : attendanceableCount}
+                                    : checkedInCount}
                             </Badge>
                         </TabsTrigger>
                     </TabsList>
@@ -1236,17 +1255,17 @@ export default function AttendancePage() {
                     </Card>
                 </TabsContent>
 
-                <TabsContent value="attendanceable-staffs" className="mt-0">
+                <TabsContent value="headcount" className="mt-0">
                     <Card className="border-border/60 shadow-md">
                         <CardHeader className="pb-3">
                             <CardTitle className="flex items-center gap-2 text-xl">
                                 <UserCheck className="h-5 w-5 text-emerald-500" />
-                                Attendanceable Staffs
+                                Headcount
                                 <Badge
                                     variant="secondary"
                                     className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 font-mono"
                                 >
-                                    {attendanceableCount}
+                                    {checkedInCount}
                                 </Badge>
                             </CardTitle>
                         </CardHeader>
@@ -1262,16 +1281,13 @@ export default function AttendancePage() {
                                                 Name
                                             </TableHead>
                                             <TableHead className="font-semibold">
-                                                Email
-                                            </TableHead>
-                                            <TableHead className="font-semibold">
                                                 Designation
                                             </TableHead>
                                             <TableHead className="font-semibold">
                                                 Department
                                             </TableHead>
                                             <TableHead className="font-semibold">
-                                                Role
+                                                Check In
                                             </TableHead>
                                             <TableHead className="font-semibold">
                                                 Status
@@ -1279,12 +1295,12 @@ export default function AttendancePage() {
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {isAttendanceableLoading ? (
+                                        {isTodayAttendanceLoading ? (
                                             Array.from({ length: 5 }).map(
                                                 (_, i) => (
                                                     <TableRow key={i}>
                                                         {Array.from({
-                                                            length: 7,
+                                                            length: 6,
                                                         }).map((_, j) => (
                                                             <TableCell key={j}>
                                                                 <Skeleton className="h-4 w-[80px]" />
@@ -1293,70 +1309,71 @@ export default function AttendancePage() {
                                                     </TableRow>
                                                 ),
                                             )
-                                        ) : attendanceableStaffs.length ===
-                                          0 ? (
+                                        ) : checkedInStaffs.length === 0 ? (
                                             <TableRow>
                                                 <TableCell
-                                                    colSpan={7}
+                                                    colSpan={6}
                                                     className="text-center py-16 text-muted-foreground"
                                                 >
                                                     <div className="flex flex-col items-center gap-3">
                                                         <UserCheck className="h-10 w-10 text-muted-foreground/30" />
                                                         <p className="text-base font-medium">
-                                                            No attendanceable
-                                                            staffs found
+                                                            No one has checked in today yet
                                                         </p>
                                                     </div>
                                                 </TableCell>
                                             </TableRow>
                                         ) : (
-                                            attendanceableStaffs.map(
-                                                (staff: IStaffListItem) => (
+                                            checkedInStaffs.map(
+                                                (record: IAttendanceRecord) => (
                                                     <TableRow
-                                                        key={staff._id}
+                                                        key={record._id}
                                                         className="hover:bg-muted/30"
                                                     >
                                                         <TableCell className="font-mono text-sm">
-                                                            {staff.staffId ||
+                                                            {record.staffId?.staffId ||
                                                                 "-"}
                                                         </TableCell>
                                                         <TableCell className="font-medium">
                                                             <div className="text-sm font-semibold">
-                                                                {staff.user
-                                                                    ?.name ||
+                                                                {record.staffId?.name ||
                                                                     "Unknown"}
                                                             </div>
                                                         </TableCell>
                                                         <TableCell className="text-sm text-muted-foreground">
-                                                            {staff.user
-                                                                ?.email || "-"}
-                                                        </TableCell>
-                                                        <TableCell className="text-sm text-muted-foreground">
-                                                            {staff.designation ||
+                                                            {record.staffId?.designation ||
                                                                 "-"}
                                                         </TableCell>
                                                         <TableCell className="text-sm text-muted-foreground">
-                                                            {staff.department ||
+                                                            {record.staffId?.department ||
                                                                 "-"}
+                                                        </TableCell>
+                                                        <TableCell className="text-sm font-mono text-muted-foreground">
+                                                            {record.checkInAt
+                                                                ? format(
+                                                                      new Date(
+                                                                          record.checkInAt,
+                                                                      ),
+                                                                      "hh:mm a",
+                                                                  )
+                                                                : "-"}
                                                         </TableCell>
                                                         <TableCell>
                                                             <Badge
                                                                 variant="outline"
-                                                                className="capitalize font-medium shadow-none"
+                                                                className={cn(
+                                                                    "capitalize font-medium shadow-none",
+                                                                    statusOptions.find(
+                                                                        (o) =>
+                                                                            o.value ===
+                                                                            record.status,
+                                                                    )?.color,
+                                                                )}
                                                             >
-                                                                {staff.user?.role?.replace(
+                                                                {record.status?.replace(
                                                                     "_",
                                                                     " ",
                                                                 ) || "-"}
-                                                            </Badge>
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            <Badge
-                                                                variant="outline"
-                                                                className="capitalize font-medium shadow-none text-green-600"
-                                                            >
-                                                                {staff.status ||
-                                                                    "-"}
                                                             </Badge>
                                                         </TableCell>
                                                     </TableRow>
