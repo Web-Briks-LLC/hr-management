@@ -12,6 +12,7 @@ export interface IInvoiceRecord {
     dueDate: Date;
     paymentStatus: "pending" | "paid" | "failed";
     paymentToken?: string; // Secure token for payment verification
+    pendingPaymentIntentId?: string | null; // Temporarily stores Stripe Intent ID for confirmation verification
     items: Array<{
         name: string;
         price: number;
@@ -46,6 +47,7 @@ const invoiceRecordSchema = new Schema<IInvoiceRecord>(
             default: "pending",
         },
         paymentToken: { type: String, unique: true, sparse: true },
+        pendingPaymentIntentId: { type: String },
         items: [
             {
                 name: { type: String, required: true },

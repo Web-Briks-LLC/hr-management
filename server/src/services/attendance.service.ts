@@ -90,9 +90,13 @@ const checkInInDB = async ({
   const [h, m] = shift.startTime.split(":");
   shiftStart.setHours(Number(h), Number(m), 0, 0);
 
-  const shiftEnd = new Date(now);
+  const shiftEnd = new Date(shiftStart);
   const [eh, em] = shift.endTime.split(":");
   shiftEnd.setHours(Number(eh), Number(em), 0, 0);
+
+  if (shiftEnd <= shiftStart) {
+    shiftEnd.setDate(shiftEnd.getDate() + 1);
+  }
 
   // Allow 15 minutes buffer before shift start
   const EARLY_BUFFER_MINUTES = 15;
@@ -285,9 +289,19 @@ async function checkOutInDB({
   if (shiftAssignment?.shiftId) {
     const shiftData = shiftAssignment.shiftId as unknown as IShift;
 
-    const shiftEnd = new Date(now);
+    const baseDate = new Date(attendanceDay.date);
+
+    const shiftStart = new Date(baseDate);
+    const [sh, sm] = shiftData.startTime.split(":");
+    shiftStart.setHours(Number(sh), Number(sm), 0, 0);
+
+    const shiftEnd = new Date(baseDate);
     const [eh, em] = shiftData.endTime.split(":");
     shiftEnd.setHours(Number(eh), Number(em), 0, 0);
+
+    if (shiftEnd <= shiftStart) {
+      shiftEnd.setDate(shiftEnd.getDate() + 1);
+    }
 
     if (now > shiftEnd) {
       const otMinutes = Math.round(

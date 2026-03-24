@@ -180,12 +180,36 @@ export const confirmPayment = async (
                 const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
                 if (paymentIntent.status === 'succeeded') {
                     // Check if intent belongs to this invoice
-                    if (paymentIntent.metadata.invoiceNumber !== invoiceNumber) {
+                    if (paymentIntent.metadata.invoiceNumber !== String(invoiceNumber)) {
                         console.error(`[Payment] STRIPE INVOICE MISMATCH: ${paymentIntentId}`);
                         await session.abortTransaction();
                         session.endSession();
                         return res.status(400).json({ error: 'Payment reference does not match this invoice' });
                     }
+
+                    if (paymentIntent.id !== invoice.pendingPaymentIntentId) {
+                        console.error(`[Payment] STRIPE INTENT MISMATCH: Expected ${invoice.pendingPaymentIntentId}, got ${paymentIntent.id}`);
+                        await session.abortTransaction();
+                        session.endSession();
+                        return res.status(400).json({ error: 'Payment intent mismatch' });
+                    }
+
+                    const expectedAmount = Math.round(invoice.totalAmount * 100);
+                    if (paymentIntent.amount !== expectedAmount) {
+                        console.error(`[Payment] STRIPE AMOUNT MISMATCH: Expected ${expectedAmount}, got ${paymentIntent.amount}`);
+                        await session.abortTransaction();
+                        session.endSession();
+                        return res.status(400).json({ error: 'Payment amount mismatch' });
+                    }
+
+                    const expectedCurrency = (invoice.currency || 'usd').toLowerCase();
+                    if (paymentIntent.currency.toLowerCase() !== expectedCurrency) {
+                        console.error(`[Payment] STRIPE CURRENCY MISMATCH: Expected ${expectedCurrency}, got ${paymentIntent.currency}`);
+                        await session.abortTransaction();
+                        session.endSession();
+                        return res.status(400).json({ error: 'Payment currency mismatch' });
+                    }
+
                     verified = true;
                 }
             } catch (err) {
@@ -235,6 +259,7 @@ export const confirmPayment = async (
             // 3. Mark Invoice as Paid
             invoice.paymentStatus = 'paid';
             invoice.paymentToken = paymentIntentId || paypalOrderId;
+            invoice.pendingPaymentIntentId = null;
             await invoice.save({ session });
 
             // 4. Update Earning Record
