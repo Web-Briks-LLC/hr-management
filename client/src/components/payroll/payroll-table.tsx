@@ -10,14 +10,17 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   Ban,
   Banknote,
   Loader2,
-  User,
-  CheckCheck,
   Pencil,
   RefreshCcw,
   Search,
@@ -317,15 +320,9 @@ export default function PayrollTable({
                   <TableRow
                     key={row._id}
                     className={cn(
-                      "cursor-pointer transition-colors hover:bg-muted/20",
+                      "transition-colors hover:bg-muted/20",
                       selectedStaffIds.includes(row._id) ? "bg-muted/30" : "",
                     )}
-                    onClick={() =>
-                      setCalendarStaff({
-                        id: row._id,
-                        name: row.name,
-                      })
-                    }
                   >
                     {isSelectMode && (
                       <TableCell>
@@ -337,23 +334,13 @@ export default function PayrollTable({
                       </TableCell>
                     )}
                     <TableCell>
-                      <div className="flex items-center gap-3">
-                        <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                        <Avatar className="h-9 w-9 border">
-                          <AvatarImage src={row.image} alt={row.name} />
-                          <AvatarFallback>
-                            <User className="h-4 w-4" />
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <div className="font-medium">{row.name}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {row.bankName || "N/A"} - {row.branch || "N/A"}
-                          </div>
-                          <div className="text-[10px] text-muted-foreground font-mono bg-muted/60 px-1.5 py-0.5 rounded w-fit mt-1">
-                            {row.bank?.accountNumber || "N/A"}
-                          </div>
-                        </div>
+                      <div className="flex flex-col">
+                        <span className="font-medium">{row.name}</span>
+                        <span className="text-xs text-muted-foreground mt-0.5">
+                          Shift: {row.calendar?.find(c => c.shiftStart && c.shiftEnd) 
+                                   ? `${row.calendar.find(c => c.shiftStart && c.shiftEnd)!.shiftStart} - ${row.calendar.find(c => c.shiftStart && c.shiftEnd)!.shiftEnd}`
+                                   : "No Shift Assigned"}
+                        </span>
                       </div>
                     </TableCell>
                     <TableCell className="text-center">
@@ -368,38 +355,16 @@ export default function PayrollTable({
                     <TableCell className="text-right font-mono text-xs">
                       {row.perDaySalary}
                     </TableCell>
-                    <TableCell className="text-right group relative">
+                    <TableCell className="text-right">
                       <div className="flex flex-col items-end">
-                        <div className="flex items-center gap-2">
-                          {!isPaid && !isLocked && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setEditParams({
-                                  open: true,
-                                  staffId: row._id,
-                                  staffName: row.name,
-                                  baseAmount:
-                                    adjustments[row._id]?.baseAmount ??
-                                    row.payableSalary,
-                                  mode: "pay",
-                                });
-                              }}
-                              className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-muted rounded text-muted-foreground hover:text-foreground"
-                              title="Adjust Salary"
-                            >
-                              <Pencil className="h-3 w-3" />
-                            </button>
+                        <span
+                          className={cn(
+                            "font-bold font-mono",
+                            hasAdjustment ? "text-blue-600" : "",
                           )}
-                          <span
-                            className={cn(
-                              "font-bold font-mono",
-                              hasAdjustment ? "text-blue-600" : "",
-                            )}
-                          >
-                            {finalAmount}
-                          </span>
-                        </div>
+                        >
+                          {finalAmount}
+                        </span>
                         {hasAdjustment && !isPaid && (
                           <span className="text-[10px] text-blue-500 font-mono">
                             {adj.bonus > 0 && `+${adj.bonus}`}
@@ -412,70 +377,132 @@ export default function PayrollTable({
                       </div>
                     </TableCell>
                     <TableCell className="text-center">
-                      <div className="flex justify-center gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-8 w-8 p-0"
-                          onClick={() =>
-                            setGraceParams({
-                              open: true,
-                              staffId: row._id,
-                              staffName: row.name,
-                            })
-                          }
-                          title="Grace"
-                          disabled={isPaid || isLocked}
-                        >
-                          <Ban className="h-3.5 w-3.5 text-muted-foreground" />
-                        </Button>
+                      <TooltipProvider delayDuration={200}>
+                        <div className="flex justify-center items-center gap-1">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 w-8 p-0 hover:bg-muted"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setCalendarStaff({
+                                    id: row._id,
+                                    name: row.name,
+                                  });
+                                }}
+                              >
+                                <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>View Calendar</TooltipContent>
+                          </Tooltip>
 
-                        {isPaid ? (
-                          <div className="flex items-center gap-2">
-                            <Badge
-                              variant="outline"
-                              className="h-8 px-3 text-xs gap-1.5 border-green-200 bg-green-50 text-green-700"
-                            >
-                              <CheckCheck className="h-3.5 w-3.5" />
-                              Paid
-                            </Badge>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-8 w-8 p-0 text-muted-foreground hover:text-red-600"
-                              onClick={() => handleUndoPayment(row)}
-                              disabled={isProcessing || isLocked}
-                              title="Undo Payment"
-                            >
-                              {isProcessing ? (
-                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                              ) : (
-                                <RefreshCcw className="h-3.5 w-3.5" />
-                              )}
-                            </Button>
-                          </div>
-                        ) : (
-                          <Button
-                            size="sm"
-                            className="h-8 px-3 text-xs gap-1.5 bg-green-600 hover:bg-green-700"
-                            disabled={isLocked}
-                            onClick={() =>
-                              setEditParams({
-                                open: true,
-                                staffId: row._id,
-                                staffName: row.name,
-                                baseAmount:
-                                  adjustments[row._id]?.baseAmount ??
-                                  row.payableSalary,
-                                mode: "pay",
-                              })
-                            }
-                          >
-                            <Banknote className="h-3.5 w-3.5" />
-                            Pay
-                          </Button>
-                        )}
-                      </div>
+                          {!isPaid && !isLocked && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 w-8 p-0 text-muted-foreground hover:text-blue-600 hover:bg-blue-50"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditParams({
+                                      open: true,
+                                      staffId: row._id,
+                                      staffName: row.name,
+                                      baseAmount: adjustments[row._id]?.baseAmount ?? row.payableSalary,
+                                      mode: "pay",
+                                    });
+                                  }}
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Adjust Salary</TooltipContent>
+                            </Tooltip>
+                          )}
+
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600 text-muted-foreground"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setGraceParams({
+                                    open: true,
+                                    staffId: row._id,
+                                    staffName: row.name,
+                                  });
+                                }}
+                                disabled={isPaid || isLocked}
+                              >
+                                <Ban className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Provide Grace</TooltipContent>
+                          </Tooltip>
+
+                          {isPaid ? (
+                            <div className="flex items-center ml-1">
+                              <Badge
+                                variant="outline"
+                                className="h-6 px-1.5 text-[10px] gap-1 border-green-200 bg-green-50 text-green-700 font-semibold"
+                              >
+                                Paid
+                              </Badge>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-8 w-8 p-0 text-muted-foreground hover:text-red-600 hover:bg-red-50 ml-1"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleUndoPayment(row);
+                                    }}
+                                    disabled={isProcessing || isLocked}
+                                  >
+                                    {isProcessing ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <RefreshCcw className="h-4 w-4" />
+                                    )}
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Undo Payment</TooltipContent>
+                              </Tooltip>
+                            </div>
+                          ) : (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 w-8 p-0 hover:bg-green-50 hover:text-green-600"
+                                  disabled={isLocked}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditParams({
+                                      open: true,
+                                      staffId: row._id,
+                                      staffName: row.name,
+                                      baseAmount: adjustments[row._id]?.baseAmount ?? row.payableSalary,
+                                      mode: "pay",
+                                    });
+                                  }}
+                                >
+                                  <Banknote className="h-4 w-4 text-green-600" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Proceed to Pay</TooltipContent>
+                            </Tooltip>
+                          )}
+                        </div>
+                      </TooltipProvider>
                     </TableCell>
                   </TableRow>
                 );

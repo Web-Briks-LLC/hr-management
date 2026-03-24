@@ -9,8 +9,13 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Banknote, Loader2, User, RefreshCcw } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Banknote, Loader2, RefreshCcw } from "lucide-react";
 import { useSession } from "@/lib/auth-client";
 import {
     useProcessPaymentMutation,
@@ -344,44 +349,13 @@ export default function OvertimeTable({
                                             />
                                         </TableCell>
                                         <TableCell>
-                                            <div className="flex items-center gap-3">
-                                                <Avatar className="h-9 w-9 border">
-                                                    <AvatarImage
-                                                        src={row.image}
-                                                        alt={row.name}
-                                                    />
-                                                    <AvatarFallback>
-                                                        <User className="h-4 w-4" />
-                                                    </AvatarFallback>
-                                                </Avatar>
-                                                <div>
-                                                    <div className="font-medium">
-                                                        {row.name}
-                                                    </div>
-                                                    <div className="text-xs text-muted-foreground mt-1">
-                                                        <span className="font-medium text-foreground">
-                                                            {row.bank
-                                                                ?.bankName ||
-                                                                "No Bank"}
-                                                        </span>
-                                                        {row.bank?.branch &&
-                                                            ` - ${row.bank?.branch}`}
-                                                    </div>
-                                                    <div className="flex items-center gap-2 mt-1 whitespace-nowrap">
-                                                        <div className="text-[10px] text-muted-foreground font-mono bg-muted/60 px-1.5 py-0.5 rounded w-fit border border-border/50">
-                                                            AC:{" "}
-                                                            {row.bank
-                                                                ?.accountNumber ||
-                                                                "N/A"}
-                                                        </div>
-                                                        <div className="text-[10px] text-muted-foreground font-mono bg-muted/60 px-1.5 py-0.5 rounded w-fit border border-border/50">
-                                                            RT:{" "}
-                                                            {row.bank
-                                                                ?.routingNumber ||
-                                                                "N/A"}
-                                                        </div>
-                                                    </div>
-                                                </div>
+                                            <div className="flex flex-col">
+                                                <span className="font-medium">{row.name}</span>
+                                                <span className="text-xs text-muted-foreground mt-0.5">
+                                                  Shift: {row.calendar?.find(c => c.shiftStart && c.shiftEnd) 
+                                                           ? `${row.calendar.find(c => c.shiftStart && c.shiftEnd)!.shiftStart} - ${row.calendar.find(c => c.shiftStart && c.shiftEnd)!.shiftEnd}`
+                                                           : "No Shift Assigned"}
+                                                </span>
                                             </div>
                                         </TableCell>
                                         <TableCell className="text-center font-mono">
@@ -411,54 +385,52 @@ export default function OvertimeTable({
                                         </TableCell>
                                         <TableCell className="text-center">
                                             <div className="flex justify-center gap-2">
-                                                {isPaid ? (
-                                                    <Button
-                                                        size="sm"
-                                                        variant="ghost"
-                                                        className="h-8 w-8 p-0 text-muted-foreground hover:text-red-600"
-                                                        onClick={() =>
-                                                            handleUndoOvertime(
-                                                                row,
-                                                            )
-                                                        }
-                                                        disabled={
-                                                            isRowProcessing ||
-                                                            isUndoing ||
-                                                            isLocked
-                                                        }
-                                                        title="Undo Payment"
-                                                    >
-                                                        {isRowProcessing ? (
-                                                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                                        ) : (
-                                                            <RefreshCcw className="h-3.5 w-3.5" />
-                                                        )}
-                                                    </Button>
-                                                ) : (
-                                                    <Button
-                                                        size="sm"
-                                                        className="h-8 px-3 text-xs gap-1.5 bg-green-600 hover:bg-green-700"
-                                                        onClick={() =>
-                                                            handlePayOvertime(
-                                                                row,
-                                                            )
-                                                        }
-                                                        disabled={
-                                                            isRowProcessing ||
-                                                            isProcessing ||
-                                                            row.otPayable <=
-                                                            0 ||
-                                                            isLocked
-                                                        }
-                                                    >
-                                                        {isRowProcessing ? (
-                                                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                                        ) : (
-                                                            <Banknote className="h-3.5 w-3.5" />
-                                                        )}
-                                                        Pay OT
-                                                    </Button>
-                                                )}
+                                                <TooltipProvider delayDuration={200}>
+                                                    {isPaid ? (
+                                                        <Tooltip>
+                                                            <TooltipTrigger asChild>
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="ghost"
+                                                                    className="h-8 w-8 p-0 text-muted-foreground hover:text-red-600 hover:bg-red-50"
+                                                                    onClick={() => handleUndoOvertime(row)}
+                                                                    disabled={isRowProcessing || isUndoing || isLocked}
+                                                                >
+                                                                    {isRowProcessing ? (
+                                                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                                                    ) : (
+                                                                        <RefreshCcw className="h-4 w-4" />
+                                                                    )}
+                                                                </Button>
+                                                            </TooltipTrigger>
+                                                            <TooltipContent>Undo Payment</TooltipContent>
+                                                        </Tooltip>
+                                                    ) : (
+                                                        <Tooltip>
+                                                            <TooltipTrigger asChild>
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="ghost"
+                                                                    className="h-8 w-8 p-0 hover:bg-green-50 hover:text-green-600"
+                                                                    onClick={() => handlePayOvertime(row)}
+                                                                    disabled={
+                                                                        isRowProcessing ||
+                                                                        isProcessing ||
+                                                                        row.otPayable <= 0 ||
+                                                                        isLocked
+                                                                    }
+                                                                >
+                                                                    {isRowProcessing ? (
+                                                                        <Loader2 className="h-4 w-4 animate-spin text-green-600" />
+                                                                    ) : (
+                                                                        <Banknote className="h-4 w-4 text-green-600" />
+                                                                    )}
+                                                                </Button>
+                                                            </TooltipTrigger>
+                                                            <TooltipContent>Proceed to Pay OT</TooltipContent>
+                                                        </Tooltip>
+                                                    )}
+                                                </TooltipProvider>
                                             </div>
                                         </TableCell>
                                     </TableRow>

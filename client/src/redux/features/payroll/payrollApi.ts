@@ -108,6 +108,10 @@ export const payrollApi = apiSlice.injectEndpoints({
                     patchResult.undo();
                 }
             },
+            invalidatesTags: (_result, _error, { month, branchId }) => [
+                { type: "Payroll", id: `${month}-all` },
+                ...(branchId && branchId !== "all" ? [{ type: "Payroll" as const, id: `${month}-${branchId}` }] : []),
+            ],
         }),
 
         bulkProcessPayment: builder.mutation<
@@ -152,6 +156,10 @@ export const payrollApi = apiSlice.injectEndpoints({
                     patchResult.undo();
                 }
             },
+            invalidatesTags: (_result, _error, { month, branchId }) => [
+                { type: "Payroll", id: `${month}-all` },
+                ...(branchId && branchId !== "all" ? [{ type: "Payroll" as const, id: `${month}-${branchId}` }] : []),
+            ],
         }),
 
         undoPayment: builder.mutation<
@@ -195,6 +203,10 @@ export const payrollApi = apiSlice.injectEndpoints({
                     patchResult.undo();
                 }
             },
+            invalidatesTags: (_result, _error, { month, branchId }) => [
+                { type: "Payroll", id: `${month}-all` },
+                ...(branchId && branchId !== "all" ? [{ type: "Payroll" as const, id: `${month}-${branchId}` }] : []),
+            ],
         }),
 
         graceAttendance: builder.mutation<
@@ -213,7 +225,8 @@ export const payrollApi = apiSlice.injectEndpoints({
                 body: { staffId: data.staffId, dates: data.dates, note: data.note },
             }),
             invalidatesTags: (_result, _error, { month, branchId }) => [
-                { type: "Payroll", id: `${month}-${branchId || "all"}` },
+                { type: "Payroll", id: `${month}-all` },
+                ...(branchId && branchId !== "all" ? [{ type: "Payroll" as const, id: `${month}-${branchId}` }] : []),
             ],
         }),
 
@@ -339,10 +352,8 @@ export const payrollApi = apiSlice.injectEndpoints({
                 }
             },
             invalidatesTags: (_result, _error, { month, branchId }) => [
-                {
-                    type: "Payroll",
-                    id: `${month}-${branchId || "all"}`,
-                },
+                { type: "Payroll", id: `${month}-all` },
+                ...(branchId && branchId !== "all" ? [{ type: "Payroll" as const, id: `${month}-${branchId}` }] : []),
             ],
         }),
     }),

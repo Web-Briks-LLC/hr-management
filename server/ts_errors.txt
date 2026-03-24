@@ -1,1 +1,0 @@
-src/controllers/payment.controller.ts(262,13): error TS2412: Type 'undefined' is not assignable to type 'string' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the type of the target.
