@@ -1,5 +1,12 @@
 import { z } from 'zod';
 
+const teamMemberSchema = z.object({
+    name: z.string().min(1, 'Team member name is required').max(100),
+    email: z.string().email('Invalid team member email'),
+    phone: z.string().optional(),
+    designation: z.string().max(100).optional(),
+});
+
 export const createClientSchema = z.object({
     clientId: z
         .string({ message: 'Client ID is required' })
@@ -24,6 +31,8 @@ export const createClientSchema = z.object({
     description: z.string().max(1000, 'Description too long').optional(),
     currency: z.string().max(10, 'Currency code too long').optional(),
     status: z.enum(['active', 'inactive']).default('active'),
+    teamMembers: z.array(teamMemberSchema).optional(),
+    assignedServices: z.array(z.string()).optional(),
 });
 
 export const updateClientSchema = z.object({
@@ -51,6 +60,8 @@ export const updateClientSchema = z.object({
     description: z.string().max(1000, 'Description too long').optional(),
     currency: z.string().max(10, 'Currency code too long').optional(),
     status: z.enum(['active', 'inactive']).optional(),
+    teamMembers: z.array(teamMemberSchema).optional(),
+    assignedServices: z.array(z.string()).optional(),
 });
 
 export type CreateClientInput = z.infer<typeof createClientSchema>;

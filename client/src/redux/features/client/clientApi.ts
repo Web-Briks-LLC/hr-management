@@ -1,6 +1,7 @@
 import { apiSlice } from '@/redux/api/apiSlice';
 import type {
     Client,
+    ClientEmail,
     ClientQueryParams,
     ClientsResponse,
 } from '@/types/client.type';
@@ -98,6 +99,22 @@ export const clientApi = apiSlice.injectEndpoints({
             }) => response.data,
             providesTags: ['Client'],
         }),
+        getAssignedServices: builder.query<{ _id: string; name: string }[], string>({
+            query: (id) => ({
+                url: `/clients/${id}/assigned-services`,
+                method: 'GET',
+            }),
+            transformResponse: (response: { data: { _id: string; name: string }[] }) => response.data,
+            providesTags: ['Client'],
+        }),
+        getClientEmails: builder.query<ClientEmail[], string>({
+            query: (id) => ({
+                url: `/clients/${id}/emails`,
+                method: 'GET',
+            }),
+            transformResponse: (response: { data: ClientEmail[] }) => response.data,
+            providesTags: ['Client'],
+        }),
     }),
 });
 
@@ -109,4 +126,6 @@ export const {
     useDeleteClientMutation,
     useLazyCheckClientIdQuery,
     useGetClientStatsQuery,
+    useGetAssignedServicesQuery,
+    useGetClientEmailsQuery,
 } = clientApi;

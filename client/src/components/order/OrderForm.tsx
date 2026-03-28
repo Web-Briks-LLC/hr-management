@@ -13,7 +13,10 @@ import {
     useGetReturnFileFormatsQuery,
     useCreateReturnFileFormatMutation,
 } from '@/redux/features/returnFileFormat/returnFileFormatApi';
-import { useGetClientsQuery } from '@/redux/features/client/clientApi';
+import { 
+    useGetClientsQuery,
+    useGetAssignedServicesQuery 
+} from '@/redux/features/client/clientApi';
 import { useGetStaffsQuery } from '@/redux/features/staff/staffApi';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,14 +31,6 @@ import {
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from '@/components/ui/dialog';
-import {
     Command,
     CommandEmpty,
     CommandGroup,
@@ -48,11 +43,12 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover';
-import { Loader, Plus, X, Check, ChevronsUpDown } from 'lucide-react';
+import { Loader, Plus, X, Check, ChevronsUpDown, Filter } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { DatePicker } from '@/components/shared/DatePicker';
 import { DateTimePicker } from '@/components/shared/DateTimePicker';
+import { Badge } from '@/components/ui/badge';
 import type { OrderPriority } from '@/types/order.type';
 
 export interface OrderFormData {
@@ -108,6 +104,9 @@ export function OrderForm({
     const [newFormatName, setNewFormatName] = useState('');
     const [newFormatExtension, setNewFormatExtension] = useState('');
 
+    // Filter mode: 'assigned' or 'all'
+    const [showAllServices, setShowAllServices] = useState(false);
+
     // Service search with debounce
     const [serviceSearchInput, setServiceSearchInput] = useState('');
     const [debouncedServiceSearch, setDebouncedServiceSearch] = useState('');
@@ -140,8 +139,13 @@ export function OrderForm({
         },
     });
 
+    const clientId = watch('clientId');
+
+    // Queries
     const { data: servicesData, isLoading: isLoadingServices } =
         useGetServicesQuery({ isActive: true, limit: 1000 });
+    const { data: assignedServices, isLoading: isLoadingAssigned } = 
+        useGetAssignedServicesQuery(clientId, { skip: !clientId });
     const { data: formatsData, isLoading: isLoadingFormats } =
         useGetReturnFileFormatsQuery({ isActive: true });
     const { data: clientsData, isLoading: isLoadingClients } =
@@ -154,10 +158,21 @@ export function OrderForm({
     const [createFormat, { isLoading: isCreatingFormat }] =
         useCreateReturnFileFormatMutation();
 
-    const services = servicesData?.data || [];
+    const allServices = servicesData?.data || [];
     const formats = formatsData?.data || [];
     const clients = clientsData?.clients || [];
     const staffs = staffsData?.staffs || [];
+
+    // Determine derived services list
+    const services = useMemo(() => {
+        if (!clientId || showAllServices) return allServices;
+        if (assignedServices && assignedServices.length > 0) {
+            return assignedServices;
+        }
+        return allServices;
+    }, [clientId, showAllServices, assignedServices, allServices]);
+
+    const hasAssignedServices = assignedServices && assignedServices.length > 0;
 
     // Debounce service search (300ms delay)
     useEffect(() => {
@@ -353,6 +368,8 @@ export function OrderForm({
                                                     client._id,
                                                 );
                                                 setOpenClient(false);
+                                                // Reset services filter when client changes
+                                                setShowAllServices(false);
                                             }}
                                         >
                                             <Check
@@ -478,7 +495,15 @@ export function OrderForm({
             {/* Services */}
             <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                    <Label>Services *</Label>
+                    <div className="flex items-center gap-2">
+                        <Label>Services *</Label>
+                        {clientId && hasAssignedServices && (
+                            <Badge variant={showAllServices ? "outline" : "secondary"} className="text-[10px] cursor-pointer" onClick={() => setShowAllServices(!showAllServices)}>
+                                <Filter className="h-3 w-3 mr-1" />
+                                {showAllServices ? "Showing All" : "Assigned"}
+                            </Badge>
+                        )}
+                    </div>
                     <Button
                         type="button"
                         variant={isNewServiceMode ? 'secondary' : 'outline'}
@@ -552,14 +577,14 @@ export function OrderForm({
                     className="h-9"
                 />
 
-                {isLoadingServices ? (
-                    <p className="text-sm text-muted-foreground">
-                        Loading services...
-                    </p>
+                {isLoadingServices || (clientId && isLoadingAssigned) ? (
+                    <div className="flex items-center justify-center p-6 border rounded-md">
+                         <Loader className="h-6 w-6 animate-spin text-muted-foreground" />
+                    </div>
                 ) : (
                     <div className="grid grid-cols-2 gap-2 p-3 border rounded-md max-h-40 overflow-y-auto">
                         {filteredServices.length === 0 ? (
-                            <p className="text-sm text-muted-foreground col-span-2">
+                            <p className="text-sm text-muted-foreground col-span-2 text-center py-4">
                                 No services found
                             </p>
                         ) : (
@@ -784,3 +809,4 @@ export function OrderForm({
         </form>
     );
 }
+

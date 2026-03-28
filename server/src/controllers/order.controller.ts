@@ -403,19 +403,33 @@ async function updateOrderStatus(req: Request, res: Response) {
             try {
                 const client = order.clientId as any;
                 if (client?.emails?.length > 0) {
-                    const recipientEmail =
+                    // Support multi-recipient: selectedEmails (array) takes priority
+                    let recipients: string[] = [];
+
+                    if (
+                        Array.isArray(req.body.selectedEmails) &&
+                        req.body.selectedEmails.length > 0
+                    ) {
+                        recipients = req.body.selectedEmails;
+                    } else if (
                         typeof req.body.selectedEmail === 'string' &&
                         req.body.selectedEmail.trim() !== ''
-                            ? req.body.selectedEmail
-                            : client.emails[0];
+                    ) {
+                        recipients = [req.body.selectedEmail];
+                    } else {
+                        recipients = [client.emails[0]];
+                    }
 
-                    await emailService.sendOrderStatusEmail({
-                        to: recipientEmail,
-                        clientName: client.name || '',
-                        orderName: (order as any).orderName || '',
-                        status,
-                        message: customEmailMessage,
-                    });
+                    // Send to all selected recipients
+                    for (const recipientEmail of recipients) {
+                        await emailService.sendOrderStatusEmail({
+                            to: recipientEmail,
+                            clientName: client.name || '',
+                            orderName: (order as any).orderName || '',
+                            status,
+                            message: customEmailMessage,
+                        });
+                    }
                 }
             } catch (emailError) {
                 console.error('Failed to send status email:', emailError);

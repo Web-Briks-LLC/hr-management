@@ -139,6 +139,7 @@ export interface UpdateStatusInput {
     downloadLink?: string;
     sendEmail?: boolean;
     selectedEmail?: string;
+    selectedEmails?: string[];
 }
 
 export interface ExtendDeadlineInput {

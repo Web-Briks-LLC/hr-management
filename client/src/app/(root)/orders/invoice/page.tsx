@@ -11,6 +11,9 @@ import {
     useRecordInvoiceMutation,
 } from "@/redux/features/invoice/invoiceApi";
 import {
+    useGetClientEmailsQuery,
+} from "@/redux/features/client/clientApi";
+import {
     Card,
     CardContent,
     CardDescription,
@@ -40,11 +43,12 @@ import { ArrowLeft, FileText, Mail, Loader, CheckCircle2 } from "lucide-react";
 import { format } from "date-fns";
 import Link from "next/link";
 import type { IOrder, OrderStatus } from "@/types/order.type";
-import type { Client } from "@/types/client.type";
+import type { Client, ClientEmail } from "@/types/client.type";
 import dynamic from "next/dynamic";
 import { pdf } from "@react-pdf/renderer";
 import { InvoiceDocument } from "@/components/invoice/InvoicePDF";
 import { toast } from "sonner";
+import { MultiSelect } from "@/components/ui/multi-select";
 import {
     Dialog,
     DialogContent,
@@ -52,7 +56,6 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-    DialogTrigger,
 } from "@/components/ui/dialog";
 
 // Dynamically import the PDF component to avoid SSR issues
@@ -100,7 +103,19 @@ export default function InvoicePage() {
     const [paymentToken, setPaymentToken] = useState<string>("");
     const [showPDF, setShowPDF] = useState(false);
     const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
-    const [targetEmail, setTargetEmail] = useState<string>("");
+    const [selectedEmailRecipients, setSelectedEmailRecipients] = useState<string[]>([]);
+
+    const { data: clientEmails, isLoading: isLoadingEmails } = useGetClientEmailsQuery(selectedClientId, {
+        skip: !selectedClientId || !isEmailDialogOpen,
+    });
+
+    const emailOptions = useMemo(() => {
+        if (!clientEmails) return [];
+        return clientEmails.map((item: ClientEmail) => ({
+            label: item.label,
+            value: item.email,
+        }));
+    }, [clientEmails]);
 
     const [sendInvoiceEmail, { isLoading: isSending }] =
         useSendInvoiceEmailMutation();
@@ -297,8 +312,8 @@ export default function InvoicePage() {
         }
     };
 
-    const performDirectSend = async (email: string) => {
-        if (selectedOrders.size === 0 || !selectedClient) return;
+    const performDirectSend = async (emails: string[]) => {
+        if (selectedOrders.size === 0 || !selectedClient || emails.length === 0) return;
 
         try {
             let currentInvoiceNumber = invoiceNumber;
@@ -339,7 +354,7 @@ export default function InvoicePage() {
                         dateFrom: minDate,
                         dateTo: maxDate,
                         totalOrders: selectedOrdersList.length,
-                        clientEmail: email,
+                        clientEmail: emails[0], // primary reference
                         items: selectedOrdersList.map((order) => ({
                             name: order.orderName,
                             price: order.perImagePrice * order.imageQuantity,
@@ -379,7 +394,8 @@ export default function InvoicePage() {
 
             const formData = new FormData();
             formData.append("file", blob, fileName);
-            formData.append("to", email);
+            formData.append("to", emails.join(', '));
+            emails.forEach(email => formData.append("selectedEmails[]", email));
             formData.append("clientName", selectedClient.name);
             formData.append(
                 "month",
@@ -390,7 +406,7 @@ export default function InvoicePage() {
             const result = await sendInvoiceEmail(formData).unwrap();
 
             if (result.success) {
-                toast.success("Invoice sent successfully to " + email);
+                toast.success(`Invoice sent successfully to ${emails.length} recipient(s)`);
                 setIsEmailDialogOpen(false);
             } else {
                 throw new Error(result.message || "Failed to send email");
@@ -410,12 +426,9 @@ export default function InvoicePage() {
             return;
         }
 
-        if (selectedClient.emails.length > 1) {
-            setTargetEmail(selectedClient.emails[0]);
-            setIsEmailDialogOpen(true);
-        } else {
-            await performDirectSend(selectedClient.emails[0]);
-        }
+        // Set default recipient to client's primary email
+        setSelectedEmailRecipients([selectedClient.emails[0]]);
+        setIsEmailDialogOpen(true);
     };
 
     const formatCurrency = (amount: number) => {
@@ -582,42 +595,55 @@ export default function InvoicePage() {
                                 </Button>
                                 <DialogContent className="sm:max-w-md">
                                     <DialogHeader>
-                                        <DialogTitle>Select Recipient Email</DialogTitle>
+                                        <DialogTitle className="flex items-center gap-2">
+                                            <Mail className="h-5 w-5 text-orange-500" />
+                                            Email Invoice
+                                        </DialogTitle>
                                         <DialogDescription>
-                                            This client has multiple email addresses. Please select which one to send the invoice to.
+                                            Select one or multiple recipients to receive this invoice.
                                         </DialogDescription>
                                     </DialogHeader>
-                                    <div className="flex items-center space-x-2 py-4">
-                                        <Select
-                                            value={targetEmail}
-                                            onValueChange={setTargetEmail}
-                                        >
-                                            <SelectTrigger className="w-full">
-                                                <SelectValue placeholder="Select email..." />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {selectedClient?.emails?.map((email) => (
-                                                    <SelectItem key={email} value={email}>
-                                                        {email}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
+                                    <div className="flex flex-col space-y-4 py-6">
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium">Recipients</label>
+                                            {isLoadingEmails ? (
+                                                <div className="h-10 flex items-center justify-center border rounded-md bg-muted/20">
+                                                    <Loader className="h-4 w-4 animate-spin text-muted-foreground mr-2" />
+                                                    <span className="text-xs text-muted-foreground">Loading email list...</span>
+                                                </div>
+                                            ) : (
+                                                <MultiSelect
+                                                    options={emailOptions}
+                                                    selected={selectedEmailRecipients}
+                                                    onChange={setSelectedEmailRecipients}
+                                                    placeholder="Select recipients..."
+                                                    className="w-full"
+                                                />
+                                            )}
+                                        </div>
                                     </div>
-                                    <DialogFooter className="sm:justify-end">
+                                    <DialogFooter className="sm:justify-end gap-2">
                                         <Button
                                             type="button"
                                             variant="secondary"
                                             onClick={() => setIsEmailDialogOpen(false)}
+                                            disabled={isSending}
                                         >
                                             Cancel
                                         </Button>
                                         <Button
-                                            className="bg-orange-500 hover:bg-orange-600"
-                                            disabled={isSending}
-                                            onClick={() => performDirectSend(targetEmail)}
+                                            className="bg-orange-500 hover:bg-orange-600 min-w-[120px]"
+                                            disabled={isSending || selectedEmailRecipients.length === 0}
+                                            onClick={() => performDirectSend(selectedEmailRecipients)}
                                         >
-                                            {isSending ? "Sending..." : "Send Invoice"}
+                                            {isSending ? (
+                                                <>
+                                                    <Loader className="h-4 w-4 animate-spin mr-2" />
+                                                    Sending...
+                                                </>
+                                            ) : (
+                                                "Send Invoice"
+                                            )}
                                         </Button>
                                     </DialogFooter>
                                 </DialogContent>

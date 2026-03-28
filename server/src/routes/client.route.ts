@@ -30,4 +30,14 @@ router.post('/', authorizeTelemarketer, ClientController.createClient);
 // Update client
 router.patch('/:id', authorizeTelemarketer, ClientController.updateClient);
 
+// Get assigned services for a client
+router.get(
+    '/:id/assigned-services',
+    authorizeTelemarketer,
+    ClientController.getAssignedServices,
+);
+
+// Get all emails (client + team) for a client
+router.get('/:id/emails', authorizeTelemarketer, ClientController.getClientEmails);
+
 export const clientRoute = router;

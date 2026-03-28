@@ -178,6 +178,14 @@ const getClientByIdFromDB = async (id: string) => {
             },
         },
         {
+            $lookup: {
+                from: 'services',
+                localField: 'assignedServices',
+                foreignField: '_id',
+                as: 'assignedServicesDetails',
+            },
+        },
+        {
             $project: {
                 'createdBy.password': 0,
                 'createdBy.passwordHistory': 0,
@@ -234,9 +242,15 @@ const createClientInDB = async (
         ...(payload.address && { address: payload.address }),
         ...(payload.officeAddress && { officeAddress: payload.officeAddress }),
         ...(payload.description && { description: payload.description }),
+        ...(payload.teamMembers && { teamMembers: payload.teamMembers }),
+        ...(payload.assignedServices && {
+            assignedServices: payload.assignedServices.map(
+                (id) => new Types.ObjectId(id),
+            ),
+        }),
     };
 
-    const result = await ClientModel.create(clientData);
+    const result = await ClientModel.create(clientData as any);
     return result;
 };
 
@@ -267,8 +281,15 @@ const updateClientInDB = async (id: string, payload: UpdateClientInput) => {
             );
         }
     }
+    // Convert assignedServices string IDs to ObjectIds if provided
+    const updateData: Record<string, unknown> = { ...payload };
+    if (payload.assignedServices) {
+        updateData.assignedServices = payload.assignedServices.map(
+            (id) => new Types.ObjectId(id),
+        );
+    }
 
-    const result = await ClientModel.findByIdAndUpdate(id, payload, {
+    const result = await ClientModel.findByIdAndUpdate(id, updateData, {
         new: true,
     });
     return result;

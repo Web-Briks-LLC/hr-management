@@ -221,7 +221,7 @@ export default function OrdersPage() {
     const confirmEmailAndStatusChange = async (
         message: string,
         downloadLink?: string,
-        selectedEmail?: string,
+        selectedEmails?: string[],
     ) => {
         if (!emailPendingOrder || !emailPendingStatus) return;
         setIsEmailSending(true);
@@ -233,7 +233,7 @@ export default function OrdersPage() {
                     customEmailMessage: message,
                     downloadLink,
                     sendEmail: true,
-                    selectedEmail,
+                    selectedEmails,
                 } as UpdateStatusInput,
             }).unwrap();
             toast.success(

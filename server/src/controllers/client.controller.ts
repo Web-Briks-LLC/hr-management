@@ -308,12 +308,117 @@ const getClientStats = async (req: Request, res: Response) => {
     }
 };
 
+const getAssignedServices = async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        if (!id) throw new Error('Client ID is required');
+
+        const client = await ClientServices.getClientByIdFromDB(id);
+        if (!client) {
+            res.status(404).json({
+                success: false,
+                message: 'Client not found',
+            });
+            return;
+        }
+
+        // If client has assigned services, return those (already populated via lookup)
+        if (
+            client.assignedServicesDetails &&
+            client.assignedServicesDetails.length > 0
+        ) {
+            res.status(200).json({
+                success: true,
+                data: client.assignedServicesDetails,
+            });
+            return;
+        }
+
+        // Fallback: return all active services
+        const { default: ServiceModel } = await import(
+            '../models/service.model.js'
+        );
+        const allServices = await ServiceModel.find({ isActive: true })
+            .select('name description')
+            .lean();
+        res.status(200).json({
+            success: true,
+            data: allServices,
+        });
+    } catch (error: unknown) {
+        const err = error as Error;
+        res.status(500).json({
+            success: false,
+            message: err.message || 'Failed to fetch assigned services',
+        });
+    }
+};
+
+// Get all emails (client + team members) for a client
+const getClientEmails = async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        if (!id) throw new Error('Client ID is required');
+
+        const client = await ClientServices.getClientByIdFromDB(id);
+        if (!client) {
+            res.status(404).json({
+                success: false,
+                message: 'Client not found',
+            });
+            return;
+        }
+
+        // Combine client emails and team member emails
+        const emails: { email: string; label: string; type: string }[] = [];
+
+        // Add client's own emails
+        if (client.emails) {
+            client.emails.forEach((email: string, index: number) => {
+                emails.push({
+                    email,
+                    label:
+                        index === 0
+                            ? `${client.name} (Primary)`
+                            : `${client.name} (${email})`,
+                    type: 'client',
+                });
+            });
+        }
+
+        // Add team member emails
+        if (client.teamMembers) {
+            client.teamMembers.forEach(
+                (member: { name: string; email: string; designation?: string }) => {
+                    emails.push({
+                        email: member.email,
+                        label: `${member.name}${member.designation ? ` (${member.designation})` : ''} — Team`,
+                        type: 'team_member',
+                    });
+                },
+            );
+        }
+
+        res.status(200).json({
+            success: true,
+            data: emails,
+        });
+    } catch (error: unknown) {
+        const err = error as Error;
+        res.status(500).json({
+            success: false,
+            message: err.message || 'Failed to fetch client emails',
+        });
+    }
+};
+
 export default {
     getAllClients,
     getClientById,
     createClient,
     updateClient,
-
     checkClientId,
     getClientStats,
+    getAssignedServices,
+    getClientEmails,
 };

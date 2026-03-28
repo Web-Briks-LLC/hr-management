@@ -1,6 +1,31 @@
 import { model, Schema } from 'mongoose';
 import type { IClient } from '../types/client.type.js';
 
+const teamMemberSchema = new Schema(
+    {
+        name: {
+            type: String,
+            required: true,
+            trim: true,
+        },
+        email: {
+            type: String,
+            required: true,
+            trim: true,
+            lowercase: true,
+        },
+        phone: {
+            type: String,
+            trim: true,
+        },
+        designation: {
+            type: String,
+            trim: true,
+        },
+    },
+    { _id: true },
+);
+
 const ClientSchema = new Schema<IClient>(
     {
         clientId: {
@@ -44,7 +69,7 @@ const ClientSchema = new Schema<IClient>(
         currency: {
             type: String,
             trim: true,
-            uppercase: true, // Store as uppercase (USD, EUR, etc.)
+            uppercase: true,
         },
         status: {
             type: String,
@@ -52,6 +77,16 @@ const ClientSchema = new Schema<IClient>(
             default: 'active',
             index: true,
         },
+        teamMembers: {
+            type: [teamMemberSchema],
+            default: [],
+        },
+        assignedServices: [
+            {
+                type: Schema.Types.ObjectId,
+                ref: 'Service',
+            },
+        ],
         createdBy: {
             type: Schema.Types.ObjectId,
             ref: 'User',

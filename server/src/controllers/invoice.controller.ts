@@ -58,6 +58,18 @@ export const sendInvoiceEmailHandler = async (req: Request, res: Response) => {
             });
         }
 
+        // Support multi-recipient: 'to' can be a comma-separated string or comes as array via selectedEmails
+        let recipients: string[] = [];
+        if (Array.isArray(req.body.selectedEmails) && req.body.selectedEmails.length > 0) {
+            recipients = req.body.selectedEmails;
+        } else if (typeof to === 'string') {
+            recipients = to.split(',').map((e: string) => e.trim()).filter(Boolean);
+        }
+
+        if (recipients.length === 0) {
+            return res.status(400).json({ message: "At least one recipient email is required" });
+        }
+
         // Upload to Cloudinary
         const { default: cloudinary } = await import("../lib/cloudinary.js");
         const { Readable } = await import("stream");
@@ -88,21 +100,24 @@ export const sendInvoiceEmailHandler = async (req: Request, res: Response) => {
         const { default: emailService } =
             await import("../services/email.service.js");
 
-        await emailService.sendInvoiceEmail({
-            to,
-            clientName,
-            month,
-            year,
-            invoiceUrl,
-            attachment: {
-                filename: file.originalname,
-                content: file.buffer,
-                contentType: file.mimetype,
-            },
-        });
+        // Send to all selected recipients
+        for (const recipientEmail of recipients) {
+            await emailService.sendInvoiceEmail({
+                to: recipientEmail,
+                clientName,
+                month,
+                year,
+                invoiceUrl,
+                attachment: {
+                    filename: file.originalname,
+                    content: file.buffer,
+                    contentType: file.mimetype,
+                },
+            });
+        }
 
         return res.status(200).json({
-            message: "Invoice sent successfully",
+            message: `Invoice sent successfully to ${recipients.length} recipient(s)`,
         });
     } catch (error) {
         console.error("Error sending invoice:", error);
