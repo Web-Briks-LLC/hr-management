@@ -1,8 +1,9 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Bell, Check, Trash2, X } from 'lucide-react';
+import { Bell, Check, Trash2, X, Loader } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useRouter } from 'next/navigation';
 import {
     Popover,
     PopoverContent,
@@ -10,7 +11,7 @@ import {
 } from '@/components/ui/popover';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
+
 import {
     useGetNotificationsQuery,
     useGetUnreadCountQuery,
@@ -20,20 +21,10 @@ import {
 } from '@/redux/features/notification/notificationApi';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import type { Notification as ApiNotification } from '@/redux/features/notification/notificationApi';
 
-interface Notification {
-    _id: string;
-    title: string;
-    message: string;
-    type: 'overtime' | 'leave' | 'attendance' | 'shift' | 'announcement';
-    priority: 'low' | 'medium' | 'high' | 'urgent';
-    isRead: boolean;
-    createdAt: string;
-    actionUrl?: string;
-    actionLabel?: string;
-}
-
-const NotificationItem = ({ notification }: { notification: Notification }) => {
+const NotificationItem = ({ notification }: { notification: ApiNotification }) => {
+    const router = useRouter();
     const [markAsRead] = useMarkAsReadMutation();
     const [deleteNotification] = useDeleteNotificationMutation();
 
@@ -54,7 +45,7 @@ const NotificationItem = ({ notification }: { notification: Notification }) => {
             await markAsRead(notification._id);
         }
         if (notification.actionUrl) {
-            window.location.href = notification.actionUrl;
+            router.push(notification.actionUrl);
         }
     };
 
@@ -65,6 +56,7 @@ const NotificationItem = ({ notification }: { notification: Notification }) => {
             case 'leave': return 'text-green-600';
             case 'attendance': return 'text-purple-600';
             case 'announcement': return 'text-gray-600';
+            case 'earning': return 'text-emerald-600';
             default: return 'text-gray-600';
         }
     };
@@ -141,7 +133,7 @@ const NotificationItem = ({ notification }: { notification: Notification }) => {
 export default function NotificationBell() {
     const [open, setOpen] = useState(false);
     const [page, setPage] = useState(1);
-    const [allNotifications, setAllNotifications] = useState<Notification[]>([]);
+    const [allNotifications, setAllNotifications] = useState<ApiNotification[]>([]);
     const [hasMore, setHasMore] = useState(true);
     const scrollRef = useRef<HTMLDivElement>(null);
     const observerRef = useRef<IntersectionObserver | null>(null);
@@ -159,29 +151,32 @@ export default function NotificationBell() {
     const [markAllAsRead] = useMarkAllAsReadMutation();
 
     // Update notifications when new data arrives
-    useEffect(() => {
-        if (notifications) {
-            if (page === 1) {
-                setAllNotifications(notifications);
-            } else {
-                setAllNotifications(prev => {
-                    const newNotifs = notifications.filter(
-                        (n: Notification) => !prev.find(p => p._id === n._id)
-                    );
-                    return [...prev, ...newNotifs];
-                });
-            }
-            setHasMore(notifications.length === 20);
-        }
-    }, [notifications, page]);
+    const [lastProcessedData, setLastProcessedData] = useState<ApiNotification[] | null>(null);
 
-    // Reset when popover opens
-    useEffect(() => {
-        if (open) {
+    // Sync state during render to avoid cascading renders warning
+    if (notifications && notifications !== lastProcessedData) {
+        setLastProcessedData(notifications);
+        if (page === 1) {
+            setAllNotifications(notifications);
+        } else {
+            setAllNotifications(prev => {
+                const newNotifs = notifications.filter(
+                    (n: ApiNotification) => !prev.find(p => p._id === n._id)
+                );
+                return [...prev, ...newNotifs];
+            });
+        }
+        setHasMore(notifications.length === 20);
+    }
+
+    // Handle open change
+    const handleOpenChange = (newOpen: boolean) => {
+        setOpen(newOpen);
+        if (newOpen) {
             setPage(1);
             setHasMore(true);
         }
-    }, [open]);
+    };
 
     // Infinite scroll observer
     const loadMore = useCallback(() => {
@@ -222,7 +217,7 @@ export default function NotificationBell() {
     const unreadCount = countData?.count || 0;
 
     return (
-        <Popover open={open} onOpenChange={setOpen}>
+        <Popover open={open} onOpenChange={handleOpenChange}>
             <PopoverTrigger asChild>
                 <Button variant="ghost" size="icon" className="relative">
                     <Bell className="h-5 w-5" />
@@ -282,9 +277,10 @@ export default function NotificationBell() {
                             {hasMore && (
                                 <div ref={loadMoreRef} className="p-4 text-center">
                                     {isFetching ? (
-                                        <span className="text-sm text-muted-foreground">
-                                            Loading more...
-                                        </span>
+                                        <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                                            <Loader className="h-4 w-4 animate-spin" />
+                                            <span>Loading more...</span>
+                                        </div>
                                     ) : (
                                         <span className="text-sm text-muted-foreground">
                                             Scroll for more

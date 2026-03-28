@@ -2,7 +2,7 @@
 
 import { format } from 'date-fns';
 import type { ITimelineEntry } from '@/types/order.type';
-import { ORDER_STATUS_LABELS } from '@/types/order.type';
+import { ORDER_STATUS_LABELS } from '@/lib/constants';
 import {
     Clock,
     CheckCircle,

@@ -21,7 +21,7 @@ import type {
     OrderFilters,
     UpdateStatusInput,
 } from "@/types/order.type";
-import { ORDER_STATUS_LABELS, ORDER_PRIORITY_LABELS } from "@/types/order.type";
+import { ORDER_STATUS_LABELS, ORDER_PRIORITY_LABELS } from "@/lib/constants";
 import {
     Card,
     CardContent,

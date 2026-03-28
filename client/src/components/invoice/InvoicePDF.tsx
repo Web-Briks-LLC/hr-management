@@ -38,7 +38,6 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-    DialogTrigger,
 } from "@/components/ui/dialog";
 
 // Register fonts if needed (optional)
@@ -330,7 +329,16 @@ const styles = StyleSheet.create({
 });
 
 export interface InvoicePDFProps {
-    client: Client;
+    client: Pick<
+        Client,
+        | "_id"
+        | "clientId"
+        | "name"
+        | "emails"
+        | "currency"
+        | "address"
+        | "officeAddress"
+    >;
     orders: IOrder[];
     month: string;
     year: string;

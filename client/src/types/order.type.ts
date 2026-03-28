@@ -188,20 +188,4 @@ export interface OrderFilters {
     page?: number;
     limit?: number;
 }
-
-export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
-    pending: "Pending",
-    in_progress: "In Progress",
-    quality_check: "Quality Check",
-    revision: "Revision",
-    completed: "Completed",
-    delivered: "Delivered",
-    cancelled: "Cancelled",
-};
-
-export const ORDER_PRIORITY_LABELS: Record<OrderPriority, string> = {
-    low: "Low",
-    normal: "Normal",
-    high: "High",
-    urgent: "Urgent",
-};
+// Labels and other constants moved to @/lib/constants.ts

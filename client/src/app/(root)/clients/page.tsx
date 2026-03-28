@@ -1,683 +1,379 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
-    useGetClientsQuery,
-    useCreateClientMutation,
-    useUpdateClientMutation,
+  useGetClientsQuery,
+  useCreateClientMutation,
+  useUpdateClientMutation,
 } from "@/redux/features/client/clientApi";
 import { useGetMeQuery } from "@/redux/features/staff/staffApi";
-import type { Client } from "@/types/client.type";
 import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from "@/components/ui/card";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/components/ui/table";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-    ChevronLeft,
-    ChevronRight,
-    ChevronsLeft,
-    ChevronsRight,
-    Plus,
-    Edit2,
-    Users,
-    Eye,
-    UserCheck,
-    UserX,
+  Plus,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  Loader,
+  FileDown,
+  RefreshCw,
 } from "lucide-react";
-import Link from "next/link";
-import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import {
-    ClientForm,
-    type ClientFormData,
+  ClientForm,
+  type ClientFormData,
 } from "@/components/client/ClientForm";
-
-const statusOptions = [
-    { value: "active", label: "Active", color: "text-green-600 bg-green-100" },
-    {
-        value: "inactive",
-        label: "Inactive",
-        color: "text-gray-600 bg-gray-100",
-    },
-];
-
-const perPageOptions = [10, 25, 50, 100];
-
-interface ApiErrorResponse {
-    data?: {
-        message?: string;
-        errors?: Record<string, string[]>;
-    };
-}
+import { ClientStats } from "@/components/client/ClientStats";
+import { ClientFilters } from "@/components/client/ClientFilters";
+import { ClientTable } from "@/components/client/ClientTable";
+import { PER_PAGE_OPTIONS } from "@/lib/constants";
+import { Client } from "@/types/client.type";
 
 export default function ClientsPage() {
-    const [page, setPage] = useState(1);
-    const [filters, setFilters] = useState({
-        search: "",
-        status: "",
-        limit: 10,
-        sortBy: "createdAt",
-        sortOrder: "desc" as "asc" | "desc",
+  const { data: user } = useGetMeQuery({});
+  const isTelemarketer = user?.role === "telemarketer";
+
+  // Filter states
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("");
+
+  // Dialog states
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [editDefaultValues, setEditDefaultValues] = useState<
+    ClientFormData | undefined
+  >(undefined);
+
+  // Queries
+  const {
+    data: clientsData,
+    isLoading,
+    isFetching,
+    refetch,
+  } = useGetClientsQuery({
+    page,
+    limit,
+    search: search || undefined,
+    status: status || undefined,
+  });
+
+  const [createClient, { isLoading: isCreating }] = useCreateClientMutation();
+  const [updateClient, { isLoading: isUpdating }] = useUpdateClientMutation();
+
+  const [addServerErrors, setAddServerErrors] = useState<
+    Record<string, string[]> | undefined
+  >(undefined);
+  const [updateServerErrors, setUpdateServerErrors] = useState<
+    Record<string, string[]> | undefined
+  >(undefined);
+
+  const clients = useMemo(() => clientsData?.clients || [], [clientsData?.clients]);
+  const pagination = clientsData?.pagination || {
+    page: 1,
+    limit: 10,
+    total: 0,
+    pages: 1,
+  };
+
+  // Derived stats for the CURRENT PAGE
+  const stats = useMemo(() => {
+    return {
+      total: pagination.total,
+      active: clients.filter((c: Client) => c.status === "active").length,
+      inactive: clients.filter((c: Client) => c.status === "inactive").length,
+    };
+  }, [clients, pagination.total]);
+
+  const handleFilterChange = (key: string, value: string | number) => {
+    if (key === "search") setSearch(value as string);
+    if (key === "status") setStatus(value as string);
+    if (key === "limit") setLimit(value as number);
+    setPage(1); // Reset to page 1 on filter change
+  };
+
+  const handleClearFilters = () => {
+    setSearch("");
+    setStatus("");
+    setLimit(10);
+    setPage(1);
+  };
+
+  const handleAddClient = async (data: ClientFormData) => {
+    try {
+      setAddServerErrors(undefined);
+      await createClient(data).unwrap();
+      toast.success("Client created successfully");
+      setIsAddDialogOpen(false);
+    } catch (error: unknown) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const err = error as any;
+      setAddServerErrors(err?.data?.errors || err?.errors);
+      toast.error(err?.data?.message || "Failed to create client");
+    }
+  };
+
+  const handleUpdateClient = async (data: ClientFormData) => {
+    if (!selectedClient) return;
+    try {
+      setUpdateServerErrors(undefined);
+      await updateClient({ id: selectedClient._id, ...data }).unwrap();
+      toast.success("Client updated successfully");
+      setIsEditDialogOpen(false);
+    } catch (error: unknown) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const err = error as any;
+      setUpdateServerErrors(err?.data?.errors || err?.errors);
+      toast.error(err?.data?.message || "Failed to update client");
+    }
+  };
+
+  const openEditDialog = (client: Client) => {
+    setSelectedClient(client);
+    setUpdateServerErrors(undefined);
+    setEditDefaultValues({
+      clientId: client.clientId,
+      name: client.name,
+      emails: client.emails,
+      phone: client.phone || "",
+      address: client.address || "",
+      officeAddress: client.officeAddress || "",
+      description: client.description || "",
+      currency: client.currency || "",
+      status: client.status,
+      teamMembers: client.teamMembers || [],
+      assignedServices: client.assignedServices || [],
     });
-    const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-    const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+    setIsEditDialogOpen(true);
+  };
 
-    const [selectedClient, setSelectedClient] = useState<Client | null>(null);
-
-    // Server errors state for displaying in forms
-    const [createServerErrors, setCreateServerErrors] = useState<
-        Record<string, string[]> | undefined
-    >(undefined);
-    const [updateServerErrors, setUpdateServerErrors] = useState<
-        Record<string, string[]> | undefined
-    >(undefined);
-
-    // Default form values for edit
-    const [editDefaultValues, setEditDefaultValues] = useState<
-        ClientFormData | undefined
-    >(undefined);
-
-    // Queries
-    const { data: meData } = useGetMeQuery({});
-    const {
-        data: clientData,
-        isLoading,
-        isFetching,
-    } = useGetClientsQuery({
-        ...filters,
-        page,
-    });
-
-    // Mutations
-    const [createClient, { isLoading: isCreating }] = useCreateClientMutation();
-    const [updateClient, { isLoading: isUpdating }] = useUpdateClientMutation();
-
-    const clients = clientData?.clients || [];
-    const pagination = clientData?.pagination;
-    const totalPages = pagination?.pages || 1;
-
-    // Count active and inactive clients from current data
-    const activeClients = clients.filter((c) => c.status === "active").length;
-    const inactiveClients = clients.filter(
-        (c) => c.status === "inactive",
-    ).length;
-
-    const isTelemarketer =
-        meData?.staff?.designation?.toLowerCase() === "telemarketer";
-
-    // Generate pagination numbers
-    const getPaginationNumbers = () => {
-        const pages: (number | string)[] = [];
-
-        if (totalPages <= 7) {
-            for (let i = 1; i <= totalPages; i++) pages.push(i);
-        } else {
-            pages.push(1);
-            if (page > 3) pages.push("...");
-            const start = Math.max(2, page - 1);
-            const end = Math.min(totalPages - 1, page + 1);
-            for (let i = start; i <= end; i++) {
-                if (!pages.includes(i)) pages.push(i);
-            }
-            if (page < totalPages - 2) pages.push("...");
-            if (!pages.includes(totalPages)) pages.push(totalPages);
-        }
-        return pages;
-    };
-
-    const handleFilterChange = (key: string, value: string | number) => {
-        setFilters((prev) => ({ ...prev, [key]: value }));
-        setPage(1);
-    };
-
-    const handleCreateClient = async (data: ClientFormData) => {
-        setCreateServerErrors(undefined);
-        try {
-            await createClient(data).unwrap();
-            toast.success("Client created successfully");
-            setIsAddDialogOpen(false);
-        } catch (error: unknown) {
-            const err = error as ApiErrorResponse;
-            // Check if it's a validation error with field errors
-            if (err?.data?.errors) {
-                setCreateServerErrors(err.data.errors);
-            } else {
-                toast.error(err?.data?.message || "Failed to create client");
-            }
-        }
-    };
-
-    const handleUpdateClient = async (data: ClientFormData) => {
-        if (!selectedClient) return;
-        setUpdateServerErrors(undefined);
-        try {
-            await updateClient({
-                id: selectedClient._id,
-                ...data,
-            }).unwrap();
-            toast.success("Client updated successfully");
-            setIsEditDialogOpen(false);
-            setSelectedClient(null);
-        } catch (error: unknown) {
-            const err = error as ApiErrorResponse;
-            // Check if it's a validation error with field errors
-            if (err?.data?.errors) {
-                setUpdateServerErrors(err.data.errors);
-            } else {
-                toast.error(err?.data?.message || "Failed to update client");
-            }
-        }
-    };
-
-    const openEditDialog = (client: Client) => {
-        setSelectedClient(client);
-        setUpdateServerErrors(undefined);
-        setEditDefaultValues({
-            clientId: client.clientId,
-            name: client.name,
-            emails: client.emails,
-            phone: client.phone || "",
-            address: client.address || "",
-            officeAddress: client.officeAddress || "",
-            description: client.description || "",
-            currency: client.currency || "",
-            status: client.status,
-        });
-        setIsEditDialogOpen(true);
-    };
-
-    const handleAddDialogChange = (open: boolean) => {
-        setIsAddDialogOpen(open);
-        if (!open) {
-            setCreateServerErrors(undefined);
-        }
-    };
-
-    const handleEditDialogChange = (open: boolean) => {
-        setIsEditDialogOpen(open);
-        if (!open) {
-            setUpdateServerErrors(undefined);
-        }
-    };
-
-    return (
-        <div className="space-y-6">
-            {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* Total Clients */}
-                <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-slate-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-slate-500/5 hover:border-slate-500/30">
-                    <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-slate-500/10 blur-2xl transition-all duration-300 group-hover:bg-slate-500/20" />
-                    <div className="relative">
-                        <div className="flex items-center justify-between mb-3">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-500/10 text-slate-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-slate-500/20">
-                                <Users className="h-5 w-5" />
-                            </div>
-                        </div>
-                        <h3 className="text-3xl font-bold tracking-tight text-slate-600 dark:text-slate-300">
-                            {pagination?.total || 0}
-                        </h3>
-                        <p className="text-xs text-muted-foreground mt-1">
-                            Total Clients
-                        </p>
-                    </div>
-                </div>
-
-                {/* Active Clients */}
-                <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-green-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-green-500/5 hover:border-green-500/30">
-                    <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-green-500/10 blur-2xl transition-all duration-300 group-hover:bg-green-500/20" />
-                    <div className="relative">
-                        <div className="flex items-center justify-between mb-3">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-500/10 text-green-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-green-500/20">
-                                <UserCheck className="h-5 w-5" />
-                            </div>
-                        </div>
-                        <h3 className="text-3xl font-bold tracking-tight text-green-600 dark:text-green-400">
-                            {activeClients}
-                        </h3>
-                        <p className="text-xs text-muted-foreground mt-1">
-                            Active (this page)
-                        </p>
-                    </div>
-                </div>
-
-                {/* Inactive Clients */}
-                <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-gray-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-gray-500/5 hover:border-gray-500/30">
-                    <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-gray-500/10 blur-2xl transition-all duration-300 group-hover:bg-gray-500/20" />
-                    <div className="relative">
-                        <div className="flex items-center justify-between mb-3">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gray-500/10 text-gray-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-gray-500/20">
-                                <UserX className="h-5 w-5" />
-                            </div>
-                        </div>
-                        <h3 className="text-3xl font-bold tracking-tight text-gray-600 dark:text-gray-400">
-                            {inactiveClients}
-                        </h3>
-                        <p className="text-xs text-muted-foreground mt-1">
-                            Inactive (this page)
-                        </p>
-                    </div>
-                </div>
-            </div>
-
-            {/* Main Card */}
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                    <div>
-                        <CardTitle className="text-2xl">
-                            Client Management
-                        </CardTitle>
-                        <CardDescription>
-                            Manage your clients and their information
-                        </CardDescription>
-                    </div>
-                    <Dialog
-                        open={isAddDialogOpen}
-                        onOpenChange={handleAddDialogChange}
-                    >
-                        <DialogTrigger asChild>
-                            <Button>
-                                <Plus />
-                                Add Client
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-                            <DialogHeader>
-                                <DialogTitle>Add New Client</DialogTitle>
-                                <DialogDescription>
-                                    Fill in the details to add a new client
-                                </DialogDescription>
-                            </DialogHeader>
-                            <ClientForm
-                                onSubmit={handleCreateClient}
-                                isSubmitting={isCreating}
-                                submitLabel="Create"
-                                onCancel={() => setIsAddDialogOpen(false)}
-                                serverErrors={createServerErrors}
-                            />
-                        </DialogContent>
-                    </Dialog>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    {/* Filters */}
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 w-full">
-                        <Input
-                            placeholder="Search by name, email, or ID..."
-                            value={filters.search}
-                            onChange={(e) =>
-                                handleFilterChange("search", e.target.value)
-                            }
-                            className="w-full"
-                        />
-                        <Select
-                            value={filters.status}
-                            onValueChange={(value) =>
-                                handleFilterChange("status", value)
-                            }
-                        >
-                            <SelectTrigger className="w-full">
-                                <SelectValue placeholder="All statuses" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {statusOptions.map((opt) => (
-                                    <SelectItem
-                                        key={opt.value}
-                                        value={opt.value}
-                                    >
-                                        {opt.label}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                        <Select
-                            value={filters.limit.toString()}
-                            onValueChange={(value) =>
-                                handleFilterChange("limit", parseInt(value))
-                            }
-                        >
-                            <SelectTrigger className="w-full">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {perPageOptions.map((opt) => (
-                                    <SelectItem
-                                        key={opt}
-                                        value={opt.toString()}
-                                    >
-                                        {opt}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                        <Button
-                            variant="outline"
-                            onClick={() => {
-                                setFilters({
-                                    search: "",
-                                    status: "",
-                                    limit: 10,
-                                    sortBy: "createdAt",
-                                    sortOrder: "desc",
-                                });
-                                setPage(1);
-                            }}
-                        >
-                            Clear Filters
-                        </Button>
-                    </div>
-
-                    {/* Table */}
-                    <div className="border">
-                        {isLoading ? (
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead className="border-r text-center">
-                                            Client ID
-                                        </TableHead>
-                                        <TableHead className="border-r text-center">
-                                            Name
-                                        </TableHead>
-                                        <TableHead className="border-r text-center">
-                                            Email
-                                        </TableHead>
-                                        <TableHead className="border-r text-center">
-                                            Phone
-                                        </TableHead>
-                                        <TableHead className="border-r text-center">
-                                            Status
-                                        </TableHead>
-                                        <TableHead className="text-center">
-                                            Actions
-                                        </TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {[...Array(5)].map((_, i) => (
-                                        <TableRow key={i}>
-                                            <TableCell className="border-r">
-                                                <Skeleton className="h-4 w-20" />
-                                            </TableCell>
-                                            <TableCell className="border-r">
-                                                <Skeleton className="h-4 w-32" />
-                                            </TableCell>
-                                            <TableCell className="border-r">
-                                                <Skeleton className="h-4 w-40" />
-                                            </TableCell>
-                                            <TableCell className="border-r">
-                                                <Skeleton className="h-4 w-24" />
-                                            </TableCell>
-                                            <TableCell className="border-r">
-                                                <Skeleton className="h-6 w-16 rounded-full" />
-                                            </TableCell>
-                                            <TableCell className="text-right">
-                                                <div className="flex justify-end gap-2">
-                                                    <Skeleton className="h-8 w-8" />
-                                                    <Skeleton className="h-8 w-8" />
-                                                </div>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        ) : (
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead className="border-r text-center">
-                                            Client ID
-                                        </TableHead>
-                                        <TableHead className="border-r text-center">
-                                            Name
-                                        </TableHead>
-                                        <TableHead className="border-r text-center">
-                                            Email
-                                        </TableHead>
-                                        <TableHead className="border-r text-center">
-                                            Phone
-                                        </TableHead>
-                                        <TableHead className="border-r text-center">
-                                            Status
-                                        </TableHead>
-                                        <TableHead className="text-center">
-                                            Actions
-                                        </TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {clients.length === 0 ? (
-                                        <TableRow>
-                                            <TableCell
-                                                colSpan={6}
-                                                className="text-center py-8 text-muted-foreground"
-                                            >
-                                                No clients found
-                                            </TableCell>
-                                        </TableRow>
-                                    ) : (
-                                        clients.map((client: Client) => {
-                                            const statusOpt =
-                                                statusOptions.find(
-                                                    (s) =>
-                                                        s.value ===
-                                                        client.status,
-                                                );
-                                            return (
-                                                <TableRow key={client._id}>
-                                                    <TableCell className="border-r font-mono">
-                                                        {client.clientId}
-                                                    </TableCell>
-                                                    <TableCell className="font-medium border-r">
-                                                        {client.name}
-                                                    </TableCell>
-                                                    <TableCell className="border-r">
-                                                        <div className="flex items-center gap-1">
-                                                            <span className="truncate max-w-[150px]">
-                                                                {client.emails?.[0] || "-"}
-                                                            </span>
-                                                            {client.emails && client.emails.length > 1 && (
-                                                                <span className="shrink-0 px-1.5 py-0.5 rounded-sm bg-teal-50 text-teal-600 text-[10px] font-bold">
-                                                                    +{client.emails.length - 1}
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    </TableCell>
-                                                    <TableCell className="border-r">
-                                                        {client.phone || "-"}
-                                                    </TableCell>
-                                                    <TableCell className="border-r text-center">
-                                                        <span
-                                                            className={`px-2 py-1 rounded-full text-xs font-medium ${statusOpt?.color}`}
-                                                        >
-                                                            {statusOpt?.label}
-                                                        </span>
-                                                    </TableCell>
-                                                    <TableCell className="text-right">
-                                                        <div className="flex items-center justify-center gap-2">
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                asChild
-                                                            >
-                                                                <Link
-                                                                    href={`/clients/${client._id}`}
-                                                                >
-                                                                    <Eye className="h-4 w-4" />
-                                                                </Link>
-                                                            </Button>
-                                                            {!isTelemarketer && (
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="icon"
-                                                                    onClick={() =>
-                                                                        openEditDialog(
-                                                                            client,
-                                                                        )
-                                                                    }
-                                                                >
-                                                                    <Edit2 />
-                                                                </Button>
-                                                            )}
-                                                        </div>
-                                                    </TableCell>
-                                                </TableRow>
-                                            );
-                                        })
-                                    )}
-                                </TableBody>
-                            </Table>
-                        )}
-                    </div>
-
-                    {/* Pagination */}
-                    {pagination && totalPages > 1 && (
-                        <div className="flex items-center justify-between">
-                            <div className="text-sm text-muted-foreground">
-                                Showing {(page - 1) * filters.limit + 1} to{" "}
-                                {Math.min(
-                                    page * filters.limit,
-                                    pagination.total,
-                                )}{" "}
-                                of {pagination.total} clients
-                            </div>
-                            <div className="flex items-center gap-1">
-                                {/* First Page */}
-                                <Button
-                                    variant="outline"
-                                    size="icon"
-                                    className="h-8 w-8"
-                                    onClick={() => setPage(1)}
-                                    disabled={page === 1 || isFetching}
-                                >
-                                    <ChevronsLeft className="h-4 w-4" />
-                                </Button>
-
-                                {/* Previous */}
-                                <Button
-                                    variant="outline"
-                                    size="icon"
-                                    className="h-8 w-8"
-                                    onClick={() =>
-                                        setPage((p) => Math.max(1, p - 1))
-                                    }
-                                    disabled={page === 1 || isFetching}
-                                >
-                                    <ChevronLeft className="h-4 w-4" />
-                                </Button>
-
-                                {/* Page Numbers */}
-                                {getPaginationNumbers().map((pageNum, idx) =>
-                                    pageNum === "..." ? (
-                                        <span
-                                            key={`ellipsis-${idx}`}
-                                            className="px-2 text-muted-foreground"
-                                        >
-                                            ...
-                                        </span>
-                                    ) : (
-                                        <Button
-                                            key={pageNum}
-                                            variant={
-                                                page === pageNum
-                                                    ? "default"
-                                                    : "outline"
-                                            }
-                                            size="icon"
-                                            className="h-8 w-8"
-                                            onClick={() =>
-                                                setPage(pageNum as number)
-                                            }
-                                            disabled={isFetching}
-                                        >
-                                            {pageNum}
-                                        </Button>
-                                    ),
-                                )}
-
-                                {/* Next */}
-                                <Button
-                                    variant="outline"
-                                    size="icon"
-                                    className="h-8 w-8"
-                                    onClick={() =>
-                                        setPage((p) =>
-                                            Math.min(totalPages, p + 1),
-                                        )
-                                    }
-                                    disabled={page === totalPages || isFetching}
-                                >
-                                    <ChevronRight className="h-4 w-4" />
-                                </Button>
-
-                                {/* Last Page */}
-                                <Button
-                                    variant="outline"
-                                    size="icon"
-                                    className="h-8 w-8"
-                                    onClick={() => setPage(totalPages)}
-                                    disabled={page === totalPages || isFetching}
-                                >
-                                    <ChevronsRight className="h-4 w-4" />
-                                </Button>
-                            </div>
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
-
-            {/* Edit Dialog */}
-            <Dialog
-                open={isEditDialogOpen}
-                onOpenChange={handleEditDialogChange}
-            >
-                <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-                    <DialogHeader>
-                        <DialogTitle>Edit Client</DialogTitle>
-                        <DialogDescription>
-                            Update the client details
-                        </DialogDescription>
-                    </DialogHeader>
-                    {editDefaultValues && (
-                        <ClientForm
-                            key={selectedClient?._id}
-                            defaultValues={editDefaultValues}
-                            onSubmit={handleUpdateClient}
-                            isSubmitting={isUpdating}
-                            submitLabel="Update"
-                            onCancel={() => setIsEditDialogOpen(false)}
-                            serverErrors={updateServerErrors}
-                            isEditMode={true}
-                        />
-                    )}
-                </DialogContent>
-            </Dialog>
+  return (
+    <div className="space-y-8 animate-in fade-in duration-500">
+      {/* Header section */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+        <div className="space-y-1">
+          <h1 className="text-3xl font-bold tracking-tight text-slate-800 dark:text-slate-100">
+            Clients
+          </h1>
+          <p className="text-muted-foreground flex items-center gap-2">
+            Manage your client database and team assignments
+            {isFetching && (
+              <Loader className="h-3 w-3 animate-spin text-primary" />
+            )}
+          </p>
         </div>
-    );
+        {!isTelemarketer && (
+          <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              className="bg-card shadow-sm hover:shadow-md transition-all duration-200"
+              onClick={() => toast.info("Export feature coming soon")}
+            >
+              <FileDown className="mr-2 h-4 w-4 text-slate-500" />
+              Export
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => refetch()}
+              disabled={isLoading || isFetching}
+              className="bg-card shadow-sm hover:shadow-md transition-all duration-200"
+            >
+              <RefreshCw
+                className={isFetching ? "animate-spin" : ""}
+                size={16}
+              />
+            </Button>
+            <Button
+              onClick={() => setIsAddDialogOpen(true)}
+              className="bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all duration-200"
+            >
+              <Plus className="mr-2 h-4 w-4" /> Add Client
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* Stats section */}
+      <ClientStats
+        total={stats.total}
+        active={stats.active}
+        inactive={stats.inactive}
+        isLoading={isLoading}
+      />
+
+      {/* Filter section */}
+      <div className="bg-card p-4 rounded-xl border shadow-sm space-y-4">
+        <ClientFilters
+          search={search}
+          status={status}
+          limit={limit}
+          onFilterChange={handleFilterChange}
+          onClearFilters={handleClearFilters}
+        />
+      </div>
+
+      {/* Table section */}
+      <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
+        <ClientTable
+          clients={clients}
+          isLoading={isLoading}
+          isTelemarketer={isTelemarketer}
+          onEdit={openEditDialog}
+        />
+
+        {/* Pagination */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-6 py-4 border-t bg-muted/20">
+          <div className="flex items-center gap-4 order-2 sm:order-1">
+            <div className="text-sm text-muted-foreground">
+              Showing{" "}
+              <span className="font-medium text-foreground">
+                {clients.length}
+              </span>{" "}
+              of{" "}
+              <span className="font-medium text-foreground">
+                {pagination.total}
+              </span>{" "}
+              clients
+            </div>
+            <div className="h-4 w-px bg-slate-300 hidden sm:block" />
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground whitespace-nowrap">
+                Per page
+              </span>
+              <Select
+                value={limit.toString()}
+                onValueChange={(val) =>
+                  handleFilterChange("limit", parseInt(val))
+                }
+              >
+                <SelectTrigger className="h-7 w-[70px] text-xs bg-background">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PER_PAGE_OPTIONS.map((opt) => (
+                    <SelectItem
+                      key={opt}
+                      value={opt.toString()}
+                      className="text-xs"
+                    >
+                      {opt}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="flex items-center space-x-2 order-1 sm:order-2">
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => setPage(1)}
+              disabled={page === 1 || isLoading}
+            >
+              <ChevronsLeft className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page === 1 || isLoading}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <div className="flex items-center gap-1.5 px-3">
+              <span className="text-sm font-medium">Page</span>
+              <span className="flex h-7 w-12 items-center justify-center rounded-md border bg-background text-sm font-bold text-primary">
+                {page}
+              </span>
+              <span className="text-sm font-medium">
+                of {pagination.pages}
+              </span>
+            </div>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() =>
+                setPage((p) => Math.min(pagination.pages, p + 1))
+              }
+              disabled={page === pagination.pages || isLoading}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => setPage(pagination.pages)}
+              disabled={page === pagination.pages || isLoading}
+            >
+              <ChevronsRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Add Client Dialog */}
+      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Add New Client</DialogTitle>
+            <DialogDescription>
+              Create a new client profile with contact and team details.
+            </DialogDescription>
+          </DialogHeader>
+          <ClientForm
+            onSubmit={handleAddClient}
+            isSubmitting={isCreating}
+            submitLabel="Create Client"
+            onCancel={() => setIsAddDialogOpen(false)}
+            serverErrors={addServerErrors}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Client Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Client</DialogTitle>
+            <DialogDescription>
+              Update client profile and team information.
+            </DialogDescription>
+          </DialogHeader>
+          {editDefaultValues && (
+            <ClientForm
+              key={selectedClient?._id}
+              defaultValues={editDefaultValues}
+              onSubmit={handleUpdateClient}
+              isSubmitting={isUpdating}
+              submitLabel="Save Changes"
+              onCancel={() => setIsEditDialogOpen(false)}
+              serverErrors={updateServerErrors}
+              isEditMode
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
 }

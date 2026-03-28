@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useGetStaffsQuery } from "@/redux/features/staff/staffApi";
 import { useGetAllShiftsQuery } from "@/redux/features/shift/shiftApi";
@@ -23,9 +23,7 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
-    Loader,
     Search,
     Eye,
     User,
@@ -33,7 +31,6 @@ import {
     ChevronRight,
     ChevronsLeft,
     ChevronsRight,
-    Filter,
     X,
 } from "lucide-react";
 
@@ -45,7 +42,6 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { format } from "date-fns";
 import { useDebounce } from "../../../hooks/use-debounce";
 
 const statusColors: Record<string, string> = {
@@ -112,6 +108,15 @@ export default function StaffsPage() {
     const [limit, setLimit] = useState(20);
     const [searchQuery, setSearchQuery] = useState("");
     const debouncedSearch = useDebounce(searchQuery, 500);
+ interface StaffFilters {
+    page: number;
+    limit: number;
+    search?: string;
+    department?: string;
+    designation?: string;
+    shiftId?: string;
+    status?: string;
+}
 
     // Filters
     const [departmentFilter, setDepartmentFilter] = useState("");
@@ -120,7 +125,7 @@ export default function StaffsPage() {
     const [statusFilter, setStatusFilter] = useState<string>("all");
     const router = useRouter();
 
-    const queryParams: any = {
+    const queryParams: StaffFilters = {
         page,
         limit,
         search: debouncedSearch || undefined,
@@ -165,7 +170,7 @@ export default function StaffsPage() {
     };
 
     return (
-        <div className="p-6 space-y-6">
+        <div className="space-y-6">
             <Card>
                 <CardHeader>
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -260,7 +265,7 @@ export default function StaffsPage() {
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="all">All Shifts</SelectItem>
-                                {shifts.map((shift: any) => (
+                                {shifts.map((shift: { _id: string; name: string; title: string }) => (
                                     <SelectItem
                                         key={shift._id}
                                         value={shift._id}

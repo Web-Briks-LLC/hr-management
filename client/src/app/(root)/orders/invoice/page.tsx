@@ -11,9 +11,6 @@ import {
     useRecordInvoiceMutation,
 } from "@/redux/features/invoice/invoiceApi";
 import {
-    useGetClientEmailsQuery,
-} from "@/redux/features/client/clientApi";
-import {
     Card,
     CardContent,
     CardDescription,
@@ -39,24 +36,16 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, FileText, Mail, Loader, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, FileText, Mail, Loader } from "lucide-react";
 import { format } from "date-fns";
 import Link from "next/link";
-import type { IOrder, OrderStatus } from "@/types/order.type";
-import type { Client, ClientEmail } from "@/types/client.type";
+import type { IOrder } from "@/types/order.type";
 import dynamic from "next/dynamic";
 import { pdf } from "@react-pdf/renderer";
 import { InvoiceDocument } from "@/components/invoice/InvoicePDF";
 import { toast } from "sonner";
-import { MultiSelect } from "@/components/ui/multi-select";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from "@/components/ui/dialog";
+import { InvoiceEmailDialog } from "@/components/invoice/InvoiceEmailDialog";
+import { MONTH_OPTIONS } from "@/lib/constants";
 
 // Dynamically import the PDF component to avoid SSR issues
 const InvoicePDF = dynamic(() => import("@/components/invoice/InvoicePDF"), {
@@ -64,30 +53,7 @@ const InvoicePDF = dynamic(() => import("@/components/invoice/InvoicePDF"), {
     loading: () => <span>Loading PDF generator...</span>,
 });
 
-const statusLabels: Record<OrderStatus, string> = {
-    pending: "Pending",
-    in_progress: "In Progress",
-    quality_check: "Quality Check",
-    revision: "Revision",
-    completed: "Completed",
-    delivered: "Delivered",
-    cancelled: "Cancelled",
-};
-
-const months = [
-    { value: "1", label: "January" },
-    { value: "2", label: "February" },
-    { value: "3", label: "March" },
-    { value: "4", label: "April" },
-    { value: "5", label: "May" },
-    { value: "6", label: "June" },
-    { value: "7", label: "July" },
-    { value: "8", label: "August" },
-    { value: "9", label: "September" },
-    { value: "10", label: "October" },
-    { value: "11", label: "November" },
-    { value: "12", label: "December" },
-];
+const months = MONTH_OPTIONS;
 
 export default function InvoicePage() {
     const currentDate = new Date();
@@ -103,19 +69,7 @@ export default function InvoicePage() {
     const [paymentToken, setPaymentToken] = useState<string>("");
     const [showPDF, setShowPDF] = useState(false);
     const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
-    const [selectedEmailRecipients, setSelectedEmailRecipients] = useState<string[]>([]);
-
-    const { data: clientEmails, isLoading: isLoadingEmails } = useGetClientEmailsQuery(selectedClientId, {
-        skip: !selectedClientId || !isEmailDialogOpen,
-    });
-
-    const emailOptions = useMemo(() => {
-        if (!clientEmails) return [];
-        return clientEmails.map((item: ClientEmail) => ({
-            label: item.label,
-            value: item.email,
-        }));
-    }, [clientEmails]);
+    const [initialRecipients, setInitialRecipients] = useState<string[]>([]);
 
     const [sendInvoiceEmail, { isLoading: isSending }] =
         useSendInvoiceEmailMutation();
@@ -144,7 +98,7 @@ export default function InvoicePage() {
         }
     }, [years, selectedYear]);
 
-    // Fetch all orders for selected year/month (to get unique clients)
+    // Fetch all orders for selected year/month
     const { data: allOrdersData, isLoading: isLoadingAllOrders } =
         useGetOrdersQuery(
             selectedYear
@@ -164,7 +118,7 @@ export default function InvoicePage() {
         );
     }, [allOrdersData]);
 
-    // Extract unique clients from orders
+    // Extract unique clients
     const availableClients = useMemo(() => {
         const clientMap = new Map<
             string,
@@ -204,17 +158,14 @@ export default function InvoicePage() {
         );
     }, [allOrders, selectedClientId]);
 
-    // Get selected client details
     const selectedClient = useMemo(() => {
         return availableClients.find((c) => c._id === selectedClientId);
     }, [availableClients, selectedClientId]);
 
-    // Get selected order objects
     const selectedOrdersList = useMemo(() => {
         return orders.filter((order: IOrder) => selectedOrders.has(order._id));
     }, [orders, selectedOrders]);
 
-    // Calculate totals
     const totals = useMemo(() => {
         let totalImages = 0;
         let totalAmount = 0;
@@ -251,28 +202,21 @@ export default function InvoicePage() {
             if (result.success) {
                 const generatedNumber = result.formattedInvoiceNumber;
 
-                // Calculate date range
                 const orderDates = selectedOrdersList.map((o) =>
                     new Date(o.orderDate).getTime(),
                 );
                 const minDate = new Date(Math.min(...orderDates)).toISOString();
                 const maxDate = new Date(Math.max(...orderDates)).toISOString();
 
-                // Record invoice immediately to get the secure hashed link token
                 const recordResult = await recordInvoice({
                     invoiceNumber: generatedNumber,
                     clientName: selectedClient.name,
                     clientId: selectedClient.clientId,
-                    clientAddress:
-                        selectedClient.address ||
-                        selectedClient.officeAddress ||
-                        "N/A",
+                    clientAddress: selectedClient.address || selectedClient.officeAddress || "N/A",
                     companyName: selectedClient.officeAddress || "N/A",
                     totalAmount: totals.totalAmount,
                     currency: selectedClient.currency || "USD",
-                    dueDate: new Date(
-                        new Date().getTime() + 7 * 24 * 60 * 60 * 1000,
-                    ).toISOString(),
+                    dueDate: new Date(new Date().getTime() + 7 * 24 * 60 * 60 * 1000).toISOString(),
                     month: Number(selectedMonth),
                     year: Number(selectedYear),
                     totalImages: totals.totalImages,
@@ -289,15 +233,11 @@ export default function InvoicePage() {
                 }).unwrap();
 
                 if (recordResult.success && recordResult.invoice) {
-                    const invoiceData = recordResult.invoice as {
-                        paymentToken: string;
-                        [key: string]: unknown;
-                    };
+                    const invoiceData = recordResult.invoice as { paymentToken: string };
                     setInvoiceNumber(generatedNumber);
                     setPaymentToken(invoiceData.paymentToken);
                     setShowPDF(true);
 
-                    // Smooth scroll to PDF section
                     setTimeout(() => {
                         pdfSectionRef.current?.scrollIntoView({
                             behavior: "smooth",
@@ -312,7 +252,7 @@ export default function InvoicePage() {
         }
     };
 
-    const performDirectSend = async (emails: string[]) => {
+    const performEmailSend = async (emails: string[]) => {
         if (selectedOrders.size === 0 || !selectedClient || emails.length === 0) return;
 
         try {
@@ -324,37 +264,26 @@ export default function InvoicePage() {
                 if (result.success) {
                     currentInvoiceNumber = result.formattedInvoiceNumber;
 
-                    const orderDates = selectedOrdersList.map((o) =>
-                        new Date(o.orderDate).getTime(),
-                    );
-                    const minDate = new Date(
-                        Math.min(...orderDates),
-                    ).toISOString();
-                    const maxDate = new Date(
-                        Math.max(...orderDates),
-                    ).toISOString();
+                    const orderDates = selectedOrdersList.map((o) => new Date(o.orderDate).getTime());
+                    const minDate = new Date(Math.min(...orderDates)).toISOString();
+                    const maxDate = new Date(Math.max(...orderDates)).toISOString();
 
                     const recordResult = await recordInvoice({
                         invoiceNumber: currentInvoiceNumber,
                         clientName: selectedClient.name,
                         clientId: selectedClient.clientId,
-                        clientAddress:
-                            selectedClient.address ||
-                            selectedClient.officeAddress ||
-                            "N/A",
+                        clientAddress: selectedClient.address || selectedClient.officeAddress || "N/A",
                         companyName: selectedClient.officeAddress || "N/A",
                         totalAmount: totals.totalAmount,
                         currency: selectedClient.currency || "USD",
-                        dueDate: new Date(
-                            new Date().getTime() + 7 * 24 * 60 * 60 * 1000,
-                        ).toISOString(),
+                        dueDate: new Date(new Date().getTime() + 7 * 24 * 60 * 60 * 1000).toISOString(),
                         month: Number(selectedMonth),
                         year: Number(selectedYear),
                         totalImages: totals.totalImages,
                         dateFrom: minDate,
                         dateTo: maxDate,
                         totalOrders: selectedOrdersList.length,
-                        clientEmail: emails[0], // primary reference
+                        clientEmail: emails[0],
                         items: selectedOrdersList.map((order) => ({
                             name: order.orderName,
                             price: order.perImagePrice * order.imageQuantity,
@@ -362,10 +291,7 @@ export default function InvoicePage() {
                         })),
                     }).unwrap();
 
-                    const invoiceData = recordResult.invoice as {
-                        paymentToken: string;
-                        [key: string]: unknown;
-                    };
+                    const invoiceData = recordResult.invoice as { paymentToken: string };
                     currentToken = invoiceData.paymentToken;
 
                     setInvoiceNumber(currentInvoiceNumber);
@@ -376,15 +302,11 @@ export default function InvoicePage() {
             }
 
             const fileName = `Invoice_${selectedClient.clientId}_${selectedMonth}_${selectedYear}.pdf`;
-
             const blob = await pdf(
                 <InvoiceDocument
-                    client={selectedClient as Client}
+                    client={selectedClient}
                     orders={selectedOrdersList}
-                    month={
-                        months.find((m) => m.value === selectedMonth)?.label ||
-                        ""
-                    }
+                    month={months.find((m) => m.value === selectedMonth)?.label || ""}
                     year={selectedYear}
                     invoiceNumber={currentInvoiceNumber}
                     paymentToken={currentToken}
@@ -397,10 +319,7 @@ export default function InvoicePage() {
             formData.append("to", emails.join(', '));
             emails.forEach(email => formData.append("selectedEmails[]", email));
             formData.append("clientName", selectedClient.name);
-            formData.append(
-                "month",
-                months.find((m) => m.value === selectedMonth)?.label || "",
-            );
+            formData.append("month", months.find((m) => m.value === selectedMonth)?.label || "");
             formData.append("year", selectedYear);
 
             const result = await sendInvoiceEmail(formData).unwrap();
@@ -417,17 +336,13 @@ export default function InvoicePage() {
         }
     };
 
-    const handleSendDirectly = async () => {
-        if (selectedOrders.size === 0 || !selectedClient) return;
-
-        // Check email first
+    const handleOpenEmailDialog = () => {
+        if (!selectedClient) return;
         if (!selectedClient.emails || selectedClient.emails.length === 0) {
             toast.error("Client email is missing.");
             return;
         }
-
-        // Set default recipient to client's primary email
-        setSelectedEmailRecipients([selectedClient.emails[0]]);
+        setInitialRecipients([selectedClient.emails[0]]);
         setIsEmailDialogOpen(true);
     };
 
@@ -440,7 +355,6 @@ export default function InvoicePage() {
 
     return (
         <div className="p-6 space-y-6">
-            {/* Header */}
             <div className="flex items-center gap-4">
                 <Button variant="outline" size="icon" asChild>
                     <Link href="/orders">
@@ -448,381 +362,108 @@ export default function InvoicePage() {
                     </Link>
                 </Button>
                 <div>
-                    <h1 className="text-2xl font-bold">Generate Invoice</h1>
+                    <h1 className="text-2xl font-bold font-heading">Generate Invoice</h1>
                     <p className="text-muted-foreground">
                         Select year, month, and client to generate an invoice
                     </p>
                 </div>
             </div>
 
-            {/* Filters */}
             <Card>
                 <CardHeader>
                     <CardTitle>Select Orders</CardTitle>
-                    <CardDescription>
-                        Choose a year, month, and client to view orders
-                    </CardDescription>
+                    <CardDescription>Choose period and client to view available orders</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        {/* Year Select */}
                         <div className="space-y-2">
                             <label className="text-sm font-medium">Year</label>
-                            {isLoadingYears ? (
-                                <Skeleton className="h-10 w-full" />
-                            ) : (
-                                <Select
-                                    value={selectedYear}
-                                    onValueChange={(value) => {
-                                        setSelectedYear(value);
-                                        setSelectedClientId("");
-                                        setSelectedOrders(new Set());
-                                        setShowPDF(false);
-                                    }}
-                                >
-                                    <SelectTrigger className="w-full">
-                                        <SelectValue
-                                            placeholder={
-                                                years.length === 0
-                                                    ? "No orders found"
-                                                    : "Select year"
-                                            }
-                                        />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {years.map((year) => (
-                                            <SelectItem key={year} value={year}>
-                                                {year}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
+                            {isLoadingYears ? <Skeleton className="h-10 w-full" /> : (
+                                <Select value={selectedYear} onValueChange={(val) => { setSelectedYear(val); setSelectedClientId(""); setSelectedOrders(new Set()); setShowPDF(false); }}>
+                                    <SelectTrigger><SelectValue placeholder="Select year" /></SelectTrigger>
+                                    <SelectContent>{years.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}</SelectContent>
                                 </Select>
                             )}
                         </div>
 
-                        {/* Month Select */}
                         <div className="space-y-2">
                             <label className="text-sm font-medium">Month</label>
-                            <Select
-                                value={selectedMonth}
-                                onValueChange={(value) => {
-                                    setSelectedMonth(value);
-                                    setSelectedClientId("");
-                                    setSelectedOrders(new Set());
-                                    setShowPDF(false);
-                                }}
-                            >
-                                <SelectTrigger className="w-full">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {months.map((month) => (
-                                        <SelectItem
-                                            key={month.value}
-                                            value={month.value}
-                                        >
-                                            {month.label}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
+                            <Select value={selectedMonth} onValueChange={(val) => { setSelectedMonth(val); setSelectedClientId(""); setSelectedOrders(new Set()); setShowPDF(false); }}>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>{months.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent>
                             </Select>
                         </div>
 
-                        {/* Client Select - Dynamic based on Year/Month */}
                         <div className="space-y-2">
-                            <label className="text-sm font-medium">
-                                Client
-                            </label>
-                            {isLoadingAllOrders ? (
-                                <Skeleton className="h-10 w-full" />
-                            ) : (
-                                <Select
-                                    value={selectedClientId}
-                                    onValueChange={(value) => {
-                                        setSelectedClientId(value);
-                                        setSelectedOrders(new Set());
-                                        setShowPDF(false);
-                                    }}
-                                >
-                                    <SelectTrigger className="w-full">
-                                        <SelectValue
-                                            placeholder={
-                                                availableClients.length === 0
-                                                    ? "No clients found"
-                                                    : "Select a client"
-                                            }
-                                        />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {availableClients.map((client) => (
-                                            <SelectItem
-                                                key={client._id}
-                                                value={client._id}
-                                            >
-                                                {client.name} ({client.clientId}
-                                                )
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
+                            <label className="text-sm font-medium">Client</label>
+                            {isLoadingAllOrders ? <Skeleton className="h-10 w-full" /> : (
+                                <Select value={selectedClientId} onValueChange={(val) => { setSelectedClientId(val); setSelectedOrders(new Set()); setShowPDF(false); }}>
+                                    <SelectTrigger><SelectValue placeholder={availableClients.length === 0 ? "No clients found" : "Select a client"} /></SelectTrigger>
+                                    <SelectContent>{availableClients.map(c => <SelectItem key={c._id} value={c._id}>{c.name} ({c.clientId})</SelectItem>)}</SelectContent>
                                 </Select>
                             )}
-                            {!isLoadingAllOrders &&
-                                availableClients.length === 0 && (
-                                    <p className="text-xs text-muted-foreground">
-                                        No orders found for this period
-                                    </p>
-                                )}
                         </div>
 
-                        {/* Buttons */}
-                        <div className="flex items-end gap-2 flex-wrap">
-                            <Dialog open={isEmailDialogOpen} onOpenChange={setIsEmailDialogOpen}>
-                                <Button
-                                    onClick={handleSendDirectly}
-                                    disabled={
-                                        selectedOrders.size === 0 ||
-                                        isGeneratingInvoice ||
-                                        isSending
-                                    }
-                                    className="flex-1 bg-orange-500 hover:bg-orange-600"
-                                >
-                                    {isSending ? (
-                                        <Loader className="h-4 w-4  animate-spin" />
-                                    ) : (
-                                        <Mail className="h-4 w-4 " />
-                                    )}
-                                    {isSending ? "Processing..." : "Send"}
-                                </Button>
-                                <DialogContent className="sm:max-w-md">
-                                    <DialogHeader>
-                                        <DialogTitle className="flex items-center gap-2">
-                                            <Mail className="h-5 w-5 text-orange-500" />
-                                            Email Invoice
-                                        </DialogTitle>
-                                        <DialogDescription>
-                                            Select one or multiple recipients to receive this invoice.
-                                        </DialogDescription>
-                                    </DialogHeader>
-                                    <div className="flex flex-col space-y-4 py-6">
-                                        <div className="space-y-2">
-                                            <label className="text-sm font-medium">Recipients</label>
-                                            {isLoadingEmails ? (
-                                                <div className="h-10 flex items-center justify-center border rounded-md bg-muted/20">
-                                                    <Loader className="h-4 w-4 animate-spin text-muted-foreground mr-2" />
-                                                    <span className="text-xs text-muted-foreground">Loading email list...</span>
-                                                </div>
-                                            ) : (
-                                                <MultiSelect
-                                                    options={emailOptions}
-                                                    selected={selectedEmailRecipients}
-                                                    onChange={setSelectedEmailRecipients}
-                                                    placeholder="Select recipients..."
-                                                    className="w-full"
-                                                />
-                                            )}
-                                        </div>
-                                    </div>
-                                    <DialogFooter className="sm:justify-end gap-2">
-                                        <Button
-                                            type="button"
-                                            variant="secondary"
-                                            onClick={() => setIsEmailDialogOpen(false)}
-                                            disabled={isSending}
-                                        >
-                                            Cancel
-                                        </Button>
-                                        <Button
-                                            className="bg-orange-500 hover:bg-orange-600 min-w-[120px]"
-                                            disabled={isSending || selectedEmailRecipients.length === 0}
-                                            onClick={() => performDirectSend(selectedEmailRecipients)}
-                                        >
-                                            {isSending ? (
-                                                <>
-                                                    <Loader className="h-4 w-4 animate-spin mr-2" />
-                                                    Sending...
-                                                </>
-                                            ) : (
-                                                "Send Invoice"
-                                            )}
-                                        </Button>
-                                    </DialogFooter>
-                                </DialogContent>
-                            </Dialog>
-                            <Button
-                                onClick={handleGenerateInvoice}
-                                disabled={
-                                    selectedOrders.size === 0 ||
-                                    isGeneratingInvoice ||
-                                    isRecording ||
-                                    isSending
-                                }
-                                className="flex-1 bg-teal-500 hover:bg-teal-600"
-                            >
-                                {isGeneratingInvoice ? (
-                                    <Loader className="h-4 w-4  animate-spin" />
-                                ) : (
-                                    <FileText className="h-4 w-4 " />
-                                )}
-                                {isGeneratingInvoice
-                                    ? "Generating..."
-                                    : `Generate Invoice (${selectedOrders.size})`}
+                        <div className="flex items-end gap-2">
+                            <Button onClick={handleOpenEmailDialog} disabled={selectedOrders.size === 0 || isSending} className="flex-1 bg-orange-500 hover:bg-orange-600">
+                                {isSending ? <Loader className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4 mr-2" />}
+                                Send
+                            </Button>
+                            <Button onClick={handleGenerateInvoice} disabled={selectedOrders.size === 0 || isGeneratingInvoice || isRecording} className="flex-1 bg-teal-500 hover:bg-teal-600">
+                                {isGeneratingInvoice ? <Loader className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
+                                Preview
                             </Button>
                         </div>
                     </div>
                 </CardContent>
             </Card>
 
-            {/* Orders Table */}
             {selectedClientId && (
                 <Card>
-                    <CardHeader>
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <CardTitle>Orders</CardTitle>
-                                <CardDescription>
-                                    {selectedClient?.name} -{" "}
-                                    {
-                                        months.find(
-                                            (m) => m.value === selectedMonth,
-                                        )?.label
-                                    }{" "}
-                                    {selectedYear}
-                                </CardDescription>
-                            </div>
-                            {selectedOrders.size > 0 && (
-                                <div className="text-right">
-                                    <p className="text-sm text-muted-foreground">
-                                        Selected: {selectedOrders.size} orders
-                                    </p>
-                                    <p className="font-semibold">
-                                        Total:{" "}
-                                        {formatCurrency(totals.totalAmount)}
-                                    </p>
-                                </div>
-                            )}
+                    <CardHeader className="flex flex-row items-center justify-between">
+                        <div>
+                            <CardTitle>Orders for {selectedClient?.name}</CardTitle>
+                            <CardDescription>{months.find(m => m.value === selectedMonth)?.label} {selectedYear}</CardDescription>
                         </div>
+                        {selectedOrders.size > 0 && (
+                            <div className="text-right">
+                                <p className="text-sm text-muted-foreground">{selectedOrders.size} orders selected</p>
+                                <p className="text-lg font-bold text-primary">{formatCurrency(totals.totalAmount)}</p>
+                            </div>
+                        )}
                     </CardHeader>
                     <CardContent>
-                        <div className="border">
-                            {orders.length === 0 ? (
-                                <div className="p-8 text-center text-muted-foreground">
-                                    No orders found for this client in this
-                                    period
-                                </div>
-                            ) : (
+                        <div className="border rounded-md">
+                            {orders.length === 0 ? <div className="p-8 text-center text-muted-foreground">No orders found</div> : (
                                 <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead className="w-12 border">
-                                                <Checkbox
-                                                    checked={
-                                                        orders.length > 0 &&
-                                                        selectedOrders.size ===
-                                                        orders.length
-                                                    }
-                                                    onCheckedChange={
-                                                        handleSelectAll
-                                                    }
-                                                />
-                                            </TableHead>
-                                            <TableHead className="border">
-                                                Order Name
-                                            </TableHead>
-                                            <TableHead className="border">
-                                                Order Date
-                                            </TableHead>
-                                            <TableHead className="border">
-                                                Images
-                                            </TableHead>
-                                            <TableHead className="border">
-                                                Per Image
-                                            </TableHead>
-                                            <TableHead className="border">
-                                                Total
-                                            </TableHead>
-                                            <TableHead className="border">
-                                                Status
-                                            </TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {orders.map((order: IOrder) => (
-                                            <TableRow
-                                                key={order._id}
-                                                className={
-                                                    selectedOrders.has(
-                                                        order._id,
-                                                    )
-                                                        ? "bg-muted/50"
-                                                        : ""
-                                                }
-                                            >
-                                                <TableCell className="border">
-                                                    <Checkbox
-                                                        checked={selectedOrders.has(
-                                                            order._id,
-                                                        )}
-                                                        onCheckedChange={(
-                                                            checked,
-                                                        ) =>
-                                                            handleSelectOrder(
-                                                                order._id,
-                                                                checked as boolean,
-                                                            )
-                                                        }
-                                                    />
-                                                </TableCell>
-                                                <TableCell className="border">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="font-medium">
-                                                            {order.orderName}
-                                                        </span>
-                                                        {order.isPaid ? (
-                                                            <div className="flex items-center gap-1 w-fit bg-green-100 text-green-700 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase">
-                                                                <CheckCircle2 className="h-3 w-3" />
-                                                                Paid
-                                                            </div>
-                                                        ) : order.invoiceNumber ? (
-                                                            <div className="flex items-center gap-1 w-fit bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase">
-                                                                <FileText className="h-3 w-3" />
-                                                                Inv #{order.invoiceNumber}
-                                                            </div>
-                                                        ) : null}
+                                    <TableHeader><TableRow>
+                                        <TableHead className="w-12"><Checkbox checked={orders.length > 0 && selectedOrders.size === orders.length} onCheckedChange={handleSelectAll} /></TableHead>
+                                        <TableHead>Order Name</TableHead>
+                                        <TableHead>Date</TableHead>
+                                        <TableHead className="text-center">Images</TableHead>
+                                        <TableHead className="text-right">Price</TableHead>
+                                        <TableHead className="text-center">Status</TableHead>
+                                    </TableRow></TableHeader>
+                                    <TableBody>{orders.map(order => (
+                                        <TableRow key={order._id} className={selectedOrders.has(order._id) ? "bg-muted/50" : ""}>
+                                            <TableCell><Checkbox checked={selectedOrders.has(order._id)} onCheckedChange={(val) => handleSelectOrder(order._id, !!val)} /></TableCell>
+                                            <TableCell>
+                                                <div className="flex flex-col">
+                                                    <span className="font-medium">{order.orderName}</span>
+                                                    <div className="flex gap-1 mt-1">
+                                                        {order.isPaid && <Badge className="text-[9px] bg-green-100 text-green-700">PAID</Badge>}
+                                                        {order.invoiceNumber && <Badge className="text-[9px] bg-blue-100 text-blue-700">INV #{order.invoiceNumber}</Badge>}
                                                     </div>
-                                                </TableCell>
-                                                <TableCell className="border">
-                                                    {format(
-                                                        new Date(
-                                                            order.orderDate,
-                                                        ),
-                                                        "MMM dd, yyyy",
-                                                    )}
-                                                </TableCell>
-                                                <TableCell className="border">
-                                                    {order.imageQuantity}
-                                                </TableCell>
-                                                <TableCell className="border">
-                                                    {formatCurrency(
-                                                        order.perImagePrice,
-                                                    )}
-                                                </TableCell>
-                                                <TableCell className="font-medium border">
-                                                    {formatCurrency(
-                                                        order.totalPrice,
-                                                    )}
-                                                </TableCell>
-                                                <TableCell className="border">
-                                                    <Badge variant="outline">
-                                                        {
-                                                            statusLabels[
-                                                            order.status
-                                                            ]
-                                                        }
-                                                    </Badge>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="text-xs">{format(new Date(order.orderDate), "MMM dd, yyyy")}</TableCell>
+                                            <TableCell className="text-center font-bold">{order.imageQuantity}</TableCell>
+                                            <TableCell className="text-right font-semibold">{formatCurrency(order.totalPrice)}</TableCell>
+                                            <TableCell className="text-center">
+                                                <Badge variant="outline" className="capitalize text-[10px]">{order.status.replace('_', ' ')}</Badge>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}</TableBody>
                                 </Table>
                             )}
                         </div>
@@ -830,21 +471,37 @@ export default function InvoicePage() {
                 </Card>
             )}
 
-            {/* PDF Preview */}
-            {showPDF && selectedClient && selectedOrdersList.length > 0 && (
-                <div ref={pdfSectionRef}>
-                    <InvoicePDF
-                        client={selectedClient as Client}
-                        orders={selectedOrdersList}
-                        month={
-                            months.find((m) => m.value === selectedMonth)
-                                ?.label || ""
-                        }
-                        year={selectedYear}
-                        invoiceNumber={invoiceNumber}
-                        paymentToken={paymentToken}
-                        totals={totals}
-                    />
+            <InvoiceEmailDialog
+                isOpen={isEmailDialogOpen}
+                onClose={() => setIsEmailDialogOpen(false)}
+                clientId={selectedClientId}
+                onSend={performEmailSend}
+                isSending={isSending}
+                defaultEmails={initialRecipients}
+            />
+
+            {showPDF && (
+                <div ref={pdfSectionRef} className="pt-8 border-t space-y-4">
+                    <div className="flex items-center justify-between">
+                        <h2 className="text-xl font-bold font-heading">Invoice Preview</h2>
+                        <Button variant="outline" onClick={() => setShowPDF(false)}>Close Preview</Button>
+                    </div>
+                    <Card><CardContent className="p-0 bg-muted/20 min-h-[600px] flex items-center justify-center">
+                        {selectedClient && (
+                            <InvoicePDF
+                                client={selectedClient}
+                                orders={selectedOrdersList}
+                                invoiceNumber={invoiceNumber}
+                                paymentToken={paymentToken}
+                                totals={totals}
+                                month={
+                                    months.find((m) => m.value === selectedMonth)
+                                        ?.label || ""
+                                }
+                                year={selectedYear}
+                            />
+                        )}
+                    </CardContent></Card>
                 </div>
             )}
         </div>

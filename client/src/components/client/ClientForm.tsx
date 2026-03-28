@@ -29,13 +29,16 @@ import { MultiSelect } from '@/components/ui/multi-select';
 import { Card, CardContent } from '@/components/ui/card';
 
 // Zod schema for client form validation
+// Team member schema needs _id to correctly handle existing records from the API
 const teamMemberSchema = z.object({
+    _id: z.string().optional(),
     name: z.string().min(1, 'Name is required'),
     email: z.string().email('Invalid email'),
     phone: z.string().optional(),
     designation: z.string().optional(),
 });
 
+// We use { value: string }[] for emails to correctly support React Hook Form's useFieldArray
 export const clientFormSchema = z.object({
     clientId: z
         .string()
@@ -51,7 +54,7 @@ export const clientFormSchema = z.object({
         .min(1, 'Name is required')
         .min(2, 'Name must be at least 2 characters'),
     emails: z
-        .array(z.string().email('Invalid email address'))
+        .array(z.object({ value: z.string().email('Invalid email address') }))
         .min(1, 'At least one email is required'),
     phone: z.string().optional(),
     address: z.string().optional(),
@@ -59,11 +62,33 @@ export const clientFormSchema = z.object({
     description: z.string().optional(),
     currency: z.string().optional(),
     status: z.enum(['active', 'inactive']),
-    teamMembers: z.array(teamMemberSchema).default([]),
-    assignedServices: z.array(z.string()).default([]),
+    teamMembers: z.array(teamMemberSchema),
+    assignedServices: z.array(z.string()),
 });
 
-export type ClientFormData = z.infer<typeof clientFormSchema>;
+// FormValues is the internal state that React Hook Form manages
+export type FormValues = z.infer<typeof clientFormSchema>;
+
+// ClientFormData is the cleaned up data that the API expects
+export interface ClientFormData {
+    clientId: string;
+    name: string;
+    emails: string[];
+    phone?: string;
+    address?: string;
+    officeAddress?: string;
+    description?: string;
+    currency?: string;
+    status: 'active' | 'inactive';
+    teamMembers: {
+        _id?: string;
+        name: string;
+        email: string;
+        phone?: string;
+        designation?: string;
+    }[];
+    assignedServices: string[];
+}
 
 interface ClientFormProps {
     defaultValues?: Partial<ClientFormData>;
@@ -102,14 +127,14 @@ export function ClientForm({
     const { data: servicesData } = useGetServicesQuery({ isActive: true });
     
     const [clientIdError, setClientIdError] = useState<string | null>(null);
-    const debounceRef = useRef<NodeJS.Timeout | null>(null);
+    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    const form = useForm<ClientFormData>({
+    const form = useForm<FormValues>({
         resolver: zodResolver(clientFormSchema),
         defaultValues: {
             clientId: defaultValues?.clientId || '',
             name: defaultValues?.name || '',
-            emails: defaultValues?.emails || [''],
+            emails: defaultValues?.emails?.map(email => ({ value: email })) || [{ value: '' }],
             phone: defaultValues?.phone || '',
             address: defaultValues?.address || '',
             officeAddress: defaultValues?.officeAddress || '',
@@ -132,7 +157,7 @@ export function ClientForm({
 
     const { fields: emailFields, append: appendEmail, remove: removeEmail } = useFieldArray({
         control,
-        name: "emails" as never,
+        name: "emails",
     });
 
     const { fields: teamFields, append: appendTeam, remove: removeTeam } = useFieldArray({
@@ -140,6 +165,7 @@ export function ClientForm({
         name: "teamMembers",
     });
 
+    // eslint-disable-next-line react-hooks/incompatible-library
     const clientIdValue = watch('clientId');
 
     // Debounced client ID check
@@ -176,39 +202,63 @@ export function ClientForm({
         };
     }, [clientIdValue, isEditMode, checkClientId]);
 
-    const handleFormSubmit = async (data: ClientFormData) => {
+    const handleFormSubmit = async (data: FormValues) => {
         if (clientIdError && !isEditMode) {
             return;
         }
-        await onSubmit(data);
+        // Explicitly map internal FormValues to API-ready ClientFormData
+        const formattedData: ClientFormData = {
+            clientId: data.clientId,
+            name: data.name,
+            emails: data.emails.map(e => e.value),
+            phone: data.phone,
+            address: data.address,
+            officeAddress: data.officeAddress,
+            description: data.description,
+            currency: data.currency,
+            status: data.status,
+            teamMembers: data.teamMembers,
+            assignedServices: data.assignedServices,
+        };
+        await onSubmit(formattedData);
     };
 
     const getFieldError = (fieldName: string) => {
         if (fieldName === 'clientId' && clientIdError) return clientIdError;
 
-        // Handle nested errors for emails array
+        // Handle nested errors for emails array of objects
         if (fieldName.startsWith('emails')) {
             const parts = fieldName.split('.');
-            const index = parseInt(parts[1]);
-            const emailErrors = errors.emails as any;
-            if (emailErrors && emailErrors[index]?.message) {
-                return emailErrors[index].message;
+            if (parts.length >= 2) {
+                const index = parseInt(parts[1]);
+                const emailErrors = errors.emails;
+                if (emailErrors && emailErrors[index]?.value?.message) {
+                    return emailErrors[index]?.value?.message;
+                }
             }
         }
 
         // Handle nested errors for teamMembers array
         if (fieldName.startsWith('teamMembers')) {
             const parts = fieldName.split('.');
-            const index = parseInt(parts[1]);
-            const subField = parts[2];
-            const teamErrors = errors.teamMembers as any;
-            if (teamErrors && teamErrors[index] && teamErrors[index][subField]?.message) {
-                return teamErrors[index][subField].message;
+            if (parts.length >= 3) {
+                const index = parseInt(parts[1]);
+                const subField = parts[2] as keyof FormValues['teamMembers'][0];
+                const teamErrors = errors.teamMembers;
+                if (teamErrors && teamErrors[index]) {
+                    const fieldError = teamErrors[index]?.[subField];
+                    if (fieldError && typeof fieldError === 'object' && 'message' in fieldError && typeof fieldError.message === 'string') {
+                        return fieldError.message;
+                    }
+                }
             }
         }
 
-        const error = (errors as any)[fieldName];
-        if (error?.message) return error.message;
+        // Root level fields
+        const error = errors[fieldName as keyof typeof errors];
+        if (error && typeof error === 'object' && 'message' in error && typeof error.message === 'string') {
+            return error.message;
+        }
 
         if (serverErrors?.[fieldName]?.[0]) {
             return serverErrors[fieldName][0];
@@ -219,6 +269,7 @@ export function ClientForm({
     // Prepare options for MultiSelect
     const serviceOptions = servicesData?.data?.map(s => ({
         label: s.name,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         value: (s as any)._id
     })) || [];
 
@@ -276,7 +327,7 @@ export function ClientForm({
                             <div key={field.id} className="space-y-1">
                                 <div className="flex gap-2">
                                     <Input
-                                        {...register(`emails.${index}` as const)}
+                                        {...register(`emails.${index}.value` as const)}
                                         type="email"
                                         placeholder="email@example.com"
                                         className={cn(getFieldError(`emails.${index}`) && 'border-destructive')}
@@ -301,7 +352,7 @@ export function ClientForm({
                             type="button"
                             variant="outline"
                             size="sm"
-                            onClick={() => appendEmail('' as any)}
+                            onClick={() => appendEmail({ value: '' })}
                             className="w-full sm:w-auto"
                         >
                             <Plus className="h-4 w-4 mr-2" />
