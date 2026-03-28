@@ -3,6 +3,7 @@ import StaffModel from "../models/staff.model.js";
 import type IStaff from "../types/staff.type.js";
 import { startOfDay, endOfDay } from "date-fns";
 import { escapeRegex } from "../lib/sanitize.js";
+import auditService from "./audit.service.js";
 
 export type IStaffQueryParams = {
     page?: number;
@@ -582,8 +583,10 @@ async function updateProfileInDB(payload: {
 async function viewSalaryWithPassword(payload: {
     userId: string;
     password: string;
+    ipAddress?: string | undefined;
+    userAgent?: string | undefined;
 }) {
-    const { userId, password } = payload;
+    const { userId, password, ipAddress, userAgent } = payload;
 
     // Get user from database
     const db = (await import("../lib/db.js")).client;
@@ -627,6 +630,17 @@ async function viewSalaryWithPassword(payload: {
         );
     }
 
+    // Log Salary View
+    await auditService.createLog({
+        userId,
+        action: 'SALARY_VIEW',
+        entity: 'Staff',
+        entityId: staff._id.toString(),
+        ipAddress,
+        userAgent,
+        details: { staffId: staff.staffId }
+    });
+
     return {
         salary: staff.salary,
         salaryVisibleToEmployee: staff.salaryVisibleToEmployee,
@@ -639,9 +653,18 @@ async function updateSalaryInDB(payload: {
     salaryVisibleToEmployee?: boolean;
     changedBy?: string;
     reason?: string;
+    ipAddress?: string | undefined;
+    userAgent?: string | undefined;
 }) {
-    const { staffId, salary, salaryVisibleToEmployee, changedBy, reason } =
-        payload;
+    const {
+        staffId,
+        salary,
+        salaryVisibleToEmployee,
+        changedBy,
+        reason,
+        ipAddress,
+        userAgent,
+    } = payload;
 
     const staff = await StaffModel.findById(staffId);
     if (!staff) throw new Error("Staff not found");
@@ -677,6 +700,23 @@ async function updateSalaryInDB(payload: {
         { new: true },
     );
 
+    if (updated && changedBy) {
+        await auditService.createLog({
+            userId: changedBy,
+            action: 'SALARY_UPDATE',
+            entity: 'Staff',
+            entityId: staffId,
+            ipAddress,
+            userAgent,
+            details: {
+                previousSalary: staff.salary,
+                newSalary: salary,
+                reason: reason || "Salary Adjustment",
+                visible: salaryVisibleToEmployee
+            }
+        });
+    }
+
     return updated;
 }
 
@@ -694,8 +734,10 @@ async function updateStaffInDB(payload: {
     staffData: Partial<IStaff>;
     role?: string;
     changedBy?: string;
+    ipAddress?: string | undefined;
+    userAgent?: string | undefined;
 }) {
-    const { staffId, staffData, role, changedBy } = payload;
+    const { staffId, staffData, role, changedBy, ipAddress, userAgent } = payload;
 
     const session = await mongoose.startSession();
     session.startTransaction();
@@ -749,6 +791,23 @@ async function updateStaffInDB(payload: {
         }
 
         await session.commitTransaction();
+
+        if (changedBy) {
+            const isSalaryChange = staffData.salary !== undefined && staffData.salary !== staff.salary;
+            await auditService.createLog({
+                userId: changedBy,
+                action: isSalaryChange ? 'SALARY_UPDATE' : 'UPDATE',
+                entity: 'Staff',
+                entityId: staff._id.toString(),
+                ipAddress,
+                userAgent,
+                details: {
+                    updatedFields: Object.keys(staffData),
+                    roleChanged: !!role
+                }
+            });
+        }
+
         return updatedStaff;
     } catch (err) {
         await session.abortTransaction();
@@ -758,7 +817,13 @@ async function updateStaffInDB(payload: {
     }
 }
 
-async function setSalaryPin(staffId: string, pin: string, _changedBy: string) {
+async function setSalaryPin(
+    staffId: string,
+    pin: string,
+    changedBy: string,
+    ipAddress?: string | undefined,
+    userAgent?: string | undefined,
+) {
     const session = await mongoose.startSession();
     session.startTransaction();
 
@@ -781,8 +846,16 @@ async function setSalaryPin(staffId: string, pin: string, _changedBy: string) {
             { session },
         );
 
-        // Can log this action if needed
-        // await AuditLog.create(...)
+        // Log PIN set action
+        await auditService.createLog({
+            userId: changedBy,
+            action: 'UPDATE',
+            entity: 'Staff',
+            entityId: staff._id.toString(),
+            ipAddress,
+            userAgent,
+            details: { action: 'SET_SALARY_PIN' }
+        });
 
         await session.commitTransaction();
         return { success: true, message: "Salary PIN set successfully" };

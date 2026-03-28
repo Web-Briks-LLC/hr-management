@@ -171,6 +171,8 @@ async function viewSalary(req: Request, res: Response) {
         const result = await StaffServices.viewSalaryWithPassword({
             userId,
             password,
+            ipAddress: req.ip,
+            userAgent: req.headers['user-agent'],
         });
 
         return res.status(200).json({ success: true, data: result });
@@ -206,6 +208,10 @@ async function updateSalary(req: Request, res: Response) {
             payload.salaryVisibleToEmployee = salaryVisibleToEmployee;
         if (req.user?.id) payload.changedBy = req.user.id;
         if (reason !== undefined) payload.reason = reason;
+        
+        // Add audit context
+        (payload as any).ipAddress = req.ip;
+        (payload as any).userAgent = req.headers['user-agent'];
 
         const result = await StaffServices.updateSalaryInDB(payload);
 
@@ -293,6 +299,8 @@ async function updateStaff(req: Request, res: Response) {
             },
             role,
             changedBy: changedBy || 'system',
+            ipAddress: req.ip,
+            userAgent: req.headers['user-agent'],
         });
 
         return res.status(200).json({ success: true, staff: result });
@@ -322,6 +330,8 @@ async function setSalaryPin(req: Request, res: Response) {
             staffId,
             pin,
             changedBy || 'system',
+            req.ip,
+            req.headers['user-agent'],
         );
 
         return res.status(200).json(result);

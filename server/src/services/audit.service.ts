@@ -6,8 +6,8 @@ async function createLog(data: {
     entity: string;
     entityId?: string;
     details?: any;
-    ipAddress?: string;
-    userAgent?: string;
+    ipAddress?: string | undefined;
+    userAgent?: string | undefined;
 }) {
     await (AuditLogModel.create as any)(data);
 }

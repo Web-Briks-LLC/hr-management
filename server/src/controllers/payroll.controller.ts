@@ -39,6 +39,8 @@ const processPayment = async (req: Request, res: Response) => {
             deduction,
             createdBy: (req as any).user.id || (req as any).user._id,
             paymentType,
+            ipAddress: req.ip,
+            userAgent: req.headers['user-agent'],
         });
 
         return res.status(200).json({
@@ -65,6 +67,8 @@ const bulkProcessPayment = async (req: Request, res: Response) => {
             paymentMethod,
             createdBy: userId,
             paymentType,
+            ipAddress: req.ip,
+            userAgent: req.headers['user-agent'],
         });
 
         return res.status(200).json({
@@ -87,6 +91,11 @@ const graceAttendance = async (req: Request, res: Response) => {
         const result = await payrollService.graceAttendance(
             staffId,
             dates,
+            {
+                userId: (req as any).user.id,
+                ipAddress: req.ip,
+                userAgent: req.headers['user-agent'],
+            },
             note,
         );
         return res.status(200).json({
@@ -118,6 +127,11 @@ const undoPayment = async (req: Request, res: Response) => {
             staffId,
             month,
             paymentType,
+            {
+                userId: (req as any).user.id,
+                ipAddress: req.ip,
+                userAgent: req.headers['user-agent'],
+            }
         );
         return res.status(200).json({
             success: true,
@@ -158,8 +172,10 @@ const lockMonth = async (req: Request, res: Response) => {
     try {
         const { month } = req.body;
         const userId = (req as any).user.id || (req as any).user._id;
-
-        const lock = await payrollService.lockMonth(month, userId);
+        const ipAddress = req.ip;
+        const userAgent = (req.headers['user-agent'] as string) || '';
+        
+        const lock = await payrollService.lockMonth(month, userId, ipAddress, userAgent);
         return res.status(200).json({
             success: true,
             message: `Payroll for ${month} has been locked`,
@@ -177,7 +193,14 @@ const unlockMonth = async (req: Request, res: Response) => {
     try {
         const { month } = req.body;
 
-        await payrollService.unlockMonth(month);
+        const userId = (req as any).user.id;
+        
+        await payrollService.unlockMonth(month, {
+            userId,
+            ipAddress: req.ip,
+            userAgent: req.headers['user-agent'],
+        });
+        
         return res.status(200).json({
             success: true,
             message: `Payroll for ${month} has been unlocked`,
@@ -202,6 +225,11 @@ const setAttendance = async (req: Request, res: Response) => {
             staffId,
             date,
             status,
+            context: {
+                userId: (req as any).user.id || (req as any).user._id,
+                ipAddress: req.ip,
+                userAgent: req.headers['user-agent'],
+            }
         });
 
         return res.status(200).json({

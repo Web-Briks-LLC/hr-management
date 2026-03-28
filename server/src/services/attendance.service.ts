@@ -13,6 +13,7 @@ import {
   getBDMonthRange,
   getBDWeekDay,
 } from "../utils/date.util.js";
+import auditService from "./audit.service.js";
 
 const checkInInDB = async ({
   userId,
@@ -675,11 +676,16 @@ async function updateAttendanceStatusInDB({
   attendanceId,
   status,
   notes,
+  updatedBy,
+  ipAddress,
+  userAgent,
 }: {
   attendanceId: string;
   status: string;
   notes?: string;
   updatedBy: string;
+  ipAddress?: string | undefined;
+  userAgent?: string | undefined;
 }) {
   const validStatuses = [
     "present",
@@ -704,6 +710,8 @@ async function updateAttendanceStatusInDB({
     throw new Error("Attendance record not found");
   }
 
+  const oldStatus = attendanceDay.status;
+
   // Update attendance
   attendanceDay.status = status as any;
   attendanceDay.isManual = true;
@@ -713,14 +721,20 @@ async function updateAttendanceStatusInDB({
 
   await attendanceDay.save();
 
-  // Log audit trail (optional - import AuditLog model if you have it)
-  // await AuditLogModel.create({
-  //     action: 'UPDATE_ATTENDANCE_STATUS',
-  //     performedBy: updatedBy,
-  //     targetId: attendanceId,
-  //     changes: { from: oldStatus, to: status },
-  //     notes,
-  // });
+  // Log audit trail
+  await auditService.createLog({
+      userId: updatedBy,
+      action: 'ATTENDANCE_UPDATE',
+      entity: 'AttendanceDay',
+      entityId: attendanceId,
+      ipAddress,
+      userAgent,
+      details: {
+          from: oldStatus,
+          to: status,
+          notes
+      }
+  });
 
   return attendanceDay;
 }

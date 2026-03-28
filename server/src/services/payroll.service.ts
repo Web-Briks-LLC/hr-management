@@ -9,6 +9,7 @@ import { PayrollLockModel } from '../models/payroll-lock.model.js';
 import SalaryAdjustmentLogModel from '../models/salary-adjustment-log.model.js';
 import mongoose, { Types } from 'mongoose';
 import { getBDMonthRange, getBDNow, getBDWeekDay, getBDStartOfDay, getBDDateString } from '../utils/date.util.js';
+import auditService from './audit.service.js';
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
@@ -398,6 +399,8 @@ interface IPayrollProcessParams {
     deduction?: number;
     createdBy: string;
     paymentType?: 'salary' | 'overtime';
+    ipAddress?: string | undefined;
+    userAgent?: string | undefined;
 }
 
 const processPayroll = async ({
@@ -410,6 +413,8 @@ const processPayroll = async ({
     deduction = 0,
     createdBy,
     paymentType = 'salary',
+    ipAddress,
+    userAgent,
 }: IPayrollProcessParams) => {
     // Check if month is locked
     const locked = await PayrollLockModel.findOne({ month });
@@ -644,6 +649,25 @@ const processPayroll = async ({
         }
 
         await session.commitTransaction();
+
+        // Log Payment Process
+        await auditService.createLog({
+            userId: createdBy,
+            action: 'PAYMENT_PROCESS',
+            entity: 'Staff',
+            entityId: staffId,
+            ipAddress,
+            userAgent,
+            details: {
+                month,
+                amount,
+                paymentType,
+                bonus,
+                deduction,
+                expenseId: createdExpense._id
+            }
+        });
+
         return createdExpense;
     } catch (error) {
         await session.abortTransaction();
@@ -667,6 +691,8 @@ interface IBulkPayrollParams {
     paymentMethod: string;
     createdBy: string;
     paymentType?: 'salary' | 'overtime';
+    ipAddress?: string | undefined;
+    userAgent?: string | undefined;
 }
 
 const bulkProcessPayment = async ({
@@ -675,6 +701,8 @@ const bulkProcessPayment = async ({
     paymentMethod,
     createdBy,
     paymentType = 'salary',
+    ipAddress,
+    userAgent,
 }: IBulkPayrollParams) => {
     // Check lock once at bulk level
     const locked = await PayrollLockModel.findOne({ month });
@@ -699,6 +727,8 @@ const bulkProcessPayment = async ({
                 deduction: payment.deduction ?? 0,
                 createdBy,
                 paymentType,
+                ipAddress,
+                userAgent,
             });
             results.push({
                 staffId: payment.staffId,
@@ -722,6 +752,11 @@ const bulkProcessPayment = async ({
 const graceAttendance = async (
     staffId: string,
     dates: string[],
+    context: {
+        userId: string;
+        ipAddress?: string | undefined;
+        userAgent?: string | undefined;
+    },
     note?: string,
 ) => {
     const updatedRecords = [];
@@ -751,13 +786,30 @@ const graceAttendance = async (
         });
 
         if (attendance) {
+            const oldStatus = attendance.status;
             attendance.status = 'present';
             attendance.notes = note
                 ? `${attendance.notes || ''} [Grace: ${note}]`
                 : (attendance.notes ?? null);
             attendance.isManual = true;
-            await attendance.save();
-            updatedRecords.push(attendance);
+            const result = await attendance.save();
+
+            // Log Attendance Update
+            await auditService.createLog({
+                userId: context.userId,
+                action: 'ATTENDANCE_UPDATE',
+                entity: 'AttendanceDay',
+                entityId: result._id.toString(),
+                ipAddress: context.ipAddress,
+                userAgent: context.userAgent,
+                details: {
+                    staffId,
+                    date,
+                    status: 'present',
+                    previousStatus: oldStatus
+                }
+            });
+            updatedRecords.push(result);
         } else {
             // Find shift for this specific day
             const dayAssignment = (allAssignments as any[]).find((sa) => {
@@ -790,6 +842,21 @@ const graceAttendance = async (
     if (updatedRecords.length === 0) {
         throw new Error('No absent records found for the provided dates');
     }
+
+    // Log Grace Action
+    await auditService.createLog({
+        userId: context.userId,
+        action: 'GRACE_ATTENDANCE',
+        entity: 'Staff',
+        entityId: staffId,
+        ipAddress: context.ipAddress,
+        userAgent: context.userAgent,
+        details: {
+            dates,
+            note,
+            recordCount: updatedRecords.length
+        }
+    });
 
     return updatedRecords;
 };
@@ -877,9 +944,14 @@ const getAbsentDates = async (staffId: string, month: string) => {
 // ── Undo Payment (UTC-safe) ────────────────────────────────────────────
 
 const undoPayroll = async (
-    staffId: string,
-    month: string,
-    paymentType: 'salary' | 'overtime' = 'salary',
+    staffId: string, 
+    month: string, 
+    paymentType: string = 'salary',
+    context: {
+        userId: string;
+        ipAddress?: string | undefined;
+        userAgent?: string | undefined;
+    }
 ) => {
     // Check lock
     const locked = await PayrollLockModel.findOne({ month });
@@ -915,7 +987,22 @@ const undoPayroll = async (
         throw new Error('Payroll record not found for this month');
     }
 
-    return { message: 'Payroll payment undone successfully' };
+    // Log Payment Undo
+    await auditService.createLog({
+        userId: context.userId,
+        action: 'PAYMENT_UNDO',
+        entity: 'Staff',
+        entityId: staffId,
+        ipAddress: context.ipAddress,
+        userAgent: context.userAgent,
+        details: {
+            month,
+            paymentType,
+            expenseId: expense._id
+        }
+    });
+
+    return { success: true };
 };
 
 // ── Payroll Lock Management ────────────────────────────────────────────
@@ -924,37 +1011,67 @@ const getLockStatus = async (month: string) => {
     return await PayrollLockModel.findOne({ month });
 };
 
-const lockMonth = async (month: string, userId: string) => {
+const lockMonth = async (month: string, userId: string, ipAddress?: string | undefined, userAgent?: string | undefined) => {
     const existing = await PayrollLockModel.findOne({ month });
     if (existing) {
         throw new Error(`Payroll for ${month} is already locked`);
     }
 
-    return await PayrollLockModel.create({
+    const lock = await PayrollLockModel.create({
         month,
-        lockedBy: new Types.ObjectId(userId),
+        lockedBy: userId,
     });
+
+    // Log Lock Action
+    await auditService.createLog({
+        userId,
+        action: 'PAYROLL_LOCK',
+        entity: 'PayrollLock',
+        entityId: lock._id.toString(),
+        ipAddress,
+        userAgent,
+        details: { month }
+    });
+
+    return lock;
 };
 
-const unlockMonth = async (month: string) => {
-    const result = await PayrollLockModel.findOneAndDelete({ month });
-    if (!result) {
-        throw new Error(`Payroll for ${month} is not locked`);
+const unlockMonth = async (month: string, context: {
+    userId: string;
+    ipAddress?: string | undefined;
+    userAgent?: string | undefined;
+}) => {
+    const lock = await PayrollLockModel.findOneAndDelete({ month });
+
+    if (lock) {
+        // Log Unlock Action
+        await auditService.createLog({
+            userId: context.userId,
+            action: 'PAYROLL_UNLOCK',
+            entity: 'PayrollLock',
+            entityId: (lock as any)._id.toString(),
+            ipAddress: context.ipAddress,
+            userAgent: context.userAgent,
+            details: { month }
+        });
     }
-    return result;
+
+    return lock;
 };
 
 // ── Set / Create Attendance from Calendar ──────────────────────────────
 
-const setAttendance = async ({
-    staffId,
-    date,
-    status,
-}: {
+async function setAttendance(payload: {
     staffId: string;
-    date: string; // YYYY-MM-DD
+    date: string;
     status: string;
-}) => {
+    context: {
+        userId: string;
+        ipAddress?: string | undefined;
+        userAgent?: string | undefined;
+    }
+}) {
+    const { staffId, date, status, context } = payload;
     // 1. Find shift assignment for this staff on this date
     const assignment = await ShiftAssignmentModel.findOne({
         staffId: new Types.ObjectId(staffId),
@@ -980,12 +1097,30 @@ const setAttendance = async ({
     });
 
     if (existing) {
+        const previousStatus = existing.status;
         existing.status = status as any;
         existing.isManual = true;
         existing.notes = (existing.notes || '') + ' | Manually updated via Payroll Calendar';
         existing.processedAt = getBDNow();
-        await existing.save();
-        return existing;
+        const result = await existing.save();
+
+        // Log Attendance Update
+        await auditService.createLog({
+            userId: context.userId,
+            action: 'ATTENDANCE_UPDATE',
+            entity: 'AttendanceDay',
+            entityId: result._id.toString(),
+            ipAddress: context.ipAddress,
+            userAgent: context.userAgent,
+            details: {
+                staffId,
+                date,
+                status,
+                previousStatus
+            }
+        });
+
+        return result;
     }
 
     // Create new
@@ -999,8 +1134,24 @@ const setAttendance = async ({
         processedAt: getBDNow(),
     });
 
+    // Log Attendance Create
+    await auditService.createLog({
+        userId: context.userId,
+        action: 'ATTENDANCE_UPDATE',
+        entity: 'AttendanceDay',
+        entityId: newRecord._id.toString(),
+        ipAddress: context.ipAddress,
+        userAgent: context.userAgent,
+        details: {
+            staffId,
+            date,
+            status,
+            previousStatus: 'absent'
+        }
+    });
+
     return newRecord;
-};
+}
 
 export default {
     getPayrollPreview,

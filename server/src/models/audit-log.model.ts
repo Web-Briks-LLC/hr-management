@@ -26,7 +26,10 @@ const auditLogSchema = new Schema<IAuditLog>(
                 'LOGIN', 'LOGOUT',
                 'SALARY_VIEW', 'SALARY_UPDATE',
                 'INVITATION_CREATE', 'INVITATION_ACCEPT',
-                'PROFILE_UPDATE', 'PASSWORD_CHANGE'
+                'PROFILE_UPDATE', 'PASSWORD_CHANGE',
+                'ATTENDANCE_UPDATE', 'GRACE_ATTENDANCE',
+                'PAYMENT_PROCESS', 'PAYMENT_UNDO',
+                'PAYROLL_LOCK', 'PAYROLL_UNLOCK'
             ],
         },
         entity: {
