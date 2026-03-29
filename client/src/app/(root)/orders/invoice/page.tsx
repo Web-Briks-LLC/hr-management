@@ -324,8 +324,8 @@ export default function InvoicePage() {
 
             const result = await sendInvoiceEmail(formData).unwrap();
 
-            if (result.success) {
-                toast.success(`Invoice sent successfully to ${emails.length} recipient(s)`);
+            if (result.success !== false) {
+                toast.success(result.message || `Invoice sent successfully to ${emails.length} recipient(s)`);
                 setIsEmailDialogOpen(false);
             } else {
                 throw new Error(result.message || "Failed to send email");

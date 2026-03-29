@@ -117,6 +117,7 @@ export const sendInvoiceEmailHandler = async (req: Request, res: Response) => {
         }
 
         return res.status(200).json({
+            success: true,
             message: `Invoice sent successfully to ${recipients.length} recipient(s)`,
         });
     } catch (error) {
