@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useEffect, useRef, useMemo } from 'react';
+import { useForm, useFieldArray, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
@@ -122,11 +122,10 @@ export function ClientForm({
     serverErrors,
     isEditMode = false,
 }: ClientFormProps) {
-    const [checkClientId, { isFetching: isCheckingId }] =
+    const [checkClientId, { isFetching: isCheckingId, data: checkResult, originalArgs: lastCheckedClientId }] =
         useLazyCheckClientIdQuery();
     const { data: servicesData } = useGetServicesQuery({ isActive: true });
     
-    const [clientIdError, setClientIdError] = useState<string | null>(null);
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const form = useForm<FormValues>({
@@ -151,7 +150,6 @@ export function ClientForm({
         register,
         handleSubmit,
         setValue,
-        watch,
         formState: { errors },
     } = form;
 
@@ -165,13 +163,25 @@ export function ClientForm({
         name: "teamMembers",
     });
 
-    // eslint-disable-next-line react-hooks/incompatible-library
-    const clientIdValue = watch('clientId');
+    const clientIdValue = useWatch({ control, name: 'clientId' });
+    const status = useWatch({ control, name: 'status' });
+    const assignedServices = useWatch({ control, name: 'assignedServices' });
+    const currency = useWatch({ control, name: 'currency' });
+
+    // Derived client ID error from API result
+    const clientIdError = useMemo(() => {
+        if (isEditMode || !clientIdValue || clientIdValue.length < 2) return null;
+        // Only show error if the current value matches what we last checked with the API
+        if (lastCheckedClientId === clientIdValue && checkResult && !checkResult.available) {
+            const suggestions = checkResult.suggestions?.join(', ') || '';
+            return `Client ID "${clientIdValue}" already exists.${suggestions ? ` Try: ${suggestions}` : ''}`;
+        }
+        return null;
+    }, [isEditMode, clientIdValue, lastCheckedClientId, checkResult]);
 
     // Debounced client ID check
     useEffect(() => {
         if (isEditMode || !clientIdValue || clientIdValue.length < 2) {
-            setClientIdError(null);
             return;
         }
 
@@ -181,17 +191,9 @@ export function ClientForm({
 
         debounceRef.current = setTimeout(async () => {
             try {
-                const result = await checkClientId(clientIdValue).unwrap();
-                if (!result.available) {
-                    const suggestions = result.suggestions?.join(', ') || '';
-                    setClientIdError(
-                        `Client ID "${clientIdValue}" already exists.${suggestions ? ` Try: ${suggestions}` : ''}`,
-                    );
-                } else {
-                    setClientIdError(null);
-                }
+                await checkClientId(clientIdValue).unwrap();
             } catch {
-                setClientIdError(null);
+                // Error handling is managed by RTK Query's result state
             }
         }, 500);
 
@@ -376,7 +378,7 @@ export function ClientForm({
                     <div className="space-y-2">
                         <Label>Status</Label>
                         <Select
-                            value={watch('status')}
+                            value={status}
                             onValueChange={(value: 'active' | 'inactive') => setValue('status', value)}
                         >
                             <SelectTrigger className="w-full">
@@ -477,7 +479,7 @@ export function ClientForm({
                     <Label>Select Services for this Client</Label>
                     <MultiSelect
                         options={serviceOptions}
-                        selected={watch('assignedServices')}
+                        selected={assignedServices}
                         onChange={(selected) => setValue('assignedServices', selected)}
                         placeholder="Pick services..."
                     />
@@ -519,7 +521,7 @@ export function ClientForm({
                     <div className="space-y-2">
                         <Label>Currency</Label>
                         <Select
-                            value={watch('currency') || ''}
+                            value={currency || ''}
                             onValueChange={(value) => setValue('currency', value === 'none' ? '' : value)}
                         >
                             <SelectTrigger className="w-full">

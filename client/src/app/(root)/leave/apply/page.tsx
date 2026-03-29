@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { format } from 'date-fns';
 import {
     Calendar as CalendarIcon,
@@ -56,8 +56,15 @@ import {
     useUploadMedicalDocumentMutation,
 } from '@/redux/features/leave/leaveApi';
 import { useGetStaffsQuery } from '@/redux/features/staff/staffApi';
-import type { LeaveType, ILeaveApplication } from '@/types/leave.type';
+import type { LeaveType, ILeaveApplication, ApplyLeaveInput } from '@/types/leave.type';
 import { LEAVE_TYPE_LABELS, LEAVE_STATUS_LABELS } from '@/types/leave.type';
+import IStaff from '@/types/staff.type';
+
+interface ApiError {
+    data?: {
+        message?: string;
+    };
+}
 
 interface FormData {
     leaveType: LeaveType;
@@ -68,13 +75,11 @@ const ADMIN_ROLES = ['admin', 'super_admin', 'hr_admin'];
 
 export default function LeaveApplyPage() {
     const { data: session } = useSession();
-    const userRole = session?.user?.role as string | undefined;
-    const isAdmin = userRole && ADMIN_ROLES.includes(userRole);
+    const isAdmin = !!session?.user?.role && ADMIN_ROLES.includes(session.user.role);
 
     const [startDate, setStartDate] = useState<Date | undefined>();
     const [endDate, setEndDate] = useState<Date | undefined>();
     const [workingDaysCount, setWorkingDaysCount] = useState(0);
-    const [workingDates, setWorkingDates] = useState<string[]>([]);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [selectedStaffId, setSelectedStaffId] = useState<string>('');
 
@@ -82,8 +87,8 @@ export default function LeaveApplyPage() {
         register,
         handleSubmit,
         reset,
-        watch,
         setValue,
+        control,
         formState: { errors },
     } = useForm<FormData>({
         defaultValues: {
@@ -92,7 +97,7 @@ export default function LeaveApplyPage() {
         },
     });
 
-    const leaveType = watch('leaveType');
+    const leaveType = useWatch({ control, name: 'leaveType' });
 
     // Fetch staff list for admin
     const { data: staffsData } = useGetStaffsQuery(
@@ -126,22 +131,20 @@ export default function LeaveApplyPage() {
                         endDate: format(endDate, 'yyyy-MM-dd'),
                     }).unwrap();
                     setWorkingDaysCount(result.data.count);
-                    setWorkingDates(result.data.dates);
                 } catch (error) {
                     console.error('Error calculating working days:', error);
                 }
             } else {
                 setWorkingDaysCount(0);
-                setWorkingDates([]);
             }
         };
 
         fetchWorkingDays();
     }, [startDate, endDate, calculateWorkingDays]);
 
+    // Handlers for dates
     const handleStartDateSelect = (date: Date | undefined) => {
         setStartDate(date);
-        // If end date is before start date, reset it
         if (date && endDate && endDate < date) {
             setEndDate(undefined);
         }
@@ -211,7 +214,7 @@ export default function LeaveApplyPage() {
         }
 
         try {
-            const payload: any = {
+            const payload: ApplyLeaveInput = {
                 leaveType: data.leaveType,
                 startDate: format(startDate, 'yyyy-MM-dd'),
                 endDate: format(endDate, 'yyyy-MM-dd'),
@@ -233,9 +236,11 @@ export default function LeaveApplyPage() {
                         file: selectedFile,
                     }).unwrap();
                     toast.success('Medical document uploaded successfully');
-                } catch (uploadError: any) {
-                    console.error('Document upload failed:', uploadError);
+                } catch (uploadError) {
+                    const err = uploadError as ApiError;
+                    console.error('Document upload failed:', err);
                     toast.error(
+                        err.data?.message ||
                         'Application submitted but document upload failed. Please contact HR.',
                     );
                 }
@@ -249,8 +254,9 @@ export default function LeaveApplyPage() {
             setEndDate(undefined);
             setSelectedFile(null);
             setSelectedStaffId('');
-        } catch (error: any) {
-            toast.error(error?.data?.message || 'Failed to submit application');
+        } catch (error) {
+            const err = error as ApiError;
+            toast.error(err.data?.message || 'Failed to submit application');
         }
     };
 
@@ -258,8 +264,9 @@ export default function LeaveApplyPage() {
         try {
             await cancelApplication(id).unwrap();
             toast.success('Leave application cancelled');
-        } catch (error: any) {
-            toast.error(error?.data?.message || 'Failed to cancel application');
+        } catch (error) {
+            const err = error as ApiError;
+            toast.error(err.data?.message || 'Failed to cancel application');
         }
     };
 
@@ -327,7 +334,7 @@ export default function LeaveApplyPage() {
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             {/* Annual Leave Card */}
                             <Card className="relative overflow-hidden">
-                                <div className="absolute top-0 right-0 w-32 h-32 -mr-8 -mt-8 bg-gradient-to-br from-blue-500/20 to-transparent rounded-full" />
+                                <div className="absolute top-0 right-0 w-32 h-32 -mr-8 -mt-8 bg-linear-to-br from-blue-500/20 to-transparent rounded-full" />
                                 <CardContent className="p-6">
                                     <div className="flex items-start justify-between">
                                         <div className="space-y-3">
@@ -377,7 +384,7 @@ export default function LeaveApplyPage() {
 
                             {/* Sick Leave Card */}
                             <Card className="relative overflow-hidden">
-                                <div className="absolute top-0 right-0 w-32 h-32 -mr-8 -mt-8 bg-gradient-to-br from-orange-500/20 to-transparent rounded-full" />
+                                <div className="absolute top-0 right-0 w-32 h-32 -mr-8 -mt-8 bg-linear-to-br from-orange-500/20 to-transparent rounded-full" />
                                 <CardContent className="p-6">
                                     <div className="flex items-start justify-between">
                                         <div className="space-y-3">
@@ -461,7 +468,7 @@ export default function LeaveApplyPage() {
                                                 <SelectValue placeholder="Select a staff member" />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                {staffs.map((staff: any) => (
+                                                {staffs.map((staff: IStaff) => (
                                                     <SelectItem
                                                         key={staff._id}
                                                         value={staff._id}
@@ -648,7 +655,7 @@ export default function LeaveApplyPage() {
 
                                 {/* Working Days Info */}
                                 {workingDaysCount > 0 && (
-                                    <div className="flex items-center gap-4 p-4 bg-gradient-to-r from-primary/5 to-primary/10 rounded-xl border border-primary/20">
+                                    <div className="flex items-center gap-4 p-4 bg-linear-to-r from-primary/5 to-primary/10 rounded-xl border border-primary/20">
                                         <div className="p-3 bg-primary/10 rounded-full">
                                             <CalendarDays className="h-6 w-6 text-primary" />
                                         </div>

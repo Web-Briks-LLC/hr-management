@@ -21,8 +21,8 @@ async function createOrder(req: Request, res: Response) {
             returnFileFormat,
             instruction,
             priority,
-            assignedTo,
             notes,
+            contactPersonId,
         } = req.body;
         const userId = req.user?.id;
 
@@ -64,9 +64,8 @@ async function createOrder(req: Request, res: Response) {
         // Only include optional fields if they have valid values
         if (instruction) orderData.instruction = instruction;
         if (priority) orderData.priority = priority;
-        if (assignedTo && assignedTo.trim() !== '')
-            orderData.assignedTo = assignedTo;
         if (notes) orderData.notes = notes;
+        if (contactPersonId) orderData.contactPersonId = contactPersonId;
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const order = await orderService.createOrderInDB(orderData as any);
@@ -91,7 +90,6 @@ async function getAllOrders(req: Request, res: Response) {
             clientId,
             status,
             priority,
-            assignedTo,
             startDate,
             endDate,
             month,
@@ -108,7 +106,6 @@ async function getAllOrders(req: Request, res: Response) {
             clientIds?: string[];
             status?: OrderStatus;
             priority?: OrderPriority;
-            assignedTo?: string;
             startDate?: string;
             endDate?: string;
             month?: number;
@@ -125,7 +122,6 @@ async function getAllOrders(req: Request, res: Response) {
         if (clientId) filters.clientId = clientId as string;
         if (status) filters.status = status as OrderStatus;
         if (priority) filters.priority = priority as OrderPriority;
-        if (assignedTo) filters.assignedTo = assignedTo as string;
         if (startDate) filters.startDate = startDate as string;
         if (endDate) filters.endDate = endDate as string;
         if (month) filters.month = parseInt(month as string);
@@ -226,8 +222,8 @@ async function updateOrder(req: Request, res: Response) {
             instruction,
             status,
             priority,
-            assignedTo,
             notes,
+            contactPersonId,
         } = req.body;
 
         if (!id) {
@@ -277,15 +273,8 @@ async function updateOrder(req: Request, res: Response) {
         if (instruction !== undefined) updateData.instruction = instruction;
         if (status !== undefined) updateData.status = status;
         if (priority !== undefined) updateData.priority = priority;
-        // Handle assignedTo - only include if it's a valid ObjectId, otherwise unset it
-        if (assignedTo !== undefined) {
-            if (assignedTo && assignedTo.trim() !== '') {
-                updateData.assignedTo = assignedTo;
-            } else {
-                updateData.assignedTo = null; // This will unset the field
-            }
-        }
         if (notes !== undefined) updateData.notes = notes;
+        if (contactPersonId !== undefined) updateData.contactPersonId = contactPersonId;
 
         const order = await orderService.updateOrderInDB(id, updateData);
 

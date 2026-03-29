@@ -129,9 +129,8 @@ const orderSchema = new Schema<IOrder>(
             default: 'normal',
             index: true,
         },
-        assignedTo: {
+        contactPersonId: {
             type: Schema.Types.ObjectId,
-            ref: 'Staff',
             index: true,
         },
         notes: {
@@ -188,7 +187,7 @@ orderSchema.virtual('earning', {
 // Compound indexes for common queries
 orderSchema.index({ clientId: 1, orderDate: -1 });
 orderSchema.index({ status: 1, deadline: 1 });
-orderSchema.index({ assignedTo: 1, status: 1 });
+orderSchema.index({ status: 1 });
 
 // Text search index
 orderSchema.index({ orderName: 'text' });

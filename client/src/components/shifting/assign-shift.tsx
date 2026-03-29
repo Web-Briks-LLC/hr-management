@@ -19,7 +19,7 @@ import { useGetStaffsQuery } from '@/redux/features/staff/staffApi';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { IconPlus, IconX } from '@tabler/icons-react';
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import z from 'zod';
 import { DatePicker } from '../shared/DatePicker';
 import {
@@ -90,6 +90,9 @@ export default function AssignShift() {
             startDate: new Date(),
         },
     });
+
+    const shiftId = useWatch({ control: form.control, name: 'shiftId' });
+    const startDate = useWatch({ control: form.control, name: 'startDate' });
 
     const isLoading =
         isPending ||
@@ -183,7 +186,7 @@ export default function AssignShift() {
                             <Label>Shift *</Label>
 
                             <Select
-                                value={form.watch('shiftId')}
+                                value={shiftId}
                                 onValueChange={(v) =>
                                     form.setValue('shiftId', v)
                                 }
@@ -346,7 +349,7 @@ export default function AssignShift() {
 
                         <DatePicker
                             label="Start Date *"
-                            value={form.watch('startDate')}
+                            value={startDate}
                             onChange={(d) => d && form.setValue('startDate', d)}
                         />
                     </div>

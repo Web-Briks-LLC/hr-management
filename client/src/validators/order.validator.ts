@@ -69,7 +69,7 @@ export const createOrderSchema = z.object({
         .enum(['low', 'normal', 'high', 'urgent'])
         .optional()
         .default('normal'),
-    assignedTo: z.string().optional(),
+    contactPersonId: z.string().optional(),
     notes: z
         .string()
         .max(1000, 'Notes must be at most 1000 characters')

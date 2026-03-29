@@ -18,7 +18,7 @@ import { Role } from '@/constants/role';
 import { useSession } from '@/lib/auth-client';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { IconPlus } from '@tabler/icons-react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { z } from 'zod';
 import { toast } from 'sonner';
 
@@ -39,7 +39,7 @@ export default function CreateBranch() {
     const { data: session, isPending, isRefetching } = useSession();
     const [createBranch, { isLoading: isCreating }] = useCreateBranchMutation();
 
-    const [open, setOpen] = useState<Boolean>(false);
+    const [open, setOpen] = useState<boolean>(false);
 
     const form = useForm<BranchFormValues>({
         resolver: zodResolver(branchSchema),
@@ -50,6 +50,9 @@ export default function CreateBranch() {
             isActive: true,
         },
     });
+
+    const codeValue = useWatch({ control: form.control, name: 'code' });
+    const isActiveValue = useWatch({ control: form.control, name: 'isActive' });
 
     const isLoading = isPending || isRefetching || isCreating;
 
@@ -116,7 +119,7 @@ export default function CreateBranch() {
                         <Label>Branch Code *</Label>
                         <Input
                             placeholder="DHA"
-                            value={form.watch('code')}
+                            value={codeValue}
                             onChange={(e) =>
                                 form.setValue(
                                     'code',
@@ -146,7 +149,7 @@ export default function CreateBranch() {
                         </div>
 
                         <Switch
-                            checked={form.watch('isActive')}
+                            checked={isActiveValue}
                             onCheckedChange={(value) =>
                                 form.setValue('isActive', value, {
                                     shouldDirty: true,

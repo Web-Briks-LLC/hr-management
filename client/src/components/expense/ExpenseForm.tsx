@@ -1,6 +1,6 @@
 'use client';
 
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
@@ -88,9 +88,14 @@ export function ExpenseForm({
         register,
         handleSubmit,
         setValue,
-        watch,
         formState: { errors },
+        control,
     } = form;
+
+    const dateValue = useWatch({ control, name: 'date' });
+    const categoryIdValue = useWatch({ control, name: 'categoryId' });
+    const branchIdValue = useWatch({ control, name: 'branchId' });
+    const statusValue = useWatch({ control, name: 'status' });
 
     const handleFormSubmit = async (data: ExpenseFormData) => {
         await onSubmit(data);
@@ -106,7 +111,7 @@ export function ExpenseForm({
                 <Label className="text-right pt-2">Date *</Label>
                 <div className="col-span-3">
                     <DatePicker
-                        value={watch('date')}
+                        value={dateValue}
                         onChange={(date) =>
                             setValue('date', date || new Date())
                         }
@@ -144,7 +149,7 @@ export function ExpenseForm({
                 <div className="col-span-3">
                     <div className="flex gap-2">
                         <Select
-                            value={watch('categoryId')}
+                            value={categoryIdValue}
                             onValueChange={(value) =>
                                 setValue('categoryId', value)
                             }
@@ -182,7 +187,7 @@ export function ExpenseForm({
                 <Label className="text-right pt-2">Branch *</Label>
                 <div className="col-span-3">
                     <Select
-                        value={watch('branchId')}
+                        value={branchIdValue}
                         onValueChange={(value) => setValue('branchId', value)}
                     >
                         <SelectTrigger className="w-full">
@@ -273,7 +278,7 @@ export function ExpenseForm({
                 <Label className="text-right pt-2">Status</Label>
                 <div className="col-span-3">
                     <Select
-                        value={watch('status')}
+                        value={statusValue}
                         onValueChange={(
                             value: 'pending' | 'paid' | 'partial_paid',
                         ) => setValue('status', value)}

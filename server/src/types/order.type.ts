@@ -41,7 +41,7 @@ export interface IOrder extends Document {
     instruction?: string;
     status: OrderStatus;
     priority: OrderPriority;
-    assignedTo?: Types.ObjectId;
+    contactPersonId?: Types.ObjectId;
     notes?: string;
     revisionCount: number;
     isLegacy?: boolean; // Flag for migrated orders
@@ -62,7 +62,7 @@ export interface IOrderPopulated extends Omit<
     | 'clientId'
     | 'services'
     | 'returnFileFormat'
-    | 'assignedTo'
+    | 'contactPersonId'
     | 'revisionInstructions'
     | 'timeline'
 > {
@@ -81,13 +81,7 @@ export interface IOrderPopulated extends Omit<
         name: string;
         extension: string;
     };
-    assignedTo?: {
-        _id: Types.ObjectId;
-        staffId: string;
-        userId: {
-            name: string;
-        };
-    };
+    contactPersonId?: Types.ObjectId;
     revisionInstructions: {
         instruction: string;
         createdAt: Date;

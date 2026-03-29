@@ -591,8 +591,8 @@ export default function OrdersPage() {
             returnFileFormat: order.returnFileFormat._id,
             instruction: order.instruction || "",
             priority: order.priority,
-            assignedTo: order.assignedTo?._id || "",
             notes: order.notes || "",
+            contactPersonId: order.contactPersonId || "",
         });
         setIsEditDialogOpen(true);
     };
@@ -1632,7 +1632,6 @@ export default function OrdersPage() {
                             submitLabel="Update Order"
                             onCancel={() => setIsEditDialogOpen(false)}
                             serverErrors={serverErrors}
-                            isEditMode={true}
                         />
                     )}
                 </DialogContent>
@@ -1656,6 +1655,19 @@ export default function OrdersPage() {
                                     </p>
                                     <p className="font-medium">
                                         {selectedOrder.clientId?.name}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="text-sm text-muted-foreground">
+                                        Team Member
+                                    </p>
+                                    <p className="font-medium">
+                                        {(() => {
+                                            const member = selectedOrder.clientId?.teamMembers?.find(
+                                                (m) => m._id === selectedOrder.contactPersonId
+                                            );
+                                            return member ? `${member.name} (${member.designation})` : "N/A";
+                                        })()}
                                     </p>
                                 </div>
                                 <div>

@@ -21,8 +21,8 @@ interface CreateOrderData {
     returnFileFormat: string;
     instruction?: string;
     priority?: OrderPriority;
-    assignedTo?: string;
     notes?: string;
+    contactPersonId?: string;
     createdBy: string;
 }
 
@@ -39,8 +39,8 @@ interface UpdateOrderData {
     instruction?: string;
     status?: OrderStatus;
     priority?: OrderPriority;
-    assignedTo?: string | null;
     notes?: string;
+    contactPersonId?: string;
     completedAt?: Date;
     deliveredAt?: Date;
 }
@@ -50,7 +50,6 @@ interface GetOrdersFilters {
     clientIds?: string[]; // Ownership filter: restrict to specific client IDs
     status?: OrderStatus;
     priority?: OrderPriority;
-    assignedTo?: string;
     startDate?: string;
     endDate?: string;
     month?: number;
@@ -119,7 +118,6 @@ async function getAllOrdersFromDB(filters: GetOrdersFilters): Promise<{
         clientId,
         status,
         priority,
-        assignedTo,
         startDate,
         endDate,
         month,
@@ -156,10 +154,6 @@ async function getAllOrdersFromDB(filters: GetOrdersFilters): Promise<{
 
     if (priority) {
         matchStage.priority = priority;
-    }
-
-    if (assignedTo) {
-        matchStage.assignedTo = new mongoose.Types.ObjectId(assignedTo);
     }
 
     if (startDate || endDate) {
@@ -262,35 +256,6 @@ async function getAllOrdersFromDB(filters: GetOrdersFilters): Promise<{
         },
     });
 
-    // AssignedTo (Staff) and nested User
-    pipeline.push({
-        $lookup: {
-            from: 'staffs',
-            localField: 'assignedTo',
-            foreignField: '_id',
-            as: 'assignedTo',
-        },
-    });
-    pipeline.push({
-        $unwind: { path: '$assignedTo', preserveNullAndEmptyArrays: true },
-    });
-
-    // Nested User lookup for Staff
-    pipeline.push({
-        $lookup: {
-            from: 'user', // Native user collection
-            localField: 'assignedTo.userId',
-            foreignField: '_id',
-            as: 'assignedTo.userId',
-        },
-    });
-    pipeline.push({
-        $unwind: {
-            path: '$assignedTo.userId',
-            preserveNullAndEmptyArrays: true,
-        },
-    });
-
     // Earning (Virtual) imitation
     pipeline.push({
         $lookup: {
@@ -330,7 +295,9 @@ async function getAllOrdersFromDB(filters: GetOrdersFilters): Promise<{
                                 currency: 1,
                                 officeAddress: 1,
                                 address: 1,
+                                teamMembers: 1,
                             },
+                            contactPersonId: 1,
                             orderDate: 1,
                             deadline: 1,
                             imageQuantity: 1,
@@ -348,15 +315,6 @@ async function getAllOrdersFromDB(filters: GetOrdersFilters): Promise<{
                             instruction: 1,
                             status: 1,
                             priority: 1,
-                            assignedTo: {
-                                _id: 1,
-                                staffId: 1,
-                                userId: {
-                                    _id: 1,
-                                    name: 1,
-                                    email: 1,
-                                },
-                            },
                             notes: 1,
                             revisionCount: 1,
                             isLegacy: 1,
@@ -402,7 +360,7 @@ async function getAllOrdersFromDB(filters: GetOrdersFilters): Promise<{
     // clientId: 'clientId name email currency officeAddress address'
     // services: 'name'
     // returnFileFormat: 'name extension'
-    // assignedTo: 'staffId userId' -> userId: 'name'
+    // Map/Transform if needed
     // earning: 'status'
 
     // We can add a projection stage inside the facet, or map the results.
@@ -421,18 +379,10 @@ async function getOrderByIdFromDB(id: string): Promise<IOrder | null> {
     const order = await OrderModel.findById(id)
         .populate(
             'clientId',
-            'clientId name email emails phone currency officeAddress address createdBy',
+            'clientId name email emails phone currency officeAddress address createdBy teamMembers',
         )
         .populate('services', 'name description')
         .populate('returnFileFormat', 'name extension')
-        .populate({
-            path: 'assignedTo',
-            select: 'staffId userId',
-            populate: {
-                path: 'userId',
-                select: 'name email',
-            },
-        })
         .populate('earning', 'status')
         .lean();
 
@@ -484,18 +434,10 @@ async function updateOrderInDB(
         })
             .populate(
                 'clientId',
-                'clientId name email emails currency officeAddress address',
+                'clientId name email emails currency officeAddress address teamMembers',
             )
             .populate('services', 'name')
             .populate('returnFileFormat', 'name extension')
-            .populate({
-                path: 'assignedTo',
-                select: 'staffId userId',
-                populate: {
-                    path: 'userId',
-                    select: 'name',
-                },
-            })
             .lean();
 
         // Update monthly earning if order amount, imageQty or date changes
@@ -593,14 +535,6 @@ async function updateOrderStatusWithTimeline(
         )
         .populate('services', 'name')
         .populate('returnFileFormat', 'name extension')
-        .populate({
-            path: 'assignedTo',
-            select: 'staffId userId',
-            populate: {
-                path: 'userId',
-                select: 'name',
-            },
-        })
         .lean();
 }
 
@@ -675,7 +609,7 @@ async function addRevision(
     })
         .populate(
             'clientId',
-            'clientId name email emails currency officeAddress address',
+            'clientId name email emails currency officeAddress address teamMembers',
         )
         .populate('services', 'name')
         .populate('returnFileFormat', 'name extension')

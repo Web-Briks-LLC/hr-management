@@ -58,6 +58,7 @@ export interface IOrder {
         address?: string;
         officeAddress?: string;
         createdBy?: string;
+        teamMembers?: import('./client.type').TeamMember[];
     };
     orderDate: string;
     deadline: string;
@@ -77,13 +78,7 @@ export interface IOrder {
     instruction?: string;
     status: OrderStatus;
     priority: OrderPriority;
-    assignedTo?: {
-        _id: string;
-        staffId: string;
-        userId: {
-            name: string;
-        };
-    };
+    contactPersonId?: string;
     notes?: string;
     revisionCount: number;
     isLegacy?: boolean; // Flag for migrated orders
@@ -124,7 +119,7 @@ export interface CreateOrderInput {
     returnFileFormat: string;
     instruction?: string;
     priority?: OrderPriority;
-    assignedTo?: string;
+    contactPersonId?: string;
     notes?: string;
 }
 
@@ -179,7 +174,6 @@ export interface OrderFilters {
     clientId?: string;
     status?: OrderStatus;
     priority?: OrderPriority;
-    assignedTo?: string;
     startDate?: string;
     endDate?: string;
     month?: number;

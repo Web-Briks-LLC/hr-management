@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { format } from 'date-fns';
 import { createOrderSchema } from '@/validators/order.validator';
@@ -17,7 +17,6 @@ import {
     useGetClientsQuery,
     useGetAssignedServicesQuery 
 } from '@/redux/features/client/clientApi';
-import { useGetStaffsQuery } from '@/redux/features/staff/staffApi';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -62,8 +61,8 @@ export interface OrderFormData {
     services: string[];
     returnFileFormat: string;
     instruction?: string;
-    priority?: OrderPriority;
-    assignedTo?: string;
+    priority: OrderPriority;
+    contactPersonId?: string;
     notes?: string;
 }
 
@@ -74,7 +73,6 @@ interface OrderFormProps {
     submitLabel: string;
     onCancel: () => void;
     serverErrors?: Record<string, string[]>;
-    isEditMode?: boolean;
 }
 
 export function OrderForm({
@@ -84,7 +82,6 @@ export function OrderForm({
     submitLabel,
     onCancel,
     serverErrors,
-    isEditMode = false,
 }: OrderFormProps) {
     const [selectedServices, setSelectedServices] = useState<string[]>(
         defaultValues?.services || [],
@@ -117,8 +114,8 @@ export function OrderForm({
         handleSubmit,
         formState: { errors },
         setValue,
-        watch,
         setError,
+        control,
     } = useForm<OrderFormData>({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         resolver: zodResolver(createOrderSchema) as any,
@@ -134,12 +131,15 @@ export function OrderForm({
             returnFileFormat: '',
             instruction: '',
             priority: 'normal',
-            assignedTo: '',
+            contactPersonId: '',
             notes: '',
         },
     });
 
-    const clientId = watch('clientId');
+    const clientId = useWatch({ control, name: 'clientId' });
+    const contactPersonId = useWatch({ control, name: 'contactPersonId' });
+    const priority = useWatch({ control, name: 'priority' });
+    const returnFileFormat = useWatch({ control, name: 'returnFileFormat' });
 
     // Queries
     const { data: servicesData, isLoading: isLoadingServices } =
@@ -150,18 +150,15 @@ export function OrderForm({
         useGetReturnFileFormatsQuery({ isActive: true });
     const { data: clientsData, isLoading: isLoadingClients } =
         useGetClientsQuery({ limit: 100 });
-    const { data: staffsData, isLoading: isLoadingStaffs } =
-        useGetStaffsQuery(undefined);
 
     const [createService, { isLoading: isCreatingService }] =
         useCreateServiceMutation();
     const [createFormat, { isLoading: isCreatingFormat }] =
         useCreateReturnFileFormatMutation();
 
-    const allServices = servicesData?.data || [];
-    const formats = formatsData?.data || [];
-    const clients = clientsData?.clients || [];
-    const staffs = staffsData?.staffs || [];
+    const allServices = useMemo(() => servicesData?.data || [], [servicesData]);
+    const formats = useMemo(() => formatsData?.data || [], [formatsData]);
+    const clients = useMemo(() => clientsData?.clients || [], [clientsData]);
 
     // Determine derived services list
     const services = useMemo(() => {
@@ -171,6 +168,12 @@ export function OrderForm({
         }
         return allServices;
     }, [clientId, showAllServices, assignedServices, allServices]);
+    
+    const selectedClient = useMemo(() => {
+        return clients.find((c) => c._id === clientId);
+    }, [clientId, clients]);
+
+    const teamMembers = selectedClient?.teamMembers || [];
 
     const hasAssignedServices = assignedServices && assignedServices.length > 0;
 
@@ -191,9 +194,9 @@ export function OrderForm({
         );
     }, [services, debouncedServiceSearch]);
 
-    const imageQuantity = watch('imageQuantity');
-    const perImagePrice = watch('perImagePrice');
-    const totalPrice = watch('totalPrice');
+    const imageQuantity = useWatch({ control, name: 'imageQuantity' });
+    const perImagePrice = useWatch({ control, name: 'perImagePrice' });
+    const totalPrice = useWatch({ control, name: 'totalPrice' });
 
     // Track which field the user is editing - 'perImage' or 'total'
     const [priceMode, setPriceMode] = useState<'perImage' | 'total'>(
@@ -335,15 +338,17 @@ export function OrderForm({
                             aria-expanded={openClient}
                             className={cn(
                                 'w-full justify-between',
-                                !watch('clientId') && 'text-muted-foreground',
+                                !clientId && 'text-muted-foreground',
                             )}
                             disabled={isLoadingClients}
                         >
-                            {watch('clientId')
-                                ? clients.find(
-                                      (client) =>
-                                          client._id === watch('clientId'),
-                                  )?.name
+                            {clientId
+                                ? (() => {
+                                      return clients.find(
+                                          (client: { _id: string }) =>
+                                              client._id === clientId,
+                                      )?.name;
+                                  })()
                                 : 'Select client'}
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                         </Button>
@@ -367,6 +372,7 @@ export function OrderForm({
                                                     'clientId',
                                                     client._id,
                                                 );
+                                                setValue('contactPersonId', '');
                                                 setOpenClient(false);
                                                 // Reset services filter when client changes
                                                 setShowAllServices(false);
@@ -375,7 +381,7 @@ export function OrderForm({
                                             <Check
                                                 className={cn(
                                                     ' h-4 w-4',
-                                                    watch('clientId') ===
+                                                    clientId ===
                                                         client._id
                                                         ? 'opacity-100'
                                                         : 'opacity-0',
@@ -400,6 +406,39 @@ export function OrderForm({
                     </p>
                 )}
             </div>
+
+            {/* Contact Person */}
+            {clientId && teamMembers.length > 0 && (
+                <div className="space-y-2 animate-in fade-in slide-in-from-top-1">
+                    <Label htmlFor="contactPersonId">Team Member</Label>
+                    <Select
+                        value={contactPersonId || '_none'}
+                        onValueChange={(value) =>
+                            setValue(
+                                'contactPersonId',
+                                value === '_none' ? '' : value,
+                            )
+                        }
+                    >
+                        <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Select team member" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="_none">None</SelectItem>
+                            {teamMembers.map((member) => (
+                                <SelectItem key={member._id} value={member._id!}>
+                                    {member.name} {member.designation ? `(${member.designation})` : ''}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    {errors.contactPersonId && (
+                        <p className="text-sm text-destructive">
+                            {errors.contactPersonId.message}
+                        </p>
+                    )}
+                </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
                 {/* Order Date */}
@@ -690,7 +729,7 @@ export function OrderForm({
                     </div>
                 )}
                 <Select
-                    value={watch('returnFileFormat')}
+                    value={returnFileFormat}
                     onValueChange={(value) =>
                         setValue('returnFileFormat', value)
                     }
@@ -718,7 +757,7 @@ export function OrderForm({
             <div className="space-y-2">
                 <Label>Priority</Label>
                 <Select
-                    value={watch('priority')}
+                    value={priority}
                     onValueChange={(value) =>
                         setValue('priority', value as OrderPriority)
                     }
@@ -731,33 +770,6 @@ export function OrderForm({
                         <SelectItem value="normal">Normal</SelectItem>
                         <SelectItem value="high">High</SelectItem>
                         <SelectItem value="urgent">Urgent</SelectItem>
-                    </SelectContent>
-                </Select>
-            </div>
-
-            {/* Assigned To */}
-            <div className="space-y-2">
-                <Label htmlFor="assignedTo">Assigned To</Label>
-                <Select
-                    value={watch('assignedTo') || '_unassigned'}
-                    onValueChange={(value) =>
-                        setValue(
-                            'assignedTo',
-                            value === '_unassigned' ? '' : value,
-                        )
-                    }
-                >
-                    <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select staff member" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="_unassigned">Unassigned</SelectItem>
-                        {staffs.map((staff: any) => (
-                            <SelectItem key={staff._id} value={staff._id}>
-                                {staff.user?.name || 'Unknown'} (
-                                {staff.ids?.staffId || staff.staffId})
-                            </SelectItem>
-                        ))}
                     </SelectContent>
                 </Select>
             </div>
