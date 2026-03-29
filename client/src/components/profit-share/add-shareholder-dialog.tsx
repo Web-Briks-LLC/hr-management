@@ -26,6 +26,7 @@ import {
     type IShareholder,
 } from '@/redux/features/profitShare/profitShareApi';
 import { useGetStaffsQuery } from '@/redux/features/staff/staffApi';
+import type IStaff from '@/types/staff.type';
 import { Loader, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -68,13 +69,15 @@ export default function AddShareholderDialog({
 
     // Memoize admins to prevent infinite loop - filter admins from staffData
     const admins = useMemo(() => {
-        return (staffData?.staffs || []).filter((staff: any) =>
+        return (staffData?.staffs || []).filter((staff: IStaff) =>
             ADMIN_ROLES.includes(staff.user?.role),
         );
     }, [staffData?.staffs]);
 
-    // Populate form when editing
-    useEffect(() => {
+    // Track previous editingShareholder to handle state reset on change
+    const [prevEditingShareholder, setPrevEditingShareholder] = useState<IShareholder | null>(null);
+    if (editingShareholder !== prevEditingShareholder) {
+        setPrevEditingShareholder(editingShareholder);
         if (editingShareholder) {
             setFormData({
                 name: editingShareholder.name,
@@ -92,12 +95,14 @@ export default function AddShareholderDialog({
             });
             setSelectedAdmin('');
         }
-    }, [editingShareholder]);
+    }
 
     // When admin is selected, populate name and email from user object
-    useEffect(() => {
+    const [prevSelectedAdmin, setPrevSelectedAdmin] = useState<string>('');
+    if (selectedAdmin !== prevSelectedAdmin) {
+        setPrevSelectedAdmin(selectedAdmin);
         if (selectedAdmin && !isEditing) {
-            const admin = admins.find((a: any) => a._id === selectedAdmin);
+            const admin = admins.find((a: IStaff) => a._id === selectedAdmin);
             if (admin) {
                 setFormData((prev) => ({
                     ...prev,
@@ -106,8 +111,7 @@ export default function AddShareholderDialog({
                 }));
             }
         }
-        // Only run when selectedAdmin changes, admins is now memoized so it won't cause re-runs
-    }, [selectedAdmin, isEditing, admins]);
+    }
 
     const maxPercentage = isEditing
         ? remainingPercentage + (editingShareholder?.percentage || 0)
@@ -151,9 +155,10 @@ export default function AddShareholderDialog({
             }
 
             onClose();
-        } catch (err: any) {
+        } catch (err: unknown) {
+            const error = err as { data?: { message?: string } };
             toast.error(
-                err?.data?.message ||
+                error?.data?.message ||
                     `Failed to ${isEditing ? 'update' : 'add'} shareholder`,
             );
         }
@@ -215,7 +220,7 @@ export default function AddShareholderDialog({
                                             No admins found
                                         </div>
                                     ) : (
-                                        admins.map((admin: any) => (
+                                        admins.map((admin: IStaff) => (
                                             <SelectItem
                                                 key={admin._id}
                                                 value={admin._id}

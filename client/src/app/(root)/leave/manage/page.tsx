@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { format } from 'date-fns';
 import {
     Check,
@@ -48,7 +48,6 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
@@ -106,18 +105,6 @@ export default function LeaveManagePage() {
     const pendingCount = pendingData?.count || 0;
     const applications = applicationsData?.data || [];
 
-    useEffect(() => {
-        if (selectedApplication && showApproveDialog) {
-            const initialSelections = selectedApplication.requestedDates.map(
-                (date) => ({
-                    date: new Date(date).toISOString(),
-                    decision: 'approve' as DateDecision,
-                }),
-            );
-            setDateSelections(initialSelections);
-            setApprovalMode('full');
-        }
-    }, [selectedApplication, showApproveDialog]);
 
     const handleDateDecisionChange = (
         dateStr: string,
@@ -247,6 +234,17 @@ export default function LeaveManagePage() {
     const openApproveDialog = (app: ILeaveApplication) => {
         setSelectedApplication(app);
         setComment('');
+        
+        // Initialize date selections for approval
+        const initialSelections = app.requestedDates.map(
+            (date) => ({
+                date: new Date(date).toISOString(),
+                decision: 'approve' as DateDecision,
+            }),
+        );
+        setDateSelections(initialSelections);
+        setApprovalMode('full');
+        
         setShowApproveDialog(true);
     };
 
@@ -509,7 +507,7 @@ export default function LeaveManagePage() {
                 open={showApproveDialog}
                 onOpenChange={setShowApproveDialog}
             >
-                <DialogContent className="!max-w-[900px] w-[900px] max-h-[85vh] overflow-y-auto">
+                <DialogContent className="max-w-[900px]! w-[900px] max-h-[85vh] overflow-y-auto">
                     <DialogHeader className="pb-4 border-b">
                         <div className="flex items-center gap-3">
                             <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-xl">
@@ -535,7 +533,7 @@ export default function LeaveManagePage() {
                     <div className="space-y-5 py-4">
                         {/* Leave Info Card */}
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-900/20 dark:to-blue-800/10 rounded-xl border border-blue-200 dark:border-blue-800">
+                            <div className="p-4 bg-linear-to-br from-blue-50 to-blue-100/50 dark:from-blue-900/20 dark:to-blue-800/10 rounded-xl border border-blue-200 dark:border-blue-800">
                                 <p className="text-xs text-blue-600 dark:text-blue-400 font-medium uppercase tracking-wide">
                                     Leave Type
                                 </p>
@@ -546,7 +544,7 @@ export default function LeaveManagePage() {
                                         ]}
                                 </p>
                             </div>
-                            <div className="p-4 bg-gradient-to-br from-purple-50 to-purple-100/50 dark:from-purple-900/20 dark:to-purple-800/10 rounded-xl border border-purple-200 dark:border-purple-800">
+                            <div className="p-4 bg-linear-to-br from-purple-50 to-purple-100/50 dark:from-purple-900/20 dark:to-purple-800/10 rounded-xl border border-purple-200 dark:border-purple-800">
                                 <p className="text-xs text-purple-600 dark:text-purple-400 font-medium uppercase tracking-wide">
                                     Total Days
                                 </p>
@@ -555,7 +553,7 @@ export default function LeaveManagePage() {
                                     days
                                 </p>
                             </div>
-                            <div className="p-4 bg-gradient-to-br from-emerald-50 to-emerald-100/50 dark:from-emerald-900/20 dark:to-emerald-800/10 rounded-xl border border-emerald-200 dark:border-emerald-800">
+                            <div className="p-4 bg-linear-to-br from-emerald-50 to-emerald-100/50 dark:from-emerald-900/20 dark:to-emerald-800/10 rounded-xl border border-emerald-200 dark:border-emerald-800">
                                 <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium uppercase tracking-wide">
                                     From
                                 </p>
@@ -569,7 +567,7 @@ export default function LeaveManagePage() {
                                         )}
                                 </p>
                             </div>
-                            <div className="p-4 bg-gradient-to-br from-amber-50 to-amber-100/50 dark:from-amber-900/20 dark:to-amber-800/10 rounded-xl border border-amber-200 dark:border-amber-800">
+                            <div className="p-4 bg-linear-to-br from-amber-50 to-amber-100/50 dark:from-amber-900/20 dark:to-amber-800/10 rounded-xl border border-amber-200 dark:border-amber-800">
                                 <p className="text-xs text-amber-600 dark:text-amber-400 font-medium uppercase tracking-wide">
                                     To
                                 </p>
@@ -911,7 +909,7 @@ export default function LeaveManagePage() {
                     </DialogHeader>
                     <div className="space-y-4">
                         {/* Leave Info Card */}
-                        <div className="bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-950/30 dark:to-amber-950/30 p-3 rounded-lg border border-orange-200 dark:border-orange-800">
+                        <div className="bg-linear-to-r from-orange-50 to-amber-50 dark:from-orange-950/30 dark:to-amber-950/30 p-3 rounded-lg border border-orange-200 dark:border-orange-800">
                             <div className="grid grid-cols-2 gap-2">
                                 <div>
                                     <p className="text-xs text-muted-foreground">

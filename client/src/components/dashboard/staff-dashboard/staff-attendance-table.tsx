@@ -17,6 +17,8 @@ import { useGetMyAttendanceHistoryQuery } from '@/redux/features/attendance/atte
 import { format } from 'date-fns';
 import { Clock, CheckCircle2, XCircle, MinusCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { IAttendanceDay } from '@/types/attendance.type';
+import { IOvertime } from '@/types/overtime.type';
 
 const formatDuration = (minutes: number) => {
     const h = Math.floor(minutes / 60);
@@ -30,8 +32,8 @@ const formatTime = (date: string | Date | null | undefined) => {
 };
 
 export default function StaffAttendanceTable() {
-    const { data: attendanceHistory, isLoading } = useGetMyAttendanceHistoryQuery(7);
-    const { data: overtimeData } = useGetMyOvertimeQuery({});
+    const { data: attendanceHistory } = useGetMyAttendanceHistoryQuery(7);
+    const { data: overtimeData } = useGetMyOvertimeQuery(undefined);
 
     // Generate last 7 days (most recent first)
     const getLast7Days = () => {
@@ -49,7 +51,7 @@ export default function StaffAttendanceTable() {
     // Get attendance for a specific date
     const getAttendanceForDate = (date: Date) => {
         // Find attendance record for this date
-        const attendance = attendanceHistory?.find((record: any) => {
+        const attendance = attendanceHistory?.find((record: IAttendanceDay) => {
             const recordDate = new Date(record.date);
             return (
                 recordDate.getDate() === date.getDate() &&
@@ -61,7 +63,7 @@ export default function StaffAttendanceTable() {
         if (!attendance) return null;
 
         // Find OT for this date
-        const otForDate = overtimeData?.find((ot: any) => {
+        const otForDate = overtimeData?.find((ot: IOvertime) => {
             const otDate = new Date(ot.date);
             return (
                 otDate.getDate() === date.getDate() &&
@@ -73,7 +75,7 @@ export default function StaffAttendanceTable() {
 
         return {
             date,
-            shiftName: attendance.shiftId?.name || 'N/A',
+            shiftName: (typeof attendance.shiftId === 'object' && attendance.shiftId !== null) ? attendance.shiftId.name : 'N/A',
             checkIn: attendance.checkInAt,
             checkOut: attendance.checkOutAt,
             workHours: attendance.totalMinutes || 0,

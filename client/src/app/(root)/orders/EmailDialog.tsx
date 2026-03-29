@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import {
     Dialog,
     DialogContent,
@@ -25,6 +25,12 @@ interface EmailDialogProps {
     isLoading?: boolean;
 }
 
+interface ClientEmail {
+    label: string;
+    email: string;
+    type: string;
+}
+
 const defaultTemplates: Partial<Record<OrderStatus, string>> = {
     cancelled:
         "Hi {clientName},\n\nUnfortunately, your order '{orderName}' has been cancelled.\n\nOur team has stopped work on this order. If you have any questions or feel this is a mistake, please reach out to us by replying to this email.\n\nBest regards,\nWeb Briks Team",
@@ -45,6 +51,7 @@ export const EmailDialog: React.FC<EmailDialogProps> = ({
     const [message, setMessage] = useState("");
     const [downloadLink, setDownloadLink] = useState("");
     const [selectedEmails, setSelectedEmails] = useState<string[]>([]);
+    const [prevOrderAndStatus, setPrevOrderAndStatus] = useState<{ id: string; status: OrderStatus } | null>(null);
 
     const clientId = order?.clientId?._id;
     const { data: emailsData, isLoading: isLoadingEmails } = useGetClientEmailsQuery(clientId!, {
@@ -53,31 +60,29 @@ export const EmailDialog: React.FC<EmailDialogProps> = ({
 
     const emailOptions = useMemo(() => {
         if (!emailsData) return [];
-        return emailsData.map((item: any) => ({
-            label: `${item.name} (${item.email}) - ${item.type}`,
+        return (emailsData as ClientEmail[]).map((item) => ({
+            label: `${item.label} (${item.email}) - ${item.type}`,
             value: item.email,
         }));
     }, [emailsData]);
 
-    useEffect(() => {
-        if (open && order && status) {
-            const tmpl = defaultTemplates[status] || `Status updated to ${status}.`;
-            // populate variables
-            const msg = tmpl
-                .replace("{clientName}", order.clientId?.name || "Client")
-                .replace("{orderName}", order.orderName || "Order");
+    if (open && order && status && (order._id !== prevOrderAndStatus?.id || status !== prevOrderAndStatus?.status)) {
+        setPrevOrderAndStatus({ id: order._id, status });
+        
+        const tmpl = defaultTemplates[status] || `Status updated to ${status}.`;
+        const msg = tmpl
+            .replace("{clientName}", order.clientId?.name || "Client")
+            .replace("{orderName}", order.orderName || "Order");
 
-            setMessage(msg);
-            setDownloadLink("");
-            
-            // Set default recipient to client's primary email if available
-            if (order.clientId?.emails?.[0]) {
-                setSelectedEmails([order.clientId.emails[0]]);
-            } else {
-                setSelectedEmails([]);
-            }
+        setMessage(msg);
+        setDownloadLink("");
+        
+        if (order.clientId?.emails?.[0]) {
+            setSelectedEmails([order.clientId.emails[0]]);
+        } else {
+            setSelectedEmails([]);
         }
-    }, [open, order, status]);
+    }
 
     const handleSend = () => {
         let finalMessage = message;

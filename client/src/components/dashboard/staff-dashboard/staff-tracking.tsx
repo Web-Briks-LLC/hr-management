@@ -1,6 +1,4 @@
-'use client';
-
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
     Card,
@@ -50,12 +48,10 @@ const formatDuration = (minutes: number) => {
 const EARLY_CHECKIN_WINDOW_MINUTES = 15;
 
 export default function StaffTracking() {
-    const { data: todaysData, isLoading: isLoadingToday } =
-        useGetTodayAttendanceQuery({});
-    const { data: myOvertimeData, isLoading: isLoadingOT } =
-        useGetMyOvertimeQuery({});
-    const { data: scheduledOT } = useGetScheduledOvertimeTodayQuery({});
-    const { data: myShiftData } = useGetMyShiftQuery({});
+    const { data: todaysData } = useGetTodayAttendanceQuery(undefined);
+    const { data: myOvertimeData } = useGetMyOvertimeQuery(undefined);
+    const { data: scheduledOT } = useGetScheduledOvertimeTodayQuery(undefined);
+    const { data: myShiftData } = useGetMyShiftQuery(undefined);
 
     const attendanceDay = todaysData?.attendance?.attendanceDay;
 
@@ -69,9 +65,10 @@ export default function StaffTracking() {
     const [countdown, setCountdown] = useState<string>('');
 
     // Find active OT (checked in but not ended)
-    const activeOT = myOvertimeData?.find(
-        (ot: any) => ot.actualStartTime && !ot.endTime,
-    );
+    const activeOT = useMemo(() => 
+        myOvertimeData?.find((ot: { actualStartTime?: string; endTime?: string }) => 
+            ot.actualStartTime && !ot.endTime
+        ), [myOvertimeData]);
 
     // Get shift start time for today
     const getShiftStartTime = useCallback(() => {
@@ -104,10 +101,11 @@ export default function StaffTracking() {
                 description: `Time: ${format(officialTime, 'hh:mm aa')}`,
             });
             return true;
-        } catch (error: any) {
+        } catch (error: unknown) {
+            const err = error as { data?: { message?: string }; error?: string };
             const apiMessage =
-                error?.data?.message ||
-                error?.error ||
+                err?.data?.message ||
+                err?.error ||
                 'Failed to check in. Please try again.';
 
             if (
@@ -159,7 +157,7 @@ export default function StaffTracking() {
     useEffect(() => {
         if (!scheduledOT) return;
 
-        const updateCountdown = () => {
+        const interval = setInterval(() => {
             const now = new Date();
             const scheduledTime = new Date(scheduledOT.startTime);
             const diff = scheduledTime.getTime() - now.getTime();
@@ -171,16 +169,13 @@ export default function StaffTracking() {
                 const seconds = Math.floor((diff / 1000) % 60);
                 setCountdown(`Starts in ${minutes}m ${seconds}s`);
             }
-        };
-
-        updateCountdown();
-        const interval = setInterval(updateCountdown, 1000);
+        }, 1000);
 
         return () => clearInterval(interval);
     }, [scheduledOT]);
 
     // Calculate current OT minutes
-    const getCurrentOTMinutes = () => {
+    const getCurrentOTMinutes = useCallback(() => {
         if (activeOT && activeOT.actualStartTime) {
             // OT is running - calculate live duration
             const now = new Date();
@@ -191,7 +186,7 @@ export default function StaffTracking() {
 
         // Check for completed OT today
         const today = new Date();
-        const completedOTToday = myOvertimeData?.find((ot: any) => {
+        const completedOTToday = myOvertimeData?.find((ot: { date: string; durationMinutes?: number; endTime?: string }) => {
             const otDate = new Date(ot.date);
             return (
                 otDate.getDate() === today.getDate() &&
@@ -202,21 +197,18 @@ export default function StaffTracking() {
         });
 
         return completedOTToday?.durationMinutes || 0;
-    };
+    }, [activeOT, myOvertimeData]);
 
     const [currentOTMinutes, setCurrentOTMinutes] = useState(0);
 
     // Update OT minutes every second if OT is active
     useEffect(() => {
-        const updateOTMinutes = () => {
+        const interval = setInterval(() => {
             setCurrentOTMinutes(getCurrentOTMinutes());
-        };
-
-        updateOTMinutes();
-        const interval = setInterval(updateOTMinutes, 1000);
+        }, 1000);
 
         return () => clearInterval(interval);
-    }, [activeOT, myOvertimeData]);
+    }, [getCurrentOTMinutes]);
 
     // Live Duration Ticker
     const [currentDuration, setCurrentDuration] = useState(0);
@@ -235,8 +227,6 @@ export default function StaffTracking() {
     }, [attendanceDay]);
 
     useEffect(() => {
-        setCurrentDuration(calculateDuration());
-
         // Only set interval if checked in but not checked out
         if (attendanceDay?.checkInAt && !attendanceDay?.checkOutAt) {
             const interval = setInterval(() => {
@@ -264,11 +254,11 @@ export default function StaffTracking() {
             } else {
                 toast.success('Checked out successfully!');
             }
-        } catch (error: any) {
-            console.log(error);
+        } catch (error: unknown) {
+            const err = error as { data?: { message?: string }; error?: string };
             const apiMessage =
-                error?.data?.message ||
-                error?.error ||
+                err?.data?.message ||
+                err?.error ||
                 'Failed to check out. Please try again.';
 
             toast.error(apiMessage);
@@ -279,8 +269,9 @@ export default function StaffTracking() {
         try {
             await startOvertime({}).unwrap();
             toast.success('Overtime started!');
-        } catch (error: any) {
-            toast.error(error?.data?.message || 'Failed to start overtime');
+        } catch (error: unknown) {
+            const err = error as { data?: { message?: string } };
+            toast.error(err?.data?.message || 'Failed to start overtime');
         }
     };
 
@@ -296,8 +287,9 @@ export default function StaffTracking() {
             } else {
                 toast.success('Overtime stopped!');
             }
-        } catch (error: any) {
-            toast.error(error?.data?.message || 'Failed to stop overtime');
+        } catch (error: unknown) {
+            const err = error as { data?: { message?: string } };
+            toast.error(err?.data?.message || 'Failed to stop overtime');
         }
     };
 
@@ -354,7 +346,7 @@ export default function StaffTracking() {
                                 <div className="text-2xl font-bold">
                                     {attendanceDay?.checkInAt
                                         ? format(
-                                              attendanceDay.checkInAt,
+                                              new Date(attendanceDay.checkInAt),
                                               'hh:mm aa',
                                           )
                                         : '--:--'}
@@ -457,7 +449,7 @@ export default function StaffTracking() {
                                         </AlertDialogTitle>
                                         <AlertDialogDescription>
                                             This will end your shift for today.
-                                            You won't be able to check in again
+                                            You won&apos;t be able to check in again
                                             until your next shift.
                                         </AlertDialogDescription>
                                     </AlertDialogHeader>

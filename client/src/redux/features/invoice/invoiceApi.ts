@@ -1,4 +1,5 @@
 import { apiSlice } from "../../api/apiSlice";
+import type { InvoicesResponse } from "@/types/invoice.type";
 
 interface InvoiceNumberResponse {
     success: boolean;
@@ -60,7 +61,7 @@ export const invoiceApi = apiSlice.injectEndpoints({
                 body: data,
             }),
         }),
-        getInvoices: builder.query<{ success: boolean; invoices: any[] }, { clientId?: string; month?: number; year?: number; status?: string }>({
+        getInvoices: builder.query<InvoicesResponse, { clientId?: string; month?: number; year?: number; status?: string }>({
             query: (params) => ({
                 url: "/invoices",
                 params,

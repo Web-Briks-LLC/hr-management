@@ -32,7 +32,7 @@ export default function RootDashboard() {
 
     // Staff Dashboard for Staff and Team Leader
     if ([Role.STAFF, Role.TEAM_LEADER].includes(userRole)) {
-        return <StaffDashboard user={session.user} />;
+        return <StaffDashboard />;
     }
 
     return <div>No dashboard available for your role</div>;

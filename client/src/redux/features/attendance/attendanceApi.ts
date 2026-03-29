@@ -1,4 +1,5 @@
 import { apiSlice } from '@/redux/api/apiSlice';
+import type { IAttendanceDay, AttendanceStatus, IMonthlyAttendanceStats } from '@/types/attendance.type';
 
 export const attendanceApi = apiSlice.injectEndpoints({
     endpoints: (builder) => ({
@@ -25,21 +26,20 @@ export const attendanceApi = apiSlice.injectEndpoints({
             }),
             providesTags: ['Attendance'],
         }),
-        getMonthlyStats: builder.query({
+        getMonthlyStats: builder.query<IMonthlyAttendanceStats, void>({
             query: () => ({
                 url: '/attendance/monthly-stats',
                 method: 'GET',
             }),
-            // Use transformResponse if data structure is { success: true, data: ... }
-            transformResponse: (response: { data: any }) => response.data,
-            providesTags: ['Attendance', 'Overtime'], // Invalidate when Attendance OR Overtime changes
+            transformResponse: (response: { data: IMonthlyAttendanceStats }) => response.data,
+            providesTags: ['Attendance', 'Overtime'],
         }),
-        getMyAttendanceHistory: builder.query({
+        getMyAttendanceHistory: builder.query<IAttendanceDay[], number | void>({
             query: (days = 7) => ({
                 url: `/attendance/my-history?days=${days}`,
                 method: 'GET',
             }),
-            transformResponse: (response: { data: any }) => response.data,
+            transformResponse: (response: { data: IAttendanceDay[] }) => response.data,
             providesTags: ['Attendance'],
         }),
         getAllAttendance: builder.query({
@@ -49,7 +49,7 @@ export const attendanceApi = apiSlice.injectEndpoints({
             }),
             providesTags: ['Attendance'],
         }),
-        updateAttendanceStatus: builder.mutation({
+        updateAttendanceStatus: builder.mutation<void, { id: string; status: AttendanceStatus; notes?: string }>({
             query: ({ id, status, notes }) => ({
                 url: `/attendance/admin/${id}`,
                 method: 'PATCH',

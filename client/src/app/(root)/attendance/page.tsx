@@ -5,6 +5,7 @@ import {
     useGetAllAttendanceQuery,
     useUpdateAttendanceStatusMutation,
 } from "@/redux/features/attendance/attendanceApi";
+import { AttendanceStatus } from "@/types/attendance.type";
 import { useGetStaffsQuery } from "@/redux/features/staff/staffApi";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -305,7 +306,7 @@ export default function AttendancePage() {
 
     const [updateStatus] = useUpdateAttendanceStatusMutation();
 
-    const handleStatusChange = async (id: string, newStatus: string) => {
+    const handleStatusChange = async (id: string, newStatus: AttendanceStatus) => {
         try {
             await updateStatus({ id, status: newStatus }).unwrap();
             toast.success("Attendance status updated successfully");
@@ -894,7 +895,7 @@ export default function AttendancePage() {
                                                             ) =>
                                                                 handleStatusChange(
                                                                     record._id,
-                                                                    value,
+                                                                    value as AttendanceStatus,
                                                                 )
                                                             }
                                                             disabled={

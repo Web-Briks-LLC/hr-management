@@ -1,15 +1,16 @@
 'use client';
 import { Provider } from 'react-redux';
-import { useRef } from 'react';
-import { store, type AppStore } from '@/redux/store';
+import { useState } from 'react';
+import { store } from '@/redux/store';
 
 export default function ReduxProvider({
     children,
 }: {
     children: React.ReactNode;
 }) {
-    const storeRef = useRef<AppStore>(null);
-    if (!storeRef.current) storeRef.current = store();
+    // Initializing the store once using lazy-initialization in useState
+    // to avoid ref-access-during-render errors in React 18+.
+    const [storeInstance] = useState(() => store());
     
-    return <Provider store={storeRef.current}>{children}</Provider>;
+    return <Provider store={storeInstance}>{children}</Provider>;
 }

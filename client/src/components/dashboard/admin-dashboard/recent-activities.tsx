@@ -5,8 +5,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Clock, UserCheck, Timer, Calendar, Users } from 'lucide-react';
 import type { RecentActivity } from '@/types/dashboard.type';
-import { format, formatDistanceToNow } from 'date-fns';
-import { useState, useEffect } from 'react';
+import { formatDistanceToNow } from 'date-fns';
 
 interface RecentActivitiesProps {
     activities: RecentActivity[];
@@ -29,12 +28,6 @@ const activityColors = {
 };
 
 export function RecentActivities({ activities }: RecentActivitiesProps) {
-    const [mounted, setMounted] = useState(false);
-
-    useEffect(() => {
-        setMounted(true);
-    }, []);
-
     return (
         <Card>
             <CardHeader>
@@ -81,14 +74,13 @@ export function RecentActivities({ activities }: RecentActivitiesProps) {
                                         <p className="text-sm font-medium">
                                             {activity.description}
                                         </p>
-                                        <p className="text-xs text-muted-foreground">
-                                            {mounted ? (
-                                                formatDistanceToNow(new Date(activity.timestamp), {
-                                                    addSuffix: true,
-                                                })
-                                            ) : (
-                                                format(new Date(activity.timestamp), 'PPp')
-                                            )}
+                                        <p 
+                                            className="text-xs text-muted-foreground"
+                                            suppressHydrationWarning
+                                        >
+                                            {formatDistanceToNow(new Date(activity.timestamp), {
+                                                addSuffix: true,
+                                            })}
                                         </p>
                                     </div>
                                 </div>

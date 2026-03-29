@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
     Card,
     CardContent,
@@ -10,23 +10,13 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import {
-    Clock,
-    CalendarDays,
     TrendingUp,
     AlertCircle,
-    LogIn,
     LogOut,
-    FileText,
-    MapPin,
-    Mail,
-    Phone,
-    Briefcase,
 } from 'lucide-react';
-import { User } from 'better-auth';
 import StaffHeader from './staff-header';
 import StaffTracking from './staff-tracking';
 
@@ -39,47 +29,32 @@ import { ProfileCompletionDialog } from '@/components/account/profile-completion
 import { toast } from 'sonner';
 import ShiftOffNotice from '@/components/shifting/shift-off-notice';
 
-// Mock data - replace with real data from your API
-const mockUser = {
-    id: '1',
-    name: 'MD. Masud Kamal',
-    email: 'masumkamal31@gmail.com',
-    phone: '01301101116',
-    role: 'junior designer',
-    status: 'active',
-    image: '/api/placeholder/100/100',
-    location: 'kashdha, sundhorgonj, gaubandha',
-    dob: '2006-10-10',
-    employeeId: 'EMP001',
-};
-
 const formatDuration = (minutes: number) => {
     const h = Math.floor(minutes / 60);
     const m = minutes % 60;
     return `${h}h ${m}m`;
 };
 
-export default function StaffDashboard({ user }: { user: User }) {
-    const { data: monthlyStats, isLoading } = useGetMonthlyStatsQuery({});
-    const { data: meData, isLoading: isStaffLoading } = useGetMeQuery({});
+export default function StaffDashboard() {
+    const { data: monthlyStats, isLoading } = useGetMonthlyStatsQuery(undefined);
+    const { data: meData, isLoading: isStaffLoading } = useGetMeQuery(undefined);
     const staff = meData?.staff;
 
     const [isSalaryUnlocked, setIsSalaryUnlocked] = useState(false);
     const [showPinDialog, setShowPinDialog] = useState(false);
-    const [autoLockTimer, setAutoLockTimer] = useState<NodeJS.Timeout | null>(
-        null,
-    );
+    const autoLockTimerRef = useRef<NodeJS.Timeout | null>(null);
 
     // Auto-lock after 1 minute
     useEffect(() => {
         if (isSalaryUnlocked) {
-            const timer = setTimeout(() => {
+            autoLockTimerRef.current = setTimeout(() => {
                 setIsSalaryUnlocked(false);
                 toast.info('Salary view auto-locked');
             }, 60000);
-            setAutoLockTimer(timer);
 
-            return () => clearTimeout(timer);
+            return () => {
+                if (autoLockTimerRef.current) clearTimeout(autoLockTimerRef.current);
+            };
         }
     }, [isSalaryUnlocked]);
 
@@ -90,7 +65,10 @@ export default function StaffDashboard({ user }: { user: User }) {
 
     const handleLock = () => {
         setIsSalaryUnlocked(false);
-        if (autoLockTimer) clearTimeout(autoLockTimer);
+        if (autoLockTimerRef.current) {
+            clearTimeout(autoLockTimerRef.current);
+            autoLockTimerRef.current = null;
+        }
     };
 
     return (

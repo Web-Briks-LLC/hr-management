@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { format } from 'date-fns';
 import { Megaphone, X, ChevronLeft, ChevronRight, Pin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -29,11 +29,12 @@ export function FloatingNoticePopup() {
     const visibleNotices = unreadNotices.filter((n) => !dismissedIds.has(n._id));
     const currentNotice = visibleNotices[currentIndex];
 
-    useEffect(() => {
-        if (visibleNotices.length > 0 && !isLoading) {
-            setIsVisible(true);
-        }
-    }, [visibleNotices.length, isLoading]);
+    // Update visibility during render to avoid cascading renders
+    const [prevVisibleCount, setPrevVisibleCount] = useState(0);
+    if (visibleNotices.length > prevVisibleCount && !isLoading) {
+        setPrevVisibleCount(visibleNotices.length);
+        setIsVisible(true);
+    }
 
     const handleDismiss = async (notice: INotice) => {
         try {
@@ -62,7 +63,7 @@ export function FloatingNoticePopup() {
                 console.error('Failed to mark as viewed:', error);
             }
         }
-        setIsVisible(false);
+        setDismissedIds(new Set(unreadNotices.map((n) => n._id)));
     };
 
     const handlePrev = () => {
@@ -73,7 +74,7 @@ export function FloatingNoticePopup() {
         setCurrentIndex((prev) => Math.min(visibleNotices.length - 1, prev + 1));
     };
 
-    if (!isVisible || !currentNotice || visibleNotices.length === 0) {
+    if (!isVisible || !currentNotice) {
         return null;
     }
 
@@ -94,7 +95,7 @@ export function FloatingNoticePopup() {
                     <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => setIsVisible(false)}
+                        onClick={() => setDismissedIds(new Set(unreadNotices.map((n) => n._id)))}
                         className="h-8 w-8"
                     >
                         <X className="h-4 w-4" />
