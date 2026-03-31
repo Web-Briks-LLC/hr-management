@@ -79,6 +79,7 @@ import { toast } from "sonner";
 import {
     useGetEarningsQuery,
     useGetEarningStatsQuery,
+    useGetEarningYearsQuery,
     useWithdrawEarningMutation,
     useToggleEarningStatusMutation,
     useLazyGetClientOrdersForWithdrawQuery,
@@ -109,7 +110,7 @@ export default function EarningsPage() {
     const [page, setPage] = useState(1);
     const [limit, setLimit] = useState(20);
     const perPageOptions = [10, 20, 50, 100];
-    const [filterType, setFilterType] = useState<FilterType>("all");
+    const [filterType, setFilterType] = useState<FilterType>("year");
     const [statusFilter, setStatusFilter] = useState<EarningStatus | "all">(
         "all",
     );
@@ -198,6 +199,9 @@ export default function EarningsPage() {
     const { data: statsData, isLoading: isLoadingStats } =
         useGetEarningStatsQuery(filters);
     const { data: clientsData } = useGetClientsQuery({ limit: 100 });
+    const { data: yearsData } = useGetEarningYearsQuery();
+
+    const availableYears = yearsData?.data || YEARS;
 
     // Lazy query for bulk withdraw
     const [
@@ -235,7 +239,6 @@ export default function EarningsPage() {
 
     const [withdrawInvoiceNumber, setWithdrawInvoiceNumber] = useState("");
     const [withdrawTransactionId, setWithdrawTransactionId] = useState("");
-    const [isConversionMode, setIsConversionMode] = useState(false);
     const [withdrawTab, setWithdrawTab] = useState<string>("payment");
     const [selectedPaymentId, setSelectedPaymentId] = useState<string>("manual");
 
@@ -371,7 +374,7 @@ export default function EarningsPage() {
         // If we have unconverted payments, auto-select the first one if we might convert
         if (unconvertedPayments.length > 0) {
             const firstP = unconvertedPayments[0];
-            setSelectedPaymentId((firstP as any)._id || "manual");
+            setSelectedPaymentId(firstP._id || "manual");
             if (remaining <= 0.01) {
                 setWithdrawAmount(firstP.amount.toString());
                 setWithdrawInvoiceNumber(firstP.invoiceNumber || "manual");
@@ -419,8 +422,9 @@ export default function EarningsPage() {
             setWithdrawNotes("");
             setWithdrawInvoiceNumber("");
             setWithdrawTransactionId("");
-        } catch (error: any) {
-            toast.error(error.data?.message || "Failed to record payment");
+        } catch (error: unknown) {
+            const err = error as { data?: { message?: string } };
+            toast.error(err.data?.message || "Failed to record payment");
         }
     };
 
@@ -457,8 +461,9 @@ export default function EarningsPage() {
         try {
             await syncEarning(id).unwrap();
             toast.success("Earning synchronized with orders");
-        } catch (error: any) {
-            toast.error(error.data?.message || "Failed to synchronize");
+        } catch (error: unknown) {
+            const err = error as { data?: { message?: string } };
+            toast.error(err.data?.message || "Failed to synchronize");
         }
     };
 
@@ -755,7 +760,7 @@ export default function EarningsPage() {
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {YEARS.map((y) => (
+                                        {availableYears.map((y) => (
                                             <SelectItem
                                                 key={y}
                                                 value={y.toString()}
@@ -779,7 +784,7 @@ export default function EarningsPage() {
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {YEARS.map((y) => (
+                                    {availableYears.map((y) => (
                                         <SelectItem
                                             key={y}
                                             value={y.toString()}
@@ -1373,7 +1378,7 @@ export default function EarningsPage() {
 
                                         if (unconverted.length > 0) {
                                             const firstP = unconverted[0];
-                                            setSelectedPaymentId((firstP as any)._id || "manual");
+                                            setSelectedPaymentId(firstP._id || "manual");
                                             setWithdrawAmount(firstP.amount.toString());
                                             setWithdrawInvoiceNumber(firstP.invoiceNumber || "manual");
                                             setWithdrawTransactionId(firstP.transactionId || "");
@@ -1438,7 +1443,7 @@ export default function EarningsPage() {
                                                     value={withdrawInvoiceNumber}
                                                     onValueChange={(val) => {
                                                         setWithdrawInvoiceNumber(val);
-                                                        const selectedInv = pendingInvoices.find((i: any) => i.invoiceNumber === val);
+                                                        const selectedInv = pendingInvoices.find((i) => i.invoiceNumber === val);
                                                         if (selectedInv) setWithdrawAmount(selectedInv.totalAmount.toString());
                                                     }}
                                                 >
@@ -1447,7 +1452,7 @@ export default function EarningsPage() {
                                                     </SelectTrigger>
                                                     <SelectContent>
                                                         <SelectItem value="manual">None / Manual</SelectItem>
-                                                        {pendingInvoices.map((inv: any) => (
+                                                        {pendingInvoices.map((inv) => (
                                                             <SelectItem key={inv.invoiceNumber} value={inv.invoiceNumber}>
                                                                 #{inv.invoiceNumber} - {formatCurrency(inv.totalAmount, inv.currency)}
                                                             </SelectItem>
@@ -1483,7 +1488,7 @@ export default function EarningsPage() {
                                                             setWithdrawTransactionId("");
                                                             setWithdrawMethod("Cash");
                                                         } else {
-                                                            const p = selectedEarning.payments?.find(p => (p as any)._id === val);
+                                                            const p = selectedEarning.payments?.find(p => p._id === val);
                                                             if (p) {
                                                                 setWithdrawAmount(p.amount.toString());
                                                                 setWithdrawInvoiceNumber(p.invoiceNumber || "manual");
@@ -1497,7 +1502,7 @@ export default function EarningsPage() {
                                                         <SelectValue />
                                                     </SelectTrigger>
                                                     <SelectContent>
-                                                        {selectedEarning.payments?.filter(p => !p.amountInBDT || p.amountInBDT <= p.amount + 0.01 || p.conversionRate <= 1.1).map((p: any) => (
+                                                        {selectedEarning.payments?.filter(p => !p.amountInBDT || p.amountInBDT <= p.amount + 0.01 || p.conversionRate <= 1.1).map((p) => (
                                                             <SelectItem key={p._id} value={p._id}>
                                                                 {formatCurrency(p.amount, selectedEarning.currency)} via {p.method} ({p.invoiceNumber})
                                                             </SelectItem>
@@ -1866,7 +1871,7 @@ export default function EarningsPage() {
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            {YEARS.map((y) => (
+                                            {availableYears.map((y) => (
                                                 <SelectItem
                                                     key={y}
                                                     value={y.toString()}

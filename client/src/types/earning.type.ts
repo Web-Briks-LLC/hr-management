@@ -23,6 +23,7 @@ export interface IEarning {
     paidAmount: number;
     paidAmountBDT: number;
     payments: Array<{
+        _id: string;
         invoiceNumber: string;
         amount: number;
         amountInBDT: number;
