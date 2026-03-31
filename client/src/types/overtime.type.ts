@@ -11,9 +11,13 @@ export interface IOvertime {
     date: string;
     type: 'pre_shift' | 'post_shift' | 'weekend' | 'holiday';
     startTime: string;
+    actualStartTime?: string;
     endTime?: string;
     durationMinutes: number;
+    actualDurationMinutes?: number;
+    earlyStopMinutes?: number;
     status: 'pending' | 'approved' | 'rejected';
+    isAutoStopped?: boolean;
     reason?: string;
     createdBy?: {
         _id: string;

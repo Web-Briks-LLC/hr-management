@@ -13,6 +13,7 @@ import { useGetMyOvertimeQuery } from '@/redux/features/overtime/overtimeApi';
 import { IOvertime } from '@/types/overtime.type';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import OvertimeCountdownWidget from './overtime-countdown-widget';
 
 export default function MyOvertime() {
     const { data: overtimeData, isLoading } = useGetMyOvertimeQuery({});
@@ -22,8 +23,11 @@ export default function MyOvertime() {
     const records = (overtimeData?.data as IOvertime[]) || [];
 
     return (
-        <Card>
-            <CardHeader>
+        <div className="space-y-6">
+            <OvertimeCountdownWidget />
+
+            <Card>
+                <CardHeader>
                 <CardTitle>My Overtime History</CardTitle>
             </CardHeader>
             <CardContent>
@@ -97,5 +101,6 @@ export default function MyOvertime() {
                 </div>
             </CardContent>
         </Card>
+        </div>
     );
 }

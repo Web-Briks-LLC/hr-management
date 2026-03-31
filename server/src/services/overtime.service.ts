@@ -327,11 +327,47 @@ const stopOvertimeInDB = async (userId: string) => {
 
     // Update the record
     activeOvertime.endTime = endTime;
-    activeOvertime.durationMinutes = actualDurationMinutes; // Actual time worked
+    activeOvertime.actualDurationMinutes = actualDurationMinutes; // Actual time worked
     activeOvertime.earlyStopMinutes = earlyStopMinutes;
+    activeOvertime.isAutoStopped = false; // Manually stopped early
     await activeOvertime.save();
 
     return activeOvertime;
+};
+
+const extendOvertimeInDB = async (overtimeId: string, additionalMinutes: number) => {
+    const overtime = await OvertimeModel.findById(overtimeId).populate("staffId");
+    if (!overtime) throw new Error("Overtime record not found");
+
+    if (overtime.endTime) {
+        throw new Error("Cannot extend an overtime that has already ended");
+    }
+
+    if (!overtime.actualStartTime) {
+        throw new Error("Cannot extend an overtime that has not started yet");
+    }
+
+    overtime.durationMinutes += additionalMinutes;
+    overtime.reason = (overtime.reason ? overtime.reason + ' | ' : '') + `Extended by ${additionalMinutes} mins`;
+    
+    await overtime.save();
+
+    // Send notification to staff about the extension
+    const staff = overtime.staffId as any;
+    if (staff?.userId) {
+        const { default: NotificationServices } = await import("./notification.service.js");
+        await NotificationServices.createNotification({
+            userId: staff.userId,
+            title: 'Overtime Extended',
+            message: `Your active overtime session has been extended by ${additionalMinutes} minutes.`,
+            type: 'overtime',
+            priority: 'medium',
+            resourceType: 'overtime',
+            resourceId: overtime._id,
+        });
+    }
+
+    return overtime;
 };
 
 const getScheduledOvertimeForToday = async (userId: string) => {
@@ -369,5 +405,6 @@ export default {
     getStaffOvertimeFromDB,
     startOvertimeInDB,
     stopOvertimeInDB,
+    extendOvertimeInDB,
     getScheduledOvertimeForToday,
 };

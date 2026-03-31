@@ -63,6 +63,14 @@ export const overtimeApi = apiSlice.injectEndpoints({
             }),
             invalidatesTags: ['Overtime'],
         }),
+        extendOvertime: builder.mutation({
+            query: ({ id, additionalMinutes }) => ({
+                url: `/overtime/extend/${id}`,
+                method: 'PATCH',
+                body: { additionalMinutes },
+            }),
+            invalidatesTags: ['Overtime'],
+        }),
         getScheduledOvertimeToday: builder.query({
             query: () => ({
                 url: '/overtime/scheduled-today',
@@ -83,5 +91,6 @@ export const {
     useDeleteOvertimeMutation,
     useStartOvertimeMutation,
     useStopOvertimeMutation,
+    useExtendOvertimeMutation,
     useGetScheduledOvertimeTodayQuery,
 } = overtimeApi;

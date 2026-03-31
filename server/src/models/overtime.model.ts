@@ -38,7 +38,11 @@ const overtimeSchema = new Schema<IOvertime>(
         durationMinutes: {
             type: Number,
             default: 0,
-        },
+        }, // Allowed limit
+        actualDurationMinutes: {
+            type: Number,
+            default: 0,
+        }, // Actual worked time
         earlyStopMinutes: {
             type: Number,
             default: 0,
@@ -48,6 +52,10 @@ const overtimeSchema = new Schema<IOvertime>(
             enum: ['pending', 'approved', 'rejected'],
             default: 'pending',
             index: true,
+        },
+        isAutoStopped: {
+            type: Boolean,
+            default: false,
         },
         reason: {
             type: String,

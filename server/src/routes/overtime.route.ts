@@ -86,6 +86,12 @@ OvertimeRoutes.patch(
     OvertimeController.updateOvertime,
 );
 
+OvertimeRoutes.patch(
+    "/extend/:id",
+    authorize(...adminRoles),
+    OvertimeController.extendStaffOvertime,
+);
+
 OvertimeRoutes.delete(
     "/:id",
     authorize(...adminRoles),

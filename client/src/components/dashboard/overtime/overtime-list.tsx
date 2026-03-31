@@ -28,6 +28,7 @@ import {
 import {
     useDeleteOvertimeMutation,
     useGetAllOvertimeQuery,
+    useExtendOvertimeMutation,
 } from "@/redux/features/overtime/overtimeApi";
 import {
     Edit,
@@ -39,6 +40,7 @@ import {
     ChevronRight,
     ChevronsLeft,
     ChevronsRight,
+    Clock,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
@@ -67,11 +69,21 @@ export default function OvertimeList() {
     });
 
     const [deleteOvertime] = useDeleteOvertimeMutation();
+    const [extendOvertime] = useExtendOvertimeMutation();
 
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [selectedOvertime, setSelectedOvertime] = useState<IOvertime | null>(
         null,
     );
+
+    const handleExtend = async (id: string, additionalMinutes: number) => {
+        try {
+            await extendOvertime({ id, additionalMinutes }).unwrap();
+            toast.success(`Overtime extended by ${additionalMinutes} minutes`);
+        } catch (error) {
+            toast.error((error as any)?.data?.message || (error as Error).message || "Failed to extend overtime");
+        }
+    };
 
     const handleDelete = async (id: string) => {
         if (!confirm("Are you sure you want to delete this record?")) return;
@@ -252,6 +264,22 @@ export default function OvertimeList() {
                                                         <DropdownMenuLabel>
                                                             Actions
                                                         </DropdownMenuLabel>
+                                                        {ot.actualStartTime && !ot.endTime && (
+                                                            <>
+                                                                <DropdownMenuItem
+                                                                    onClick={() => handleExtend(ot._id, 30)}
+                                                                >
+                                                                    <Clock className=" h-4 w-4" />{" "}
+                                                                    Extend by 30m
+                                                                </DropdownMenuItem>
+                                                                <DropdownMenuItem
+                                                                    onClick={() => handleExtend(ot._id, 60)}
+                                                                >
+                                                                    <Clock className=" h-4 w-4" />{" "}
+                                                                    Extend by 1h
+                                                                </DropdownMenuItem>
+                                                            </>
+                                                        )}
                                                         <DropdownMenuItem
                                                             onClick={() =>
                                                                 handleEdit(ot)

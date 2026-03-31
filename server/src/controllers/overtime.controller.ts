@@ -204,6 +204,30 @@ const getScheduledOvertimeToday = async (req: Request, res: Response) => {
     }
 };
 
+const extendStaffOvertime = async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        const { additionalMinutes } = req.body;
+        
+        if (!id) throw new Error("Overtime ID is required");
+        if (!additionalMinutes || isNaN(additionalMinutes)) {
+            throw new Error("Valid additionalMinutes is required");
+        }
+
+        const result = await OvertimeServices.extendOvertimeInDB(id, Number(additionalMinutes));
+        res.status(200).json({
+            success: true,
+            message: `Overtime extended by ${additionalMinutes} minutes`,
+            data: result,
+        });
+    } catch (error: any) {
+        res.status(500).json({
+            success: false,
+            message: error.message || "Failed to extend overtime",
+        });
+    }
+};
+
 export default {
     createOvertime,
     getAllOvertime,
@@ -213,5 +237,6 @@ export default {
     deleteOvertime,
     startStaffOvertime,
     stopStaffOvertime,
+    extendStaffOvertime,
     getScheduledOvertimeToday,
 };

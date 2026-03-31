@@ -227,91 +227,67 @@ async function processAttendanceCheck() {
 }
 
 // ============================================
-// OVERTIME AUTO-CLOSE (Every 10 minutes)
+// OVERTIME AUTO-STOP (Every 1 minute)
 // ============================================
 
-async function processOvertimeAutoClose() {
+async function processOvertimeAutoStop() {
     const now = getBDNow();
-    const twelveHoursAgo = new Date(now.getTime() - 12 * 60 * 60 * 1000);
     let closedCount = 0;
 
     try {
-        // Find overtime entries that need auto-close
-        const overtimeToClose = await OvertimeModel.aggregate([
-            {
-                $match: {
-                    actualStartTime: { $ne: null, $lt: twelveHoursAgo },
-                    endTime: null,
-                },
-            },
-            {
-                $lookup: {
-                    from: 'staffs',
-                    localField: 'staffId',
-                    foreignField: '_id',
-                    as: 'staff',
-                },
-            },
-            { $unwind: { path: '$staff', preserveNullAndEmptyArrays: true } },
-            {
-                $project: {
-                    _id: 1,
-                    staffId: 1,
-                    userId: '$staff.userId',
-                    actualStartTime: 1,
-                    date: 1,
-                },
-            },
-        ]);
+        // Find all active overtimes (checked in but not ended)
+        const activeOvertimes = await OvertimeModel.find({
+            actualStartTime: { $exists: true, $ne: null },
+            endTime: { $exists: false },
+            durationMinutes: { $gt: 0 } // Must have an allowed duration
+        }).populate('staffId');
 
-        for (const ot of overtimeToClose) {
+        for (const ot of activeOvertimes) {
             try {
-                const durationMinutes = Math.floor(
-                    (now.getTime() - new Date(ot.actualStartTime).getTime()) /
-                        (1000 * 60),
-                );
+                const actualStartTime = new Date(ot.actualStartTime!);
+                // Calculate when this OT should stop based on its allowed duration
+                const scheduledEndTime = new Date(actualStartTime.getTime() + (ot.durationMinutes * 60 * 1000));
 
-                await OvertimeModel.findByIdAndUpdate(ot._id, {
-                    endTime: now,
-                    durationMinutes,
-                    reason:
-                        (ot.reason || '') +
-                        ' [Auto-closed by system after 12 hours]',
-                });
+                if (now >= scheduledEndTime) {
+                    // Time to auto-stop!
+                    const actualDurationMinutes = Math.floor(
+                        (now.getTime() - actualStartTime.getTime()) / (1000 * 60)
+                    );
 
-                closedCount++;
+                    ot.endTime = now;
+                    ot.actualDurationMinutes = actualDurationMinutes;
+                    ot.isAutoStopped = true;
+                    ot.reason = (ot.reason || '') + ' [Auto-stopped by system]';
+                    
+                    await ot.save();
+                    closedCount++;
 
-                // Send notification
-                if (ot.userId) {
-                    await notificationService.createNotification({
-                        userId: ot.userId,
-                        title: 'Overtime Auto-Closed',
-                        message: `Your overtime was automatically closed after 12 hours. Duration: ${Math.floor(
-                            durationMinutes / 60,
-                        )}h ${durationMinutes % 60}m`,
-                        type: 'overtime',
-                        priority: 'medium',
-                        resourceType: 'overtime',
-                        resourceId: ot._id,
-                    });
+                    // Send notification
+                    const staff = ot.staffId as any;
+                    if (staff?.userId) {
+                        await notificationService.createNotification({
+                            userId: staff.userId,
+                            title: 'Overtime Auto-Stopped',
+                            message: `Your overtime session automatically ended after ${ot.durationMinutes} minutes.`,
+                            type: 'overtime',
+                            priority: 'medium',
+                            resourceType: 'overtime',
+                            resourceId: ot._id,
+                        });
+                    }
                 }
             } catch (otError) {
-                console.error(
-                    `[Scheduler] Error closing overtime ${ot._id}:`,
-                    otError,
-                );
+                console.error(`[Scheduler] Error auto-stopping overtime ${ot._id}:`, otError);
             }
         }
 
         if (closedCount > 0) {
-            console.log(
-                `[Scheduler] Overtime auto-close: ${closedCount} overtime entries closed`,
-            );
+            console.log(`[Scheduler] Overtime auto-stop: ${closedCount} overtime entries completed.`);
         }
 
         return { closedCount };
     } catch (error) {
-        console.error('[Scheduler] Error in overtime auto-close:', error);
+        console.error('[Scheduler] Error in overtime auto-stop:', error);
         throw error;
     }
 }
@@ -478,12 +454,12 @@ function startAllSchedulers() {
     }, TEN_MINUTES);
     console.log('[Scheduler] Attendance check: Running every 10 minutes');
 
-    // Overtime auto-close - every 10 minutes
-    processOvertimeAutoClose().catch(console.error);
+    // Overtime auto-stop - every 1 minute
+    processOvertimeAutoStop().catch(console.error);
     overtimeInterval = setInterval(() => {
-        processOvertimeAutoClose().catch(console.error);
-    }, TEN_MINUTES);
-    console.log('[Scheduler] Overtime auto-close: Running every 10 minutes');
+        processOvertimeAutoStop().catch(console.error);
+    }, ONE_MINUTE);
+    console.log('[Scheduler] Overtime auto-stop: Running every 1 minute');
 
     // Leave expiry - check every minute, but only run at 11:59 PM
     const runLeaveExpiryIfTime = () => {
@@ -517,7 +493,7 @@ function stopAllSchedulers() {
 
 export default {
     processAttendanceCheck,
-    processOvertimeAutoClose,
+    processOvertimeAutoStop,
     processLeaveExpiry,
     startAllSchedulers,
     stopAllSchedulers,

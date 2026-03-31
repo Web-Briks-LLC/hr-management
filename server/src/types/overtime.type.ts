@@ -8,9 +8,11 @@ export interface IOvertime extends Document {
     startTime: Date;
     actualStartTime?: Date;
     endTime?: Date;
-    durationMinutes: number;
+    durationMinutes: number; // This is the "Allowed" / Scheduled limit
+    actualDurationMinutes?: number; // The actual time worked
     earlyStopMinutes: number;
     status: 'pending' | 'approved' | 'rejected';
+    isAutoStopped?: boolean;
     reason?: string;
     createdBy?: Types.ObjectId;
     approvedBy?: Types.ObjectId;
