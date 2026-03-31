@@ -103,6 +103,12 @@ export const sidebarGroups: SidebarGroup[] = [
                 access: [Role.SUPER_ADMIN, Role.ADMIN],
             },
             {
+                title: "Services",
+                url: "/services",
+                icon: IconPackage,
+                access: [Role.SUPER_ADMIN, Role.ADMIN],
+            },
+            {
                 title: "Profit Share",
                 url: "/profit-share",
                 icon: IconPigMoney,

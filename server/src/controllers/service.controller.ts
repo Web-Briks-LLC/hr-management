@@ -128,12 +128,48 @@ async function updateService(req: Request, res: Response) {
     }
 }
 
+async function checkServiceUsage(req: Request, res: Response) {
+    try {
+        const id = req.params.id;
+        if (!id) {
+            return res.status(400).json({ message: 'Service ID is required' });
+        }
+
+        const hasUsage = await serviceService.checkServiceHasUsage(id);
+        return res.status(200).json({
+            message: 'Usage check completed',
+            data: { hasUsage },
+        });
+    } catch (error) {
+        console.error('Error checking service usage:', error);
+        return res.status(500).json({ message: 'Internal server error' });
+    }
+}
+
 async function deleteService(req: Request, res: Response) {
     try {
         const id = req.params.id;
+        const { migrationId } = req.body;
 
         if (!id) {
             return res.status(400).json({ message: 'Service ID is required' });
+        }
+
+        // If migrationId is provided, migrate orders first
+        if (migrationId) {
+            if (id === migrationId) {
+                return res.status(400).json({ message: 'Cannot migrate to the same service' });
+            }
+            await serviceService.migrateServiceUsage(id, migrationId);
+        } else {
+            // Check for usage if no migrationId provided
+            const hasUsage = await serviceService.checkServiceHasUsage(id);
+            if (hasUsage) {
+                return res.status(400).json({ 
+                    message: 'Service is in use and cannot be deleted without migration.',
+                    requiresMigration: true
+                });
+            }
         }
 
         const service = await serviceService.deleteServiceFromDB(id);
@@ -143,7 +179,7 @@ async function deleteService(req: Request, res: Response) {
         }
 
         return res.status(200).json({
-            message: 'Service deleted successfully',
+            message: migrationId ? 'Service migrated and deleted successfully' : 'Service deleted successfully',
         });
     } catch (error) {
         console.error('Error deleting service:', error);
@@ -157,4 +193,5 @@ export {
     getServiceById,
     updateService,
     deleteService,
+    checkServiceUsage,
 };

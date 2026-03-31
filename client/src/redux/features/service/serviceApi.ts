@@ -7,7 +7,7 @@ import type {
 
 interface ServicesResponse {
     message: string;
-    data: IService[];
+    data: (IService & { usageCount: number })[];
     meta: {
         total: number;
     };
@@ -22,6 +22,7 @@ interface GetServicesParams {
     isActive?: boolean;
     page?: number;
     limit?: number;
+    search?: string;
 }
 
 export const serviceApi = apiSlice.injectEndpoints({
@@ -37,6 +38,10 @@ export const serviceApi = apiSlice.injectEndpoints({
         getServiceById: builder.query<ServiceResponse, string>({
             query: (id) => `/services/${id}`,
             providesTags: (_result, _error, id) => [{ type: 'Service', id }],
+        }),
+
+        checkServiceUsage: builder.query<{ data: { hasUsage: boolean } }, string>({
+            query: (id) => `/services/${id}/usage`,
         }),
 
         createService: builder.mutation<ServiceResponse, CreateServiceInput>({
@@ -63,10 +68,14 @@ export const serviceApi = apiSlice.injectEndpoints({
             ],
         }),
 
-        deleteService: builder.mutation<{ message: string }, string>({
-            query: (id) => ({
+        deleteService: builder.mutation<
+            { message: string }, 
+            { id: string; migrationId?: string }
+        >({
+            query: ({ id, migrationId }) => ({
                 url: `/services/${id}`,
                 method: 'DELETE',
+                body: { migrationId },
             }),
             invalidatesTags: ['Service'],
         }),
@@ -76,6 +85,8 @@ export const serviceApi = apiSlice.injectEndpoints({
 export const {
     useGetServicesQuery,
     useGetServiceByIdQuery,
+    useCheckServiceUsageQuery,
+    useLazyCheckServiceUsageQuery,
     useCreateServiceMutation,
     useUpdateServiceMutation,
     useDeleteServiceMutation,

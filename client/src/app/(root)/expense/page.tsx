@@ -487,6 +487,7 @@ export default function ExpensePage() {
                                 open={isExportDialogOpen}
                                 onOpenChange={setIsExportDialogOpen}
                                 availableYears={years}
+                                branches={branches}
                             />
                         </Dialog>
                         <Dialog

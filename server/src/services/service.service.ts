@@ -1,4 +1,5 @@
 import ServiceModel from "../models/service.model.js";
+import OrderModel from "../models/order.model.js";
 import type { IService } from "../types/service.type.js";
 import { escapeRegex } from "../lib/sanitize.js";
 
@@ -15,26 +16,47 @@ async function getAllServicesFromDB(options: {
     isActive?: boolean | undefined;
     page?: number;
     limit?: number;
-}): Promise<{ services: IService[]; total: number }> {
-    const { isActive, page = 1, limit = 50 } = options;
+    search?: string;
+}): Promise<{ services: (IService & { usageCount: number })[]; total: number }> {
+    const { isActive, page = 1, limit = 50, search } = options;
 
     const query: Record<string, unknown> = {};
     if (isActive !== undefined) {
         query.isActive = isActive;
     }
+    if (search) {
+        query.name = { $regex: new RegExp(escapeRegex(search), "i") };
+    }
 
     const skip = (page - 1) * limit;
 
+    const pipeline: any[] = [
+        { $match: query },
+        {
+            $lookup: {
+                from: "orders",
+                localField: "_id",
+                foreignField: "services",
+                as: "orderUsages",
+            },
+        },
+        {
+            $addFields: {
+                usageCount: { $size: "$orderUsages" },
+            },
+        },
+        { $project: { orderUsages: 0 } },
+        { $sort: { name: 1 } },
+        { $skip: skip },
+        { $limit: limit },
+    ];
+
     const [services, total] = await Promise.all([
-        ServiceModel.find(query)
-            .sort({ name: 1 })
-            .skip(skip)
-            .limit(limit)
-            .lean(),
+        ServiceModel.aggregate(pipeline),
         ServiceModel.countDocuments(query),
     ]);
 
-    return { services: services as IService[], total };
+    return { services: services as (IService & { usageCount: number })[], total };
 }
 
 async function getServiceByIdFromDB(id: string): Promise<IService | null> {
@@ -59,6 +81,33 @@ async function deleteServiceFromDB(id: string): Promise<IService | null> {
     return ServiceModel.findByIdAndDelete(id).lean();
 }
 
+async function checkServiceHasUsage(id: string): Promise<boolean> {
+    const usage = await OrderModel.findOne({ services: id }).lean();
+    return !!usage;
+}
+
+async function migrateServiceUsage(
+    oldId: string,
+    newId: string,
+): Promise<number> {
+    // For every order that has oldId in its services array, replace it with newId
+    // If the order already has newId, we should just pull oldId.
+    
+    // First, handles orders that have both (removes oldId)
+    await OrderModel.updateMany(
+        { services: { $all: [oldId, newId] } },
+        { $pull: { services: oldId } }
+    );
+
+    // Then, handles orders that have oldId but not newId (replaces oldId with newId)
+    const result = await OrderModel.updateMany(
+       { services: oldId },
+       { $set: { "services.$": newId } }
+    );
+    
+    return result.modifiedCount;
+}
+
 async function checkServiceNameExists(
     name: string,
     excludeId?: string,
@@ -80,4 +129,6 @@ export default {
     updateServiceInDB,
     deleteServiceFromDB,
     checkServiceNameExists,
+    checkServiceHasUsage,
+    migrateServiceUsage,
 };
