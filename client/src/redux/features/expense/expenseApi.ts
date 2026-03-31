@@ -46,6 +46,21 @@ export interface ExpenseQueryParams {
     status?: string;
 }
 
+export interface CreateExpenseInput {
+    date: Date | string;
+    title: string;
+    categoryId: string;
+    branchId: string;
+    amount: number;
+    status: "pending" | "paid" | "partial_paid";
+    paymentMethod?: string;
+    note?: string;
+}
+
+export interface UpdateExpenseInput extends Partial<CreateExpenseInput> {
+    id: string;
+}
+
 export const expenseApi = apiSlice.injectEndpoints({
     endpoints: (builder) => ({
         getExpenses: builder.query({
@@ -81,7 +96,7 @@ export const expenseApi = apiSlice.injectEndpoints({
                 response.data,
             providesTags: ["Expense"],
         }),
-        createExpense: builder.mutation({
+        createExpense: builder.mutation<Expense, CreateExpenseInput>({
             query: (body) => ({
                 url: "/expenses",
                 method: "POST",
@@ -89,7 +104,7 @@ export const expenseApi = apiSlice.injectEndpoints({
             }),
             invalidatesTags: ["Expense"],
         }),
-        updateExpense: builder.mutation({
+        updateExpense: builder.mutation<Expense, UpdateExpenseInput>({
             query: ({ id, ...body }) => ({
                 url: `/expenses/${id}`,
                 method: "PATCH",

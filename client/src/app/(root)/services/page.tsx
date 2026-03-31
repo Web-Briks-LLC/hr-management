@@ -312,23 +312,20 @@ export default function ServicesPage() {
         ) : (
           <>
             <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent border-b border-slate-100">
-                  <TableHead className="py-4 text-slate-900 font-bold text-xs uppercase tracking-wider">
-                    <div className="flex items-center gap-2 cursor-pointer hover:text-primary transition-colors">
-                      Service Name <TrendingUp className="h-3 w-3" />
+              <TableHeader className="bg-muted/30">
+                <TableRow className="hover:bg-transparent border-b border-slate-200/60">
+                  <TableHead className="py-4 text-slate-800 font-bold text-xs uppercase tracking-wider pl-6">
+                    <div className="flex items-center gap-2">
+                       Name & Details
                     </div>
                   </TableHead>
-                  <TableHead className="text-slate-900 font-bold text-xs uppercase tracking-wider">
-                    Description
-                  </TableHead>
-                  <TableHead className="text-center text-slate-900 font-bold text-xs uppercase tracking-wider">
+                  <TableHead className="text-center text-slate-800 font-bold text-xs uppercase tracking-wider">
                     Status
                   </TableHead>
-                  <TableHead className="text-center text-slate-900 font-bold text-xs uppercase tracking-wider">
-                    Usage
+                  <TableHead className="text-center text-slate-800 font-bold text-xs uppercase tracking-wider">
+                    Order Metrics
                   </TableHead>
-                  <TableHead className="text-right text-slate-900 font-bold text-xs uppercase tracking-wider pr-6">
+                  <TableHead className="text-right text-slate-800 font-bold text-xs uppercase tracking-wider pr-6">
                     Actions
                   </TableHead>
                 </TableRow>
@@ -347,52 +344,56 @@ export default function ServicesPage() {
                   services.map((service) => (
                     <TableRow
                       key={service._id}
-                      className="hover:bg-slate-50/50 transition-colors border-b border-slate-50 group last:border-0"
+                      className="hover:bg-accent/5 transition-colors border-b border-slate-100/50 group last:border-0"
                     >
-                      <TableCell className="py-4 font-bold text-slate-900">
-                        {service.name}
+                      <TableCell className="py-5 pl-6">
+                        <div className="flex flex-col">
+                          <span className="font-bold text-slate-900 text-sm">{service.name}</span>
+                          <span className="text-xs text-muted-foreground line-clamp-1 max-w-[300px]">
+                            {service.description || "No description provided"}
+                          </span>
+                        </div>
                       </TableCell>
-                      <TableCell className="text-slate-500 text-sm italic">
-                        {service.description || "—"}
-                      </TableCell>
-                      <TableCell className="text-center font-bold">
+                      <TableCell className="text-center">
                         <Badge
-                          variant={service.isActive ? "default" : "outline"}
+                          variant={service.isActive ? "default" : "secondary"}
                           className={cn(
-                            "px-3 py-0.5 rounded-full text-[10px] font-bold shadow-none",
+                            "px-2.5 py-0.5 rounded-full text-[10px] font-bold shadow-xs",
                             service.isActive
-                              ? "bg-emerald-50 text-emerald-600 border-emerald-100"
-                              : "bg-slate-50 text-slate-400 border-slate-100",
+                              ? "bg-emerald-50 text-emerald-700 border-emerald-200/50"
+                              : "bg-slate-50 text-slate-500 border-slate-200/50",
                           )}
                         >
                           {service.isActive ? "Active" : "Inactive"}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-center font-bold">
-                        <div className="flex flex-col items-center font-bold">
-                          <span className="font-bold text-slate-900">
+                      <TableCell className="text-center">
+                        <div className="inline-flex flex-col items-center px-3 py-1 rounded-lg bg-primary/5 hover:bg-primary/10 transition-colors border border-primary/10">
+                          <span className="text-sm font-black text-primary">
                             {service.usageCount}
                           </span>
-                          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">
-                            Orders
+                          <span className="text-[9px] text-primary/60 font-black uppercase tracking-tighter">
+                            Total Uses
                           </span>
                         </div>
                       </TableCell>
-                      <TableCell className="text-right pr-6 font-bold">
-                        <div className="flex justify-end gap-1">
+                      <TableCell className="text-right pr-6">
+                        <div className="flex justify-end gap-1.5 translate-x-2 opacity-0 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-200">
                           <Button
-                            variant="ghost"
+                            variant="outline"
                             size="icon"
+                            className="h-8 w-8 rounded-lg border-slate-200 bg-white hover:bg-slate-50 hover:text-primary transition-colors"
                             onClick={() => handleOpenEdit(service)}
                           >
-                            <Pencil className="h-4 w-4" />
+                            <Pencil className="h-3.5 w-3.5" />
                           </Button>
                           <Button
-                            variant="ghost"
+                            variant="outline"
                             size="icon"
+                            className="h-8 w-8 rounded-lg border-slate-200 bg-white hover:bg-destructive/10 hover:text-destructive hover:border-destructive/20 transition-colors"
                             onClick={() => handleDeleteClick(service)}
                           >
-                            <Trash2 className="h-4 w-4" />
+                            <Trash2 className="h-3.5 w-3.5" />
                           </Button>
                         </div>
                       </TableCell>

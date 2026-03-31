@@ -26,7 +26,7 @@ import {
 } from "@/redux/features/staff/staffApi";
 import { useGetAllBranchesQuery } from "@/redux/features/branch/branchApi";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm, Controller } from "react-hook-form";
+import { useForm, Controller, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
@@ -46,6 +46,7 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 
 const overtimeSchema = z.object({
@@ -105,9 +106,19 @@ export function OvertimeDialog({
     // Branch selection state
     const [selectedBranchId, setSelectedBranchId] = useState<string>("");
 
-    if (currentUser?.branchId && !selectedBranchId) {
-        setSelectedBranchId(currentUser.branchId);
-    }
+    // Initialize branch selection from currentUser once
+    const hasInitializedRef = useRef(false);
+    useEffect(() => {
+        if (!hasInitializedRef.current && currentUser?.branchId) {
+            // Using requestAnimationFrame to break the cascading render chain
+            requestAnimationFrame(() => {
+                if (currentUser?.branchId) {
+                    setSelectedBranchId(currentUser.branchId);
+                    hasInitializedRef.current = true;
+                }
+            });
+        }
+    }, [currentUser?.branchId]);
 
     const { data: branchesData } = useGetAllBranchesQuery(undefined, {
         skip: !canChangeBranch,
@@ -170,6 +181,8 @@ export function OvertimeDialog({
             reason: "",
         },
     });
+
+    const watchStaffIds = useWatch({ control, name: "staffIds" }) || [];
 
     useEffect(() => {
         if (data) {
@@ -262,507 +275,533 @@ export function OvertimeDialog({
                 onOpenChange(isOpen);
             }}
         >
-            <DialogContent className="sm:max-w-[520px]">
-                <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2">
-                        <Users className="h-5 w-5" />
-                        {data ? "Edit Overtime" : "Add Overtime"}
-                    </DialogTitle>
-                    <DialogDescription>
-                        {data
-                            ? "Update the overtime details below."
-                            : "Assign overtime to one or more staff members."}
-                    </DialogDescription>
-                </DialogHeader>
+        <DialogContent className="sm:max-w-2xl p-0 flex flex-col max-h-[90vh] overflow-hidden">
+            <form
+                onSubmit={handleSubmit(onSubmit)}
+                className="flex flex-col h-full overflow-hidden"
+            >
+                <div className="p-6 pb-2">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2 text-xl font-bold">
+                            <Users className="h-5 w-5 text-primary" />
+                            {data ? "Update Overtime" : "Assign Overtime"}
+                        </DialogTitle>
+                        <DialogDescription className="text-sm">
+                            {data
+                                ? "Update the overtime details for the selected staff member."
+                                : "Assign overtime to one or more staff members."}
+                        </DialogDescription>
+                    </DialogHeader>
+                </div>
 
-                <form
-                    onSubmit={handleSubmit(onSubmit)}
-                    className="space-y-5 pt-1"
-                >
-                    {/* ── Branch Selection ── */}
-                    {canChangeBranch && (
-                        <div className="space-y-2">
-                            <Label htmlFor="branch">Branch</Label>
-                            <Select
-                                value={selectedBranchId}
-                                onValueChange={setSelectedBranchId}
-                            >
-                                <SelectTrigger className="w-full">
-                                    <SelectValue placeholder="Select branch" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {branches.map((branch: IBranch) => (
-                                        <SelectItem
-                                            key={branch._id}
-                                            value={branch._id}
-                                        >
-                                            {branch.name}
+                <ScrollArea className="flex-1 px-6 py-2 border-y bg-muted/5">
+                    <div className="grid gap-6 py-4">
+                        {/* ── Branch Selection (Admin only) ── */}
+                        {canChangeBranch && !data && (
+                            <div className="space-y-2">
+                                <Label htmlFor="branch" className="text-sm font-semibold">Branch Selection</Label>
+                                <Select
+                                    onValueChange={(v) =>
+                                        setSelectedBranchId(v)
+                                    }
+                                    defaultValue={selectedBranchId || "all"}
+                                >
+                                    <SelectTrigger className="w-full h-10 border-muted-foreground/20 bg-background hover:bg-muted/50 transition-colors">
+                                        <SelectValue placeholder="All Branches" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">
+                                            All Branches
                                         </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    )}
+                                        {branches.map(
+                                            (branch: IBranch) => (
+                                                <SelectItem
+                                                    key={branch._id}
+                                                    value={branch._id}
+                                                >
+                                                    {branch.name}
+                                                </SelectItem>
+                                            ),
+                                        )}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
 
-                    {/* ── Staff Multi-Select ── */}
-                    <div className="space-y-2">
-                        <Label>Staff Members</Label>
-                        <Controller
-                            name="staffIds"
-                            control={control}
-                            render={({ field }) => {
-                                const allStaffIds: string[] =
-                                    staffsData?.staffs?.map(
-                                        (s: IStaff) => s._id,
-                                    ) || [];
-                                const isAllSelected =
-                                    allStaffIds.length > 0 &&
-                                    field.value.length === allStaffIds.length;
+                        {/* ── Staff Selection ── */}
+                        <div className="space-y-3">
+                            <Label className="text-sm font-semibold">Staff Members <span className="text-destructive">*</span></Label>
+                            <Controller
+                                control={control}
+                                name="staffIds"
+                                render={({ field }) => {
+                                    const allStaffIds =
+                                        staffsData?.staffs?.map(
+                                            (s: IStaff) => s._id,
+                                        ) || [];
+                                    const isAllSelected =
+                                        allStaffIds.length > 0 &&
+                                        field.value.length ===
+                                            allStaffIds.length;
 
-                                const toggleStaff = (staffId: string) => {
-                                    const isSelected =
-                                        field.value.includes(staffId);
-                                    if (isSelected) {
+                                    const toggleStaff = (id: string) => {
+                                        const current = [...field.value];
+                                        const index = current.indexOf(id);
+                                        if (index > -1) {
+                                            current.splice(index, 1);
+                                        } else {
+                                            current.push(id);
+                                        }
+                                        field.onChange(current);
+                                    };
+
+                                    const toggleAll = () => {
+                                        if (isAllSelected) {
+                                            field.onChange([]);
+                                        } else {
+                                            field.onChange(allStaffIds);
+                                        }
+                                    };
+
+                                    const removeStaff = (
+                                        e: React.MouseEvent,
+                                        id: string,
+                                    ) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
                                         field.onChange(
                                             field.value.filter(
-                                                (id) => id !== staffId,
+                                                (sid: string) => sid !== id,
                                             ),
                                         );
-                                    } else {
-                                        field.onChange([
-                                            ...field.value,
-                                            staffId,
-                                        ]);
-                                    }
-                                };
+                                    };
 
-                                const toggleAll = () => {
-                                    if (isAllSelected) {
+                                    const clearAll = (e: React.MouseEvent) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
                                         field.onChange([]);
-                                    } else {
-                                        field.onChange(allStaffIds);
-                                    }
-                                };
+                                    };
 
-                                const removeStaff = (
-                                    e: React.MouseEvent,
-                                    staffId: string,
-                                ) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    field.onChange(
-                                        field.value.filter(
-                                            (id) => id !== staffId,
-                                        ),
-                                    );
-                                };
-
-                                const clearAll = (e: React.MouseEvent) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    field.onChange([]);
-                                };
-
-                                return (
-                                    <div className="space-y-2">
-                                        {/* Trigger */}
-                                        <Popover
-                                            open={staffSelectOpen}
-                                            onOpenChange={(isOpen) => {
-                                                setStaffSelectOpen(isOpen);
-                                                if (!isOpen) {
-                                                    setStaffSearchTerm("");
-                                                }
-                                            }}
-                                        >
-                                            <PopoverTrigger asChild>
-                                                <Button
-                                                    variant="outline"
-                                                    role="combobox"
-                                                    aria-expanded={
-                                                        staffSelectOpen
-                                                    }
-                                                    className="w-full justify-between h-10 text-left font-normal"
-                                                    disabled={!!data}
-                                                >
-                                                    <span
-                                                        className={cn(
-                                                            "truncate",
-                                                            field.value
-                                                                .length === 0 &&
-                                                                "text-muted-foreground",
-                                                        )}
-                                                    >
-                                                        {field.value.length ===
-                                                        0
-                                                            ? "Select staff members..."
-                                                            : `${field.value.length} staff selected`}
-                                                    </span>
-                                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                                </Button>
-                                            </PopoverTrigger>
-
-                                            <PopoverContent
-                                                className="p-0"
-                                                align="start"
-                                                style={{
-                                                    width: "var(--radix-popover-trigger-width)",
-                                                }}
+                                    return (
+                                        <div className="space-y-3">
+                                            <Popover
+                                                open={staffSelectOpen}
+                                                onOpenChange={setStaffSelectOpen}
                                             >
-                                                {/* Search Input */}
-                                                <div className="flex items-center gap-2 border-b px-3 py-2">
-                                                    <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
-                                                    <input
-                                                        ref={searchInputRef}
-                                                        type="text"
-                                                        className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-                                                        placeholder="Search by name, ID, or designation..."
-                                                        value={staffSearchTerm}
-                                                        onChange={(e) =>
-                                                            setStaffSearchTerm(
-                                                                e.target.value,
-                                                            )
-                                                        }
-                                                    />
-                                                    {staffSearchTerm && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() =>
+                                                <PopoverTrigger asChild>
+                                                    <Button
+                                                        variant="outline"
+                                                        role="combobox"
+                                                        className="w-full justify-between h-10 border-muted-foreground/30 font-normal hover:bg-accent/5 transition-all text-left"
+                                                        disabled={!!data}
+                                                    >
+                                                        <span className="truncate">
+                                                            {field.value
+                                                                .length === 0
+                                                                ? "Select staff members..."
+                                                                : `${field.value.length} staff selected`}
+                                                        </span>
+                                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                                    </Button>
+                                                </PopoverTrigger>
+
+                                                <PopoverContent
+                                                    className="p-0 shadow-lg border-muted-foreground/20"
+                                                    align="start"
+                                                    style={{
+                                                        width: "var(--radix-popover-trigger-width)",
+                                                    }}
+                                                >
+                                                    {/* Search Input */}
+                                                    <div className="flex items-center gap-2 border-b px-3 py-2.5 bg-muted/30">
+                                                        <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                                        <input
+                                                            ref={searchInputRef}
+                                                            type="text"
+                                                            className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                                                            placeholder="Search workers..."
+                                                            value={staffSearchTerm}
+                                                            onChange={(e) =>
                                                                 setStaffSearchTerm(
-                                                                    "",
+                                                                    e.target.value,
                                                                 )
                                                             }
-                                                            className="text-muted-foreground hover:text-foreground"
+                                                        />
+                                                        {staffSearchTerm && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() =>
+                                                                    setStaffSearchTerm(
+                                                                        "",
+                                                                    )
+                                                                }
+                                                                className="text-muted-foreground hover:text-foreground p-0.5 rounded-full hover:bg-muted"
+                                                            >
+                                                                <X className="h-3.5 w-3.5" />
+                                                            </button>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Staff List */}
+                                                    <ScrollArea className="h-72 w-full p-1 bg-background border-t">
+                                                        {isStaffsLoading ? (
+                                                            <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
+                                                                <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                                                                Searching for staff...
+                                                            </div>
+                                                        ) : filteredStaffs.length ===
+                                                          0 ? (
+                                                            <div className="py-8 text-center text-sm text-muted-foreground">
+                                                                {debouncedSearch
+                                                                    ? `No results for "${debouncedSearch}"`
+                                                                    : "No staff found"}
+                                                            </div>
+                                                        ) : (
+                                                            <div className="space-y-0.5">
+                                                                {/* Select All */}
+                                                                {!debouncedSearch && (
+                                                                    <div
+                                                                        role="button"
+                                                                        tabIndex={0}
+                                                                        onClick={
+                                                                            toggleAll
+                                                                        }
+                                                                        onKeyDown={(e) => {
+                                                                            if (e.key === "Enter" || e.key === " ") {
+                                                                                e.preventDefault();
+                                                                                toggleAll();
+                                                                            }
+                                                                        }}
+                                                                        className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-sm hover:bg-accent/80 hover:text-accent-foreground transition-all cursor-pointer group"
+                                                                    >
+                                                                        <Checkbox
+                                                                            checked={
+                                                                                isAllSelected
+                                                                            }
+                                                                            className="pointer-events-none data-[state=checked]:bg-primary"
+                                                                        />
+                                                                        <span className="font-semibold group-hover:translate-x-0.5 transition-transform">
+                                                                            Select All Global
+                                                                        </span>
+                                                                        <span className="ml-auto text-xs text-muted-foreground font-mono bg-muted px-1.5 py-0.5 rounded">
+                                                                            {
+                                                                                allStaffIds.length
+                                                                            }
+                                                                        </span>
+                                                                    </div>
+                                                                )}
+
+                                                                {/* Staff Items */}
+                                                                {filteredStaffs.map(
+                                                                    (
+                                                                        staffList: IStaff,
+                                                                    ) => {
+                                                                        const isSelected =
+                                                                            field.value.includes(
+                                                                                staffList._id,
+                                                                            );
+                                                                        return (
+                                                                            <div
+                                                                                key={
+                                                                                    staffList._id
+                                                                                }
+                                                                                role="button"
+                                                                                tabIndex={0}
+                                                                                onClick={() =>
+                                                                                    toggleStaff(
+                                                                                        staffList._id,
+                                                                                    )
+                                                                                }
+                                                                                onKeyDown={(e) => {
+                                                                                    if (
+                                                                                        e.key === "Enter" ||
+                                                                                        e.key === " "
+                                                                                    ) {
+                                                                                        e.preventDefault();
+                                                                                        toggleStaff(staffList._id);
+                                                                                    }
+                                                                                }}
+                                                                                className={cn(
+                                                                                    "flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm transition-all cursor-pointer group",
+                                                                                    isSelected
+                                                                                        ? "bg-primary/5 hover:bg-primary/10"
+                                                                                        : "hover:bg-accent/80 hover:text-accent-foreground",
+                                                                                )}
+                                                                            >
+                                                                                <Checkbox
+                                                                                    checked={
+                                                                                        isSelected
+                                                                                    }
+                                                                                    className="pointer-events-none data-[state=checked]:bg-primary"
+                                                                                />
+                                                                                <Avatar className="h-8 w-8 border border-muted ring-offset-background group-hover:ring-2 ring-primary/20 transition-all">
+                                                                                    <AvatarImage
+                                                                                        src={
+                                                                                            staffList
+                                                                                                .user
+                                                                                                ?.image as string
+                                                                                        }
+                                                                                    />
+                                                                                    <AvatarFallback className="text-[10px] bg-muted/50">
+                                                                                        {getInitials(
+                                                                                            staffList
+                                                                                                .user
+                                                                                                ?.name ||
+                                                                                                "U",
+                                                                                        )}
+                                                                                    </AvatarFallback>
+                                                                                </Avatar>
+                                                                                <div className="flex flex-col items-start min-w-0">
+                                                                                    <span className="truncate text-sm font-semibold text-foreground/90 group-hover:text-primary transition-colors">
+                                                                                        {staffList
+                                                                                            .user
+                                                                                            ?.name ||
+                                                                                            "Unknown"}
+                                                                                    </span>
+                                                                                    <span className="truncate text-[10px] text-muted-foreground leading-tight uppercase font-bold tracking-tight">
+                                                                                        ID: {
+                                                                                            staffList.staffId
+                                                                                        }{" "}
+                                                                                        •{" "}
+                                                                                        {
+                                                                                            staffList.designation
+                                                                                        }
+                                                                                    </span>
+                                                                                </div>
+                                                                                {isSelected && (
+                                                                                    <Check className="ml-auto h-4 w-4 text-primary shrink-0 animate-in zoom-in-50 duration-200" />
+                                                                                )}
+                                                                            </div>
+                                                                        );
+                                                                    },
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </ScrollArea>
+                                                </PopoverContent>
+                                            </Popover>
+
+                                            {/* Selected Badges */}
+                                            {field.value.length > 0 && !data && (
+                                                <div className="flex flex-wrap items-center gap-1.5 pt-1.5">
+                                                    {field.value.map((id) => {
+                                                        const staff =
+                                                            getStaffById(id);
+                                                        return (
+                                                            <Badge
+                                                                key={id}
+                                                                variant="outline"
+                                                                className="gap-1 pr-1 border-primary/20 bg-primary/5 text-primary-foreground hover:bg-primary/10 transition-colors shadow-sm animate-in fade-in slide-in-from-top-1 duration-200"
+                                                            >
+                                                                <span className="max-w-[120px] truncate text-[11px] font-medium text-primary">
+                                                                    {staff?.user
+                                                                        ?.name ||
+                                                                        "Staff"}
+                                                                </span>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={(e) =>
+                                                                        removeStaff(
+                                                                            e,
+                                                                            id,
+                                                                        )
+                                                                    }
+                                                                    className="ml-0.5 rounded-full p-0.5 hover:bg-destructive hover:text-destructive-foreground transition-all group/btn"
+                                                                >
+                                                                    <X className="h-3 w-3 group-hover/btn:scale-110" />
+                                                                </button>
+                                                            </Badge>
+                                                        );
+                                                    })}
+                                                    {field.value.length > 1 && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={clearAll}
+                                                            className="text-[10px] uppercase font-extrabold text-muted-foreground hover:text-destructive transition-all px-2 py-1 rounded-md hover:bg-destructive/5 tracking-wider"
                                                         >
-                                                            <X className="h-3.5 w-3.5" />
+                                                            Dismiss All
                                                         </button>
                                                     )}
                                                 </div>
-
-                                                {/* Staff List */}
-                                                <div className="max-h-[240px] overflow-y-auto p-1">
-                                                    {isStaffsLoading ? (
-                                                        <div className="flex items-center justify-center gap-2 py-6 text-sm text-muted-foreground">
-                                                            <Loader2 className="h-4 w-4 animate-spin" />
-                                                            Loading staff...
-                                                        </div>
-                                                    ) : filteredStaffs.length ===
-                                                      0 ? (
-                                                        <div className="py-6 text-center text-sm text-muted-foreground">
-                                                            {debouncedSearch
-                                                                ? `No staff matching "${debouncedSearch}"`
-                                                                : "No staff available"}
-                                                        </div>
-                                                    ) : (
-                                                        <>
-                                                            {/* Select All */}
-                                                            {!debouncedSearch && (
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={
-                                                                        toggleAll
-                                                                    }
-                                                                    className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground transition-colors"
-                                                                >
-                                                                    <Checkbox
-                                                                        checked={
-                                                                            isAllSelected
-                                                                        }
-                                                                        className="pointer-events-none"
-                                                                    />
-                                                                    <span className="font-medium">
-                                                                        Select
-                                                                        All
-                                                                    </span>
-                                                                    <span className="ml-auto text-xs text-muted-foreground">
-                                                                        {
-                                                                            allStaffIds.length
-                                                                        }{" "}
-                                                                        staff
-                                                                    </span>
-                                                                </button>
-                                                            )}
-
-                                                            {/* Staff Items */}
-                                                            {filteredStaffs.map(
-                                                                (
-                                                                    staff: IStaff,
-                                                                ) => {
-                                                                    const isSelected =
-                                                                        field.value.includes(
-                                                                            staff._id,
-                                                                        );
-                                                                    return (
-                                                                        <button
-                                                                            key={
-                                                                                staff._id
-                                                                            }
-                                                                            type="button"
-                                                                            onClick={() =>
-                                                                                toggleStaff(
-                                                                                    staff._id,
-                                                                                )
-                                                                            }
-                                                                            className={cn(
-                                                                                "flex w-full items-center gap-2.5 rounded-sm px-2 py-1.5 text-sm transition-colors",
-                                                                                isSelected
-                                                                                    ? "bg-accent/50"
-                                                                                    : "hover:bg-accent hover:text-accent-foreground",
-                                                                            )}
-                                                                        >
-                                                                            <Checkbox
-                                                                                checked={
-                                                                                    isSelected
-                                                                                }
-                                                                                className="pointer-events-none"
-                                                                            />
-                                                                            <Avatar className="h-7 w-7">
-                                                                                <AvatarImage
-                                                                                    src={
-                                                                                        staff
-                                                                                            .user
-                                                                                            ?.image as string
-                                                                                    }
-                                                                                />
-                                                                                <AvatarFallback className="text-[10px]">
-                                                                                    {getInitials(
-                                                                                        staff
-                                                                                            .user
-                                                                                            ?.name ||
-                                                                                            "U",
-                                                                                    )}
-                                                                                </AvatarFallback>
-                                                                            </Avatar>
-                                                                            <div className="flex flex-col items-start min-w-0">
-                                                                                <span className="truncate text-sm leading-tight">
-                                                                                    {staff
-                                                                                        .user
-                                                                                        ?.name ||
-                                                                                        "Unknown"}
-                                                                                </span>
-                                                                                <span className="truncate text-xs text-muted-foreground leading-tight">
-                                                                                    {
-                                                                                        staff.staffId
-                                                                                    }{" "}
-                                                                                    •{" "}
-                                                                                    {
-                                                                                        staff.designation
-                                                                                    }
-                                                                                </span>
-                                                                            </div>
-                                                                            {isSelected && (
-                                                                                <Check className="ml-auto h-4 w-4 text-primary shrink-0" />
-                                                                            )}
-                                                                        </button>
-                                                                    );
-                                                                },
-                                                            )}
-                                                        </>
-                                                    )}
-                                                </div>
-                                            </PopoverContent>
-                                        </Popover>
-
-                                        {/* Selected Badges */}
-                                        {field.value.length > 0 && !data && (
-                                            <div className="flex flex-wrap items-center gap-1.5">
-                                                {field.value.map((id) => {
-                                                    const staff =
-                                                        getStaffById(id);
-                                                    return (
-                                                        <Badge
-                                                            key={id}
-                                                            variant="secondary"
-                                                            className="gap-1 pr-1"
-                                                        >
-                                                            <span className="max-w-[120px] truncate">
-                                                                {staff?.user
-                                                                    ?.name ||
-                                                                    "Selected"}
-                                                            </span>
-                                                            <button
-                                                                type="button"
-                                                                onClick={(e) =>
-                                                                    removeStaff(
-                                                                        e,
-                                                                        id,
-                                                                    )
-                                                                }
-                                                                className="ml-0.5 rounded-full p-0.5 hover:bg-muted-foreground/20 transition-colors"
-                                                            >
-                                                                <X className="h-3 w-3" />
-                                                            </button>
-                                                        </Badge>
-                                                    );
-                                                })}
-                                                {field.value.length > 1 && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={clearAll}
-                                                        className="text-xs text-muted-foreground hover:text-destructive transition-colors px-1.5 py-0.5"
-                                                    >
-                                                        Clear all
-                                                    </button>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                                );
-                            }}
-                        />
-                        {errors.staffIds && (
-                            <p className="text-sm text-destructive">
-                                {errors.staffIds.message}
-                            </p>
-                        )}
-                    </div>
-
-                    {/* ── Date & Type ── */}
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label>Date</Label>
-                            <Controller
-                                control={control}
-                                name="date"
-                                render={({ field }) => (
-                                    <DatePicker
-                                        value={field.value}
-                                        onChange={(date) =>
-                                            field.onChange(date as Date)
-                                        }
-                                    />
-                                )}
+                                            )}
+                                        </div>
+                                    );
+                                }}
                             />
-                            {errors.date && (
-                                <p className="text-sm text-destructive">
-                                    {errors.date.message}
+                            {errors.staffIds && (
+                                <p className="text-[11px] text-destructive bg-destructive/5 px-2 py-1 rounded text-center font-bold uppercase tracking-tighter">
+                                    {errors.staffIds.message}
                                 </p>
                             )}
                         </div>
 
-                        <div className="space-y-2">
-                            <Label htmlFor="type">Type</Label>
-                            <Controller
-                                name="type"
-                                control={control}
-                                render={({ field }) => (
-                                    <Select
-                                        onValueChange={field.onChange}
-                                        defaultValue={field.value}
-                                        value={field.value}
-                                    >
-                                        <SelectTrigger className="w-full">
-                                            <SelectValue placeholder="Select type" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="pre_shift">
-                                                Pre Shift
-                                            </SelectItem>
-                                            <SelectItem value="post_shift">
-                                                Post Shift
-                                            </SelectItem>
-                                            <SelectItem value="weekend">
-                                                Weekend
-                                            </SelectItem>
-                                            <SelectItem value="holiday">
-                                                Holiday
-                                            </SelectItem>
-                                        </SelectContent>
-                                    </Select>
+                        {/* ── Date & Type ── */}
+                        <div className="grid grid-cols-2 gap-6">
+                            <div className="space-y-2">
+                                <Label className="text-sm font-semibold">Overtime Date</Label>
+                                <Controller
+                                    control={control}
+                                    name="date"
+                                    render={({ field }) => (
+                                        <DatePicker
+                                            value={field.value}
+                                            onChange={(date) =>
+                                                field.onChange(date as Date)
+                                            }
+                                        />
+                                    )}
+                                />
+                                {errors.date && (
+                                    <p className="text-xs text-destructive font-medium">
+                                        {errors.date.message}
+                                    </p>
                                 )}
-                            />
-                            {errors.type && (
-                                <p className="text-sm text-destructive">
-                                    {errors.type.message}
-                                </p>
-                            )}
-                        </div>
-                    </div>
+                            </div>
 
-                    {/* ── Start Time & Duration ── */}
-                    <div className="grid grid-cols-2 gap-4 items-end">
-                        <div className="space-y-2">
-                            <Label htmlFor="startTime">Start Time</Label>
-                            <Controller
-                                control={control}
-                                name="startTime"
-                                render={({ field }) => (
-                                    <TimePicker
-                                        value={field.value}
-                                        onChange={field.onChange}
-                                    />
+                            <div className="space-y-2">
+                                <Label htmlFor="type" className="text-sm font-semibold">Category Type</Label>
+                                <Controller
+                                    name="type"
+                                    control={control}
+                                    render={({ field }) => (
+                                        <Select
+                                            onValueChange={field.onChange}
+                                            defaultValue={field.value}
+                                            value={field.value}
+                                        >
+                                            <SelectTrigger className="w-full h-10 border-muted-foreground/20 bg-background hover:bg-muted/50 transition-colors">
+                                                <SelectValue placeholder="Selection type" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="pre_shift">
+                                                    Pre Shift
+                                                </SelectItem>
+                                                <SelectItem value="post_shift">
+                                                    Post Shift
+                                                </SelectItem>
+                                                <SelectItem value="weekend">
+                                                    Weekend
+                                                </SelectItem>
+                                                <SelectItem value="holiday">
+                                                    Holiday
+                                                </SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    )}
+                                />
+                                {errors.type && (
+                                    <p className="text-xs text-destructive font-medium">
+                                        {errors.type.message}
+                                    </p>
                                 )}
-                            />
-                            {errors.startTime && (
-                                <p className="text-sm text-destructive">
-                                    {errors.startTime.message}
-                                </p>
-                            )}
+                            </div>
                         </div>
 
+                        {/* ── Start Time & Duration ── */}
+                        <div className="grid grid-cols-2 gap-6 items-end">
+                            <div className="space-y-2">
+                                <Label htmlFor="startTime" className="text-sm font-semibold">Start Execution</Label>
+                                <Controller
+                                    control={control}
+                                    name="startTime"
+                                    render={({ field }) => (
+                                        <TimePicker
+                                            value={field.value}
+                                            onChange={field.onChange}
+                                        />
+                                    )}
+                                />
+                                {errors.startTime && (
+                                    <p className="text-xs text-destructive font-medium">
+                                        {errors.startTime.message}
+                                    </p>
+                                )}
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="durationMinutes" className="text-sm font-semibold">
+                                    Duration <span className="text-muted-foreground font-normal">(mins)</span>
+                                </Label>
+                                <Input
+                                    id="durationMinutes"
+                                    type="number"
+                                    className="h-10 border-muted-foreground/20 bg-background focus-visible:ring-primary/20"
+                                    {...register("durationMinutes", {
+                                        valueAsNumber: true,
+                                    })}
+                                />
+                                {errors.durationMinutes && (
+                                    <p className="text-xs text-destructive font-medium">
+                                        {errors.durationMinutes.message}
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* ── Reason ── */}
                         <div className="space-y-2">
-                            <Label htmlFor="durationMinutes">
-                                Duration (mins)
+                            <Label htmlFor="reason" className="text-sm font-semibold">
+                                Internal Remarks{" "}
+                                <span className="text-muted-foreground font-normal text-xs uppercase tracking-widest ml-1">
+                                    (optional)
+                                </span>
                             </Label>
-                            <Input
-                                id="durationMinutes"
-                                type="number"
-                                {...register("durationMinutes", {
-                                    valueAsNumber: true,
-                                })}
+                            <Textarea
+                                id="reason"
+                                placeholder="State the business requirement for this overtime..."
+                                rows={3}
+                                className="border-muted-foreground/20 bg-background focus-visible:ring-primary/20 resize-none min-h-[100px]"
+                                {...register("reason")}
                             />
-                            {errors.durationMinutes && (
-                                <p className="text-sm text-destructive">
-                                    {errors.durationMinutes.message}
+                            {errors.reason && (
+                                <p className="text-xs text-destructive font-medium">
+                                    {errors.reason.message}
                                 </p>
                             )}
                         </div>
                     </div>
+                </ScrollArea>
 
-                    {/* ── Reason ── */}
-                    <div className="space-y-2">
-                        <Label htmlFor="reason">
-                            Reason{" "}
-                            <span className="text-muted-foreground font-normal">
-                                (optional)
-                            </span>
-                        </Label>
-                        <Textarea
-                            id="reason"
-                            placeholder="Describe why the overtime is needed..."
-                            rows={3}
-                            {...register("reason")}
-                        />
-                        {errors.reason && (
-                            <p className="text-sm text-destructive">
-                                {errors.reason.message}
-                            </p>
-                        )}
-                    </div>
-
-                    {/* ── Footer ── */}
-                    <DialogFooter className="gap-2 pt-2">
+                <div className="p-6 pt-3 border-t bg-muted/10">
+                    <DialogFooter className="gap-3 sm:gap-0 flex-row-reverse sm:flex-row justify-between">
                         <Button
                             type="button"
-                            variant="outline"
+                            variant="ghost"
                             onClick={() => onOpenChange(false)}
                             disabled={isLoading}
+                            className="text-muted-foreground hover:text-foreground font-semibold"
                         >
-                            Cancel
+                            Abort Changes
                         </Button>
-                        <Button type="submit" disabled={isLoading}>
-                            {isLoading && (
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        <Button
+                            type="submit"
+                            disabled={
+                                isCreating ||
+                                isUpdating ||
+                                watchStaffIds.length === 0
+                            }
+                            className={cn(
+                                "min-w-[180px] font-bold shadow-lg transition-all",
+                                watchStaffIds.length > 0 ? "bg-primary hover:bg-primary/90" : ""
                             )}
-                            {isLoading
-                                ? "Saving..."
-                                : data
-                                  ? "Update Overtime"
-                                  : "Assign Overtime"}
+                        >
+                            {isLoading ? (
+                                <div className="flex items-center gap-2">
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    <span>Syncing...</span>
+                                </div>
+                            ) : (
+                                <span>
+                                    {data
+                                        ? "Update Records"
+                                        : `Assign to ${watchStaffIds.length} Engineer${watchStaffIds.length !== 1 ? "s" : ""}`}
+                                </span>
+                            )}
                         </Button>
                     </DialogFooter>
-                </form>
-            </DialogContent>
-        </Dialog>
-    );
+                </div>
+            </form>
+        </DialogContent>
+    </Dialog>
+);
 }
