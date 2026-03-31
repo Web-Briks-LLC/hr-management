@@ -286,19 +286,36 @@ async function toggleEarningStatus(
     if (!earning) return null;
 
     if (newStatus === 'paid') {
-        const remainingAmount = earning.totalAmount - earning.paidAmount;
-        const updateData: any = { status: 'paid', paidAmount: earning.totalAmount, paidAt: new Date() };
+        const remainingAmount = Math.max(0, earning.totalAmount - earning.paidAmount);
+        const conversionRate = data?.conversionRate ?? (await (await import('./currency-rate.service.js')).default.getRateForCurrency(earning.month, earning.year, earning.currency));
+        const amountInBDT = roundAmount(remainingAmount * conversionRate);
+        const fees = data?.fees ?? 0;
+        const tax = data?.tax ?? 0;
+
+        const updateData: any = { 
+            status: 'paid', 
+            paidAmount: earning.totalAmount, 
+            paidAt: new Date(),
+            conversionRate: conversionRate,
+            paidAmountBDT: roundAmount(earning.paidAmountBDT + amountInBDT),
+            amountInBDT: roundAmount(earning.paidAmountBDT + amountInBDT),
+            fees: roundAmount(earning.fees + fees),
+            tax: roundAmount(earning.tax + tax)
+        };
         if (data?.paidBy) updateData.paidBy = new Types.ObjectId(data.paidBy);
+        
         const updateQuery: any = { $set: updateData };
-        if (remainingAmount > 0) {
+        if (remainingAmount > 0.005) {
             updateQuery.$push = { payments: {
                 invoiceNumber: `STATUS-PAID-${new Date().getTime()}`,
                 amount: remainingAmount,
-                amountInBDT: 0,
+                amountInBDT: amountInBDT,
                 method: 'Manual',
                 transactionId: `TXN-ST-${new Date().getTime()}`,
                 paidAt: new Date(),
-                conversionRate: 1,
+                conversionRate: conversionRate,
+                fees: fees,
+                tax: tax
             } };
         }
         return EarningModel.findByIdAndUpdate(earningId, updateQuery, { new: true, session: session || null })
@@ -702,14 +719,7 @@ async function getEarningStatsWithFilter(
             {
                 $group: {
                     _id: { currency: "$currency" },
-                    paidAmount: { 
-                        $sum: { 
-                            $subtract: [
-                                "$payments.amount", 
-                                { $add: [{ $ifNull: ["$payments.fees", 0] }, { $ifNull: ["$payments.tax", 0] }] }
-                            ] 
-                        } 
-                    },
+                    paidAmount: { $sum: "$payments.amount" },
                     paidAmountBDT: { $sum: "$payments.amountInBDT" },
                 },
             },
@@ -754,17 +764,16 @@ async function getEarningStatsWithFilter(
                     _id: { currency: "$currency", status: "$status" },
                     count: { $sum: 1 },
                     totalAmount: { $sum: "$totalAmount" },
-                    paidAmount: { 
+                    paidAmount: { $sum: "$paidAmount" },
+                    totalBDT: { 
                         $sum: { 
                             $cond: [
-                                { $eq: ["$status", "paid"] },
-                                { $ifNull: ["$netAmount", "$totalAmount"] }, // Sum totalAmount only if no fees/tax were subtracted
-                                { $ifNull: ["$paidAmount", 0] } // Use the actual paid amount for partials (assuming it's gross, we'd need to subtract fees)
-                                // Actually, if it's month/year view, use netAmount if possible
+                                { $and: [{ $eq: ["$status", "paid"] }, { $eq: [{ $ifNull: ["$paidAmountBDT", 0] }, 0] }] },
+                                { $multiply: ["$totalAmount", { $ifNull: ["$conversionRate", 120] }] },
+                                { $ifNull: ["$paidAmountBDT", 0] }
                             ]
                         } 
                     },
-                    totalBDT: { $sum: "$paidAmountBDT" },
                 },
             },
         ]);
@@ -791,16 +800,16 @@ async function getEarningStatsWithFilter(
                 _id: { currency: "$currency", status: "$status" },
                 count: { $sum: 1 },
                 totalAmount: { $sum: "$totalAmount" },
-                paidAmount: {
-                    $sum: {
+                paidAmount: { $sum: "$paidAmount" },
+                totalBDT: { 
+                    $sum: { 
                         $cond: [
-                            { $eq: ["$status", "paid"] },
-                            { $ifNull: ["$netAmount", "$totalAmount"] },
-                            { $subtract: ["$paidAmount", { $add: ["$fees", "$tax"] }] } // Deduct fees from what's been paid
+                            { $and: [{ $eq: ["$status", "paid"] }, { $eq: [{ $ifNull: ["$paidAmountBDT", 0] }, 0] }] },
+                            { $multiply: ["$totalAmount", { $ifNull: ["$conversionRate", 120] }] },
+                            { $ifNull: ["$paidAmountBDT", 0] }
                         ]
-                    },
+                    } 
                 },
-                totalBDT: { $sum: { $ifNull: ["$paidAmountBDT", 0] } },
             },
         },
     ]);
@@ -916,6 +925,8 @@ async function importLegacyEarning(
         netAmount: data.totalAmount,
         amountInBDT: data.amountInBDT,
         status: data.status,
+        paidAmount: data.status === 'paid' ? data.totalAmount : 0,
+        paidAmountBDT: data.status === 'paid' ? data.amountInBDT : 0,
         isLegacy: true,
         legacyClientCode: data.legacyClientCode,
         createdBy: data.createdBy,
