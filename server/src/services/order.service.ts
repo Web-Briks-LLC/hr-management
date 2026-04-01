@@ -40,7 +40,7 @@ interface UpdateOrderData {
     status?: OrderStatus;
     priority?: OrderPriority;
     notes?: string;
-    contactPersonId?: string;
+    contactPersonId?: string | null;
     completedAt?: Date;
     deliveredAt?: Date;
 }

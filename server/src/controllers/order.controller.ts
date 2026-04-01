@@ -274,7 +274,9 @@ async function updateOrder(req: Request, res: Response) {
         if (status !== undefined) updateData.status = status;
         if (priority !== undefined) updateData.priority = priority;
         if (notes !== undefined) updateData.notes = notes;
-        if (contactPersonId !== undefined) updateData.contactPersonId = contactPersonId;
+        if (contactPersonId !== undefined) {
+            updateData.contactPersonId = contactPersonId === '' ? null : contactPersonId;
+        }
 
         const order = await orderService.updateOrderInDB(id, updateData);
 
