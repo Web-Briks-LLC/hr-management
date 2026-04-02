@@ -32,11 +32,6 @@ import {
     XAxis,
     YAxis,
     CartesianGrid,
-    ResponsiveContainer,
-    Pie,
-    PieChart,
-    Cell,
-    Legend,
     Line,
     LineChart,
 } from 'recharts';
@@ -47,8 +42,21 @@ import {
     Receipt,
     Package,
     Wallet,
-    Users,
+    Download,
+    FileSpreadsheet,
+    FileText,
 } from 'lucide-react';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Button } from '@/components/ui/button';
+import {
+    exportAnalyticsToExcel,
+    exportAnalyticsToPDF,
+} from '@/utils/export-analytics';
 
 const formatCurrency = (amount: number, currency: string = 'BDT') => {
     try {
@@ -62,20 +70,12 @@ const formatCurrency = (amount: number, currency: string = 'BDT') => {
             style: 'currency',
             currency: currency,
         });
-    } catch (e) {
+    } catch {
         // Fallback for invalid currency codes
         console.error('Invalid currency code:', currency);
         return `${currency} ${amount.toFixed(2)}`;
     }
 };
-
-const COLORS = [
-    'hsl(var(--chart-1))',
-    'hsl(var(--chart-2))',
-    'hsl(var(--chart-3))',
-    'hsl(var(--chart-4))',
-    'hsl(var(--chart-5))',
-];
 
 const barChartConfig = {
     earnings: {
@@ -89,12 +89,6 @@ const barChartConfig = {
     profit: {
         label: 'Profit',
         color: 'hsl(217, 91%, 60%)',
-    },
-} satisfies ChartConfig;
-
-const pieChartConfig = {
-    category: {
-        label: 'Category',
     },
 } satisfies ChartConfig;
 
@@ -178,6 +172,43 @@ export default function FinanceAnalyticsPage() {
                     </p>
                 </div>
                 <div className="flex gap-2">
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="outline" className="flex gap-2">
+                                <Download className="h-4 w-4" />
+                                Download Report
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                                onClick={() =>
+                                    exportAnalyticsToExcel(
+                                        data,
+                                        selectedYear,
+                                        selectedMonth,
+                                    )
+                                }
+                                className="flex gap-2 cursor-pointer"
+                            >
+                                <FileSpreadsheet className="h-4 w-4 text-green-600" />
+                                Excel Format
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                                onClick={() =>
+                                    exportAnalyticsToPDF(
+                                        data,
+                                        selectedYear,
+                                        selectedMonth,
+                                    )
+                                }
+                                className="flex gap-2 cursor-pointer"
+                            >
+                                <FileText className="h-4 w-4 text-red-600" />
+                                PDF Format
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+
                     <Select
                         value={selectedMonth}
                         onValueChange={setSelectedMonth}
@@ -289,8 +320,20 @@ export default function FinanceAnalyticsPage() {
                         <Wallet className="h-4 w-4 text-orange-600" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-orange-600">
-                            {formatCurrency(summary.unpaidRevenue)}
+                        <div className="text-2xl font-bold text-orange-600 space-y-1">
+                            {summary.unpaidByCurrency &&
+                            summary.unpaidByCurrency.length > 0 ? (
+                                summary.unpaidByCurrency.map((item, index) => (
+                                    <div key={index}>
+                                        {formatCurrency(
+                                            item.amount,
+                                            item.currency,
+                                        )}
+                                    </div>
+                                ))
+                            ) : (
+                                <div>{formatCurrency(0)}</div>
+                            )}
                         </div>
 
                         <p className="text-xs text-muted-foreground mt-1">
@@ -316,7 +359,7 @@ export default function FinanceAnalyticsPage() {
                     </CardContent>
                 </Card>
 
-                <Card className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 border-emerald-200 dark:border-emerald-800">
+                <Card className="bg-linear-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 border-emerald-200 dark:border-emerald-800">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">
                             Final Amount
