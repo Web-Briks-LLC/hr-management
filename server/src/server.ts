@@ -3,6 +3,7 @@ import envConfig from "./config/env.config.js";
 import { createServer } from "http";
 import app from "./app.js";
 import schedulerService from "./services/scheduler.service.js";
+import { initSocket } from "./socket.js";
 
 const { port, mongo_uri } = envConfig;
 
@@ -13,6 +14,9 @@ async function Server() {
         console.log("Connected to database successfully.");
 
         const server = createServer(app);
+
+        // Initialize Socket.io
+        initSocket(server);
 
         server.listen(envConfig.port, () => {
             console.log(

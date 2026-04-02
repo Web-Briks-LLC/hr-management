@@ -41,6 +41,8 @@ export const apiSlice = createApi({
         "PayrollBankSettings",
         "PayrollLock",
         "WalletTransaction",
+        "Policy",
+        "PendingPolicy",
     ],
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     endpoints: (_builder) => ({}),

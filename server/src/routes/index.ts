@@ -28,6 +28,7 @@ import { payrollRoute } from "./payroll.routes.js";
 import shiftOffDateRoute from "./shift-off-date.route.js";
 import payrollBankSettingsRoute from "./payroll-bank-settings.route.js";
 import paymentRoute from "./payment.route.js";
+import { policyRoute } from "./policy.route.js";
 
 const router: Router = Router();
 
@@ -147,6 +148,10 @@ const moduleRoutes = [
     {
         path: "/payments",
         route: paymentRoute,
+    },
+    {
+        path: "/policies",
+        route: policyRoute,
     },
 ];
 

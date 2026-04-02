@@ -7,6 +7,8 @@ import ReduxProvider from './ReduxProvider';
 import { useSession } from '@/lib/auth-client';
 import { ToasterProps } from 'sonner';
 import AuthGuard from './AuthGuard';
+import { SocketProvider } from '@/contexts/SocketContext';
+import { GlobalPolicyPrompt } from '@/components/policy/GlobalPolicyPrompt';
 
 export default function Main({ children }: { children: ReactNode }) {
     const { data } = useSession();
@@ -22,7 +24,10 @@ export default function Main({ children }: { children: ReactNode }) {
                     enableSystem
                     disableTransitionOnChange
                 >
-                    {children}
+                    <SocketProvider>
+                        {children}
+                        <GlobalPolicyPrompt />
+                    </SocketProvider>
                     <Toaster theme={theme} />
                 </ThemeProvider>
             </ReduxProvider>

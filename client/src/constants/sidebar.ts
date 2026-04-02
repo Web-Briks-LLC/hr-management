@@ -17,6 +17,7 @@ import {
     IconBriefcase,
     IconCash,
     IconWallet,
+    IconShieldLock,
 } from "@tabler/icons-react";
 
 export interface SidebarItem {
@@ -233,6 +234,18 @@ export const sidebarGroups: SidebarGroup[] = [
                 title: "Notices",
                 url: "/notices",
                 icon: IconSpeakerphone,
+                access: [
+                    Role.SUPER_ADMIN,
+                    Role.ADMIN,
+                    Role.HR_MANAGER,
+                    Role.TEAM_LEADER,
+                    Role.STAFF,
+                ],
+            },
+            {
+                title: "Policies",
+                url: "/policies",
+                icon: IconShieldLock,
                 access: [
                     Role.SUPER_ADMIN,
                     Role.ADMIN,
