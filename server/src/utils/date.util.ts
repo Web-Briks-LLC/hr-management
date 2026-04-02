@@ -108,3 +108,38 @@ export function getBDDateString(date: Date | string | number): string {
 
     return `${year}-${month}-${day}`;
 }
+
+/**
+ * Returns the start and end of the previous calendar month in Bangladesh Time.
+ */
+export function getPreviousMonthRange() {
+    const now = getBDNow();
+    
+    // Get year and month components
+    const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: BD_TIMEZONE,
+        year: 'numeric',
+        month: 'numeric',
+    }).formatToParts(now);
+
+    let year = Number(parts.find(p => p.type === 'year')?.value);
+    let month = Number(parts.find(p => p.type === 'month')?.value);
+
+    // Subtract one month
+    month--;
+    if (month === 0) {
+        month = 12;
+        year--;
+    }
+
+    // Previous month start
+    const startDate = new Date(`${year}-${month.toString().padStart(2, '0')}-01T00:00:00+06:00`);
+    
+    // Previous month end (Last day of that month)
+    const lastDay = new Date(year, month, 0).getDate();
+    const endDate = new Date(`${year}-${month.toString().padStart(2, '0')}-${lastDay}T23:59:59.999+06:00`);
+
+    const monthName = new Intl.DateTimeFormat('en-US', { month: 'long' }).format(startDate);
+
+    return { startDate, endDate, month: month, monthName, year };
+}

@@ -64,5 +64,11 @@ const envConfig = {
     cloudinary_api_key: process.env.CLOUDINARY_API_KEY!,
     cloudinary_secret: process.env.CLOUDINARY_API_SECRET!,
     cloudinary_upload_path: process.env.CLOUDINARY_UPLOAD_PATH!,
+
+    // SMS Configuration
+    sms_api_key: process.env.SMS_API_KEY,
+    monthly_report_day: Number(process.env.MONTHLY_REPORT_DAY) || 10,
+    monthly_report_hour: Number(process.env.MONTHLY_REPORT_HOUR) || 10,
+    monthly_report_minute: Number(process.env.MONTHLY_REPORT_MINUTE) || 0,
 };
 export default envConfig;

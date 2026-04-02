@@ -502,7 +502,41 @@ async function getFinanceAnalytics(
     };
 }
 
+async function getFinanceTotalsForPeriod(year: number, month: number) {
+    const earningMatch = {
+        status: 'paid',
+        year: year,
+        month: month,
+    };
+
+    // Expenses use date objects
+    const startDate = new Date(`${year}-${month.toString().padStart(2, '0')}-01T00:00:00+06:00`);
+    const lastDay = new Date(year, month, 0).getDate();
+    const endDate = new Date(`${year}-${month.toString().padStart(2, '0')}-${lastDay}T23:59:59.999+06:00`);
+
+    const expenseFilter = {
+        date: { $gte: startDate, $lte: endDate },
+    };
+
+    const [earnings, expenses] = await Promise.all([
+        EarningModel.aggregate([
+            { $match: earningMatch },
+            { $group: { _id: null, total: { $sum: '$amountInBDT' } } },
+        ]),
+        ExpenseModel.aggregate([
+            { $match: expenseFilter },
+            { $group: { _id: null, total: { $sum: '$amount' } } },
+        ]),
+    ]);
+
+    return {
+        totalEarnings: earnings[0]?.total || 0,
+        totalExpenses: expenses[0]?.total || 0,
+    };
+}
+
 export default {
     getFinanceAnalytics,
     getAvailableAnalyticsYears,
+    getFinanceTotalsForPeriod,
 };

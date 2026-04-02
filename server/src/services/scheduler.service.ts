@@ -3,13 +3,18 @@ import OvertimeModel from '../models/overtime.model.js';
 import LeaveApplicationModel from '../models/leave_application.model.js';
 import ShiftAssignmentModel from '../models/shift-assignment.model.js';
 import StaffModel from '../models/staff.model.js';
+import UserModel from '../models/user.model.js';
 import notificationService from './notification.service.js';
+import analyticsService from './analytics.service.js';
+import { sendBulkSMS } from '../utils/sms.util.js';
 import {
     getBDNow,
     getBDStartOfDay,
     getBDEndOfDay,
     getBDWeekDay,
+    getPreviousMonthRange,
 } from '../utils/date.util.js';
+import envConfig from '../config/env.config.js';
 
 // ============================================
 // ATTENDANCE AUTO-CHECK (Every 10 minutes)
@@ -434,6 +439,63 @@ async function processLeaveExpiry() {
 }
 
 // ============================================
+// MONTHLY FINANCE SMS REPORT (10th at 10:00 AM)
+// ============================================
+
+async function processMonthlyFinanceSMSReport() {
+    console.log('[Scheduler] Starting monthly finance SMS report processing...');
+    
+    try {
+        const { year, month, monthName } = getPreviousMonthRange();
+        
+        // 1. Get Financial Totals
+        const { totalEarnings, totalExpenses } = await analyticsService.getFinanceTotalsForPeriod(year, month);
+        
+        // 2. Identify Recipients
+        // a. Admins (Super Admins, Admins, HR Managers)
+        await UserModel.find({
+            role: { $in: ['super_admin', 'admin'] }
+        }).toArray();
+
+        // b. Shift Assigned Staff
+        await ShiftAssignmentModel.find({ isActive: true }).select('staffId');
+        
+        // c. Fetch all staff to get phone numbers
+        const allStaff = await StaffModel.find({ status: 'active' }).select('phone userId');
+        
+        // d. Filtering & Deduplication
+        const recipientNumbers = new Set<string>();
+        
+        for (const staff of allStaff) {
+            // Criteria: Everyone with a phone number gets the monthly report
+            if (staff.phone) {
+                recipientNumbers.add(staff.phone);
+            }
+        }
+
+        const phoneList = Array.from(recipientNumbers);
+        if (phoneList.length === 0) {
+            console.warn('[Scheduler] No recipients found for monthly finance SMS.');
+            return { success: false, reason: 'No recipients' };
+        }
+
+        // 3. Construct Message
+        const message = `Finance Report (${monthName} ${year}):\nTotal Earnings: ৳${totalEarnings.toLocaleString()}\nTotal Expenses: ৳${totalExpenses.toLocaleString()}\nNet Profit: ৳${(totalEarnings - totalExpenses).toLocaleString()}.\n- HR Management System`;
+
+        // 4. Send Bulk SMS
+        console.log(`[Scheduler] Sending finance report to ${phoneList.length} recipients.`);
+        const response = await sendBulkSMS({ number: phoneList, message });
+        
+        console.log('[Scheduler] Monthly finance SMS response:', JSON.stringify(response));
+        return { success: true, recipientCount: phoneList.length };
+
+    } catch (error) {
+        console.error('[Scheduler] Error in monthly finance SMS report:', error);
+        throw error;
+    }
+}
+
+// ============================================
 // SCHEDULER MANAGER
 // ============================================
 
@@ -442,7 +504,7 @@ const ONE_MINUTE = 60 * 1000;
 
 let attendanceInterval: NodeJS.Timeout | null = null;
 let overtimeInterval: NodeJS.Timeout | null = null;
-let leaveExpiryInterval: NodeJS.Timeout | null = null;
+let monthlySMSInterval: NodeJS.Timeout | null = null;
 
 function startAllSchedulers() {
     console.log('[Scheduler] Starting all schedulers...');
@@ -461,16 +523,45 @@ function startAllSchedulers() {
     }, ONE_MINUTE);
     console.log('[Scheduler] Overtime auto-stop: Running every 1 minute');
 
-    // Leave expiry - check every minute, but only run at 11:59 PM
-    const runLeaveExpiryIfTime = () => {
+    // Monthly Finance SMS and Leave Expiry - check every minute
+    const runScheduledTasksIfTime = () => {
         const now = getBDNow();
-        if (now.getHours() === 23 && now.getMinutes() === 59) {
+        const bdParts = new Intl.DateTimeFormat('en-US', {
+            timeZone: 'Asia/Dhaka',
+            hour: 'numeric',
+            minute: 'numeric',
+            day: 'numeric',
+            hour12: false
+        }).formatToParts(now);
+
+        const hour = Number(bdParts.find(p => p.type === 'hour')?.value);
+        const minute = Number(bdParts.find(p => p.type === 'minute')?.value);
+        const day = Number(bdParts.find(p => p.type === 'day')?.value);
+
+        // Daily Leave Expiry at 11:59 PM (23:59)
+        if (hour === 23 && minute === 59) {
             processLeaveExpiry().catch(console.error);
         }
+
+        // Monthly Finance SMS from ENV (Default: 10th at 10:00 AM)
+        if (
+            day === (envConfig.monthly_report_day || 10) &&
+            hour === (envConfig.monthly_report_hour || 10) &&
+            minute === (envConfig.monthly_report_minute || 0)
+        ) {
+            processMonthlyFinanceSMSReport().catch(console.error);
+        }
     };
-    runLeaveExpiryIfTime(); // Run immediately if it's 11:59 PM
-    leaveExpiryInterval = setInterval(runLeaveExpiryIfTime, ONE_MINUTE);
-    console.log('[Scheduler] Leave expiry: Running daily at 11:59 PM');
+    
+    // Check every minute for scheduled tasks
+    runScheduledTasksIfTime();
+    monthlySMSInterval = setInterval(runScheduledTasksIfTime, ONE_MINUTE);
+    const scheduleDay = envConfig.monthly_report_day || 10;
+    const scheduleHour = envConfig.monthly_report_hour || 10;
+    const scheduleMinute = String(envConfig.monthly_report_minute || 0).padStart(2, '0');
+
+    console.log(`[Scheduler] Monthly finance SMS: Scheduled for ${scheduleDay}th at ${scheduleHour}:${scheduleMinute}`);
+    console.log('[Scheduler] Leave expiry: Scheduled for daily at 11:59 PM');
 
     console.log('[Scheduler] All schedulers started successfully');
 }
@@ -484,9 +575,9 @@ function stopAllSchedulers() {
         clearInterval(overtimeInterval);
         overtimeInterval = null;
     }
-    if (leaveExpiryInterval) {
-        clearInterval(leaveExpiryInterval);
-        leaveExpiryInterval = null;
+    if (monthlySMSInterval) {
+        clearInterval(monthlySMSInterval);
+        monthlySMSInterval = null;
     }
     console.log('[Scheduler] All schedulers stopped');
 }
@@ -495,6 +586,7 @@ export default {
     processAttendanceCheck,
     processOvertimeAutoStop,
     processLeaveExpiry,
+    processMonthlyFinanceSMSReport,
     startAllSchedulers,
     stopAllSchedulers,
 };

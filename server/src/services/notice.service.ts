@@ -1,5 +1,7 @@
 import NoticeModel from '../models/notice.model.js';
 import NotificationModel from '../models/notification.model.js';
+import StaffModel from '../models/staff.model.js';
+import { sendBulkSMS } from '../utils/sms.util.js';
 import { Types } from 'mongoose';
 
 interface CreateNoticeInput {
@@ -124,6 +126,30 @@ const publishNotice = async (noticeId: string, publishedBy: string) => {
 
     if (notifications.length > 0) {
         await NotificationModel.insertMany(notifications);
+    }
+
+    // 2. Send SMS to all non-admin staff (Non-blocking)
+    try {
+        const nonAdminUserIds = users
+            .filter((u: any) => !['super_admin', 'admin'].includes(u.role))
+            .map((u: any) => u._id);
+
+        const staffToNotify = await StaffModel.find({
+            status: 'active',
+            userId: { $in: nonAdminUserIds },
+            phone: { $exists: true, $ne: '' },
+        }).select('phone');
+
+        const phoneNumbers = staffToNotify.map((s) => s.phone);
+
+        if (phoneNumbers.length > 0) {
+            const smsMessage = `New Notice: ${notice.title}. Please check your HR dashboard for details. - HR System`;
+            sendBulkSMS({ number: phoneNumbers, message: smsMessage }).catch((err) =>
+                console.error('[PublishNotice] SMS Error:', err),
+            );
+        }
+    } catch (smsError) {
+        console.error('[PublishNotice] SMS Preparation Error:', smsError);
     }
 
     return notice;

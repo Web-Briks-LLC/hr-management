@@ -1,7 +1,9 @@
 import { Types } from 'mongoose';
+import { format } from 'date-fns';
 import StaffModel from '../models/staff.model.js';
 import ShiftModel from '../models/shift.model.js';
 import ShiftAssignmentModel from '../models/shift-assignment.model.js';
+import { sendBulkSMS } from '../utils/sms.util.js';
 
 const assignShift = async ({
     staffIds,
@@ -96,6 +98,24 @@ const assignShift = async ({
         }
 
         await session.commitTransaction();
+
+        // 1. Send SMS Notification (Non-blocking)
+        try {
+            const phoneNumbers = staffs
+                .map((s) => s.phone)
+                .filter((p): p is string => !!p);
+
+            const displayDate = format(new Date(startDate), 'dd MMM, yyyy');
+            const message = `Shift Update: You have been assigned to "${shift.name}" (${shift.startTime} - ${shift.endTime}) starting from ${displayDate}. - HR System`;
+
+            if (phoneNumbers.length > 0) {
+                sendBulkSMS({ number: phoneNumbers, message }).catch((err) =>
+                    console.error('[AssignShift] SMS Error:', err),
+                );
+            }
+        } catch (smsError) {
+            console.error('[AssignShift] SMS Preparation Error:', smsError);
+        }
 
         return {
             successCount: results.length,
