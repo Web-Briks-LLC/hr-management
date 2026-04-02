@@ -291,12 +291,16 @@ const triggerPolicyBroadcast = async (policyId: string) => {
         if (!policy) return;
 
         const baseMatch: any = {};
-        if (policy.branchId) baseMatch.branchId = policy.branchId;
-        if (policy.department) baseMatch.department = policy.department;
-        if (policy.designations && policy.designations.length > 0) baseMatch.designation = { $in: policy.designations };
+        if (policy.branchId) {
+            baseMatch.branchId = new mongoose.Types.ObjectId(policy.branchId as string);
+        }
+        if (policy.department) {
+            baseMatch.department = policy.department;
+        }
+        if (policy.designations && (policy.designations as string[]).length > 0) {
+            baseMatch.designation = { $in: policy.designations };
+        }
 
-        // We need to fetch targeted users but EXCLUDE admins
-        // Let's use aggregation on StaffModel to join with User
         const pipeline: any[] = [
             { $match: baseMatch },
             {
@@ -309,7 +313,7 @@ const triggerPolicyBroadcast = async (policyId: string) => {
                                 $expr: { 
                                     $and: [
                                         { $eq: ["$_id", { $toObjectId: "$$staffUserId" }] },
-                                        { $nin: ["$role", [Role.ADMIN, Role.SUPER_ADMIN]] }
+                                        { $nin: ["$role", [Role.ADMIN, Role.SUPER_ADMIN, Role.HR_MANAGER]] }
                                     ]
                                 } 
                             } 
