@@ -7,6 +7,7 @@ import ExpenseCategoryModel from '../models/expense-category.model.js';
 import OvertimeModel from '../models/overtime.model.js';
 import { PayrollLockModel } from '../models/payroll-lock.model.js';
 import SalaryAdjustmentLogModel from '../models/salary-adjustment-log.model.js';
+import ShiftOffDateModel from '../models/shift-off-date.model.js';
 import mongoose, { Types } from 'mongoose';
 import { getBDMonthRange, getBDNow, getBDWeekDay, getBDStartOfDay, getBDDateString } from '../utils/date.util.js';
 import auditService from './audit.service.js';
@@ -101,6 +102,7 @@ const getPayrollPreview = async ({
         allAttendance,
         approvedOvertime,
         expenseCategories,
+        shiftOffDates,
     ] = await Promise.all([
         ShiftAssignmentModel.find({
             staffId: { $in: staffIds },
@@ -119,6 +121,10 @@ const getPayrollPreview = async ({
         ExpenseCategoryModel.find({
             name: { $in: [/^Salary/i, /^Overtime/i] },
         }),
+        ShiftOffDateModel.find({
+            isActive: true,
+            dates: { $gte: startDate, $lte: endDate },
+        }).lean(),
     ]);
 
     const salaryCategory = expenseCategories.find((c) =>
@@ -191,6 +197,10 @@ const getPayrollPreview = async ({
             ? getBDDateString(staff.exitDate)
             : null;
 
+        const staffShiftOffDates = (shiftOffDates as any[]).filter(
+            (sod) => staffShiftAssignments.some(sa => sa.shiftId._id.toString() === sod.shiftId.toString())
+        ).flatMap(sod => sod.dates.map((d: Date) => getBDDateString(d)));
+
         daysInMonth.forEach((day: Date) => {
             const dayStr = getBDDateString(day);
 
@@ -216,12 +226,17 @@ const getPayrollPreview = async ({
             const shift: any = dayAssignment?.shiftId;
             if (!shift) return;
 
-            // 3. Check if it's a work day
+            // 3. Skip if it's a specific "Off Date" for this shift
+            if (staffShiftOffDates.includes(dayStr)) {
+                return; 
+            }
+
+            // 4. Check if it's a work day
             if (shift.workDays.includes(getBDWeekDay(day))) {
                 workDaysCount++;
                 expectedWorkDates.push(day);
 
-                // 4. Check for missing punch
+                // 5. Check for missing punch
                 if (dayStr < todayBDStr) {
                     const hasRecord = staffAttendance.some((a: any) => {
                         const aStr = getBDDateString(new Date(a.date));
@@ -247,7 +262,8 @@ const getPayrollPreview = async ({
 
         // Deduction formula: Absent days + Unemployed days only
         // Half-day and late count as present with full payment
-        const totalDeductionUnits = absentDays + unemployedDays;
+        // LOGIC REFINEMENT: totalDeductionUnits capped at 30 to prevent >100% deduction in 31-day months.
+        const totalDeductionUnits = Math.min(30, absentDays + unemployedDays);
         const deduction = totalDeductionUnits * perDaySalary;
         const payableSalary = Math.max(0, staffSalary - deduction);
 
@@ -456,6 +472,18 @@ const processPayroll = async ({
                 end: endDate,
             });
 
+            // Fetch Shift Off-Dates for the relevant shift(s)
+            const staffShiftIds = allAssignments.map(sa => sa.shiftId._id.toString());
+            const shiftOffDates = await ShiftOffDateModel.find({
+                shiftId: { $in: staffShiftIds },
+                isActive: true,
+                dates: { $gte: startDate, $lte: endDate },
+            }).session(session).lean();
+
+            const staffShiftOffDates = (shiftOffDates as any[]).flatMap(sod => 
+                sod.dates.map((d: Date) => getBDDateString(d))
+            );
+
             const staffSalary = staff.salary || 0;
             const perDaySalary = staffSalary / 30;
 
@@ -492,12 +520,17 @@ const processPayroll = async ({
                 const shift: any = dayAssignment?.shiftId;
                 if (!shift) return;
 
-                // 3. Work day
+                // 3. Skip if it's a specific "Off Date" for this shift
+                if (staffShiftOffDates.includes(dayStr)) {
+                    return; 
+                }
+
+                // 4. Work day
                 if (shift.workDays.includes(getBDWeekDay(day))) {
                     workDaysCount++;
                     expectedWorkDates.push(day);
 
-                    // 4. Missing punch
+                    // 5. Check for missing punch
                     if (dayStr < todayBDStr) {
                         const hasRecord = allAttendance.some((a: any) => {
                             const aStr = getBDDateString(a.date);
@@ -516,8 +549,9 @@ const processPayroll = async ({
 
             const absentDays = literalAbsentDays + missingPunches;
             // Half-day and late count as present with full payment
-            const serverDeduction =
-                (absentDays + unemployedDays) * perDaySalary;
+            // LOGIC REFINEMENT: totalDeductionUnits capped at 30 to prevent >100% deduction in 31-day months.
+            const totalDeductionUnits = Math.min(30, absentDays + unemployedDays);
+            const serverDeduction = totalDeductionUnits * perDaySalary;
             const serverPayable = Math.max(0, staffSalary - serverDeduction);
             const expectedAmount = Math.round(
                 serverPayable + bonus - deduction,
@@ -877,11 +911,28 @@ const getAbsentDates = async (staffId: string, month: string) => {
         .populate('shiftId')
         .sort({ startDate: 1 });
 
+    const staffShiftIds = allAssignments.map(sa => sa.shiftId._id.toString());
+    const shiftOffDates = await ShiftOffDateModel.find({
+        shiftId: { $in: staffShiftIds },
+        isActive: true,
+        dates: { $gte: startDate, $lte: endDate },
+    }).lean();
+
+    const staffShiftOffDates = (shiftOffDates as any[]).flatMap(sod => 
+        sod.dates.map((d: Date) => getBDDateString(d))
+    );
+
     const daysInMonth = eachDayOfInterval({ start: startDate, end: endDate });
     const expectedWorkDates: Date[] = [];
 
     daysInMonth.forEach((day: Date) => {
         const dayStr = getBDDateString(day);
+
+        // Skip if it's a specific "Off Date" for this shift
+        if (staffShiftOffDates.includes(dayStr)) {
+            return; 
+        }
+
         const dayAssignment = (allAssignments as any[]).find((sa) => {
             const s = getBDDateString(sa.startDate);
             const saEnd = sa.endDate;
