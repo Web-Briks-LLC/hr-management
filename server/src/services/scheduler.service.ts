@@ -451,23 +451,22 @@ async function processMonthlyFinanceSMSReport() {
         // 1. Get Financial Totals
         const { totalEarnings, totalExpenses } = await analyticsService.getFinanceTotalsForPeriod(year, month);
         
-        // 2. Identify Recipients
-        // a. Admins (Super Admins, Admins, HR Managers)
-        await UserModel.find({
+        // 2. Identify Recipients (Only Super Admins and Admins)
+        const adminUsers = await UserModel.find({
             role: { $in: ['super_admin', 'admin'] }
         }).toArray();
+        
+        const adminUserIds = adminUsers.map((u: any) => u._id);
 
-        // b. Shift Assigned Staff
-        await ShiftAssignmentModel.find({ isActive: true }).select('staffId');
+        const adminStaff = await StaffModel.find({ 
+            status: 'active',
+            userId: { $in: adminUserIds },
+            phone: { $exists: true, $ne: '' }
+        }).select('phone');
         
-        // c. Fetch all staff to get phone numbers
-        const allStaff = await StaffModel.find({ status: 'active' }).select('phone userId');
-        
-        // d. Filtering & Deduplication
         const recipientNumbers = new Set<string>();
         
-        for (const staff of allStaff) {
-            // Criteria: Everyone with a phone number gets the monthly report
+        for (const staff of adminStaff) {
             if (staff.phone) {
                 recipientNumbers.add(staff.phone);
             }
