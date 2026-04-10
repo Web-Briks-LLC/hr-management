@@ -3,7 +3,6 @@ import OvertimeModel from '../models/overtime.model.js';
 import LeaveApplicationModel from '../models/leave_application.model.js';
 import ShiftAssignmentModel from '../models/shift-assignment.model.js';
 import StaffModel from '../models/staff.model.js';
-import UserModel from '../models/user.model.js';
 import notificationService from './notification.service.js';
 import analyticsService from './analytics.service.js';
 import { sendBulkSMS } from '../utils/sms.util.js';
@@ -351,19 +350,23 @@ async function processLeaveExpiry() {
             {
                 $lookup: {
                     from: 'user',
-                    localField: 'userId',
-                    foreignField: '_id',
-                    as: 'user',
-                },
+                    let: { staffUserId: '$userId' },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $and: [
+                                        { $eq: [{ $toString: '$_id' }, { $toString: '$$staffUserId' }] },
+                                        { $in: ['$role', ['super_admin', 'admin', 'hr_manager']] }
+                                    ]
+                                }
+                            }
+                        }
+                    ],
+                    as: 'userInfo'
+                }
             },
-            { $unwind: '$user' },
-            {
-                $match: {
-                    'user.role': {
-                        $in: ['super_admin', 'admin', 'hr_manager'],
-                    },
-                },
-            },
+            { $unwind: '$userInfo' },
             {
                 $project: {
                     userId: 1,
@@ -452,23 +455,46 @@ async function processMonthlyFinanceSMSReport() {
         const { totalEarnings, totalExpenses } = await analyticsService.getFinanceTotalsForPeriod(year, month);
         
         // 2. Identify Recipients (Only Super Admins and Admins)
-        const adminUsers = await UserModel.find({
-            role: { $in: ['super_admin', 'admin'] }
-        }).toArray();
-        
-        const adminUserIds = adminUsers.map((u: any) => u._id);
-
-        const adminStaff = await StaffModel.find({ 
-            status: 'active',
-            userId: { $in: adminUserIds },
-            phone: { $exists: true, $ne: '' }
-        }).select('phone');
+        const adminStaff = await StaffModel.aggregate([
+            {
+                $match: {
+                    status: 'active',
+                    userId: { $exists: true, $ne: null },
+                    phone: { $exists: true, $ne: '' }
+                }
+            },
+            {
+                $lookup: {
+                    from: 'user',
+                    let: { staffUserId: '$userId' },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $and: [
+                                        { $eq: [{ $toString: '$_id' }, { $toString: '$$staffUserId' }] },
+                                        { $in: ['$role', ['super_admin', 'admin']] }
+                                    ]
+                                }
+                            }
+                        }
+                    ],
+                    as: 'adminUserInfo'
+                }
+            },
+            { $unwind: '$adminUserInfo' },
+            {
+                $project: {
+                    phone: 1
+                }
+            }
+        ]);
         
         const recipientNumbers = new Set<string>();
         
         for (const staff of adminStaff) {
             if (staff.phone) {
-                recipientNumbers.add(staff.phone);
+                recipientNumbers.add(staff.phone.trim());
             }
         }
 
