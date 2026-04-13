@@ -739,6 +739,137 @@ async function updateAttendanceStatusInDB({
   return attendanceDay;
 }
 
+async function bulkUpdateAttendanceStatusInDB({
+  staffIds,
+  date,
+  status,
+  notes,
+  shiftId,
+  updatedBy,
+  ipAddress,
+  userAgent,
+}: {
+  staffIds: string[];
+  date: string;
+  status: string;
+  notes?: string;
+  shiftId?: string;
+  updatedBy: string;
+  ipAddress?: string | undefined;
+  userAgent?: string | undefined;
+}) {
+  const validStatuses = [
+    "present",
+    "absent",
+    "on_leave",
+    "weekend",
+    "holiday",
+    "half_day",
+    "late",
+    "early_exit",
+  ];
+
+  if (!validStatuses.includes(status)) {
+    throw new Error(
+      `Invalid status. Must be one of: ${validStatuses.join(", ")}`,
+    );
+  }
+
+  const targetDate = new Date(date);
+  const dayStart = getBDStartOfDay(targetDate);
+
+  const results = [];
+
+  for (const staffId of staffIds) {
+    let attendanceDay = await AttendanceDayModel.findOne({
+      staffId,
+      date: dayStart,
+    });
+
+    let oldStatus = "none";
+    let isNew = false;
+
+    if (attendanceDay) {
+      oldStatus = attendanceDay.status;
+      attendanceDay.status = status as any;
+      attendanceDay.isManual = true;
+      if (notes) attendanceDay.notes = notes;
+    } else {
+      let shiftDataToUse = null;
+
+      if (shiftId) {
+        const { default: hShiftModel } = await import("../models/shift.model.js");
+        const foundShift = await hShiftModel.findById(shiftId).lean();
+        if (foundShift) {
+           shiftDataToUse = foundShift;
+        }
+      }
+
+      if (!shiftDataToUse) {
+        const shiftAssignment = await ShiftAssignmentModel.findOne({
+          staffId,
+          startDate: { $lte: dayStart },
+          $or: [{ endDate: null }, { endDate: { $gte: dayStart } }],
+          isActive: true,
+        })
+          .populate("shiftId")
+          .lean();
+
+        if (shiftAssignment && shiftAssignment.shiftId) {
+            shiftDataToUse = shiftAssignment.shiftId;
+        }
+      }
+
+      if (shiftDataToUse) {
+        const shiftData = shiftDataToUse as unknown as IShift;
+        const shiftStart = new Date(dayStart);
+        const [sh, sm] = shiftData.startTime.split(":");
+        shiftStart.setHours(Number(sh), Number(sm), 0, 0);
+
+        attendanceDay = new AttendanceDayModel({
+          staffId,
+          shiftId: shiftData._id,
+          date: dayStart,
+          status: status as any,
+          checkInAt: status === "present" ? shiftStart : null,
+          totalMinutes: 0,
+          lateMinutes: 0,
+          earlyExitMinutes: 0,
+          otMinutes: 0,
+          isAutoAbsent: false,
+          isManual: true,
+          notes: notes || `Created manually via Bulk Update`,
+        });
+        isNew = true;
+      } else {
+        continue;
+      }
+    }
+
+    await attendanceDay.save();
+
+    await auditService.createLog({
+      userId: updatedBy,
+      action: 'ATTENDANCE_UPDATE',
+      entity: 'AttendanceDay',
+      entityId: attendanceDay._id.toString(),
+      ipAddress,
+      userAgent,
+      details: {
+        isBulk: true,
+        isNew,
+        from: oldStatus,
+        to: status,
+        notes
+      }
+    });
+
+    results.push(attendanceDay);
+  }
+
+  return results;
+}
+
 export default {
   checkInInDB,
   checkOutInDB,
@@ -747,4 +878,5 @@ export default {
   getMyAttendanceHistoryInDB,
   getAllAttendanceFromDB,
   updateAttendanceStatusInDB,
+  bulkUpdateAttendanceStatusInDB,
 };

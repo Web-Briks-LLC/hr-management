@@ -61,6 +61,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { DateRange } from "react-day-picker";
 import { Skeleton } from "@/components/ui/skeleton";
+import { BulkAttendanceDialog } from "@/components/dashboard/attendance/bulk-attendance-dialog";
 
 interface IStaffListItem {
     _id: string;
@@ -659,6 +660,10 @@ export default function AttendancePage() {
                                             >
                                                 Clear Filters
                                             </Button>
+                                        )}
+
+                                        {(role === Role.ADMIN || role === Role.SUPER_ADMIN || role === Role.HR_MANAGER) && (
+                                            <BulkAttendanceDialog staffs={allStaffs} />
                                         )}
                                     </div>
                                 </div>

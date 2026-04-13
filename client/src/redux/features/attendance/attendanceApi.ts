@@ -57,6 +57,14 @@ export const attendanceApi = apiSlice.injectEndpoints({
             }),
             invalidatesTags: ['Attendance'],
         }),
+        bulkUpdateAttendanceStatus: builder.mutation<void, { staffIds: string[]; date: string; status: AttendanceStatus; notes?: string; shiftId?: string }>({
+            query: (body) => ({
+                url: `/attendance/admin/bulk-update`,
+                method: 'PATCH',
+                body,
+            }),
+            invalidatesTags: ['Attendance'],
+        }),
     }),
 });
 
@@ -68,4 +76,5 @@ export const {
     useGetMyAttendanceHistoryQuery,
     useGetAllAttendanceQuery,
     useUpdateAttendanceStatusMutation,
+    useBulkUpdateAttendanceStatusMutation,
 } = attendanceApi;

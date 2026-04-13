@@ -234,6 +234,56 @@ const updateAttendanceStatus = async (req: Request, res: Response) => {
     }
 };
 
+const bulkUpdateAttendanceStatus = async (req: Request, res: Response) => {
+    try {
+        const { staffIds, date, status, notes, shiftId } = req.body;
+        const updatedBy = req.user?.id;
+
+        if (!updatedBy) {
+            return res.status(401).json({
+                success: false,
+                message: "Unauthorized",
+            });
+        }
+
+        if (!staffIds || !Array.isArray(staffIds) || staffIds.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: "staffIds array is required",
+            });
+        }
+
+        if (!date) {
+            return res.status(400).json({
+                success: false,
+                message: "date is required",
+            });
+        }
+
+        const result = await AttendanceServices.bulkUpdateAttendanceStatusInDB({
+            staffIds,
+            date,
+            status: status || 'present',
+            notes,
+            shiftId,
+            updatedBy,
+            ipAddress: req.ip,
+            userAgent: req.headers['user-agent'],
+        });
+
+        return res.status(200).json({
+            success: true,
+            message: "Bulk attendance status updated successfully",
+            data: result,
+        });
+    } catch (error: any) {
+        return res.status(400).json({
+            success: false,
+            message: error.message || "Failed to update attendance status in bulk",
+        });
+    }
+};
+
 const AttendanceController = {
     checkIn,
     checkOut,
@@ -242,5 +292,6 @@ const AttendanceController = {
     getMyAttendanceHistory,
     getAllAttendance,
     updateAttendanceStatus,
+    bulkUpdateAttendanceStatus,
 };
 export default AttendanceController;
