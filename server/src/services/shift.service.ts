@@ -72,12 +72,18 @@ const createShift = async (
 };
 
 const getAllShifts = async (userId: string, userRole: string) => {
+    let query: any = {};
+
+    if (userRole !== Role.SUPER_ADMIN && userRole !== Role.ADMIN) {
+        query.isFlexible = { $ne: true };
+    }
+
     if (
         userRole === Role.SUPER_ADMIN ||
         userRole === Role.ADMIN ||
         userRole === Role.HR_MANAGER
     ) {
-        return await ShiftModel.find().populate('branchId').sort({
+        return await ShiftModel.find(query).populate('branchId').sort({
             createdAt: -1,
         });
     }
@@ -88,9 +94,9 @@ const getAllShifts = async (userId: string, userRole: string) => {
         throw new Error('Branch not found for this user');
     }
 
-    return await ShiftModel.find({
-        branchId: staff.branchId,
-    })
+    query.branchId = staff.branchId;
+
+    return await ShiftModel.find(query)
         .populate('branchId')
         .sort({ createdAt: -1 });
 };

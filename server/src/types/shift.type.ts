@@ -14,8 +14,10 @@ export interface IShift {
 
     workDays: ShiftWorkDay[];
 
-    startTime: string;
-    endTime: string;
+    startTime?: string;
+    endTime?: string;
+    
+    isFlexible?: boolean;
 
     gracePeriodMinutes: number;
     lateAfterMinutes: number;

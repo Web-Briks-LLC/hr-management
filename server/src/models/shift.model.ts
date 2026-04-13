@@ -36,12 +36,17 @@ const shiftSchema = new Schema<IShift>(
 
         startTime: {
             type: String,
-            required: true,
+            required: false,
         },
 
         endTime: {
             type: String,
-            required: true,
+            required: false,
+        },
+
+        isFlexible: {
+            type: Boolean,
+            default: false,
         },
 
         gracePeriodMinutes: {

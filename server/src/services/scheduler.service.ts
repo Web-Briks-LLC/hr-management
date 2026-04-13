@@ -88,12 +88,44 @@ async function processAttendanceCheck() {
                     gracePeriodMinutes: '$shift.gracePeriodMinutes',
                     halfDayAfterMinutes: '$shift.halfDayAfterMinutes',
                     lateAfterMinutes: '$shift.lateAfterMinutes',
+                    isFlexible: '$shift.isFlexible',
                 },
             },
         ]);
 
         for (const assignment of activeAssignments) {
             try {
+                // Determine if assignment is linked to a time-less flexible administration shift
+                if (assignment.isFlexible) {
+                    // Always try to mark them "present" at the start of the day
+                    const existingAttendance = await AttendanceDayModel.findOne({
+                        staffId: assignment.staffId,
+                        date: { $gte: todayStart, $lte: todayEnd },
+                    });
+
+                    if (!existingAttendance) {
+                        await AttendanceDayModel.create({
+                            staffId: assignment.staffId,
+                            shiftId: assignment.shiftId,
+                            date: todayStart,
+                            status: 'present',
+                            checkInAt: todayStart, // Auto check-in at midnight
+                            totalMinutes: 0,
+                            lateMinutes: 0,
+                            earlyExitMinutes: 0,
+                            otMinutes: 0,
+                            isAutoAbsent: false,
+                            isManual: false,
+                            notes: '[System] Auto-presence granted via flexible Administration shift',
+                            processedAt: now,
+                        });
+                        console.log(`[Scheduler] Auto-marked flexible admin ${assignment.staffId} as Present`);
+                    }
+
+                    // Flexible admins bypass all lateness/absence upgrades
+                    continue;
+                }
+
                 // Check if attendance already exists for today
                 const existingAttendance = await AttendanceDayModel.findOne({
                     staffId: assignment.staffId,
