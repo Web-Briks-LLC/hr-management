@@ -1,6 +1,6 @@
 import { apiSlice } from '../../api/apiSlice';
 
-interface Person {
+export interface Person {
     _id: string;
     name: string;
     phone?: string;
@@ -9,7 +9,9 @@ interface Person {
     createdAt: string;
 }
 
-interface Debit {
+export type DebitTransactionType = 'Borrow' | 'Return';
+
+export interface Debit {
     _id: string;
     personId: {
         _id: string;
@@ -17,17 +19,42 @@ interface Debit {
     };
     amount: number;
     date: string;
-    type: 'Borrow' | 'Return';
+    type: DebitTransactionType;
     description?: string;
     createdAt: string;
 }
 
-interface DebitStats {
+export interface DebitStats {
     _id: string;
     name: string;
     totalBorrowed: number;
     totalReturned: number;
     netBalance: number;
+}
+
+export interface DebitPagination {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+}
+
+export interface DebitsResponse {
+    data: Debit[];
+    pagination: DebitPagination;
+    filters: {
+        personId: string | null;
+        type: DebitTransactionType | null;
+        date: string | null;
+    };
+}
+
+export interface GetDebitsParams {
+    personId?: string;
+    page?: number;
+    limit?: number;
+    type?: DebitTransactionType | 'all';
+    date?: string;
 }
 
 export const debitApi = apiSlice.injectEndpoints({
@@ -79,11 +106,23 @@ export const debitApi = apiSlice.injectEndpoints({
         }),
 
         // Debits
-        getDebits: builder.query<Debit[], string | void>({
-            query: (personId) =>
-                personId
-                    ? `/debits/debits?personId=${personId}`
-                    : '/debits/debits',
+        getDebits: builder.query<DebitsResponse, GetDebitsParams | void>({
+            query: (params) => {
+                const searchParams = new URLSearchParams();
+
+                if (params?.personId) searchParams.set('personId', params.personId);
+                if (params?.page) searchParams.set('page', String(params.page));
+                if (params?.limit) searchParams.set('limit', String(params.limit));
+                if (params?.type && params.type !== 'all') {
+                    searchParams.set('type', params.type);
+                }
+                if (params?.date) searchParams.set('date', params.date);
+
+                const queryString = searchParams.toString();
+                return queryString
+                    ? `/debits/debits?${queryString}`
+                    : '/debits/debits';
+            },
             providesTags: ['Debit'],
         }),
         createDebit: builder.mutation<
@@ -92,7 +131,7 @@ export const debitApi = apiSlice.injectEndpoints({
                 personId: string;
                 amount: number;
                 date?: string;
-                type: 'Borrow' | 'Return';
+                type: DebitTransactionType;
                 description?: string;
             }
         >({
@@ -109,7 +148,7 @@ export const debitApi = apiSlice.injectEndpoints({
                 id: string;
                 amount: number;
                 date?: string;
-                type: 'Borrow' | 'Return';
+                type: DebitTransactionType;
                 description?: string;
             }
         >({

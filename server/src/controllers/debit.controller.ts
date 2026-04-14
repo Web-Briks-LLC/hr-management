@@ -84,14 +84,76 @@ export const createDebit = async (req: Request, res: Response) => {
 
 export const getDebits = async (req: Request, res: Response) => {
     try {
-        const { personId } = req.query as { personId?: string };
-        const filter = personId ? { personId } : {};
+        const {
+            personId,
+            page = '1',
+            limit = '10',
+            type,
+            date,
+        } = req.query as {
+            personId?: string;
+            page?: string;
+            limit?: string;
+            type?: string;
+            date?: string;
+        };
 
+        const parsedPage = Math.max(1, Number.parseInt(page, 10) || 1);
+        const parsedLimit = Math.min(
+            100,
+            Math.max(1, Number.parseInt(limit, 10) || 10)
+        );
+
+        const filter: Record<string, unknown> = {};
+        if (personId) {
+            filter.personId = personId;
+        }
+        if (
+            type &&
+            Object.values(DebitType).includes(type as DebitType)
+        ) {
+            filter.type = type;
+        }
+        if (date) {
+            const selectedDate = new Date(date);
+            if (!Number.isNaN(selectedDate.getTime())) {
+                const startOfDay = new Date(selectedDate);
+                startOfDay.setHours(0, 0, 0, 0);
+
+                const endOfDay = new Date(selectedDate);
+                endOfDay.setHours(23, 59, 59, 999);
+
+                filter.date = {
+                    $gte: startOfDay,
+                    $lte: endOfDay,
+                };
+            }
+        }
+
+        const total = await DebitModel.countDocuments(filter);
         const debits = await DebitModel.find(filter)
             .populate('personId', 'name')
-            .sort({ date: -1 });
+            .sort({ date: -1, createdAt: -1 })
+            .skip((parsedPage - 1) * parsedLimit)
+            .limit(parsedLimit);
 
-        return res.status(200).json(debits);
+        return res.status(200).json({
+            data: debits,
+            pagination: {
+                page: parsedPage,
+                limit: parsedLimit,
+                total,
+                pages: Math.max(1, Math.ceil(total / parsedLimit)),
+            },
+            filters: {
+                personId: personId || null,
+                type:
+                    type && Object.values(DebitType).includes(type as DebitType)
+                        ? type
+                        : null,
+                date: date || null,
+            },
+        });
     } catch (error) {
         console.error('Error fetching debits:', error);
         return res

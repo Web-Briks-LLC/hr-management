@@ -44,7 +44,7 @@ export function DebitStatsCards() {
     return (
         <div className="grid gap-4 md:grid-cols-3">
             {/* Total Borrowed Card */}
-            <div className="group relative overflow-hidden rounded-2xl border bg-gradient-to-br from-rose-500/10 via-card to-card p-6 transition-all duration-300 hover:shadow-xl hover:shadow-rose-500/5 hover:border-rose-500/30">
+            <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-rose-500/10 via-card to-card p-6 transition-all duration-300 hover:shadow-xl hover:shadow-rose-500/5 hover:border-rose-500/30">
                 {/* Decorative background elements */}
                 <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-rose-500/10 blur-2xl transition-all duration-300 group-hover:bg-rose-500/20" />
                 <div className="absolute -right-2 -bottom-2 h-16 w-16 rounded-full bg-rose-400/5 blur-xl" />
@@ -74,7 +74,7 @@ export function DebitStatsCards() {
                     {/* Progress bar style indicator */}
                     <div className="mt-4 h-1.5 w-full rounded-full bg-rose-500/10 overflow-hidden">
                         <div
-                            className="h-full rounded-full bg-gradient-to-r from-rose-500 to-rose-400 transition-all duration-500"
+                            className="h-full rounded-full bg-linear-to-r from-rose-500 to-rose-400 transition-all duration-500"
                             style={{
                                 width: totalBorrowed > 0
                                     ? `${Math.min((totalBorrowed / (totalBorrowed + totalReturned + 1)) * 100, 100)}%`
@@ -86,7 +86,7 @@ export function DebitStatsCards() {
             </div>
 
             {/* Total Returned Card */}
-            <div className="group relative overflow-hidden rounded-2xl border bg-gradient-to-br from-emerald-500/10 via-card to-card p-6 transition-all duration-300 hover:shadow-xl hover:shadow-emerald-500/5 hover:border-emerald-500/30">
+            <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-emerald-500/10 via-card to-card p-6 transition-all duration-300 hover:shadow-xl hover:shadow-emerald-500/5 hover:border-emerald-500/30">
                 {/* Decorative background elements */}
                 <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-emerald-500/10 blur-2xl transition-all duration-300 group-hover:bg-emerald-500/20" />
                 <div className="absolute -right-2 -bottom-2 h-16 w-16 rounded-full bg-emerald-400/5 blur-xl" />
@@ -116,7 +116,7 @@ export function DebitStatsCards() {
                     {/* Progress bar style indicator */}
                     <div className="mt-4 h-1.5 w-full rounded-full bg-emerald-500/10 overflow-hidden">
                         <div
-                            className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-400 transition-all duration-500"
+                            className="h-full rounded-full bg-linear-to-r from-emerald-500 to-emerald-400 transition-all duration-500"
                             style={{
                                 width: totalReturned > 0 && totalBorrowed > 0
                                     ? `${Math.min((totalReturned / totalBorrowed) * 100, 100)}%`
@@ -129,10 +129,10 @@ export function DebitStatsCards() {
 
             {/* Current Balance Card */}
             <div className={`group relative overflow-hidden rounded-2xl border p-6 transition-all duration-300 hover:shadow-xl ${currentBalance > 0
-                ? 'bg-gradient-to-br from-amber-500/10 via-card to-card hover:shadow-amber-500/5 hover:border-amber-500/30'
+                ? 'bg-linear-to-br from-amber-500/10 via-card to-card hover:shadow-amber-500/5 hover:border-amber-500/30'
                 : currentBalance < 0
-                    ? 'bg-gradient-to-br from-blue-500/10 via-card to-card hover:shadow-blue-500/5 hover:border-blue-500/30'
-                    : 'bg-gradient-to-br from-slate-500/10 via-card to-card hover:shadow-slate-500/5 hover:border-slate-500/30'
+                    ? 'bg-linear-to-br from-blue-500/10 via-card to-card hover:shadow-blue-500/5 hover:border-blue-500/30'
+                    : 'bg-linear-to-br from-slate-500/10 via-card to-card hover:shadow-slate-500/5 hover:border-slate-500/30'
                 }`}>
                 {/* Decorative background elements */}
                 <div className={`absolute -right-4 -top-4 h-24 w-24 rounded-full blur-2xl transition-all duration-300 ${currentBalance > 0
@@ -197,8 +197,8 @@ export function DebitStatsCards() {
                         <div className="h-1.5 flex-1 rounded-full bg-muted/50 overflow-hidden">
                             <div
                                 className={`h-full rounded-full transition-all duration-500 ${currentBalance > 0
-                                    ? 'bg-gradient-to-r from-amber-500 to-amber-400'
-                                    : 'bg-gradient-to-r from-blue-500 to-blue-400'
+                                    ? 'bg-linear-to-r from-amber-500 to-amber-400'
+                                    : 'bg-linear-to-r from-blue-500 to-blue-400'
                                     }`}
                                 style={{
                                     width: totalBorrowed > 0

@@ -84,8 +84,8 @@ export function AddTransactionDialog() {
             setDate(new Date());
             setType('Borrow');
             setDescription('');
-        } catch (err: any) {
-            toast.error(`Failed to add debit: ${err?.data?.message || err.message}`);
+        } catch (err) {
+            toast.error(`Failed to add debit: ${(err as Error).message}`);
         }
     };
 
