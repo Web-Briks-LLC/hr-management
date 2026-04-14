@@ -66,6 +66,10 @@
 }
 
 :root {
+    --font-sans: 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    --font-serif: Georgia, 'Times New Roman', serif;
+    --font-mono: 'Cascadia Code', 'SFMono-Regular', Consolas, 'Liberation Mono',
+        Menlo, monospace;
     --radius: 1.4rem;
     --background: oklch(0.994 0 0);
     --foreground: oklch(0 0 0);

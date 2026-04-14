@@ -15,6 +15,16 @@ import {
 } from "../utils/date.util.js";
 import auditService from "./audit.service.js";
 
+function requireShiftTimes<T extends IShift>(
+  shift: T,
+): T & { startTime: string; endTime: string } {
+  if (!shift.startTime || !shift.endTime) {
+    throw new Error(`Shift "${shift.name}" is missing start or end time.`);
+  }
+
+  return shift as T & { startTime: string; endTime: string };
+}
+
 const checkInInDB = async ({
   userId,
   ip,
@@ -67,7 +77,7 @@ const checkInInDB = async ({
     throw new Error("No active shift assignment found.");
   }
 
-  const shift = shiftAssignment.shiftId as unknown as IShift;
+  const shift = requireShiftTimes(shiftAssignment.shiftId as unknown as IShift);
   console.log(
     `[CheckIn] Found shift: ${shift.name} (${shift.startTime} - ${shift.endTime})`,
   );
@@ -288,7 +298,9 @@ async function checkOutInDB({
     .lean();
 
   if (shiftAssignment?.shiftId) {
-    const shiftData = shiftAssignment.shiftId as unknown as IShift;
+    const shiftData = requireShiftTimes(
+      shiftAssignment.shiftId as unknown as IShift,
+    );
 
     const baseDate = new Date(attendanceDay.date);
 
@@ -821,7 +833,7 @@ async function bulkUpdateAttendanceStatusInDB({
       }
 
       if (shiftDataToUse) {
-        const shiftData = shiftDataToUse as unknown as IShift;
+        const shiftData = requireShiftTimes(shiftDataToUse as unknown as IShift);
         const shiftStart = new Date(dayStart);
         const [sh, sm] = shiftData.startTime.split(":");
         shiftStart.setHours(Number(sh), Number(sm), 0, 0);
