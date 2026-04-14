@@ -11,6 +11,10 @@ import {
     FileText,
     ExternalLink,
     Calendar,
+    Calendar as CalendarIcon,
+    ChevronLeft,
+    ChevronRight,
+    FilterX,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -52,26 +56,73 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Calendar as DatePickerCalendar } from '@/components/ui/calendar';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
+import {
     useGetLeaveApplicationsQuery,
     useGetPendingLeavesQuery,
     useApproveLeaveMutation,
     useRejectLeaveMutation,
     useRevokeLeaveMutation,
 } from '@/redux/features/leave/leaveApi';
+import { useGetStaffsQuery } from '@/redux/features/staff/staffApi';
 import type { ILeaveApplication, LeaveStatus } from '@/types/leave.type';
 import { LEAVE_TYPE_LABELS, LEAVE_STATUS_LABELS } from '@/types/leave.type';
+import type IStaff from '@/types/staff.type';
 
 type DateDecision = 'approve' | 'paid' | 'reject';
+type LeaveStatusFilter = 'all' | LeaveStatus;
+
+interface ApiError {
+    data?: {
+        message?: string;
+    };
+}
 
 interface DateSelection {
     date: string;
     decision: DateDecision;
 }
 
+interface StaffListResponse {
+    staffs?: IStaff[];
+    data?: IStaff[];
+}
+
+const leaveStatusTabs: Array<{
+    value: LeaveStatusFilter;
+    label: string;
+}> = [
+    { value: 'all', label: 'All' },
+    { value: 'pending', label: 'Pending' },
+    { value: 'approved', label: 'Approved' },
+    { value: 'partially_approved', label: 'Partially Approved' },
+    { value: 'rejected', label: 'Rejected' },
+    { value: 'revoked', label: 'Revoked' },
+    { value: 'expired', label: 'Expired' },
+    { value: 'cancelled', label: 'Cancelled' },
+];
+
+const getErrorMessage = (error: unknown, fallback: string) => {
+    const apiError = error as ApiError;
+    return apiError.data?.message || fallback;
+};
+
 export default function LeaveManagePage() {
-    const [statusFilter, setStatusFilter] = useState<LeaveStatus | 'all'>(
-        'all',
-    );
+    const [statusFilter, setStatusFilter] = useState<LeaveStatusFilter>('all');
+    const [staffFilter, setStaffFilter] = useState<string>('all');
+    const [selectedDate, setSelectedDate] = useState<Date | undefined>();
+    const [page, setPage] = useState(1);
+    const [limit, setLimit] = useState(10);
     const [selectedApplication, setSelectedApplication] =
         useState<ILeaveApplication | null>(null);
     const [showApproveDialog, setShowApproveDialog] = useState(false);
@@ -91,11 +142,31 @@ export default function LeaveManagePage() {
     const [datesToRevoke, setDatesToRevoke] = useState<string[]>([]);
 
     const { data: pendingData } = useGetPendingLeavesQuery();
-    const { data: applicationsData, isLoading } = useGetLeaveApplicationsQuery(
-        statusFilter === 'all'
-            ? { limit: 50 }
-            : { status: statusFilter, limit: 50 },
+    const { data: staffsResponse } = useGetStaffsQuery({ page: 1, limit: 200 });
+    const staffOptions = (
+        (staffsResponse as StaffListResponse | undefined)?.staffs ||
+        (staffsResponse as StaffListResponse | undefined)?.data ||
+        []
+    ).filter((staff): staff is IStaff => Boolean(staff?._id));
+
+    const leaveQueryParams = useMemo(
+        () => ({
+            ...(statusFilter !== 'all' ? { status: statusFilter } : {}),
+            ...(staffFilter !== 'all' ? { staffId: staffFilter } : {}),
+            ...(selectedDate
+                ? {
+                      startDate: format(selectedDate, 'yyyy-MM-dd'),
+                      endDate: format(selectedDate, 'yyyy-MM-dd'),
+                  }
+                : {}),
+            page,
+            limit,
+        }),
+        [statusFilter, staffFilter, selectedDate, page, limit],
     );
+
+    const { data: applicationsData, isLoading, isFetching } =
+        useGetLeaveApplicationsQuery(leaveQueryParams);
 
     const [approveLeave, { isLoading: isApproving }] =
         useApproveLeaveMutation();
@@ -104,6 +175,7 @@ export default function LeaveManagePage() {
 
     const pendingCount = pendingData?.count || 0;
     const applications = applicationsData?.data || [];
+    const meta = applicationsData?.meta;
 
 
     const handleDateDecisionChange = (
@@ -158,8 +230,7 @@ export default function LeaveManagePage() {
             setComment('');
             setApprovalMode('full');
         } catch (error: unknown) {
-            const err = error as { data?: { message?: string } };
-            toast.error(err?.data?.message || 'Failed to approve leave');
+            toast.error(getErrorMessage(error, 'Failed to approve leave'));
         }
     };
 
@@ -176,8 +247,7 @@ export default function LeaveManagePage() {
             setSelectedApplication(null);
             setComment('');
         } catch (error: unknown) {
-            const err = error as { data?: { message?: string } };
-            toast.error(err?.data?.message || 'Failed to reject leave');
+            toast.error(getErrorMessage(error, 'Failed to reject leave'));
         }
     };
 
@@ -207,12 +277,11 @@ export default function LeaveManagePage() {
             setRevokeMode('full');
             setDatesToRevoke([]);
         } catch (error: unknown) {
-            const err = error as { data?: { message?: string } };
-            toast.error(err?.data?.message || 'Failed to revoke leave');
+            toast.error(getErrorMessage(error, 'Failed to revoke leave'));
         }
     };
 
-    const getStatusBadgeVariant = (status: string) => {
+    const getStatusBadgeVariant = (status: LeaveStatus) => {
         switch (status) {
             case 'approved':
                 return 'default';
@@ -275,6 +344,19 @@ export default function LeaveManagePage() {
         setShowDetailsDialog(true);
     };
 
+    const resetFilters = () => {
+        setStatusFilter('all');
+        setStaffFilter('all');
+        setSelectedDate(undefined);
+        setPage(1);
+        setLimit(10);
+    };
+
+    const hasActiveFilters =
+        statusFilter !== 'all' ||
+        staffFilter !== 'all' ||
+        selectedDate !== undefined;
+
     return (
         <div className="p-6 space-y-6">
             <div className="flex items-center justify-between">
@@ -292,39 +374,110 @@ export default function LeaveManagePage() {
             </div>
 
             <Card>
-                <CardContent className="pt-6">
-                    <div className="flex items-center gap-4">
-                        <Label>Filter by Status:</Label>
-                        <Select
-                            value={statusFilter}
-                            onValueChange={(value) =>
-                                setStatusFilter(value as LeaveStatus | 'all')
-                            }
+                <CardHeader>
+                    <CardTitle>Filters</CardTitle>
+                    <CardDescription>
+                        Review all leave applications together or narrow by
+                        status, staff member, and date.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <Tabs
+                        value={statusFilter}
+                        onValueChange={(value) => {
+                            setStatusFilter(value as LeaveStatusFilter);
+                            setPage(1);
+                        }}
+                        className="w-full"
+                    >
+                        <TabsList className="h-auto w-full flex-wrap justify-start">
+                            {leaveStatusTabs.map((tab) => (
+                                <TabsTrigger
+                                    key={tab.value}
+                                    value={tab.value}
+                                    className="min-w-fit"
+                                >
+                                    {tab.label}
+                                </TabsTrigger>
+                            ))}
+                        </TabsList>
+                    </Tabs>
+
+                    <div className="flex flex-col gap-3 rounded-xl border bg-muted/30 p-4 lg:flex-row lg:items-end lg:justify-between">
+                        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                            <div className="space-y-2">
+                                <Label>Staff</Label>
+                                <Select
+                                    value={staffFilter}
+                                    onValueChange={(value) => {
+                                        setStaffFilter(value);
+                                        setPage(1);
+                                    }}
+                                >
+                                    <SelectTrigger className="w-full min-w-56">
+                                        <SelectValue placeholder="All staff" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">
+                                            All Staff
+                                        </SelectItem>
+                                        {staffOptions.map((staff) => (
+                                            <SelectItem
+                                                key={staff._id}
+                                                value={staff._id}
+                                            >
+                                                {staff.user?.name || staff.staffId}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label>Date</Label>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button
+                                            variant="outline"
+                                            className="justify-between font-normal"
+                                        >
+                                            {selectedDate
+                                                ? format(selectedDate, 'PPP')
+                                                : 'All dates'}
+                                            <CalendarIcon className="h-4 w-4 opacity-50" />
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent
+                                        align="start"
+                                        className="w-auto"
+                                    >
+                                        <DatePickerCalendar
+                                            mode="single"
+                                            selected={selectedDate}
+                                            onSelect={(date) => {
+                                                setSelectedDate(date);
+                                                setPage(1);
+                                            }}
+                                            disabled={(date) =>
+                                                date > new Date() ||
+                                                date < new Date('1900-01-01')
+                                            }
+                                            initialFocus
+                                        />
+                                    </PopoverContent>
+                                </Popover>
+                            </div>
+                        </div>
+
+                        <Button
+                            variant="outline"
+                            onClick={resetFilters}
+                            disabled={!hasActiveFilters}
+                            className="justify-start lg:justify-center"
                         >
-                            <SelectTrigger className="w-[200px]">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">
-                                    All Applications
-                                </SelectItem>
-                                <SelectItem value="pending">Pending</SelectItem>
-                                <SelectItem value="approved">
-                                    Approved
-                                </SelectItem>
-                                <SelectItem value="partially_approved">
-                                    Partially Approved
-                                </SelectItem>
-                                <SelectItem value="rejected">
-                                    Rejected
-                                </SelectItem>
-                                <SelectItem value="expired">Expired</SelectItem>
-                                <SelectItem value="revoked">Revoked</SelectItem>
-                                <SelectItem value="cancelled">
-                                    Cancelled
-                                </SelectItem>
-                            </SelectContent>
-                        </Select>
+                            <FilterX />
+                            Reset
+                        </Button>
                     </div>
                 </CardContent>
             </Card>
@@ -335,7 +488,7 @@ export default function LeaveManagePage() {
                     <CardDescription>
                         {statusFilter === 'all'
                             ? 'All leave applications'
-                            : `${LEAVE_STATUS_LABELS[statusFilter as LeaveStatus]} applications`}
+                            : `${LEAVE_STATUS_LABELS[statusFilter]} applications`}
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -350,154 +503,273 @@ export default function LeaveManagePage() {
                             No applications found
                         </p>
                     ) : (
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Employee</TableHead>
-                                    <TableHead>Type</TableHead>
-                                    <TableHead>Dates</TableHead>
-                                    <TableHead>Days</TableHead>
-                                    <TableHead>Reason</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead>Applied</TableHead>
-                                    <TableHead>Actions</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {applications.map((app: ILeaveApplication) => (
-                                    <TableRow key={app._id}>
-                                        <TableCell className="font-medium">
-                                            {app.staffId?.userId?.name || 'N/A'}
-                                        </TableCell>
-                                        <TableCell>
-                                            <div className="flex items-center gap-2">
-                                                {
-                                                    LEAVE_TYPE_LABELS[
-                                                        app.leaveType
-                                                    ]
-                                                }
-                                                {app.leaveType === 'sick' &&
-                                                    app.medicalDocuments &&
-                                                    app.medicalDocuments
-                                                        .length > 0 && (
-                                                        <Badge
-                                                            variant="outline"
-                                                            className="text-xs"
-                                                        >
-                                                            <FileText className="h-3 w-3 mr-1" />
-                                                            {
-                                                                app
-                                                                    .medicalDocuments
-                                                                    .length
-                                                            }
-                                                        </Badge>
-                                                    )}
-                                            </div>
-                                        </TableCell>
-                                        <TableCell>
-                                            {format(
-                                                new Date(app.startDate),
-                                                'MMM dd',
-                                            )}{' '}
-                                            -{' '}
-                                            {format(
-                                                new Date(app.endDate),
-                                                'MMM dd',
-                                            )}
-                                        </TableCell>
-                                        <TableCell>
-                                            {app.requestedDates.length}
-                                        </TableCell>
-                                        <TableCell
-                                            className="max-w-[200px] truncate"
-                                            title={app.reason}
-                                        >
-                                            {app.reason}
-                                        </TableCell>
-                                        <TableCell>
-                                            <Badge
-                                                variant={getStatusBadgeVariant(
-                                                    app.status,
-                                                )}
-                                            >
-                                                {
-                                                    LEAVE_STATUS_LABELS[
-                                                        app.status
-                                                    ]
-                                                }
-                                            </Badge>
-                                        </TableCell>
-                                        <TableCell>
-                                            {format(
-                                                new Date(app.createdAt),
-                                                'MMM dd, HH:mm',
-                                            )}
-                                        </TableCell>
-                                        <TableCell>
-                                            <div className="flex items-center gap-1">
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    onClick={() =>
-                                                        openDetailsDialog(app)
-                                                    }
-                                                    title="View Details"
-                                                >
-                                                    <Eye className="h-4 w-4" />
-                                                </Button>
-                                                {app.status === 'pending' && (
-                                                    <>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            onClick={() =>
-                                                                openApproveDialog(
-                                                                    app,
-                                                                )
-                                                            }
-                                                            className="text-green-600 hover:text-green-700"
-                                                            title="Approve"
-                                                        >
-                                                            <Check className="h-4 w-4" />
-                                                        </Button>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            onClick={() =>
-                                                                openRejectDialog(
-                                                                    app,
-                                                                )
-                                                            }
-                                                            className="text-red-600 hover:text-red-700"
-                                                            title="Reject"
-                                                        >
-                                                            <X className="h-4 w-4" />
-                                                        </Button>
-                                                    </>
-                                                )}
-                                                {(app.status === 'approved' ||
-                                                    app.status ===
-                                                        'partially_approved') && (
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        onClick={() =>
-                                                            openRevokeDialog(
-                                                                app,
-                                                            )
+                        <div className="space-y-4">
+                            <div className="overflow-hidden rounded-xl border bg-card">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow className="hover:bg-transparent border-b">
+                                            <TableHead className="font-semibold border-r">
+                                                Employee
+                                            </TableHead>
+                                            <TableHead className="font-semibold border-r">
+                                                Type
+                                            </TableHead>
+                                            <TableHead className="font-semibold border-r">
+                                                Dates
+                                            </TableHead>
+                                            <TableHead className="font-semibold border-r">
+                                                Days
+                                            </TableHead>
+                                            <TableHead className="font-semibold border-r">
+                                                Reason
+                                            </TableHead>
+                                            <TableHead className="font-semibold border-r">
+                                                Status
+                                            </TableHead>
+                                            <TableHead className="font-semibold border-r">
+                                                Applied
+                                            </TableHead>
+                                            <TableHead className="font-semibold text-right">
+                                                Actions
+                                            </TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {applications.map((app: ILeaveApplication) => (
+                                            <TableRow key={app._id} className="group border-b">
+                                                <TableCell className="font-medium border-r">
+                                                    {app.staffId?.userId?.name || 'N/A'}
+                                                </TableCell>
+                                                <TableCell className="border-r">
+                                                    <div className="flex items-center gap-2">
+                                                        {
+                                                            LEAVE_TYPE_LABELS[
+                                                                app.leaveType
+                                                            ]
                                                         }
-                                                        className="text-orange-600 hover:text-orange-700"
-                                                        title="Revoke"
+                                                        {app.leaveType === 'sick' &&
+                                                            app.medicalDocuments &&
+                                                            app.medicalDocuments.length > 0 && (
+                                                                <Badge
+                                                                    variant="outline"
+                                                                    className="text-xs"
+                                                                >
+                                                                    <FileText className="mr-1 h-3 w-3" />
+                                                                    {
+                                                                        app
+                                                                            .medicalDocuments
+                                                                            .length
+                                                                    }
+                                                                </Badge>
+                                                            )}
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell className="border-r text-muted-foreground">
+                                                    {format(
+                                                        new Date(app.startDate),
+                                                        'MMM dd',
+                                                    )}{' '}
+                                                    -{' '}
+                                                    {format(
+                                                        new Date(app.endDate),
+                                                        'MMM dd, yyyy',
+                                                    )}
+                                                </TableCell>
+                                                <TableCell className="border-r">
+                                                    {app.requestedDates.length}
+                                                </TableCell>
+                                                <TableCell
+                                                    className="max-w-[220px] truncate border-r text-muted-foreground"
+                                                    title={app.reason}
+                                                >
+                                                    {app.reason}
+                                                </TableCell>
+                                                <TableCell className="border-r">
+                                                    <Badge
+                                                        variant={getStatusBadgeVariant(
+                                                            app.status,
+                                                        )}
                                                     >
-                                                        <RotateCcw className="h-4 w-4" />
-                                                    </Button>
-                                                )}
-                                            </div>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
+                                                        {
+                                                            LEAVE_STATUS_LABELS[
+                                                                app.status
+                                                            ]
+                                                        }
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell className="border-r text-muted-foreground">
+                                                    {format(
+                                                        new Date(app.createdAt),
+                                                        'PPP',
+                                                    )}
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                    <div className="flex items-center justify-end gap-1">
+                                                        <Tooltip>
+                                                            <TooltipTrigger asChild>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    onClick={() =>
+                                                                        openDetailsDialog(
+                                                                            app,
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    <Eye className="h-4 w-4" />
+                                                                </Button>
+                                                            </TooltipTrigger>
+                                                            <TooltipContent>
+                                                                View details
+                                                            </TooltipContent>
+                                                        </Tooltip>
+                                                        {app.status === 'pending' && (
+                                                            <>
+                                                                <Tooltip>
+                                                                    <TooltipTrigger asChild>
+                                                                        <Button
+                                                                            variant="ghost"
+                                                                            size="icon"
+                                                                            onClick={() =>
+                                                                                openApproveDialog(
+                                                                                    app,
+                                                                                )
+                                                                            }
+                                                                            className="text-green-600 hover:text-green-700"
+                                                                        >
+                                                                            <Check className="h-4 w-4" />
+                                                                        </Button>
+                                                                    </TooltipTrigger>
+                                                                    <TooltipContent>
+                                                                        Approve leave
+                                                                    </TooltipContent>
+                                                                </Tooltip>
+                                                                <Tooltip>
+                                                                    <TooltipTrigger asChild>
+                                                                        <Button
+                                                                            variant="ghost"
+                                                                            size="icon"
+                                                                            onClick={() =>
+                                                                                openRejectDialog(
+                                                                                    app,
+                                                                                )
+                                                                            }
+                                                                            className="text-red-600 hover:text-red-700"
+                                                                        >
+                                                                            <X className="h-4 w-4" />
+                                                                        </Button>
+                                                                    </TooltipTrigger>
+                                                                    <TooltipContent>
+                                                                        Reject leave
+                                                                    </TooltipContent>
+                                                                </Tooltip>
+                                                            </>
+                                                        )}
+                                                        {(app.status === 'approved' ||
+                                                            app.status ===
+                                                                'partially_approved') && (
+                                                            <Tooltip>
+                                                                <TooltipTrigger asChild>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        onClick={() =>
+                                                                            openRevokeDialog(
+                                                                                app,
+                                                                            )
+                                                                        }
+                                                                        className="text-orange-600 hover:text-orange-700"
+                                                                    >
+                                                                        <RotateCcw className="h-4 w-4" />
+                                                                    </Button>
+                                                                </TooltipTrigger>
+                                                                <TooltipContent>
+                                                                    Revoke leave
+                                                                </TooltipContent>
+                                                            </Tooltip>
+                                                        )}
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </div>
+
+                            {meta && (
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-6">
+                                        <div className="text-sm text-muted-foreground">
+                                            Page {meta.page} of{' '}
+                                            {Math.max(1, meta.totalPages)} (
+                                            {meta.total} total)
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <p className="text-sm font-medium">
+                                                Rows per page
+                                            </p>
+                                            <Select
+                                                value={`${limit}`}
+                                                onValueChange={(value) => {
+                                                    setLimit(Number(value));
+                                                    setPage(1);
+                                                }}
+                                            >
+                                                <SelectTrigger className="h-8 w-[70px]">
+                                                    <SelectValue placeholder={limit} />
+                                                </SelectTrigger>
+                                                <SelectContent side="top">
+                                                    {[10, 20, 30, 40, 50].map(
+                                                        (pageSize) => (
+                                                            <SelectItem
+                                                                key={pageSize}
+                                                                value={`${pageSize}`}
+                                                            >
+                                                                {pageSize}
+                                                            </SelectItem>
+                                                        ),
+                                                    )}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() =>
+                                                setPage((currentPage) =>
+                                                    Math.max(1, currentPage - 1),
+                                                )
+                                            }
+                                            disabled={page === 1 || isFetching}
+                                        >
+                                            <ChevronLeft className="h-4 w-4" />
+                                            Previous
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() =>
+                                                setPage((currentPage) =>
+                                                    Math.min(
+                                                        meta.totalPages,
+                                                        currentPage + 1,
+                                                    ),
+                                                )
+                                            }
+                                            disabled={
+                                                page >= meta.totalPages ||
+                                                isFetching
+                                            }
+                                        >
+                                            Next
+                                            <ChevronRight className="ml-2 h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     )}
                 </CardContent>
             </Card>

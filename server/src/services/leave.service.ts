@@ -629,13 +629,33 @@ async function getLeaveApplications(filters: GetLeavesFilters) {
     if (status) query.status = status;
     if (leaveType) query.leaveType = leaveType;
     if (startDate || endDate) {
-        query.startDate = {};
-        if (startDate)
-            (query.startDate as Record<string, Date>).$gte = new Date(
-                startDate,
-            );
-        if (endDate)
-            (query.startDate as Record<string, Date>).$lte = new Date(endDate);
+        const rangeStart = startDate ? new Date(startDate) : undefined;
+        const rangeEnd = endDate ? new Date(endDate) : undefined;
+
+        if (rangeStart) {
+            rangeStart.setHours(0, 0, 0, 0);
+        }
+
+        if (rangeEnd) {
+            rangeEnd.setHours(23, 59, 59, 999);
+        }
+
+        const overlapConditions: Array<Record<string, Record<string, Date>>> =
+            [];
+
+        if (rangeEnd) {
+            overlapConditions.push({ startDate: { $lte: rangeEnd } });
+        }
+
+        if (rangeStart) {
+            overlapConditions.push({ endDate: { $gte: rangeStart } });
+        }
+
+        if (overlapConditions.length === 1) {
+            Object.assign(query, overlapConditions[0]);
+        } else if (overlapConditions.length > 1) {
+            query.$and = overlapConditions;
+        }
     }
 
     const skip = (page - 1) * limit;
