@@ -1,15 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -38,24 +30,20 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Badge } from "@/components/ui/badge";
 import {
   Plus,
-  Pencil,
-  Trash2,
   Search,
-  Loader2,
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
-  AlertTriangle,
-  RefreshCw,
-  CheckCircle,
-  TrendingUp,
-  Box,
 } from "lucide-react";
-import { IconPackage } from "@tabler/icons-react";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   useGetServicesQuery,
   useCreateServiceMutation,
@@ -65,7 +53,8 @@ import {
 } from "@/redux/features/service/serviceApi";
 import { toast } from "sonner";
 import { IService } from "@/types/order.type";
-import { cn } from "@/lib/utils";
+import { DataTable } from "@/components/ui/data-table";
+import { getColumns } from "./columns";
 
 export default function ServicesPage() {
   const [page, setPage] = useState(1);
@@ -104,17 +93,13 @@ export default function ServicesPage() {
     isActive: true,
   });
 
-  const services = servicesData?.data || [];
-  const meta = servicesData?.meta || { total: 0 };
-  const totalPages = Math.ceil(meta.total / limit);
-
-  const handleOpenAdd = () => {
+  const handleOpenAdd = useCallback(() => {
     setSelectedService(null);
     setFormData({ name: "", description: "", isActive: true });
     setIsAddEditOpen(true);
-  };
+  }, []);
 
-  const handleOpenEdit = (service: IService & { usageCount: number }) => {
+  const handleOpenEdit = useCallback((service: IService & { usageCount: number }) => {
     setSelectedService(service);
     setFormData({
       name: service.name,
@@ -122,7 +107,23 @@ export default function ServicesPage() {
       isActive: service.isActive,
     });
     setIsAddEditOpen(true);
-  };
+  }, []);
+
+  const handleDeleteClick = useCallback(async (
+    service: IService & { usageCount: number },
+  ) => {
+    setSelectedService(service);
+    try {
+      const usageCheck = await checkUsage(service._id).unwrap();
+      if (usageCheck.data.hasUsage) {
+        setIsMigrationDialogOpen(true);
+      } else {
+        setIsDeleteAlertOpen(true);
+      }
+    } catch (error) {
+      toast.error((error as Error).message || "Failed to check service usage");
+    }
+  }, [checkUsage]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -143,21 +144,14 @@ export default function ServicesPage() {
     }
   };
 
-  const handleDeleteClick = async (
-    service: IService & { usageCount: number },
-  ) => {
-    setSelectedService(service);
-    try {
-      const usageCheck = await checkUsage(service._id).unwrap();
-      if (usageCheck.data.hasUsage) {
-        setIsMigrationDialogOpen(true);
-      } else {
-        setIsDeleteAlertOpen(true);
-      }
-    } catch (error) {
-      toast.error((error as Error).message || "Failed to check service usage");
-    }
-  };
+  const services = useMemo(() => servicesData?.data || [], [servicesData]);
+  const meta = servicesData?.meta || { total: 0 };
+  const totalPages = Math.ceil(meta.total / limit);
+
+  const columns = useMemo(() => getColumns({
+    onEdit: handleOpenEdit,
+    onDelete: handleDeleteClick,
+  }), [handleOpenEdit, handleDeleteClick]);
 
   const confirmDelete = async () => {
     if (!selectedService) return;
@@ -189,460 +183,231 @@ export default function ServicesPage() {
   };
 
   return (
-    <div className="space-y-8 p-1 animate-in fade-in duration-500">
-      {/* Header section */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-        <div className="space-y-1">
-          <h1 className="text-3xl font-bold tracking-tight bg-linear-to-r from-foreground to-foreground/70 bg-clip-text">
-            Service Registry
-          </h1>
-          <p className="text-muted-foreground max-w-2xl text-sm sm:text-base">
-            Define and manage your order services, track usage metrics, and
-            ensure workflow consistency.
+    <div className="container mx-auto py-10 space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Services</h1>
+          <p className="text-muted-foreground">
+            Manage your order services and track usage.
           </p>
         </div>
-        <Button
-          onClick={handleOpenAdd}
-          className="bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 h-11 px-6 rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98]"
-        >
-          <Plus className="mr-2 h-5 w-5" /> Add New Service
+        <Button onClick={handleOpenAdd}>
+          <Plus className="mr-2 h-4 w-4" /> Add Service
         </Button>
       </div>
 
-      {/* Stats Overview */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Total Services */}
-        <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-slate-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-slate-500/5 hover:border-slate-500/30">
-          <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-slate-500/10 blur-2xl transition-all duration-300 group-hover:bg-slate-500/20" />
-          <div className="relative">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-500/10 text-slate-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-slate-500/20">
-                <IconPackage className="h-5 w-5" />
-              </div>
-            </div>
-            <h3 className="text-3xl font-bold tracking-tight text-slate-600 dark:text-slate-100">
-              {meta.total}
-            </h3>
-            <p className="text-xs text-muted-foreground mt-1 font-bold">
-              TOTAL SERVICES
-            </p>
-          </div>
-        </div>
-
-        {/* Active Services */}
-        <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-green-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-green-500/5 hover:border-green-500/30">
-          <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-green-500/10 blur-2xl transition-all duration-300 group-hover:bg-green-500/20" />
-          <div className="relative">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-500/10 text-green-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-green-500/20">
-                <CheckCircle className="h-5 w-5" />
-              </div>
-            </div>
-            <h3 className="text-3xl font-bold tracking-tight text-green-600 dark:text-green-400">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Services</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{meta.total}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Active</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">
               {services.filter((s) => s.isActive).length}
-            </h3>
-            <p className="text-xs text-muted-foreground mt-1 font-bold">
-              ACTIVE SERVICES
-            </p>
-          </div>
-        </div>
-
-        {/* Total Usage Count */}
-        <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-blue-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/5 hover:border-blue-500/30">
-          <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-blue-500/10 blur-2xl transition-all duration-300 group-hover:bg-blue-500/20" />
-          <div className="relative">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/10 text-blue-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-blue-500/20">
-                <TrendingUp className="h-5 w-5" />
-              </div>
             </div>
-            <h3 className="text-3xl font-bold tracking-tight text-blue-600 dark:text-blue-400">
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Usage</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
               {services.reduce((acc, curr) => acc + (curr.usageCount || 0), 0)}
-            </h3>
-            <p className="text-xs text-muted-foreground mt-1 font-bold">
-              TOTAL USAGES
-            </p>
-          </div>
-        </div>
-
-        {/* Unused Services */}
-        <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-amber-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-amber-500/5 hover:border-amber-500/30">
-          <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-amber-500/10 blur-2xl transition-all duration-300 group-hover:bg-amber-500/20" />
-          <div className="relative">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/10 text-amber-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-amber-500/20">
-                <Box className="h-5 w-5" />
-              </div>
             </div>
-            <h3 className="text-3xl font-bold tracking-tight text-amber-600 dark:text-amber-400">
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Unused</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-amber-600">
               {services.filter((s) => s.usageCount === 0).length}
-            </h3>
-            <p className="text-xs text-muted-foreground mt-1 font-bold">
-              UNUSED SERVICES
-            </p>
-          </div>
-        </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Search Section */}
-      <div className="flex justify-between items-center bg-transparent mb-2">
-        <div className="relative w-full max-w-sm group">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
+      <div className="flex items-center gap-2">
+        <div className="relative w-full max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search everything..."
-            className="pl-9 h-10 bg-white border-slate-200 focus:border-primary focus:ring-1 ring-primary/20 transition-all w-full rounded-lg shadow-xs"
+            placeholder="Filter services..."
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
               setPage(1);
             }}
+            className="pl-9"
           />
         </div>
       </div>
 
-      {/* Main Table Container */}
-      <div className="border border-slate-200 rounded-lg overflow-hidden bg-white shadow-sm">
-        {isLoading ? (
-          <div className="flex flex-col items-center justify-center p-24 gap-4">
-            <Loader2 className="h-8 w-8 animate-spin text-primary/40" />
-            <p className="text-sm text-slate-400 font-medium">
-              Syncing services...
-            </p>
+      <DataTable
+        columns={columns}
+        data={services}
+        isLoading={isLoading}
+      />
+
+      {!isLoading && services.length > 0 && (
+        <div className="flex items-center justify-between py-4">
+          <div className="text-sm text-muted-foreground">
+            Page {page} of {totalPages || 1}
           </div>
-        ) : (
-          <>
-            <Table>
-              <TableHeader className="bg-muted/30">
-                <TableRow className="hover:bg-transparent border-b border-slate-200/60">
-                  <TableHead className="py-4 text-slate-800 font-bold text-xs uppercase tracking-wider pl-6">
-                    <div className="flex items-center gap-2">
-                       Name & Details
-                    </div>
-                  </TableHead>
-                  <TableHead className="text-center text-slate-800 font-bold text-xs uppercase tracking-wider">
-                    Status
-                  </TableHead>
-                  <TableHead className="text-center text-slate-800 font-bold text-xs uppercase tracking-wider">
-                    Order Metrics
-                  </TableHead>
-                  <TableHead className="text-right text-slate-800 font-bold text-xs uppercase tracking-wider pr-6">
-                    Actions
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {services.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="h-64 text-center">
-                      <div className="flex flex-col items-center justify-center gap-2 text-muted-foreground">
-                        <IconPackage className="h-10 w-10 opacity-20" />
-                        <p className="font-bold italic">No services found</p>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  services.map((service) => (
-                    <TableRow
-                      key={service._id}
-                      className="hover:bg-accent/5 transition-colors border-b border-slate-100/50 group last:border-0"
-                    >
-                      <TableCell className="py-5 pl-6">
-                        <div className="flex flex-col">
-                          <span className="font-bold text-slate-900 text-sm">{service.name}</span>
-                          <span className="text-xs text-muted-foreground line-clamp-1 max-w-[300px]">
-                            {service.description || "No description provided"}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Badge
-                          variant={service.isActive ? "default" : "secondary"}
-                          className={cn(
-                            "px-2.5 py-0.5 rounded-full text-[10px] font-bold shadow-xs",
-                            service.isActive
-                              ? "bg-emerald-50 text-emerald-700 border-emerald-200/50"
-                              : "bg-slate-50 text-slate-500 border-slate-200/50",
-                          )}
-                        >
-                          {service.isActive ? "Active" : "Inactive"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <div className="inline-flex flex-col items-center px-3 py-1 rounded-lg bg-primary/5 hover:bg-primary/10 transition-colors border border-primary/10">
-                          <span className="text-sm font-black text-primary">
-                            {service.usageCount}
-                          </span>
-                          <span className="text-[9px] text-primary/60 font-black uppercase tracking-tighter">
-                            Total Uses
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right pr-6">
-                        <div className="flex justify-end gap-1.5 translate-x-2 opacity-0 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-200">
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-8 w-8 rounded-lg border-slate-200 bg-white hover:bg-slate-50 hover:text-primary transition-colors"
-                            onClick={() => handleOpenEdit(service)}
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-8 w-8 rounded-lg border-slate-200 bg-white hover:bg-destructive/10 hover:text-destructive hover:border-destructive/20 transition-colors"
-                            onClick={() => handleDeleteClick(service)}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-
-            {/* Pagination Footer */}
-            <div className="px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-100 bg-slate-50/20 font-bold">
-              <div className="text-sm text-slate-500 order-2 sm:order-1 font-bold">
-                Showing{" "}
-                <span className="font-bold text-slate-900">
-                  {(page - 1) * limit + 1}
-                </span>{" "}
-                to{" "}
-                <span className="font-bold text-slate-900">
-                  {Math.min(page * limit, meta.total)}
-                </span>{" "}
-                of{" "}
-                <span className="font-bold text-slate-900">{meta.total}</span>{" "}
-                rows
-              </div>
-
-              <div className="flex flex-col sm:flex-row items-center gap-8 order-1 sm:order-2 font-bold">
-                <div className="flex items-center gap-3 font-bold">
-                  <span className="text-sm text-slate-500 font-bold">
-                    Rows per page
-                  </span>
-                  <Select
-                    value={limit.toString()}
-                    onValueChange={(v) => {
-                      setLimit(parseInt(v));
-                      setPage(1);
-                    }}
-                  >
-                    <SelectTrigger className="w-16 h-9 rounded-lg bg-white border-slate-200 text-xs font-bold focus:ring-0 shadow-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="10">10</SelectItem>
-                      <SelectItem value="20">20</SelectItem>
-                      <SelectItem value="50">50</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="flex items-center gap-6 font-bold">
-                  <span className="text-sm text-slate-500 font-bold whitespace-nowrap">
-                    Page{" "}
-                    <span className="font-bold text-slate-900">{page}</span> of{" "}
-                    <span className="font-bold text-slate-900">
-                      {totalPages || 1}
-                    </span>
-                  </span>
-
-                  <div className="flex items-center gap-1.5 font-bold">
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8 rounded-lg border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40"
-                      onClick={() => setPage(1)}
-                      disabled={page === 1 || isFetching}
-                    >
-                      <ChevronsLeft className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8 rounded-lg border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40"
-                      onClick={() => setPage((p) => p - 1)}
-                      disabled={page === 1 || isFetching}
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8 rounded-lg border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40"
-                      onClick={() => setPage((p) => p + 1)}
-                      disabled={
-                        page === totalPages || totalPages === 0 || isFetching
-                      }
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8 rounded-lg border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40"
-                      onClick={() => setPage(totalPages)}
-                      disabled={
-                        page === totalPages || totalPages === 0 || isFetching
-                      }
-                    >
-                      <ChevronsRight className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
+          <div className="flex items-center gap-6 lg:gap-8">
+            <div className="flex items-center space-x-2">
+              <p className="text-sm font-medium">Rows per page</p>
+              <Select
+                value={limit.toString()}
+                onValueChange={(v) => {
+                  setLimit(parseInt(v));
+                  setPage(1);
+                }}
+              >
+                <SelectTrigger className="h-8 w-[70px]">
+                  <SelectValue placeholder={limit} />
+                </SelectTrigger>
+                <SelectContent align="end">
+                  {[10, 20, 30, 40, 50].map((pageSize) => (
+                    <SelectItem key={pageSize} value={`${pageSize}`}>
+                      {pageSize}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-          </>
-        )}
-      </div>
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="outline"
+                className="h-8 w-8 p-0"
+                onClick={() => setPage(1)}
+                disabled={page === 1 || isFetching}
+              >
+                <ChevronsLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                className="h-8 w-8 p-0"
+                onClick={() => setPage((p) => p - 1)}
+                disabled={page === 1 || isFetching}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                className="h-8 w-8 p-0"
+                onClick={() => setPage((p) => p + 1)}
+                disabled={page === totalPages || totalPages === 0 || isFetching}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                className="h-8 w-8 p-0"
+                onClick={() => setPage(totalPages)}
+                disabled={page === totalPages || totalPages === 0 || isFetching}
+              >
+                <ChevronsRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
-      {/* Add/Edit Dialog */}
+      {/* Dialogs */}
       <Dialog open={isAddEditOpen} onOpenChange={setIsAddEditOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle>
-              {selectedService ? "Edit Service" : "Add New Service"}
-            </DialogTitle>
+            <DialogTitle>{selectedService ? "Edit Service" : "Add Service"}</DialogTitle>
             <DialogDescription>
-              Create or update services for your order workflows.
+              Enter the details of the service.
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4 py-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="name">Service Name</Label>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Name</Label>
               <Input
                 id="name"
                 value={formData.name}
-                onChange={(e) =>
-                  setFormData({ ...formData, name: e.target.value })
-                }
-                placeholder="e.g. Clipping Path"
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 required
               />
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="description">Description (Optional)</Label>
+            <div className="space-y-2">
+              <Label htmlFor="description">Description</Label>
               <Textarea
                 id="description"
                 value={formData.description}
-                onChange={(e) =>
-                  setFormData({ ...formData, description: e.target.value })
-                }
-                placeholder="Brief details about the service..."
-                className="resize-none"
-                rows={3}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               />
             </div>
-            <div className="flex items-center gap-2 pt-2">
+            <div className="flex items-center space-x-2">
               <input
                 type="checkbox"
                 id="isActive"
                 checked={formData.isActive}
-                onChange={(e) =>
-                  setFormData({ ...formData, isActive: e.target.checked })
-                }
-                className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
               />
-              <Label htmlFor="isActive">Service is currently active</Label>
+              <Label htmlFor="isActive">Active</Label>
             </div>
-            <DialogFooter className="pt-4">
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => setIsAddEditOpen(false)}
-              >
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsAddEditOpen(false)}>
                 Cancel
               </Button>
               <Button type="submit" disabled={isCreating || isUpdating}>
-                {(isCreating || isUpdating) && (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                )}
-                {selectedService ? "Save Changes" : "Create Service"}
+                {selectedService ? "Update" : "Create"}
               </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
 
-      {/* Standard Delete Alert */}
       <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-destructive flex items-center gap-2 font-bold">
-              <AlertTriangle className="h-5 w-5" /> Delete Service
-            </AlertDialogTitle>
-            <AlertDialogDescription className="font-bold">
-              Are you sure you want to delete{" "}
-              <span className="font-bold text-foreground">
-                {selectedService?.name}
-              </span>
-              ? This action cannot be undone.
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the service.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="font-bold">Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 font-bold"
-            >
-              {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{" "}
-              Confirm Delete
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground">
+              Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Migration Required Dialog */}
-      <Dialog
-        open={isMigrationDialogOpen}
-        onOpenChange={setIsMigrationDialogOpen}
-      >
+      <Dialog open={isMigrationDialogOpen} onOpenChange={setIsMigrationDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-warning font-bold">
-              <RefreshCw className="h-5 w-5" /> Migration Required
-            </DialogTitle>
-            <DialogDescription className="space-y-3 pt-2 font-bold">
-              <p>
-                The service{" "}
-                <span className="font-bold text-foreground">
-                  {selectedService?.name}
-                </span>{" "}
-                is currently used by
-                <Badge variant="secondary" className="mx-1">
-                  {selectedService?.usageCount}
-                </Badge>{" "}
-                active orders.
-              </p>
-              <p className="text-amber-600 font-bold bg-amber-50 p-2 rounded text-xs">
-                It cannot be deleted until you migrate these orders to a
-                different service.
-              </p>
+            <DialogTitle>Migration Required</DialogTitle>
+            <DialogDescription>
+              This service is currently in use. Please migrate usage to another service before deleting.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4 font-bold">
-            <div className="space-y-1.5">
-              <Label className="font-bold">Migrate orders to:</Label>
-              <Select
-                value={migrationTargetId}
-                onValueChange={setMigrationTargetId}
-              >
-                <SelectTrigger className="font-bold shadow-xs">
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Target Service</Label>
+              <Select value={migrationTargetId} onValueChange={setMigrationTargetId}>
+                <SelectTrigger>
                   <SelectValue placeholder="Select target service..." />
                 </SelectTrigger>
                 <SelectContent>
                   {servicesData?.data
                     .filter((s) => s._id !== selectedService?._id)
                     .map((s) => (
-                      <SelectItem
-                        key={s._id}
-                        value={s._id}
-                        className="font-bold"
-                      >
+                      <SelectItem key={s._id} value={s._id}>
                         {s.name}
                       </SelectItem>
                     ))}
@@ -650,23 +415,14 @@ export default function ServicesPage() {
               </Select>
             </div>
           </div>
-          <DialogFooter className="gap-2 sm:gap-0 font-bold">
-            <Button
-              variant="ghost"
-              className="font-bold"
-              onClick={() => {
-                setIsMigrationDialogOpen(false);
-                setMigrationTargetId("");
-              }}
-            >
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsMigrationDialogOpen(false)}>
               Cancel
             </Button>
             <Button
               disabled={!migrationTargetId || isDeleting}
               onClick={handleMigrateAndDelete}
-              className="bg-amber-600 hover:bg-amber-700 text-white font-bold shadow-md shadow-amber-200"
             >
-              {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Migrate & Delete
             </Button>
           </DialogFooter>

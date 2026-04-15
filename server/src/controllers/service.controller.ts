@@ -36,7 +36,7 @@ async function createService(req: Request, res: Response) {
 
 async function getAllServices(req: Request, res: Response) {
     try {
-        const { isActive, page, limit } = req.query;
+        const { isActive, page, limit, search } = req.query;
 
         const result = await serviceService.getAllServicesFromDB({
             isActive:
@@ -47,6 +47,7 @@ async function getAllServices(req: Request, res: Response) {
                     : undefined,
             page: page ? parseInt(page as string) : 1,
             limit: limit ? parseInt(limit as string) : 50,
+            search: search as string,
         });
 
         return res.status(200).json({
