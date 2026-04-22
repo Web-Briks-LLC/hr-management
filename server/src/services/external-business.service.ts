@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import ExternalBusinessModel from '../models/external-business.model.js';
 import ProfitTransferModel from '../models/profit-transfer.model.js';
 import analyticsService from './analytics.service.js';
@@ -146,15 +147,26 @@ async function createTransferInDB(
     data: CreateProfitTransferData,
     userId: string
 ): Promise<IProfitTransfer> {
-    const finalAmount = await analyticsService.getCurrentFinalAmount();
-    if (data.amount > finalAmount) {
-        throw new Error("Insufficient balance. Transaction exceeds available amount.");
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    try {
+        const finalAmount = await analyticsService.getCurrentFinalAmount(session);
+        if (data.amount > finalAmount) {
+            throw new Error("Insufficient balance. Transaction exceeds available amount.");
+        }
+        const transfer = new ProfitTransferModel({
+            ...data,
+            transferredBy: userId,
+        });
+        const result = await transfer.save({ session });
+        await session.commitTransaction();
+        return result;
+    } catch (error) {
+        await session.abortTransaction();
+        throw error;
+    } finally {
+        session.endSession();
     }
-    const transfer = new ProfitTransferModel({
-        ...data,
-        transferredBy: userId,
-    });
-    return await transfer.save();
 }
 
 async function getTransfersFromDB(params: ProfitTransferQueryParams): Promise<{

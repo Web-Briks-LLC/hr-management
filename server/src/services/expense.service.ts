@@ -1,4 +1,4 @@
-import { Types } from "mongoose";
+import mongoose, { Types } from "mongoose";
 import type { PipelineStage } from "mongoose";
 import {
     startOfDay,
@@ -323,15 +323,25 @@ const getAvailableExpenseYearsFromDB = async () => {
 const createExpenseInDB = async (
     payload: Partial<IExpense> & { createdBy: string },
 ) => {
-    const expenseAmount = payload.amount || 0;
-    const finalAmount = await analyticsService.getCurrentFinalAmount();
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    try {
+        const expenseAmount = payload.amount || 0;
+        const finalAmount = await analyticsService.getCurrentFinalAmount(session);
 
-    if (expenseAmount > finalAmount) {
-        throw new Error("Insufficient balance. Expense exceeds available amount.");
+        if (expenseAmount > finalAmount) {
+            throw new Error("Insufficient balance. Expense exceeds available amount.");
+        }
+
+        const result = await ExpenseModel.create([payload], { session });
+        await session.commitTransaction();
+        return result[0];
+    } catch (error) {
+        await session.abortTransaction();
+        throw error;
+    } finally {
+        session.endSession();
     }
-
-    const result = await ExpenseModel.create(payload);
-    return result;
 };
 
 // Get expense by ID
@@ -346,26 +356,37 @@ const getExpenseByIdFromDB = async (id: string) => {
 
 // Update expense
 const updateExpenseInDB = async (id: string, payload: Partial<IExpense>) => {
-    const expense = await ExpenseModel.findById(id);
-    if (!expense) {
-        throw new Error("Expense not found");
-    }
-
-    if (payload.amount !== undefined) {
-        const newExpenseAmount = payload.amount;
-        const oldExpenseAmount = expense.amount;
-        const finalAmount = await analyticsService.getCurrentFinalAmount();
-        const maxAllowed = finalAmount + oldExpenseAmount;
-
-        if (newExpenseAmount > maxAllowed) {
-            throw new Error("Insufficient balance. Expense exceeds available amount.");
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    try {
+        const expense = await ExpenseModel.findById(id).session(session);
+        if (!expense) {
+            throw new Error("Expense not found");
         }
-    }
 
-    const result = await ExpenseModel.findByIdAndUpdate(id, payload, {
-        new: true,
-    });
-    return result;
+        if (payload.amount !== undefined) {
+            const newExpenseAmount = payload.amount;
+            const oldExpenseAmount = expense.amount;
+            const finalAmount = await analyticsService.getCurrentFinalAmount(session);
+            const maxAllowed = finalAmount + oldExpenseAmount;
+
+            if (newExpenseAmount > maxAllowed) {
+                throw new Error("Insufficient balance. Expense exceeds available amount.");
+            }
+        }
+
+        const result = await ExpenseModel.findByIdAndUpdate(id, payload, {
+            new: true,
+            session,
+        });
+        await session.commitTransaction();
+        return result;
+    } catch (error) {
+        await session.abortTransaction();
+        throw error;
+    } finally {
+        session.endSession();
+    }
 };
 
 // Delete expense

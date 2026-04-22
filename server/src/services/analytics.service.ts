@@ -536,7 +536,7 @@ async function getFinanceTotalsForPeriod(year: number, month: number) {
     };
 }
 
-async function getCurrentFinalAmount(): Promise<number> {
+async function getCurrentFinalAmount(session?: any): Promise<number> {
     const now = new Date();
     const currentYear = now.getFullYear();
 
@@ -544,24 +544,24 @@ async function getCurrentFinalAmount(): Promise<number> {
     const cumEarningsResult = await EarningModel.aggregate([
         { $match: { status: 'paid' } },
         { $group: { _id: null, total: { $sum: '$amountInBDT' } } },
-    ]);
+    ], { session });
     const cumEarnings = cumEarningsResult[0]?.total || 0;
 
     // Cumulative Expenses
     const cumExpensesResult = await ExpenseModel.aggregate([
         { $group: { _id: null, total: { $sum: '$amount' } } },
-    ]);
+    ], { session });
     const cumExpenses = cumExpensesResult[0]?.total || 0;
 
     // Cumulative Shared (Transfers + Distributions)
     const [cumTransfersResult, cumDistributionsResult] = await Promise.all([
         ProfitTransferModel.aggregate([
             { $group: { _id: null, total: { $sum: '$amount' } } },
-        ]),
+        ], { session }),
         import('../models/profit-distribution.model.js').then((m) =>
             m.default.aggregate([
                 { $group: { _id: null, total: { $sum: '$shareAmount' } } },
-            ]),
+            ], { session }),
         ),
     ]);
     const cumShared =
@@ -573,11 +573,11 @@ async function getCurrentFinalAmount(): Promise<number> {
         DebitModel.aggregate([
             { $match: { type: DebitType.BORROW } },
             { $group: { _id: null, total: { $sum: '$amount' } } },
-        ]),
+        ], { session }),
         DebitModel.aggregate([
             { $match: { type: DebitType.RETURN } },
             { $group: { _id: null, total: { $sum: '$amount' } } },
-        ]),
+        ], { session }),
     ]);
     const totalBorrow = debitBorrowResult[0]?.total || 0;
     const totalReturn = debitReturnResult[0]?.total || 0;

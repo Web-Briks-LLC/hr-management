@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import type { Request, Response } from 'express';
 import PersonModel from '../models/Person.js';
 import DebitModel, { DebitType } from '../models/Debit.js';
@@ -46,41 +47,55 @@ export const getPersons = async (_req: Request, res: Response) => {
 };
 
 export const createDebit = async (req: Request, res: Response) => {
+    const session = await mongoose.startSession();
+    session.startTransaction();
     try {
         const { personId, amount, date, type, description } = req.body;
         const userId = req.user?.id;
 
         if (!userId) {
+            await session.abortTransaction();
+            session.endSession();
             return res.status(401).json({ message: 'Unauthorized' });
         }
 
         if (!personId || !amount || !type) {
+            await session.abortTransaction();
+            session.endSession();
             return res
                 .status(400)
                 .json({ message: 'Person, amount, and type are required' });
         }
 
-        const person = await PersonModel.findById(personId);
+        const person = await PersonModel.findById(personId).session(session);
         if (!person) {
+            await session.abortTransaction();
+            session.endSession();
             return res.status(404).json({ message: 'Person not found' });
         }
 
-        const currentFinalAmount = await analyticsService.getCurrentFinalAmount();
+        const currentFinalAmount = await analyticsService.getCurrentFinalAmount(session);
         if (type === DebitType.RETURN && amount > currentFinalAmount) {
+            await session.abortTransaction();
+            session.endSession();
             return res.status(400).json({ message: 'Insufficient balance. Transaction exceeds available amount.' });
         }
 
-        const debit = await DebitModel.create({
+        const debit = await DebitModel.create([{
             personId,
             amount,
             date: date || new Date(),
             type,
             description,
             createdBy: userId,
-        });
+        }], { session });
 
-        return res.status(201).json(debit);
+        await session.commitTransaction();
+        session.endSession();
+        return res.status(201).json(debit[0]);
     } catch (error) {
+        await session.abortTransaction();
+        session.endSession();
         console.error('Error creating debit:', error);
         return res
             .status(500)
@@ -228,40 +243,43 @@ export const getDebitStats = async (_req: Request, res: Response) => {
 };
 
 export const updateDebit = async (req: Request, res: Response) => {
+    const session = await mongoose.startSession();
+    session.startTransaction();
     try {
         const { id } = req.params;
         const { amount, date, type, description } = req.body;
 
-        const oldDebit = await DebitModel.findById(id);
+        const oldDebit = await DebitModel.findById(id).session(session);
         if (!oldDebit) {
+            await session.abortTransaction();
+            session.endSession();
             return res.status(404).json({ message: 'Debit not found' });
         }
 
-        const currentFinalAmount = await analyticsService.getCurrentFinalAmount();
+        const currentFinalAmount = await analyticsService.getCurrentFinalAmount(session);
         
-        // Calculate the net impact on FinalAmount
-        // Current logic: FinalAmount += (Borrow - Return)
-        // If updating: NewBalance = OldBalance - (OldBorrow - OldReturn) + (NewBorrow - NewReturn)
         let oldNet = (oldDebit.type === DebitType.BORROW ? oldDebit.amount : -oldDebit.amount);
         let newNet = (type || oldDebit.type) === DebitType.BORROW ? (amount || oldDebit.amount) : -(amount || oldDebit.amount);
         let netImpact = newNet - oldNet;
 
         if (netImpact < 0 && Math.abs(netImpact) > currentFinalAmount) {
+            await session.abortTransaction();
+            session.endSession();
             return res.status(400).json({ message: 'Insufficient balance. Transaction exceeds available amount.' });
         }
 
         const debit = await DebitModel.findByIdAndUpdate(
             id,
             { amount, date, type, description },
-            { new: true }
+            { new: true, session }
         ).populate('personId', 'name');
 
-        if (!debit) {
-            return res.status(404).json({ message: 'Debit not found' });
-        }
-
+        await session.commitTransaction();
+        session.endSession();
         return res.status(200).json(debit);
     } catch (error) {
+        await session.abortTransaction();
+        session.endSession();
         console.error('Error updating debit:', error);
         return res
             .status(500)
@@ -270,23 +288,33 @@ export const updateDebit = async (req: Request, res: Response) => {
 };
 
 export const deleteDebit = async (req: Request, res: Response) => {
+    const session = await mongoose.startSession();
+    session.startTransaction();
     try {
         const { id } = req.params;
 
-        const debit = await DebitModel.findById(id);
+        const debit = await DebitModel.findById(id).session(session);
         if (!debit) {
+            await session.abortTransaction();
+            session.endSession();
             return res.status(404).json({ message: 'Debit not found' });
         }
 
-        const currentFinalAmount = await analyticsService.getCurrentFinalAmount();
+        const currentFinalAmount = await analyticsService.getCurrentFinalAmount(session);
         if (debit.type === DebitType.BORROW && debit.amount > currentFinalAmount) {
+            await session.abortTransaction();
+            session.endSession();
             return res.status(400).json({ message: 'Insufficient balance. Transaction exceeds available amount.' });
         }
 
-        await DebitModel.findByIdAndDelete(id);
+        await DebitModel.findByIdAndDelete(id).session(session);
 
+        await session.commitTransaction();
+        session.endSession();
         return res.status(200).json({ message: 'Debit deleted successfully' });
     } catch (error) {
+        await session.abortTransaction();
+        session.endSession();
         console.error('Error deleting debit:', error);
         return res
             .status(500)

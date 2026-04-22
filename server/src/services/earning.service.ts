@@ -98,68 +98,83 @@ async function updateEarningForOrder(
         oldImageQty?: number;
         oldOrderDate?: Date;
     },
-    session?: ClientSession,
+    sessionParam?: ClientSession,
 ): Promise<IEarning | null> {
-    if (data.orderDate && data.oldOrderDate) {
-        const oldDate = new Date(data.oldOrderDate);
-        const newDate = new Date(data.orderDate);
-        const oldMonth = oldDate.getMonth() + 1;
-        const oldYear = oldDate.getFullYear();
-        const newMonth = newDate.getMonth() + 1;
-        const newYear = newDate.getFullYear();
+    const session = sessionParam || await (await import('mongoose')).default.startSession();
+    if (!sessionParam) session.startTransaction();
 
-        if (oldMonth !== newMonth || oldYear !== newYear) {
-            const oldEarning = await EarningModel.findOne({ orderIds: orderId }).session(session || null);
-            if (oldEarning) {
-                oldEarning.orderIds = oldEarning.orderIds.filter((id) => id.toString() !== orderId);
-                oldEarning.totalAmount = roundAmount(oldEarning.totalAmount - (data.oldOrderAmount || 0));
-                oldEarning.imageQty -= data.oldImageQty || 0;
-                oldEarning.netAmount = roundAmount(oldEarning.totalAmount - oldEarning.fees - oldEarning.tax);
-                if (oldEarning.orderIds.length === 0) {
-                    await EarningModel.deleteOne({ _id: oldEarning._id }).session(session || null);
-                } else {
-                    await (oldEarning as any).save({ session: session || null });
+    try {
+        if (data.orderDate && data.oldOrderDate) {
+            const oldDate = new Date(data.oldOrderDate);
+            const newDate = new Date(data.orderDate);
+            const oldMonth = oldDate.getMonth() + 1;
+            const oldYear = oldDate.getFullYear();
+            const newMonth = newDate.getMonth() + 1;
+            const newYear = newDate.getFullYear();
+
+            if (oldMonth !== newMonth || oldYear !== newYear) {
+                const oldEarning = await EarningModel.findOne({ orderIds: orderId }).session(session);
+                if (oldEarning) {
+                    oldEarning.orderIds = oldEarning.orderIds.filter((id) => id.toString() !== orderId);
+                    oldEarning.totalAmount = roundAmount(oldEarning.totalAmount - (data.oldOrderAmount || 0));
+                    oldEarning.imageQty -= data.oldImageQty || 0;
+                    oldEarning.netAmount = roundAmount(oldEarning.totalAmount - oldEarning.fees - oldEarning.tax);
+                    if (oldEarning.orderIds.length === 0) {
+                        await EarningModel.deleteOne({ _id: oldEarning._id }).session(session);
+                    } else {
+                        await (oldEarning as any).save({ session });
+                    }
+                }
+                const order = await OrderModel.findById(orderId).populate('clientId').session(session);
+                if (order) {
+                    const currency = (order.clientId as any)?.currency || 'USD';
+                    const result = await createEarningForOrder({
+                        orderId,
+                        clientId: (order.clientId as any)._id.toString(),
+                        orderDate: newDate,
+                        orderAmount: data.orderAmount || order.totalPrice,
+                        imageQty: data.imageQty || order.imageQuantity,
+                        currency,
+                        createdBy: order.createdBy.toString(),
+                    }, session);
+                    if (!sessionParam) await session.commitTransaction();
+                    return result;
                 }
             }
-            const order = await OrderModel.findById(orderId).populate('clientId').session(session || null);
-            if (order) {
-                const currency = (order.clientId as any)?.currency || 'USD';
-                return createEarningForOrder({
-                    orderId,
-                    clientId: (order.clientId as any)._id.toString(),
-                    orderDate: newDate,
-                    orderAmount: data.orderAmount || order.totalPrice,
-                    imageQty: data.imageQty || order.imageQuantity,
-                    currency,
-                    createdBy: order.createdBy.toString(),
-                }, session);
-            }
         }
-    }
 
-    const earning = await EarningModel.findOne({ orderIds: orderId }).session(session || null);
-    if (!earning) return null;
-
-    if (data.orderAmount !== undefined && data.oldOrderAmount !== undefined) {
-        const amountDiff = data.orderAmount - data.oldOrderAmount;
-        if (amountDiff < 0) {
-            // Reduction in earning
-            const finalAmount = await analyticsService.getCurrentFinalAmount();
-            // amountDiff is negative, so -amountDiff is the positive reduction
-            if (-amountDiff > finalAmount) {
-                throw new Error("Insufficient balance. Transaction exceeds available amount.");
-            }
+        const earning = await EarningModel.findOne({ orderIds: orderId }).session(session);
+        if (!earning) {
+            if (!sessionParam) await session.commitTransaction();
+            return null;
         }
-        earning.totalAmount = roundAmount(earning.totalAmount + amountDiff);
-        earning.netAmount = roundAmount(earning.totalAmount - earning.fees - earning.tax);
+
+        if (data.orderAmount !== undefined && data.oldOrderAmount !== undefined) {
+            const amountDiff = data.orderAmount - data.oldOrderAmount;
+            if (amountDiff < 0) {
+                const finalAmount = await analyticsService.getCurrentFinalAmount(session);
+                if (-amountDiff > finalAmount) {
+                    throw new Error("Insufficient balance. Transaction exceeds available amount.");
+                }
+            }
+            earning.totalAmount = roundAmount(earning.totalAmount + amountDiff);
+            earning.netAmount = roundAmount(earning.totalAmount - earning.fees - earning.tax);
+        }
+        if (data.imageQty !== undefined && data.oldImageQty !== undefined) {
+            earning.imageQty += (data.imageQty - data.oldImageQty);
+        }
+        if (earning.status === 'paid' && earning.totalAmount > earning.paidAmount + 0.005) {
+            earning.status = 'unpaid';
+        }
+        const result = await (earning as any).save({ session });
+        if (!sessionParam) await session.commitTransaction();
+        return result;
+    } catch (error) {
+        if (!sessionParam) await session.abortTransaction();
+        throw error;
+    } finally {
+        if (!sessionParam) session.endSession();
     }
-    if (data.imageQty !== undefined && data.oldImageQty !== undefined) {
-        earning.imageQty += (data.imageQty - data.oldImageQty);
-    }
-    if (earning.status === 'paid' && earning.totalAmount > earning.paidAmount + 0.005) {
-        earning.status = 'unpaid';
-    }
-    return (earning as any).save({ session: session || null });
 }
 
 // Delete earning entry when order is deleted
@@ -167,27 +182,43 @@ async function deleteEarningForOrder(
     orderId: string,
     orderAmount: number,
     imageQty: number,
-    session?: ClientSession,
+    sessionParam?: ClientSession,
 ): Promise<IEarning | null> {
-    const earning = await EarningModel.findOne({ orderIds: orderId }).session(session || null);
-    if (!earning) return null;
+    const session = sessionParam || await (await import('mongoose')).default.startSession();
+    if (!sessionParam) session.startTransaction();
 
-    // Check balance before reducing earning
-    const finalAmount = await analyticsService.getCurrentFinalAmount();
-    if (orderAmount > finalAmount) {
-        throw new Error("Insufficient balance. Transaction exceeds available amount.");
+    try {
+        const earning = await EarningModel.findOne({ orderIds: orderId }).session(session);
+        if (!earning) {
+            if (!sessionParam) await session.commitTransaction();
+            return null;
+        }
+
+        // Check balance before reducing earning
+        const finalAmount = await analyticsService.getCurrentFinalAmount(session);
+        if (orderAmount > finalAmount) {
+            throw new Error("Insufficient balance. Transaction exceeds available amount.");
+        }
+
+        earning.orderIds = earning.orderIds.filter((id) => id.toString() !== orderId);
+        earning.totalAmount = roundAmount(earning.totalAmount - orderAmount);
+        earning.imageQty -= imageQty;
+        earning.netAmount = roundAmount(earning.totalAmount - earning.fees - earning.tax);
+
+        if (earning.orderIds.length === 0 && !earning.isLegacy) {
+            await EarningModel.deleteOne({ _id: earning._id }).session(session);
+            if (!sessionParam) await session.commitTransaction();
+            return earning;
+        }
+        const result = await (earning as any).save({ session });
+        if (!sessionParam) await session.commitTransaction();
+        return result;
+    } catch (error) {
+        if (!sessionParam) await session.abortTransaction();
+        throw error;
+    } finally {
+        if (!sessionParam) session.endSession();
     }
-
-    earning.orderIds = earning.orderIds.filter((id) => id.toString() !== orderId);
-    earning.totalAmount = roundAmount(earning.totalAmount - orderAmount);
-    earning.imageQty -= imageQty;
-    earning.netAmount = roundAmount(earning.totalAmount - earning.fees - earning.tax);
-
-    if (earning.orderIds.length === 0 && !earning.isLegacy) {
-        await EarningModel.deleteOne({ _id: earning._id }).session(session || null);
-        return earning;
-    }
-    return (earning as any).save({ session: session || null });
 }
 
 // Withdraw earning (mark as paid)
@@ -896,14 +927,29 @@ async function getClientOrdersForBulkWithdraw(
 
 // Delete earning by ID
 async function deleteEarningFromDB(id: string): Promise<IEarning | null> {
-    const earning = await EarningModel.findById(id);
-    if (!earning) return null;
+    const session = await (await import('mongoose')).default.startSession();
+    session.startTransaction();
 
-    const finalAmount = await analyticsService.getCurrentFinalAmount();
-    if (earning.amountInBDT > finalAmount) {
-        throw new Error("Insufficient balance. Transaction exceeds available amount.");
+    try {
+        const earning = await EarningModel.findById(id).session(session);
+        if (!earning) {
+            await session.commitTransaction();
+            return null;
+        }
+
+        const finalAmount = await analyticsService.getCurrentFinalAmount(session);
+        if (earning.amountInBDT > finalAmount) {
+            throw new Error("Insufficient balance. Transaction exceeds available amount.");
+        }
+        const result = await EarningModel.findByIdAndDelete(id).session(session).lean();
+        await session.commitTransaction();
+        return result as any;
+    } catch (error) {
+        await session.abortTransaction();
+        throw error;
+    } finally {
+        session.endSession();
     }
-    return EarningModel.findByIdAndDelete(id).lean() as any;
 }
 
 // Get unique years from earnings for filter dropdown

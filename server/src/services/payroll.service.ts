@@ -608,7 +608,7 @@ const processPayroll = async ({
             paymentType === 'overtime' ? 'Overtime' : 'Salary'
         } - ${staffId} - ${monthName}`;
 
-        const currentFinalAmount = await analyticsService.getCurrentFinalAmount();
+        const currentFinalAmount = await analyticsService.getCurrentFinalAmount(session);
 
         // Check for existing expense — strict match only
         const existingExpense = await ExpenseModel.findOne({

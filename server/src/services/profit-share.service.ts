@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import ShareholderModel from '../models/shareholder.model.js';
 import ProfitDistributionModel from '../models/profit-distribution.model.js';
 import EarningModel from '../models/earning.model.js';
@@ -267,101 +268,113 @@ async function distributeProfitInDB(
     data: DistributeProfitData,
     userId: string,
 ): Promise<IProfitDistribution[]> {
-    // Get profit summary
-    const summary = await getProfitSummaryFromDB(
-        data.periodType,
-        data.year,
-        data.month,
-    );
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
-    // Only check for positive net profit if not using customAmount
-    if (!data.customAmount && summary.netProfit <= 0) {
-        throw new Error(
-            `Cannot distribute profit. Net profit is ৳${summary.netProfit.toLocaleString()}. There must be positive profit to distribute.`,
+    try {
+        // Get profit summary
+        const summary = await getProfitSummaryFromDB(
+            data.periodType,
+            data.year,
+            data.month,
         );
-    }
 
-    // Get shareholders
-    let shareholders;
-    if (data.shareholderIds.includes('all')) {
-        shareholders = await ShareholderModel.find({ isActive: true });
-    } else {
-        shareholders = await ShareholderModel.find({
-            _id: { $in: data.shareholderIds },
-            isActive: true,
-        });
-    }
-
-    if (shareholders.length === 0) {
-        throw new Error('No active shareholders found');
-    }
-
-    // Check available balance (FinalAmount)
-    const currentFinalAmount = await analyticsService.getCurrentFinalAmount();
-    // Calculate real total from shareholders list
-    const calculatedTotal = shareholders.reduce((sum, s) => {
-        const share = data.customAmount ? data.customAmount : (summary.netProfit * s.percentage) / 100;
-        return sum + share;
-    }, 0);
-
-    if (calculatedTotal > currentFinalAmount) {
-        throw new Error("Insufficient balance. Transaction exceeds available amount.");
-    }
-
-    // Check for existing distributions in this period for these shareholders
-    const existingFilter: Record<string, unknown> = {
-        shareholderId: { $in: shareholders.map((s) => s._id) },
-        periodType: data.periodType,
-        year: data.year,
-    };
-    if (data.periodType === 'month' && data.month) {
-        existingFilter.month = data.month;
-    }
-
-    const existingDistributions =
-        await ProfitDistributionModel.find(existingFilter);
-    if (existingDistributions.length > 0) {
-        const existingNames = existingDistributions.map((d) => {
-            const sh = shareholders.find(
-                (s) => s._id.toString() === d.shareholderId.toString(),
+        // Only check for positive net profit if not using customAmount
+        if (!data.customAmount && summary.netProfit <= 0) {
+            throw new Error(
+                `Cannot distribute profit. Net profit is ৳${summary.netProfit.toLocaleString()}. There must be positive profit to distribute.`,
             );
-            return sh?.name || 'Unknown';
-        });
-        throw new Error(
-            `Profit already distributed to: ${existingNames.join(
-                ', ',
-            )} for this period`,
-        );
-    }
+        }
 
-    // Create distribution records
-    const distributions = shareholders.map((shareholder) => {
-        // If customAmount is provided, use it directly (for single shareholder share)
-        // Otherwise calculate based on percentage
-        const shareAmount = data.customAmount
-            ? data.customAmount
-            : (summary.netProfit * shareholder.percentage) / 100;
+        // Get shareholders
+        let shareholders;
+        if (data.shareholderIds.includes('all')) {
+            shareholders = await ShareholderModel.find({ isActive: true }).session(session);
+        } else {
+            shareholders = await ShareholderModel.find({
+                _id: { $in: data.shareholderIds },
+                isActive: true,
+            }).session(session);
+        }
 
-        return {
-            shareholderId: shareholder._id,
+        if (shareholders.length === 0) {
+            throw new Error('No active shareholders found');
+        }
+
+        // Check available balance (FinalAmount)
+        const currentFinalAmount = await analyticsService.getCurrentFinalAmount(session);
+        // Calculate real total from shareholders list
+        const calculatedTotal = shareholders.reduce((sum, s) => {
+            const share = data.customAmount ? data.customAmount : (summary.netProfit * s.percentage) / 100;
+            return sum + share;
+        }, 0);
+
+        if (calculatedTotal > currentFinalAmount) {
+            throw new Error("Insufficient balance. Transaction exceeds available amount.");
+        }
+
+        // Check for existing distributions in this period for these shareholders
+        const existingFilter: Record<string, unknown> = {
+            shareholderId: { $in: shareholders.map((s) => s._id) },
             periodType: data.periodType,
-            month: data.month,
             year: data.year,
-            totalProfit: data.customAmount
-                ? data.customAmount
-                : summary.netProfit,
-            sharePercentage: data.customAmount ? 100 : shareholder.percentage, // 100% if direct amount
-            shareAmount,
-            status: 'distributed' as const,
-            distributedAt: new Date(),
-            distributedBy: userId,
-            notes: data.notes,
         };
-    });
+        if (data.periodType === 'month' && data.month) {
+            existingFilter.month = data.month;
+        }
 
-    return ProfitDistributionModel.insertMany(
-        distributions,
-    ) as unknown as Promise<IProfitDistribution[]>;
+        const existingDistributions =
+            await ProfitDistributionModel.find(existingFilter).session(session);
+        if (existingDistributions.length > 0) {
+            const existingNames = existingDistributions.map((d) => {
+                const sh = shareholders.find(
+                    (s) => s._id.toString() === d.shareholderId.toString(),
+                );
+                return sh?.name || 'Unknown';
+            });
+            throw new Error(
+                `Profit already distributed to: ${existingNames.join(
+                    ', ',
+                )} for this period`,
+            );
+        }
+
+        // Create distribution records
+        const distributions = shareholders.map((shareholder) => {
+            const shareAmount = data.customAmount
+                ? data.customAmount
+                : (summary.netProfit * shareholder.percentage) / 100;
+
+            return {
+                shareholderId: shareholder._id,
+                periodType: data.periodType,
+                month: data.month,
+                year: data.year,
+                totalProfit: data.customAmount
+                    ? data.customAmount
+                    : summary.netProfit,
+                sharePercentage: data.customAmount ? 100 : shareholder.percentage,
+                shareAmount,
+                status: 'distributed' as const,
+                distributedAt: new Date(),
+                distributedBy: userId,
+                notes: data.notes,
+            };
+        });
+
+        const result = await ProfitDistributionModel.insertMany(
+            distributions,
+            { session }
+        ) as unknown as IProfitDistribution[];
+
+        await session.commitTransaction();
+        return result;
+    } catch (error) {
+        await session.abortTransaction();
+        throw error;
+    } finally {
+        session.endSession();
+    }
 }
 
 async function getDistributionsFromDB(
