@@ -265,10 +265,7 @@ export default function ExpensePage() {
         const expenseAmount = parseFloat(data.amount);
 
         if (expenseAmount > finalAmount) {
-            const difference = expenseAmount - finalAmount;
-            toast.error(
-                `Please add ${formatCurrency(difference)} first, because the current amount is less than the expense.`,
-            );
+            toast.error("Insufficient balance. Expense exceeds available amount.");
             return;
         }
 
@@ -294,10 +291,7 @@ export default function ExpensePage() {
         const maxAllowed = finalAmount + oldExpenseAmount;
 
         if (newExpenseAmount > maxAllowed) {
-            const difference = newExpenseAmount - maxAllowed;
-            toast.error(
-                `Please add ${formatCurrency(difference)} first, because the current amount is less than the expense.`,
-            );
+            toast.error("Insufficient balance. Expense exceeds available amount.");
             return;
         }
 

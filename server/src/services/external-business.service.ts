@@ -1,5 +1,6 @@
 import ExternalBusinessModel from '../models/external-business.model.js';
 import ProfitTransferModel from '../models/profit-transfer.model.js';
+import analyticsService from './analytics.service.js';
 import type {
     IExternalBusiness,
     IExternalBusinessPopulated,
@@ -145,6 +146,10 @@ async function createTransferInDB(
     data: CreateProfitTransferData,
     userId: string
 ): Promise<IProfitTransfer> {
+    const finalAmount = await analyticsService.getCurrentFinalAmount();
+    if (data.amount > finalAmount) {
+        throw new Error("Insufficient balance. Transaction exceeds available amount.");
+    }
     const transfer = new ProfitTransferModel({
         ...data,
         transferredBy: userId,

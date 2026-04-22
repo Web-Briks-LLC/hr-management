@@ -19,6 +19,7 @@ import type {
     ExpenseStats,
 } from "../types/expense.type.js";
 import { escapeRegex } from "../lib/sanitize.js";
+import analyticsService from "./analytics.service.js";
 
 // Aggregation pipeline for expenses with lookups
 const getExpenseAggregationPipeline = (
@@ -322,6 +323,13 @@ const getAvailableExpenseYearsFromDB = async () => {
 const createExpenseInDB = async (
     payload: Partial<IExpense> & { createdBy: string },
 ) => {
+    const expenseAmount = payload.amount || 0;
+    const finalAmount = await analyticsService.getCurrentFinalAmount();
+
+    if (expenseAmount > finalAmount) {
+        throw new Error("Insufficient balance. Expense exceeds available amount.");
+    }
+
     const result = await ExpenseModel.create(payload);
     return result;
 };
@@ -338,6 +346,22 @@ const getExpenseByIdFromDB = async (id: string) => {
 
 // Update expense
 const updateExpenseInDB = async (id: string, payload: Partial<IExpense>) => {
+    const expense = await ExpenseModel.findById(id);
+    if (!expense) {
+        throw new Error("Expense not found");
+    }
+
+    if (payload.amount !== undefined) {
+        const newExpenseAmount = payload.amount;
+        const oldExpenseAmount = expense.amount;
+        const finalAmount = await analyticsService.getCurrentFinalAmount();
+        const maxAllowed = finalAmount + oldExpenseAmount;
+
+        if (newExpenseAmount > maxAllowed) {
+            throw new Error("Insufficient balance. Expense exceeds available amount.");
+        }
+    }
+
     const result = await ExpenseModel.findByIdAndUpdate(id, payload, {
         new: true,
     });

@@ -2,6 +2,7 @@ import ShareholderModel from '../models/shareholder.model.js';
 import ProfitDistributionModel from '../models/profit-distribution.model.js';
 import EarningModel from '../models/earning.model.js';
 import ExpenseModel from '../models/expense.model.js';
+import analyticsService from './analytics.service.js';
 import type {
     IShareholder,
     IShareholderPopulated,
@@ -293,6 +294,18 @@ async function distributeProfitInDB(
 
     if (shareholders.length === 0) {
         throw new Error('No active shareholders found');
+    }
+
+    // Check available balance (FinalAmount)
+    const currentFinalAmount = await analyticsService.getCurrentFinalAmount();
+    // Calculate real total from shareholders list
+    const calculatedTotal = shareholders.reduce((sum, s) => {
+        const share = data.customAmount ? data.customAmount : (summary.netProfit * s.percentage) / 100;
+        return sum + share;
+    }, 0);
+
+    if (calculatedTotal > currentFinalAmount) {
+        throw new Error("Insufficient balance. Transaction exceeds available amount.");
     }
 
     // Check for existing distributions in this period for these shareholders

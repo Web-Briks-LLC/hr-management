@@ -1,4 +1,5 @@
 import { eachDayOfInterval } from 'date-fns';
+import analyticsService from './analytics.service.js';
 import StaffModel from '../models/staff.model.js';
 import AttendanceDayModel from '../models/attendance-day.model.js';
 import ShiftAssignmentModel from '../models/shift-assignment.model.js';
@@ -607,6 +608,8 @@ const processPayroll = async ({
             paymentType === 'overtime' ? 'Overtime' : 'Salary'
         } - ${staffId} - ${monthName}`;
 
+        const currentFinalAmount = await analyticsService.getCurrentFinalAmount();
+
         // Check for existing expense — strict match only
         const existingExpense = await ExpenseModel.findOne({
             categoryId: category!._id,
@@ -617,6 +620,10 @@ const processPayroll = async ({
         let createdExpense;
 
         if (existingExpense) {
+            const maxAllowed = currentFinalAmount + existingExpense.amount;
+            if (amount > maxAllowed) {
+                throw new Error("Insufficient balance. Expense exceeds available amount.");
+            }
             existingExpense.amount = amount;
             existingExpense.note = finalNote;
             existingExpense.paymentMethod = paymentMethod || 'cash';
@@ -624,6 +631,9 @@ const processPayroll = async ({
             await existingExpense.save({ session });
             createdExpense = existingExpense;
         } else {
+            if (amount > currentFinalAmount) {
+                throw new Error("Insufficient balance. Expense exceeds available amount.");
+            }
             const expense = await ExpenseModel.create(
                 [
                     {

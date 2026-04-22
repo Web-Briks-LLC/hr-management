@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import PersonModel from '../models/Person.js';
 import DebitModel, { DebitType } from '../models/Debit.js';
+import analyticsService from '../services/analytics.service.js';
 
 export const createPerson = async (req: Request, res: Response) => {
     try {
@@ -62,6 +63,11 @@ export const createDebit = async (req: Request, res: Response) => {
         const person = await PersonModel.findById(personId);
         if (!person) {
             return res.status(404).json({ message: 'Person not found' });
+        }
+
+        const currentFinalAmount = await analyticsService.getCurrentFinalAmount();
+        if (type === DebitType.RETURN && amount > currentFinalAmount) {
+            return res.status(400).json({ message: 'Insufficient balance. Transaction exceeds available amount.' });
         }
 
         const debit = await DebitModel.create({
@@ -226,6 +232,24 @@ export const updateDebit = async (req: Request, res: Response) => {
         const { id } = req.params;
         const { amount, date, type, description } = req.body;
 
+        const oldDebit = await DebitModel.findById(id);
+        if (!oldDebit) {
+            return res.status(404).json({ message: 'Debit not found' });
+        }
+
+        const currentFinalAmount = await analyticsService.getCurrentFinalAmount();
+        
+        // Calculate the net impact on FinalAmount
+        // Current logic: FinalAmount += (Borrow - Return)
+        // If updating: NewBalance = OldBalance - (OldBorrow - OldReturn) + (NewBorrow - NewReturn)
+        let oldNet = (oldDebit.type === DebitType.BORROW ? oldDebit.amount : -oldDebit.amount);
+        let newNet = (type || oldDebit.type) === DebitType.BORROW ? (amount || oldDebit.amount) : -(amount || oldDebit.amount);
+        let netImpact = newNet - oldNet;
+
+        if (netImpact < 0 && Math.abs(netImpact) > currentFinalAmount) {
+            return res.status(400).json({ message: 'Insufficient balance. Transaction exceeds available amount.' });
+        }
+
         const debit = await DebitModel.findByIdAndUpdate(
             id,
             { amount, date, type, description },
@@ -249,11 +273,17 @@ export const deleteDebit = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
 
-        const debit = await DebitModel.findByIdAndDelete(id);
-
+        const debit = await DebitModel.findById(id);
         if (!debit) {
             return res.status(404).json({ message: 'Debit not found' });
         }
+
+        const currentFinalAmount = await analyticsService.getCurrentFinalAmount();
+        if (debit.type === DebitType.BORROW && debit.amount > currentFinalAmount) {
+            return res.status(400).json({ message: 'Insufficient balance. Transaction exceeds available amount.' });
+        }
+
+        await DebitModel.findByIdAndDelete(id);
 
         return res.status(200).json({ message: 'Debit deleted successfully' });
     } catch (error) {

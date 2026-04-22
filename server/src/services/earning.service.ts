@@ -5,6 +5,7 @@ import {
     endOfWeek,
 } from 'date-fns';
 import { Types, type HydratedDocument, type ClientSession } from 'mongoose';
+import analyticsService from './analytics.service.js';
 import EarningModel from '../models/earning.model.js';
 import ClientModel from '../models/client.model.js';
 import OrderModel from '../models/order.model.js';
@@ -141,6 +142,14 @@ async function updateEarningForOrder(
 
     if (data.orderAmount !== undefined && data.oldOrderAmount !== undefined) {
         const amountDiff = data.orderAmount - data.oldOrderAmount;
+        if (amountDiff < 0) {
+            // Reduction in earning
+            const finalAmount = await analyticsService.getCurrentFinalAmount();
+            // amountDiff is negative, so -amountDiff is the positive reduction
+            if (-amountDiff > finalAmount) {
+                throw new Error("Insufficient balance. Transaction exceeds available amount.");
+            }
+        }
         earning.totalAmount = roundAmount(earning.totalAmount + amountDiff);
         earning.netAmount = roundAmount(earning.totalAmount - earning.fees - earning.tax);
     }
@@ -162,6 +171,12 @@ async function deleteEarningForOrder(
 ): Promise<IEarning | null> {
     const earning = await EarningModel.findOne({ orderIds: orderId }).session(session || null);
     if (!earning) return null;
+
+    // Check balance before reducing earning
+    const finalAmount = await analyticsService.getCurrentFinalAmount();
+    if (orderAmount > finalAmount) {
+        throw new Error("Insufficient balance. Transaction exceeds available amount.");
+    }
 
     earning.orderIds = earning.orderIds.filter((id) => id.toString() !== orderId);
     earning.totalAmount = roundAmount(earning.totalAmount - orderAmount);
@@ -881,6 +896,13 @@ async function getClientOrdersForBulkWithdraw(
 
 // Delete earning by ID
 async function deleteEarningFromDB(id: string): Promise<IEarning | null> {
+    const earning = await EarningModel.findById(id);
+    if (!earning) return null;
+
+    const finalAmount = await analyticsService.getCurrentFinalAmount();
+    if (earning.amountInBDT > finalAmount) {
+        throw new Error("Insufficient balance. Transaction exceeds available amount.");
+    }
     return EarningModel.findByIdAndDelete(id).lean() as any;
 }
 

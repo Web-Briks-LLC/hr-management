@@ -434,6 +434,7 @@ async function getFinanceAnalytics(
     if (year >= 2025) {
         finalAmount += totalDebit;
     }
+    finalAmount = Math.max(0, finalAmount);
 
     const summary = {
         totalEarnings,
@@ -535,8 +536,64 @@ async function getFinanceTotalsForPeriod(year: number, month: number) {
     };
 }
 
+async function getCurrentFinalAmount(): Promise<number> {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+
+    // Cumulative Earnings
+    const cumEarningsResult = await EarningModel.aggregate([
+        { $match: { status: 'paid' } },
+        { $group: { _id: null, total: { $sum: '$amountInBDT' } } },
+    ]);
+    const cumEarnings = cumEarningsResult[0]?.total || 0;
+
+    // Cumulative Expenses
+    const cumExpensesResult = await ExpenseModel.aggregate([
+        { $group: { _id: null, total: { $sum: '$amount' } } },
+    ]);
+    const cumExpenses = cumExpensesResult[0]?.total || 0;
+
+    // Cumulative Shared (Transfers + Distributions)
+    const [cumTransfersResult, cumDistributionsResult] = await Promise.all([
+        ProfitTransferModel.aggregate([
+            { $group: { _id: null, total: { $sum: '$amount' } } },
+        ]),
+        import('../models/profit-distribution.model.js').then((m) =>
+            m.default.aggregate([
+                { $group: { _id: null, total: { $sum: '$shareAmount' } } },
+            ]),
+        ),
+    ]);
+    const cumShared =
+        (cumTransfersResult[0]?.total || 0) +
+        (cumDistributionsResult[0]?.total || 0);
+
+    // All Time Debit
+    const [debitBorrowResult, debitReturnResult] = await Promise.all([
+        DebitModel.aggregate([
+            { $match: { type: DebitType.BORROW } },
+            { $group: { _id: null, total: { $sum: '$amount' } } },
+        ]),
+        DebitModel.aggregate([
+            { $match: { type: DebitType.RETURN } },
+            { $group: { _id: null, total: { $sum: '$amount' } } },
+        ]),
+    ]);
+    const totalBorrow = debitBorrowResult[0]?.total || 0;
+    const totalReturn = debitReturnResult[0]?.total || 0;
+    const totalDebit = totalBorrow - totalReturn;
+
+    let finalAmount = cumEarnings - cumExpenses - cumShared;
+    if (currentYear >= 2025) {
+        finalAmount += totalDebit;
+    }
+
+    return Math.max(0, finalAmount);
+}
+
 export default {
     getFinanceAnalytics,
     getAvailableAnalyticsYears,
     getFinanceTotalsForPeriod,
+    getCurrentFinalAmount,
 };
