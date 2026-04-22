@@ -4,7 +4,7 @@ import {
     startOfWeek,
     endOfWeek,
 } from 'date-fns';
-import { Types, type HydratedDocument, type ClientSession } from 'mongoose';
+import mongoose, { Types, type HydratedDocument, type ClientSession } from 'mongoose';
 import analyticsService from './analytics.service.js';
 import EarningModel from '../models/earning.model.js';
 import ClientModel from '../models/client.model.js';
@@ -100,7 +100,7 @@ async function updateEarningForOrder(
     },
     sessionParam?: ClientSession,
 ): Promise<IEarning | null> {
-    const session = sessionParam || await (await import('mongoose')).default.startSession();
+    const session = sessionParam || await mongoose.startSession();
     if (!sessionParam) session.startTransaction();
 
     try {
@@ -184,7 +184,7 @@ async function deleteEarningForOrder(
     imageQty: number,
     sessionParam?: ClientSession,
 ): Promise<IEarning | null> {
-    const session = sessionParam || await (await import('mongoose')).default.startSession();
+    const session = sessionParam || await mongoose.startSession();
     if (!sessionParam) session.startTransaction();
 
     try {
@@ -927,7 +927,7 @@ async function getClientOrdersForBulkWithdraw(
 
 // Delete earning by ID
 async function deleteEarningFromDB(id: string): Promise<IEarning | null> {
-    const session = await (await import('mongoose')).default.startSession();
+    const session = await mongoose.startSession();
     session.startTransaction();
 
     try {
