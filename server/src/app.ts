@@ -26,6 +26,8 @@ app.use(
     }),
 );
 
+app.set("trust proxy", true);
+
 // SECURITY: Global rate limiter — 1000 requests per 5 minutes per IP
 const globalLimiter = rateLimit({
     windowMs: 5 * 60 * 1000, // 5 minutes
