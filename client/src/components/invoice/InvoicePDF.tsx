@@ -529,7 +529,7 @@ export const InvoiceDocument = ({
                     </View>
                     <View style={styles.payNowButtonContainer}>
                         <Link
-                            src={`${process.env.NEXT_PUBLIC_PAYMENT_URL || "http://localhost:3002"}/payment/${invoiceNumber}?token=${paymentToken || ""}`}
+                            src={`${process.env.NEXT_PUBLIC_PAYMENT_URL!}/payment/${invoiceNumber}?token=${paymentToken || ""}`}
                             style={{ textDecoration: "none" }}
                         >
                             <View style={styles.payNowButton}>

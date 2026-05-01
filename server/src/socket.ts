@@ -1,5 +1,6 @@
 import { Server as SocketIOServer } from 'socket.io';
 import { Server as HttpServer } from 'http';
+import envConfig from './config/env.config.js';
 
 let io: SocketIOServer;
 
@@ -9,7 +10,7 @@ const userSockets = new Map<string, string[]>();
 export const initSocket = (server: HttpServer) => {
     io = new SocketIOServer(server, {
         cors: {
-            origin: process.env.CLIENT_URL || 'http://localhost:3000',
+            origin: envConfig.client_url,
             methods: ['GET', 'POST'],
             credentials: true,
         },
@@ -23,7 +24,9 @@ export const initSocket = (server: HttpServer) => {
                 socket.data.userId = userId;
                 const existingSockets = userSockets.get(userId) || [];
                 userSockets.set(userId, [...existingSockets, socket.id]);
-                console.log(`User ${userId} authenticated on socket ${socket.id}`);
+                console.log(
+                    `User ${userId} authenticated on socket ${socket.id}`,
+                );
             }
         });
 
@@ -32,7 +35,9 @@ export const initSocket = (server: HttpServer) => {
             const userId = socket.data.userId;
             if (userId) {
                 const existingSockets = userSockets.get(userId) || [];
-                const updatedSockets = existingSockets.filter((id) => id !== socket.id);
+                const updatedSockets = existingSockets.filter(
+                    (id) => id !== socket.id,
+                );
                 if (updatedSockets.length > 0) {
                     userSockets.set(userId, updatedSockets);
                 } else {
@@ -66,7 +71,10 @@ export const emitToUser = (userId: string, event: string, data: any) => {
     }
 };
 
-export const broadcastPolicyPrompt = (targetUserIds: string[], policyData: any) => {
+export const broadcastPolicyPrompt = (
+    targetUserIds: string[],
+    policyData: any,
+) => {
     targetUserIds.forEach((userId) => {
         emitToUser(userId, 'policy:prompt', policyData);
     });

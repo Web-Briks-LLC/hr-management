@@ -50,7 +50,7 @@ const envConfig = {
     trusted_origins: process.env.TRUSTED_ORIGINS!,
 
     // client
-    client_url: process.env.CLIENT_URL || 'http://localhost:3000',
+    client_url: process.env.CLIENT_URL!,
 
     // nodemailer
     smtp_user: process.env.SMTP_USER!,
