@@ -151,7 +151,7 @@ async function updateEarningForOrder(
 
         if (data.orderAmount !== undefined && data.oldOrderAmount !== undefined) {
             const amountDiff = data.orderAmount - data.oldOrderAmount;
-            if (amountDiff < 0) {
+            if (amountDiff < 0 && earning.status === 'paid') {
                 const finalAmount = await analyticsService.getCurrentFinalAmount(session);
                 if (-amountDiff > finalAmount) {
                     throw new Error("Insufficient balance. Transaction exceeds available amount.");
@@ -195,9 +195,11 @@ async function deleteEarningForOrder(
         }
 
         // Check balance before reducing earning
-        const finalAmount = await analyticsService.getCurrentFinalAmount(session);
-        if (orderAmount > finalAmount) {
-            throw new Error("Insufficient balance. Transaction exceeds available amount.");
+        if (earning.status === 'paid') {
+            const finalAmount = await analyticsService.getCurrentFinalAmount(session);
+            if (orderAmount > finalAmount) {
+                throw new Error("Insufficient balance. Transaction exceeds available amount.");
+            }
         }
 
         earning.orderIds = earning.orderIds.filter((id) => id.toString() !== orderId);

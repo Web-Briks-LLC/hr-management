@@ -63,12 +63,7 @@ export const OrderExportEmail = ({
 
                         {/* Download/Action Button */}
                         <Section style={btnContainer}>
-                            <Button
-                                style={button}
-                                href={
-                                    invoiceUrl || 'http://localhost:3000/orders'
-                                }
-                            >
+                            <Button style={button} href={invoiceUrl!}>
                                 Download Invoice
                             </Button>
                         </Section>

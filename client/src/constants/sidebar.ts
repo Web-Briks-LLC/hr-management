@@ -18,6 +18,7 @@ import {
     IconCash,
     IconWallet,
     IconShieldLock,
+    IconUserShare,
 } from "@tabler/icons-react";
 
 export interface SidebarItem {
@@ -112,7 +113,7 @@ export const sidebarGroups: SidebarGroup[] = [
             {
                 title: "Profit Share",
                 url: "/profit-share",
-                icon: IconPigMoney,
+                icon: IconUserShare,
                 access: [Role.SUPER_ADMIN, Role.ADMIN],
             },
             {

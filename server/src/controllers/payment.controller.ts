@@ -9,6 +9,7 @@ import { InvoiceRecord } from '../models/invoice-record.model.js';
 import EarningModel from '../models/earning.model.js';
 import ClientModel from '../models/client.model.js';
 import notificationService from '../services/notification.service.js';
+import envConfig from '../config/env.config.js';
 
 // Initialize Stripe gracefully
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
@@ -142,19 +143,27 @@ export const confirmPayment = async (
         if (!invoiceNumber) {
             await session.abortTransaction();
             session.endSession();
-            return res.status(400).json({ error: 'Invoice number is required' });
+            return res
+                .status(400)
+                .json({ error: 'Invoice number is required' });
         }
 
         if (!paymentIntentId && !paypalOrderId) {
             await session.abortTransaction();
             session.endSession();
-            return res.status(400).json({ error: 'Payment gateway reference is required' });
+            return res
+                .status(400)
+                .json({ error: 'Payment gateway reference is required' });
         }
 
-        console.log(`[Payment] Confirming payment for Invoice: ${invoiceNumber}`);
+        console.log(
+            `[Payment] Confirming payment for Invoice: ${invoiceNumber}`,
+        );
 
         // 1. Find the invoice with session
-        const invoice = await InvoiceRecord.findOne({ invoiceNumber }).session(session);
+        const invoice = await InvoiceRecord.findOne({ invoiceNumber }).session(
+            session,
+        );
 
         if (!invoice) {
             await session.abortTransaction();
@@ -177,37 +186,66 @@ export const confirmPayment = async (
         // 2. Verify with gateway
         if (paymentIntentId) {
             try {
-                const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+                const paymentIntent =
+                    await stripe.paymentIntents.retrieve(paymentIntentId);
                 if (paymentIntent.status === 'succeeded') {
                     // Check if intent belongs to this invoice
-                    if (paymentIntent.metadata.invoiceNumber !== String(invoiceNumber)) {
-                        console.error(`[Payment] STRIPE INVOICE MISMATCH: ${paymentIntentId}`);
+                    if (
+                        paymentIntent.metadata.invoiceNumber !==
+                        String(invoiceNumber)
+                    ) {
+                        console.error(
+                            `[Payment] STRIPE INVOICE MISMATCH: ${paymentIntentId}`,
+                        );
                         await session.abortTransaction();
                         session.endSession();
-                        return res.status(400).json({ error: 'Payment reference does not match this invoice' });
+                        return res
+                            .status(400)
+                            .json({
+                                error: 'Payment reference does not match this invoice',
+                            });
                     }
 
                     if (paymentIntent.id !== invoice.pendingPaymentIntentId) {
-                        console.error(`[Payment] STRIPE INTENT MISMATCH: Expected ${invoice.pendingPaymentIntentId}, got ${paymentIntent.id}`);
+                        console.error(
+                            `[Payment] STRIPE INTENT MISMATCH: Expected ${invoice.pendingPaymentIntentId}, got ${paymentIntent.id}`,
+                        );
                         await session.abortTransaction();
                         session.endSession();
-                        return res.status(400).json({ error: 'Payment intent mismatch' });
+                        return res
+                            .status(400)
+                            .json({ error: 'Payment intent mismatch' });
                     }
 
-                    const expectedAmount = Math.round(invoice.totalAmount * 100);
+                    const expectedAmount = Math.round(
+                        invoice.totalAmount * 100,
+                    );
                     if (paymentIntent.amount !== expectedAmount) {
-                        console.error(`[Payment] STRIPE AMOUNT MISMATCH: Expected ${expectedAmount}, got ${paymentIntent.amount}`);
+                        console.error(
+                            `[Payment] STRIPE AMOUNT MISMATCH: Expected ${expectedAmount}, got ${paymentIntent.amount}`,
+                        );
                         await session.abortTransaction();
                         session.endSession();
-                        return res.status(400).json({ error: 'Payment amount mismatch' });
+                        return res
+                            .status(400)
+                            .json({ error: 'Payment amount mismatch' });
                     }
 
-                    const expectedCurrency = (invoice.currency || 'usd').toLowerCase();
-                    if (paymentIntent.currency.toLowerCase() !== expectedCurrency) {
-                        console.error(`[Payment] STRIPE CURRENCY MISMATCH: Expected ${expectedCurrency}, got ${paymentIntent.currency}`);
+                    const expectedCurrency = (
+                        invoice.currency || 'usd'
+                    ).toLowerCase();
+                    if (
+                        paymentIntent.currency.toLowerCase() !==
+                        expectedCurrency
+                    ) {
+                        console.error(
+                            `[Payment] STRIPE CURRENCY MISMATCH: Expected ${expectedCurrency}, got ${paymentIntent.currency}`,
+                        );
                         await session.abortTransaction();
                         session.endSession();
-                        return res.status(400).json({ error: 'Payment currency mismatch' });
+                        return res
+                            .status(400)
+                            .json({ error: 'Payment currency mismatch' });
                     }
 
                     verified = true;
@@ -216,34 +254,55 @@ export const confirmPayment = async (
                 console.error('[Payment] Stripe verification error:', err);
                 await session.abortTransaction();
                 session.endSession();
-                return res.status(500).json({ error: 'Stripe verification failed' });
+                return res
+                    .status(500)
+                    .json({ error: 'Stripe verification failed' });
             }
         } else if (paypalOrderId) {
             try {
                 const accessToken = await getPayPalAccessToken();
-                const baseUrl = process.env.PAYPAL_MODE === 'live' ? 'https://api-m.paypal.com' : 'https://api-m.sandbox.paypal.com';
-                
-                const orderRes = await fetch(`${baseUrl}/v2/checkout/orders/${paypalOrderId}`, {
-                    headers: { Authorization: `Bearer ${accessToken}` }
-                });
+                const baseUrl =
+                    process.env.PAYPAL_MODE === 'live'
+                        ? 'https://api-m.paypal.com'
+                        : 'https://api-m.sandbox.paypal.com';
+
+                const orderRes = await fetch(
+                    `${baseUrl}/v2/checkout/orders/${paypalOrderId}`,
+                    {
+                        headers: { Authorization: `Bearer ${accessToken}` },
+                    },
+                );
                 const order: any = await orderRes.json();
-                
+
                 if (order.status === 'COMPLETED') {
                     const purchaseUnit = order.purchase_units?.[0];
-                    const paidAmount = purchaseUnit?.amount?.value ? parseFloat(purchaseUnit.amount.value) : 0;
-                    
+                    const paidAmount = purchaseUnit?.amount?.value
+                        ? parseFloat(purchaseUnit.amount.value)
+                        : 0;
+
                     if (paidAmount < invoice.totalAmount - 0.01) {
-                        console.error(`[Payment] PAYPAL AMOUNT MISMATCH: Expected ${invoice.totalAmount}, got ${paidAmount}`);
+                        console.error(
+                            `[Payment] PAYPAL AMOUNT MISMATCH: Expected ${invoice.totalAmount}, got ${paidAmount}`,
+                        );
                         await session.abortTransaction();
                         session.endSession();
-                        return res.status(400).json({ error: 'Payment amount mismatch' });
+                        return res
+                            .status(400)
+                            .json({ error: 'Payment amount mismatch' });
                     }
-                    
-                    if (String(purchaseUnit?.reference_id) !== String(invoiceNumber)) {
-                        console.error(`[Payment] PAYPAL INVOICE MISMATCH: ${paypalOrderId}`);
+
+                    if (
+                        String(purchaseUnit?.reference_id) !==
+                        String(invoiceNumber)
+                    ) {
+                        console.error(
+                            `[Payment] PAYPAL INVOICE MISMATCH: ${paypalOrderId}`,
+                        );
                         await session.abortTransaction();
                         session.endSession();
-                        return res.status(400).json({ error: 'Payment reference mismatch' });
+                        return res
+                            .status(400)
+                            .json({ error: 'Payment reference mismatch' });
                     }
                     verified = true;
                 }
@@ -251,7 +310,9 @@ export const confirmPayment = async (
                 console.error('[Payment] PayPal verification error:', err);
                 await session.abortTransaction();
                 session.endSession();
-                return res.status(500).json({ error: 'PayPal verification failed' });
+                return res
+                    .status(500)
+                    .json({ error: 'PayPal verification failed' });
             }
         }
 
@@ -263,8 +324,12 @@ export const confirmPayment = async (
             await invoice.save({ session });
 
             // 4. Update Earning Record
-            const client = invoice.clientId ? await ClientModel.findOne({ clientId: invoice.clientId }).session(session) : null;
-            
+            const client = invoice.clientId
+                ? await ClientModel.findOne({
+                      clientId: invoice.clientId,
+                  }).session(session)
+                : null;
+
             if (client && invoice.month && invoice.year) {
                 // Find or Create earning for that specific month/year (Strict Monthly Isolation)
                 let earning = await EarningModel.findOne({
@@ -282,23 +347,34 @@ export const confirmPayment = async (
                         currency: invoice.currency,
                         status: 'unpaid',
                         isLegacy: false,
-                        createdBy: client.createdBy || '659696956565656565656565',
+                        createdBy:
+                            client.createdBy || '659696956565656565656565',
                     });
                     await (earning as any).save({ session });
                 }
 
                 const conversionRate = (earning as any).conversionRate || 120;
-                const { default: earningService } = await import("../services/earning.service.js");
+                const { default: earningService } =
+                    await import('../services/earning.service.js');
 
-                await earningService.withdrawEarning((earning as any)._id.toString(), {
-                    amount: invoice.totalAmount,
-                    method: paymentIntentId ? 'Stripe' : 'PayPal',
-                    invoiceNumber: invoice.invoiceNumber,
-                    transactionId: paymentIntentId || paypalOrderId || `WB-PAY-${Date.now()}`,
-                    conversionRate: conversionRate,
-                    notes: `Automated payment for Invoice ${invoice.invoiceNumber}`,
-                    paidBy: (client.createdBy || '659696956565656565656565').toString(),
-                }, session);
+                await earningService.withdrawEarning(
+                    (earning as any)._id.toString(),
+                    {
+                        amount: invoice.totalAmount,
+                        method: paymentIntentId ? 'Stripe' : 'PayPal',
+                        invoiceNumber: invoice.invoiceNumber,
+                        transactionId:
+                            paymentIntentId ||
+                            paypalOrderId ||
+                            `WB-PAY-${Date.now()}`,
+                        conversionRate: conversionRate,
+                        notes: `Automated payment for Invoice ${invoice.invoiceNumber}`,
+                        paidBy: (
+                            client.createdBy || '659696956565656565656565'
+                        ).toString(),
+                    },
+                    session,
+                );
             }
 
             await session.commitTransaction();
@@ -308,19 +384,32 @@ export const confirmPayment = async (
             (async () => {
                 try {
                     // Client receipt
-                    if (client && (invoice.clientEmail || client.emails?.length > 0)) {
-                        const recipient = invoice.clientEmail || client.emails[0];
-                        const emailHtml = await render(PaymentReceiptEmail({
-                            clientName: client.name || invoice.clientName,
-                            invoiceNumber: invoice.invoiceNumber,
-                            amountPaidCurrency: invoice.currency,
-                            amountPaidValue: invoice.totalAmount,
-                            amountPaidBDT: invoice.totalAmount * (invoice.currency === 'BDT' ? 1 : 120),
-                            referenceId: paymentIntentId || paypalOrderId || 'SUCCESS',
-                            paymentGateway: paymentIntentId ? 'Stripe' : 'PayPal',
-                            date: new Date(),
-                        }));
-                        
+                    if (
+                        client &&
+                        (invoice.clientEmail || client.emails?.length > 0)
+                    ) {
+                        const recipient =
+                            invoice.clientEmail || client.emails[0];
+                        const emailHtml = await render(
+                            PaymentReceiptEmail({
+                                clientName: client.name || invoice.clientName,
+                                invoiceNumber: invoice.invoiceNumber,
+                                amountPaidCurrency: invoice.currency,
+                                amountPaidValue: invoice.totalAmount,
+                                amountPaidBDT:
+                                    invoice.totalAmount *
+                                    (invoice.currency === 'BDT' ? 1 : 120),
+                                referenceId:
+                                    paymentIntentId ||
+                                    paypalOrderId ||
+                                    'SUCCESS',
+                                paymentGateway: paymentIntentId
+                                    ? 'Stripe'
+                                    : 'PayPal',
+                                date: new Date(),
+                            }),
+                        );
+
                         await sendMail({
                             to: recipient as string,
                             subject: `Receipt for Invoice #${invoice.invoiceNumber} - Web Briks`,
@@ -328,7 +417,7 @@ export const confirmPayment = async (
                             fromName: 'Payment - Web Briks',
                         });
                     }
-                    
+
                     // Admin notifications
                     if (client) {
                         await notificationService.notifyAdminsPaymentReceived({
@@ -347,7 +436,7 @@ export const confirmPayment = async (
                                 invoiceNumber: invoice.invoiceNumber,
                                 amount: invoice.totalAmount,
                                 currency: invoice.currency,
-                                earningsUrl: `${process.env.CLIENT_URL || 'http://localhost:3000'}/earnings`,
+                                earningsUrl: `${envConfig.client_url}/earnings`,
                             });
                         }
                     }
@@ -356,11 +445,15 @@ export const confirmPayment = async (
                 }
             })();
 
-            return res.status(200).json({ success: true, message: 'Payment confirmed' });
+            return res
+                .status(200)
+                .json({ success: true, message: 'Payment confirmed' });
         } else {
             await session.abortTransaction();
             session.endSession();
-            return res.status(400).json({ error: 'Payment verification failed' });
+            return res
+                .status(400)
+                .json({ error: 'Payment verification failed' });
         }
     } catch (error: any) {
         if (session.inTransaction()) await session.abortTransaction();
