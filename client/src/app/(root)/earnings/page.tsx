@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { useState, useMemo, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { useState, useMemo, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import {
     Dialog,
     DialogContent,
@@ -10,29 +10,30 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-} from "@/components/ui/dialog";
+} from '@/components/ui/dialog';
 import {
     Table,
     TableBody,
     TableCell,
+    TableFooter,
     TableHead,
     TableHeader,
     TableRow,
-} from "@/components/ui/table";
+} from '@/components/ui/table';
 import {
     Select,
     SelectContent,
     SelectItem,
     SelectTrigger,
     SelectValue,
-} from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+} from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -42,7 +43,7 @@ import {
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+} from '@/components/ui/alert-dialog';
 import {
     Trash2,
     DollarSign,
@@ -68,14 +69,14 @@ import {
     ArrowRight,
     History as HistoryIcon,
     RefreshCcw,
-} from "lucide-react";
+} from 'lucide-react';
 import {
     Tooltip,
     TooltipContent,
     TooltipProvider,
     TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { toast } from "sonner";
+} from '@/components/ui/tooltip';
+import { toast } from 'sonner';
 import {
     useGetEarningsQuery,
     useGetEarningStatsQuery,
@@ -87,20 +88,20 @@ import {
     useUpdateEarningMutation,
     useDeleteEarningMutation,
     useSyncEarningMutation,
-} from "@/redux/features/earning/earningApi";
-import { useGetInvoicesQuery } from "@/redux/features/invoice/invoiceApi";
-import { useGetClientsQuery } from "@/redux/features/client/clientApi";
+} from '@/redux/features/earning/earningApi';
+import { useGetInvoicesQuery } from '@/redux/features/invoice/invoiceApi';
+import { useGetClientsQuery } from '@/redux/features/client/clientApi';
 import type {
     IEarning,
     EarningFilters,
     EarningStatus,
-} from "@/types/earning.type";
-import { CURRENCY_SYMBOLS, MONTHS } from "@/types/earning.type";
-import { cn } from "@/lib/utils";
-import { format } from "date-fns";
-import { ExportEarningDialog } from "@/components/earning/ExportEarningDialog";
+} from '@/types/earning.type';
+import { CURRENCY_SYMBOLS, MONTHS } from '@/types/earning.type';
+import { cn } from '@/lib/utils';
+import { format } from 'date-fns';
+import { ExportEarningDialog } from '@/components/earning/ExportEarningDialog';
 
-type FilterType = "all" | "today" | "week" | "month" | "year";
+type FilterType = 'all' | 'today' | 'week' | 'month' | 'year';
 
 // MONTHS moved to types file
 
@@ -111,11 +112,11 @@ export default function EarningsPage() {
     const [page, setPage] = useState(1);
     const [limit, setLimit] = useState(20);
     const perPageOptions = [10, 20, 50, 100];
-    const [filterType, setFilterType] = useState<FilterType>("year");
-    const [statusFilter, setStatusFilter] = useState<EarningStatus | "all">(
-        "all",
+    const [filterType, setFilterType] = useState<FilterType>('year');
+    const [statusFilter, setStatusFilter] = useState<EarningStatus | 'all'>(
+        'all',
     );
-    const [clientFilter, setClientFilter] = useState<string>("all");
+    const [clientFilter, setClientFilter] = useState<string>('all');
     const [selectedMonth, setSelectedMonth] = useState(
         new Date().getMonth() + 1,
     );
@@ -133,54 +134,54 @@ export default function EarningsPage() {
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     // Edit Client Dialog state
     const [isEditClientDialogOpen, setIsEditClientDialogOpen] = useState(false);
-    const [editClientId, setEditClientId] = useState("");
+    const [editClientId, setEditClientId] = useState('');
 
     const [updateEarning, { isLoading: isUpdating }] =
         useUpdateEarningMutation();
 
     // Withdraw form state
 
-    const [withdrawAmount, setWithdrawAmount] = useState("");
-    const [withdrawMethod, setWithdrawMethod] = useState("Cash");
-    const [withdrawFees, setWithdrawFees] = useState("0");
-    const [withdrawTax, setWithdrawTax] = useState("0");
-    const [withdrawRate, setWithdrawRate] = useState("");
-    const [withdrawNotes, setWithdrawNotes] = useState("");
+    const [withdrawAmount, setWithdrawAmount] = useState('');
+    const [withdrawMethod, setWithdrawMethod] = useState('Cash');
+    const [withdrawFees, setWithdrawFees] = useState('0');
+    const [withdrawTax, setWithdrawTax] = useState('0');
+    const [withdrawRate, setWithdrawRate] = useState('');
+    const [withdrawNotes, setWithdrawNotes] = useState('');
 
     // Bulk withdraw state
-    const [bulkClientId, setBulkClientId] = useState("");
+    const [bulkClientId, setBulkClientId] = useState('');
     const [bulkMonth, setBulkMonth] = useState(new Date().getMonth() + 1);
     const [bulkYear, setBulkYear] = useState(currentYear);
-    const [bulkFees, setBulkFees] = useState("0");
-    const [bulkTax, setBulkTax] = useState("0");
-    const [bulkRate, setBulkRate] = useState("");
-    const [bulkNotes, setBulkNotes] = useState("");
+    const [bulkFees, setBulkFees] = useState('0');
+    const [bulkTax, setBulkTax] = useState('0');
+    const [bulkRate, setBulkRate] = useState('');
+    const [bulkNotes, setBulkNotes] = useState('');
 
     // Build filters
     const filters = useMemo<EarningFilters>(() => {
         const f: EarningFilters = { page, limit };
 
-        if (statusFilter !== "all") f.status = statusFilter;
+        if (statusFilter !== 'all') f.status = statusFilter;
 
         switch (filterType) {
-            case "today":
-                f.filterType = "today";
+            case 'today':
+                f.filterType = 'today';
                 break;
-            case "week":
-                f.filterType = "week";
+            case 'week':
+                f.filterType = 'week';
                 break;
-            case "month":
-                f.filterType = "month";
+            case 'month':
+                f.filterType = 'month';
                 f.month = selectedMonth;
                 f.year = selectedYear;
                 break;
-            case "year":
-                f.filterType = "year";
+            case 'year':
+                f.filterType = 'year';
                 f.year = selectedYear;
                 break;
         }
 
-        if (clientFilter !== "all") f.clientId = clientFilter;
+        if (clientFilter !== 'all') f.clientId = clientFilter;
         return f;
     }, [
         page,
@@ -239,10 +240,11 @@ export default function EarningsPage() {
         getClientOrders,
     ]);
 
-    const [withdrawInvoiceNumber, setWithdrawInvoiceNumber] = useState("");
-    const [withdrawTransactionId, setWithdrawTransactionId] = useState("");
-    const [withdrawTab, setWithdrawTab] = useState<string>("payment");
-    const [selectedPaymentId, setSelectedPaymentId] = useState<string>("manual");
+    const [withdrawInvoiceNumber, setWithdrawInvoiceNumber] = useState('');
+    const [withdrawTransactionId, setWithdrawTransactionId] = useState('');
+    const [withdrawTab, setWithdrawTab] = useState<string>('payment');
+    const [selectedPaymentId, setSelectedPaymentId] =
+        useState<string>('manual');
 
     // Fetch invoices for selection in withdraw dialog
     const { data: invoicesData } = useGetInvoicesQuery(
@@ -250,7 +252,7 @@ export default function EarningsPage() {
             clientId: selectedEarning?.clientId?._id,
             month: selectedEarning?.month,
             year: selectedEarning?.year,
-            status: "pending",
+            status: 'pending',
         },
         { skip: !isWithdrawDialogOpen || !selectedEarning },
     );
@@ -273,14 +275,21 @@ export default function EarningsPage() {
     // Withdraw calculations
     const rawAmount = parseFloat(withdrawAmount);
     const withdrawAmountNum = isNaN(rawAmount)
-        ? Math.max(0, (selectedEarning?.totalAmount || 0) - (selectedEarning?.paidAmount || 0))
+        ? Math.max(
+              0,
+              (selectedEarning?.totalAmount || 0) -
+                  (selectedEarning?.paidAmount || 0),
+          )
         : rawAmount;
 
     const withdrawFeesNum = parseFloat(withdrawFees) || 0;
     const withdrawTaxNum = parseFloat(withdrawTax) || 0;
     const withdrawRateNum = parseFloat(withdrawRate) || 0;
 
-    const withdrawNetAmount = Math.max(0, withdrawAmountNum - withdrawFeesNum - withdrawTaxNum);
+    const withdrawNetAmount = Math.max(
+        0,
+        withdrawAmountNum - withdrawFeesNum - withdrawTaxNum,
+    );
     const withdrawBDT = Math.round(withdrawNetAmount * withdrawRateNum);
 
     // Bulk withdraw calculations
@@ -292,23 +301,23 @@ export default function EarningsPage() {
         (bulkOrdersData?.totalAmount || 0) - bulkFeesNum - bulkTaxNum;
     const bulkBDT = bulkNetAmount * bulkRateNum;
 
-    const formatCurrency = (amount: number = 0, curr: string = "BDT") => {
+    const formatCurrency = (amount: number = 0, curr: string = 'BDT') => {
         const safeAmount = Number(amount) || 0;
-        if (curr === "BDT") {
-            return new Intl.NumberFormat("bn-BD", {
-                style: "currency",
-                currency: "BDT",
+        if (curr === 'BDT') {
+            return new Intl.NumberFormat('bn-BD', {
+                style: 'currency',
+                currency: 'BDT',
                 maximumFractionDigits: 0,
             }).format(safeAmount);
         }
-        const symbol = CURRENCY_SYMBOLS[curr] || "$";
+        const symbol = CURRENCY_SYMBOLS[curr] || '$';
         return `${symbol}${safeAmount.toFixed(2)}`;
     };
 
     // Handlers
     const handleEditClient = (earning: IEarning) => {
         setSelectedEarning(earning);
-        setEditClientId(earning.clientId?._id || "");
+        setEditClientId(earning.clientId?._id || '');
         setIsEditClientDialogOpen(true);
     };
 
@@ -321,14 +330,14 @@ export default function EarningsPage() {
                 data: { clientId: editClientId },
             }).unwrap();
 
-            toast.success("Client updated successfully");
+            toast.success('Client updated successfully');
             setIsEditClientDialogOpen(false);
             setSelectedEarning(null);
         } catch (error: unknown) {
-            console.error("Error updating client:", error);
+            console.error('Error updating client:', error);
             const message =
                 (error as { data?: { message?: string } })?.data?.message ||
-                "Failed to update client";
+                'Failed to update client';
             toast.error(message);
         }
     };
@@ -338,58 +347,70 @@ export default function EarningsPage() {
 
         try {
             await deleteEarning(selectedEarning._id).unwrap();
-            toast.success("Earning record deleted successfully");
+            toast.success('Earning record deleted successfully');
             setIsDeleteDialogOpen(false);
             setSelectedEarning(null);
         } catch (error) {
-            console.error("Error deleting earning:", error);
-            toast.error("Failed to delete earning record");
+            console.error('Error deleting earning:', error);
+            toast.error('Failed to delete earning record');
         }
     };
 
     const handleWithdraw = (earning: IEarning) => {
         const remaining = Math.max(0, earning.totalAmount - earning.paidAmount);
-        const paymentsTotal = earning.payments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
+        const paymentsTotal =
+            earning.payments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
         const gapAmount = earning.paidAmount - paymentsTotal;
 
-        const unconvertedPayments = earning.payments?.filter(p => !p.amountInBDT || p.amountInBDT <= p.amount + 0.01 || p.conversionRate <= 1.1) || [];
+        const unconvertedPayments =
+            earning.payments?.filter(
+                (p) =>
+                    !p.amountInBDT ||
+                    p.amountInBDT <= p.amount + 0.01 ||
+                    p.conversionRate <= 1.1,
+            ) || [];
 
         setSelectedEarning(earning);
 
         // Default Tab: if there's no remaining USD but there are unconverted payments (or a gap), go to conversion
-        if (remaining <= 0.01 && (unconvertedPayments.length > 0 || gapAmount > 0.01)) {
-            setWithdrawTab("conversion");
+        if (
+            remaining <= 0.01 &&
+            (unconvertedPayments.length > 0 || gapAmount > 0.01)
+        ) {
+            setWithdrawTab('conversion');
         } else {
-            setWithdrawTab("payment");
+            setWithdrawTab('payment');
         }
 
         setWithdrawAmount(remaining.toFixed(2));
-        setWithdrawMethod("Cash");
-        setWithdrawFees("0");
-        setWithdrawTax("0");
-        setWithdrawRate(earning.conversionRate > 0 ? earning.conversionRate.toString() : "");
-        setWithdrawNotes("");
-        setWithdrawInvoiceNumber("manual");
-        setWithdrawTransactionId("");
-        setSelectedPaymentId("manual");
+        setWithdrawMethod('Cash');
+        setWithdrawFees('0');
+        setWithdrawTax('0');
+        setWithdrawRate(
+            earning.conversionRate > 0 ? earning.conversionRate.toString() : '',
+        );
+        setWithdrawNotes('');
+        setWithdrawInvoiceNumber('manual');
+        setWithdrawTransactionId('');
+        setSelectedPaymentId('manual');
 
         // If we have unconverted payments, auto-select the first one if we might convert
         if (unconvertedPayments.length > 0) {
             const firstP = unconvertedPayments[0];
-            setSelectedPaymentId(firstP._id || "manual");
+            setSelectedPaymentId(firstP._id || 'manual');
             if (remaining <= 0.01) {
                 setWithdrawAmount(firstP.amount.toString());
-                setWithdrawInvoiceNumber(firstP.invoiceNumber || "manual");
-                setWithdrawTransactionId(firstP.transactionId || "");
-                setWithdrawMethod(firstP.method || "Cash");
+                setWithdrawInvoiceNumber(firstP.invoiceNumber || 'manual');
+                setWithdrawTransactionId(firstP.transactionId || '');
+                setWithdrawMethod(firstP.method || 'Cash');
             }
         } else if (gapAmount > 0.01) {
             // If there's a gap, default to selecting the gap for conversion
-            setSelectedPaymentId("manual-gap");
+            setSelectedPaymentId('manual-gap');
             setWithdrawAmount(gapAmount.toFixed(2));
-            setWithdrawInvoiceNumber("manual");
-            setWithdrawTransactionId("");
-            setWithdrawMethod("Cash");
+            setWithdrawInvoiceNumber('manual');
+            setWithdrawTransactionId('');
+            setWithdrawMethod('Cash');
         }
 
         setIsWithdrawDialogOpen(true);
@@ -404,29 +425,41 @@ export default function EarningsPage() {
                 data: {
                     amount: withdrawAmountNum,
                     method: withdrawMethod,
-                    invoiceNumber: withdrawInvoiceNumber !== "manual" ? withdrawInvoiceNumber : undefined,
+                    invoiceNumber:
+                        withdrawInvoiceNumber !== 'manual'
+                            ? withdrawInvoiceNumber
+                            : undefined,
                     transactionId: withdrawTransactionId || undefined,
                     fees: withdrawFeesNum,
                     tax: withdrawTaxNum,
                     conversionRate: withdrawRateNum,
                     notes: withdrawNotes || undefined,
-                    isConversion: withdrawTab === "conversion",
-                    paymentId: withdrawTab === "conversion" && selectedPaymentId !== "manual" && selectedPaymentId !== "manual-gap" ? selectedPaymentId : undefined,
-                    isGapConversion: withdrawTab === "conversion" && selectedPaymentId === "manual-gap" ? true : undefined,
+                    isConversion: withdrawTab === 'conversion',
+                    paymentId:
+                        withdrawTab === 'conversion' &&
+                        selectedPaymentId !== 'manual' &&
+                        selectedPaymentId !== 'manual-gap'
+                            ? selectedPaymentId
+                            : undefined,
+                    isGapConversion:
+                        withdrawTab === 'conversion' &&
+                        selectedPaymentId === 'manual-gap'
+                            ? true
+                            : undefined,
                 },
             }).unwrap();
 
-            toast.success("Payment recorded successfully");
+            toast.success('Payment recorded successfully');
             setIsWithdrawDialogOpen(false);
-            setWithdrawAmount("");
-            setWithdrawFees("0");
-            setWithdrawTax("0");
-            setWithdrawNotes("");
-            setWithdrawInvoiceNumber("");
-            setWithdrawTransactionId("");
+            setWithdrawAmount('');
+            setWithdrawFees('0');
+            setWithdrawTax('0');
+            setWithdrawNotes('');
+            setWithdrawInvoiceNumber('');
+            setWithdrawTransactionId('');
         } catch (error: unknown) {
             const err = error as { data?: { message?: string } };
-            toast.error(err.data?.message || "Failed to record payment");
+            toast.error(err.data?.message || 'Failed to record payment');
         }
     };
 
@@ -434,27 +467,27 @@ export default function EarningsPage() {
         earning: IEarning,
         newStatus: EarningStatus,
     ) => {
-        if (newStatus === "paid" && earning.status === "unpaid") {
+        if (newStatus === 'paid' && earning.status === 'unpaid') {
             try {
                 await toggleStatus({
                     id: earning._id,
-                    data: { status: "paid" },
+                    data: { status: 'paid' },
                 }).unwrap();
-                toast.success("Earning marked as paid");
+                toast.success('Earning marked as paid');
             } catch (error) {
-                console.error("Error toggling status:", error);
-                toast.error("Failed to mark as paid");
+                console.error('Error toggling status:', error);
+                toast.error('Failed to mark as paid');
             }
-        } else if (newStatus === "unpaid" && earning.status === "paid") {
+        } else if (newStatus === 'unpaid' && earning.status === 'paid') {
             try {
                 await toggleStatus({
                     id: earning._id,
-                    data: { status: "unpaid" },
+                    data: { status: 'unpaid' },
                 }).unwrap();
-                toast.success("Earning marked as unpaid");
+                toast.success('Earning marked as unpaid');
             } catch (error) {
-                console.error("Error toggling status:", error);
-                toast.error("Failed to update status");
+                console.error('Error toggling status:', error);
+                toast.error('Failed to update status');
             }
         }
     };
@@ -462,10 +495,10 @@ export default function EarningsPage() {
     const handleSync = async (id: string) => {
         try {
             await syncEarning(id).unwrap();
-            toast.success("Earning synchronized with orders");
+            toast.success('Earning synchronized with orders');
         } catch (error: unknown) {
             const err = error as { data?: { message?: string } };
-            toast.error(err.data?.message || "Failed to synchronize");
+            toast.error(err.data?.message || 'Failed to synchronize');
         }
     };
 
@@ -475,13 +508,13 @@ export default function EarningsPage() {
             clients.find((c) => c._id === clientId) ||
             clientsWithEarnings.find((c) => c._id === clientId);
         if (client?.currency) {
-            setBulkRate("");
+            setBulkRate('');
         }
     };
 
     const handleConfirmBulkWithdraw = async () => {
         if (!bulkOrdersData) {
-            toast.error("No earning to withdraw");
+            toast.error('No earning to withdraw');
             return;
         }
 
@@ -496,12 +529,12 @@ export default function EarningsPage() {
                 },
             }).unwrap();
 
-            toast.success("Monthly earning withdrawn successfully");
+            toast.success('Monthly earning withdrawn successfully');
             setIsBulkWithdrawDialogOpen(false);
-            setBulkClientId("");
+            setBulkClientId('');
         } catch (error) {
-            console.error("Error withdrawing:", error);
-            toast.error("Failed to withdraw");
+            console.error('Error withdrawing:', error);
+            toast.error('Failed to withdraw');
         }
     };
 
@@ -529,7 +562,10 @@ export default function EarningsPage() {
                                     <DollarSign className="h-5 w-5" />
                                 </div>
                                 {!isLoadingStats && (
-                                    <Badge variant="outline" className="text-[10px] font-medium opacity-70 group-hover:opacity-100">
+                                    <Badge
+                                        variant="outline"
+                                        className="text-[10px] font-medium opacity-70 group-hover:opacity-100"
+                                    >
                                         Total
                                     </Badge>
                                 )}
@@ -543,12 +579,27 @@ export default function EarningsPage() {
                                             (stats?.filteredUnpaidCount || 0)}
                                     </h3>
                                     <div className="mt-2 space-y-1">
-                                        {stats?.filteredCurrencyStats?.map((curr) => (
-                                            <div key={curr.currency} className="flex items-center justify-between text-[11px]">
-                                                <span className="text-muted-foreground font-medium">{curr.currency} ({curr.paidCount + curr.unpaidCount}):</span>
-                                                <span className="font-semibold">{formatCurrency(curr.totalAmount, curr.currency)}</span>
-                                            </div>
-                                        ))}
+                                        {stats?.filteredCurrencyStats?.map(
+                                            (curr) => (
+                                                <div
+                                                    key={curr.currency}
+                                                    className="flex items-center justify-between text-[11px]"
+                                                >
+                                                    <span className="text-muted-foreground font-medium">
+                                                        {curr.currency} (
+                                                        {curr.paidCount +
+                                                            curr.unpaidCount}
+                                                        ):
+                                                    </span>
+                                                    <span className="font-semibold">
+                                                        {formatCurrency(
+                                                            curr.totalAmount,
+                                                            curr.currency,
+                                                        )}
+                                                    </span>
+                                                </div>
+                                            ),
+                                        )}
                                     </div>
                                 </div>
                             )}
@@ -567,7 +618,10 @@ export default function EarningsPage() {
                                     <Clock className="h-5 w-5" />
                                 </div>
                                 {!isLoadingStats && (
-                                    <Badge variant="outline" className="text-[10px] font-medium bg-orange-500/5 text-orange-500 border-orange-500/20 px-1.5 py-0 h-5">
+                                    <Badge
+                                        variant="outline"
+                                        className="text-[10px] font-medium bg-orange-500/5 text-orange-500 border-orange-500/20 px-1.5 py-0 h-5"
+                                    >
                                         Pending
                                     </Badge>
                                 )}
@@ -580,14 +634,25 @@ export default function EarningsPage() {
                                         {stats?.filteredUnpaidCount || 0}
                                     </h3>
                                     <div className="mt-2 space-y-1">
-                                        {stats?.filteredCurrencyStats?.map((curr) => (
-                                            <div key={curr.currency} className="flex items-center justify-between text-[11px]">
-                                                <span className="text-muted-foreground font-medium">{curr.currency} ({curr.unpaidCount}):</span>
-                                                <span className="font-semibold text-orange-600/90 dark:text-orange-400/90">
-                                                    {formatCurrency(curr.unpaidAmount, curr.currency)}
-                                                </span>
-                                            </div>
-                                        ))}
+                                        {stats?.filteredCurrencyStats?.map(
+                                            (curr) => (
+                                                <div
+                                                    key={curr.currency}
+                                                    className="flex items-center justify-between text-[11px]"
+                                                >
+                                                    <span className="text-muted-foreground font-medium">
+                                                        {curr.currency} (
+                                                        {curr.unpaidCount}):
+                                                    </span>
+                                                    <span className="font-semibold text-orange-600/90 dark:text-orange-400/90">
+                                                        {formatCurrency(
+                                                            curr.unpaidAmount,
+                                                            curr.currency,
+                                                        )}
+                                                    </span>
+                                                </div>
+                                            ),
+                                        )}
                                     </div>
                                 </div>
                             )}
@@ -606,7 +671,10 @@ export default function EarningsPage() {
                                     <CheckCircle2 className="h-5 w-5" />
                                 </div>
                                 {!isLoadingStats && (
-                                    <Badge variant="outline" className="text-[10px] font-medium bg-green-500/5 text-green-500 border-green-500/20 px-1.5 py-0 h-5">
+                                    <Badge
+                                        variant="outline"
+                                        className="text-[10px] font-medium bg-green-500/5 text-green-500 border-green-500/20 px-1.5 py-0 h-5"
+                                    >
                                         Success
                                     </Badge>
                                 )}
@@ -619,14 +687,25 @@ export default function EarningsPage() {
                                         {stats?.filteredPaidCount || 0}
                                     </h3>
                                     <div className="mt-2 space-y-1">
-                                        {stats?.filteredCurrencyStats?.map((curr) => (
-                                            <div key={curr.currency} className="flex items-center justify-between text-[11px]">
-                                                <span className="text-muted-foreground font-medium">{curr.currency} ({curr.paidCount}):</span>
-                                                <span className="font-semibold text-green-600/90 dark:text-green-400/90">
-                                                    {formatCurrency(curr.paidAmount, curr.currency)}
-                                                </span>
-                                            </div>
-                                        ))}
+                                        {stats?.filteredCurrencyStats?.map(
+                                            (curr) => (
+                                                <div
+                                                    key={curr.currency}
+                                                    className="flex items-center justify-between text-[11px]"
+                                                >
+                                                    <span className="text-muted-foreground font-medium">
+                                                        {curr.currency} (
+                                                        {curr.paidCount}):
+                                                    </span>
+                                                    <span className="font-semibold text-green-600/90 dark:text-green-400/90">
+                                                        {formatCurrency(
+                                                            curr.paidAmount,
+                                                            curr.currency,
+                                                        )}
+                                                    </span>
+                                                </div>
+                                            ),
+                                        )}
                                     </div>
                                 </div>
                             )}
@@ -645,7 +724,10 @@ export default function EarningsPage() {
                                     <TrendingUp className="h-5 w-5" />
                                 </div>
                                 {!isLoadingStats && (
-                                    <Badge variant="outline" className="text-[10px] font-medium bg-blue-500/5 text-blue-500 border-blue-500/20 px-1.5 py-0 h-5">
+                                    <Badge
+                                        variant="outline"
+                                        className="text-[10px] font-medium bg-blue-500/5 text-blue-500 border-blue-500/20 px-1.5 py-0 h-5"
+                                    >
                                         BDT
                                     </Badge>
                                 )}
@@ -660,14 +742,24 @@ export default function EarningsPage() {
                                         )}
                                     </h3>
                                     <div className="mt-2 space-y-1">
-                                        {stats?.filteredCurrencyStats?.map((curr) => (
-                                            <div key={curr.currency} className="flex items-center justify-between text-[11px]">
-                                                <span className="text-muted-foreground font-medium">{curr.currency}:</span>
-                                                <span className="font-semibold text-blue-600/90 dark:text-blue-400/90">
-                                                    {formatCurrency(curr.paidAmountBDT, "BDT")}
-                                                </span>
-                                            </div>
-                                        ))}
+                                        {stats?.filteredCurrencyStats?.map(
+                                            (curr) => (
+                                                <div
+                                                    key={curr.currency}
+                                                    className="flex items-center justify-between text-[11px]"
+                                                >
+                                                    <span className="text-muted-foreground font-medium">
+                                                        {curr.currency}:
+                                                    </span>
+                                                    <span className="font-semibold text-blue-600/90 dark:text-blue-400/90">
+                                                        {formatCurrency(
+                                                            curr.paidAmountBDT,
+                                                            'BDT',
+                                                        )}
+                                                    </span>
+                                                </div>
+                                            ),
+                                        )}
                                     </div>
                                 </div>
                             )}
@@ -687,21 +779,25 @@ export default function EarningsPage() {
                             <DollarSign className="h-5 w-5 text-primary" />
                             Recent Earnings
                         </CardTitle>
-                        <Button
-                            className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
-                            onClick={() => setIsBulkWithdrawDialogOpen(true)}
-                        >
-                            <Download className=" h-4 w-4" />
-                            Monthly Withdraw
-                        </Button>
-                        <Button
-                            variant="outline"
-                            className="border-primary text-primary hover:bg-primary/10 shadow-sm"
-                            onClick={() => setIsExportDialogOpen(true)}
-                        >
-                            <Download className=" h-4 w-4" />
-                            Export
-                        </Button>
+                        <div className='flex items-center gap-3'>
+                            <Button
+                                className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
+                                onClick={() =>
+                                    setIsBulkWithdrawDialogOpen(true)
+                                }
+                            >
+                                <Download className=" h-4 w-4" />
+                                Monthly Withdraw
+                            </Button>
+                            <Button
+                                variant="outline"
+                                className="border-primary text-primary hover:bg-primary/10 shadow-sm"
+                                onClick={() => setIsExportDialogOpen(true)}
+                            >
+                                <Download className=" h-4 w-4" />
+                                Export
+                            </Button>
+                        </div>
                     </div>
                 </CardHeader>
 
@@ -738,7 +834,7 @@ export default function EarningsPage() {
                         </Select>
 
                         {/* Contextual Date Filters */}
-                        {filterType === "month" && (
+                        {filterType === 'month' && (
                             <div className="flex gap-2 animate-in fade-in slide-in-from-left-2 duration-300">
                                 <Select
                                     value={selectedMonth.toString()}
@@ -783,7 +879,7 @@ export default function EarningsPage() {
                             </div>
                         )}
 
-                        {filterType === "year" && (
+                        {filterType === 'year' && (
                             <Select
                                 value={selectedYear.toString()}
                                 onValueChange={(v) =>
@@ -810,7 +906,7 @@ export default function EarningsPage() {
                         <Select
                             value={statusFilter}
                             onValueChange={(v) => {
-                                setStatusFilter(v as EarningStatus | "all");
+                                setStatusFilter(v as EarningStatus | 'all');
                                 setPage(1);
                             }}
                         >
@@ -866,6 +962,12 @@ export default function EarningsPage() {
                                     <TableHead className="font-semibold text-right">
                                         Amount
                                     </TableHead>
+                                    <TableHead className="font-semibold text-right">
+                                        Charges
+                                    </TableHead>
+                                    <TableHead className="font-semibold text-right">
+                                        Rate
+                                    </TableHead>
                                     <TableHead className="font-semibold">
                                         Status
                                     </TableHead>
@@ -894,6 +996,12 @@ export default function EarningsPage() {
                                                 <Skeleton className="h-4 w-16 ml-auto" />
                                             </TableCell>
                                             <TableCell>
+                                                <Skeleton className="h-4 w-12 ml-auto" />
+                                            </TableCell>
+                                            <TableCell>
+                                                <Skeleton className="h-4 w-10 ml-auto" />
+                                            </TableCell>
+                                            <TableCell>
                                                 <Skeleton className="h-6 w-20 rounded-full" />
                                             </TableCell>
                                             <TableCell>
@@ -907,7 +1015,7 @@ export default function EarningsPage() {
                                 ) : earnings.length === 0 ? (
                                     <TableRow>
                                         <TableCell
-                                            colSpan={7}
+                                            colSpan={9}
                                             className="h-48 text-center"
                                         >
                                             <div className="flex flex-col items-center justify-center text-muted-foreground gap-2">
@@ -937,7 +1045,7 @@ export default function EarningsPage() {
                                                             m.value ===
                                                             earning.month,
                                                     )?.label
-                                                }{" "}
+                                                }{' '}
                                                 {earning.year}
                                             </TableCell>
                                             <TableCell className="font-medium">
@@ -951,7 +1059,7 @@ export default function EarningsPage() {
                                                 ) : (
                                                     <span>
                                                         {earning.orderIds
-                                                            ?.length || 0}{" "}
+                                                            ?.length || 0}{' '}
                                                         orders
                                                     </span>
                                                 )}
@@ -959,34 +1067,69 @@ export default function EarningsPage() {
                                             <TableCell className="max-w-[150px] truncate text-muted-foreground">
                                                 {earning.clientId?.name ||
                                                     earning.legacyClientCode ||
-                                                    "-"}
+                                                    '-'}
                                             </TableCell>
                                             <TableCell className="text-right font-medium">
                                                 <div className="flex flex-col items-end gap-1">
-                                                    <span className={cn(
-                                                        "text-sm font-semibold",
-                                                        earning.status === "unpaid" && earning.paidAmount > 0 && "text-orange-600"
-                                                    )}>
+                                                    <span
+                                                        className={cn(
+                                                            'text-sm font-semibold',
+                                                            earning.status ===
+                                                                'unpaid' &&
+                                                                earning.paidAmount >
+                                                                    0 &&
+                                                                'text-orange-600',
+                                                        )}
+                                                    >
                                                         {formatCurrency(
                                                             earning.totalAmount,
                                                             earning.currency,
                                                         )}
                                                     </span>
-                                                    {earning.paidAmount > 0 && earning.status !== "paid" && (
-                                                        <div className="w-24 space-y-1">
-                                                            <div className="flex justify-between text-[10px] text-muted-foreground font-normal">
-                                                                <span>Paid</span>
-                                                                <span>{Math.round((earning.paidAmount / earning.totalAmount) * 100)}%</span>
+                                                    {earning.paidAmount > 0 &&
+                                                        earning.status !==
+                                                            'paid' && (
+                                                            <div className="w-24 space-y-1">
+                                                                <div className="flex justify-between text-[10px] text-muted-foreground font-normal">
+                                                                    <span>
+                                                                        Paid
+                                                                    </span>
+                                                                    <span>
+                                                                        {Math.round(
+                                                                            (earning.paidAmount /
+                                                                                earning.totalAmount) *
+                                                                                100,
+                                                                        )}
+                                                                        %
+                                                                    </span>
+                                                                </div>
+                                                                <div className="h-1 w-full bg-muted rounded-full overflow-hidden">
+                                                                    <div
+                                                                        className="h-full bg-orange-500 rounded-full"
+                                                                        style={{
+                                                                            width: `${(earning.paidAmount / earning.totalAmount) * 100}%`,
+                                                                        }}
+                                                                    />
+                                                                </div>
                                                             </div>
-                                                            <div className="h-1 w-full bg-muted rounded-full overflow-hidden">
-                                                                <div
-                                                                    className="h-full bg-orange-500 rounded-full"
-                                                                    style={{ width: `${(earning.paidAmount / earning.totalAmount) * 100}%` }}
-                                                                />
-                                                            </div>
-                                                        </div>
-                                                    )}
+                                                        )}
                                                 </div>
+                                            </TableCell>
+                                            <TableCell className="text-right whitespace-nowrap">
+                                                <span className="text-xs text-destructive font-medium">
+                                                    -
+                                                    {formatCurrency(
+                                                        (earning.fees || 0) +
+                                                            (earning.tax || 0),
+                                                        earning.currency,
+                                                    )}
+                                                </span>
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                                <span className="text-xs font-mono font-medium text-muted-foreground">
+                                                    {earning.conversionRate ||
+                                                        '—'}
+                                                </span>
                                             </TableCell>
                                             <TableCell>
                                                 <Select
@@ -1001,43 +1144,52 @@ export default function EarningsPage() {
                                                 >
                                                     <SelectTrigger
                                                         className={cn(
-                                                            "w-auto h-8 border-none focus:ring-0 focus:ring-offset-0",
-                                                            earning.status === "paid"
-                                                                ? "text-green-600 font-medium hover:text-green-700"
-                                                                : earning.paidAmount > 0
-                                                                    ? "text-yellow-500 font-medium hover:text-yellow-600"
-                                                                    : "text-orange-600 font-medium hover:text-orange-700",
+                                                            'w-auto h-8 border-none focus:ring-0 focus:ring-offset-0',
+                                                            earning.status ===
+                                                                'paid'
+                                                                ? 'text-green-600 font-medium hover:text-green-700'
+                                                                : earning.paidAmount >
+                                                                    0
+                                                                  ? 'text-yellow-500 font-medium hover:text-yellow-600'
+                                                                  : 'text-orange-600 font-medium hover:text-orange-700',
                                                         )}
                                                     >
                                                         <div className="flex items-center gap-1.5">
-                                                            {earning.status === "paid" ? (
+                                                            {earning.status ===
+                                                            'paid' ? (
                                                                 <CheckCircle2 className="h-4 w-4" />
-                                                            ) : earning.paidAmount > 0 ? (
+                                                            ) : earning.paidAmount >
+                                                              0 ? (
                                                                 <HistoryIcon className="h-4 w-4" />
                                                             ) : (
                                                                 <Clock className="h-4 w-4" />
                                                             )}
                                                             <span className="capitalize text-xs font-semibold">
-                                                                {earning.status === "unpaid" && earning.paidAmount > 0 ? "Partially Paid" : earning.status}
+                                                                {earning.status ===
+                                                                    'unpaid' &&
+                                                                earning.paidAmount >
+                                                                    0
+                                                                    ? 'Partially Paid'
+                                                                    : earning.status}
                                                             </span>
                                                         </div>
                                                     </SelectTrigger>
                                                     <SelectContent>
                                                         <SelectItem value="unpaid">
                                                             <span className="flex items-center gap-2 text-orange-600">
-                                                                <XCircle className="h-4 w-4" />{" "}
+                                                                <XCircle className="h-4 w-4" />{' '}
                                                                 Unpaid
                                                             </span>
                                                         </SelectItem>
                                                         <SelectItem value="partialPaid">
                                                             <span className="flex items-center gap-2 text-yellow-600">
-                                                                <HistoryIcon className="h-4 w-4" />{" "}
+                                                                <HistoryIcon className="h-4 w-4" />{' '}
                                                                 Partially Paid
                                                             </span>
                                                         </SelectItem>
                                                         <SelectItem value="paid">
                                                             <span className="flex items-center gap-2 text-green-600">
-                                                                <CheckCircle2 className="h-4 w-4" />{" "}
+                                                                <CheckCircle2 className="h-4 w-4" />{' '}
                                                                 Paid
                                                             </span>
                                                         </SelectItem>
@@ -1045,15 +1197,15 @@ export default function EarningsPage() {
                                                 </Select>
                                             </TableCell>
                                             <TableCell className="text-right">
-                                                {earning.status === "paid" &&
-                                                    earning.amountInBDT > 0 ? (
+                                                {earning.status === 'paid' &&
+                                                earning.amountInBDT > 0 ? (
                                                     <span className="font-mono text-green-600/90 font-medium">
                                                         {formatCurrency(
                                                             earning.amountInBDT,
                                                         )}
                                                     </span>
                                                 ) : earning.status ===
-                                                    "paid" ? (
+                                                  'paid' ? (
                                                     <span className="text-orange-500/80 text-xs font-medium">
                                                         Pending
                                                     </span>
@@ -1109,39 +1261,58 @@ export default function EarningsPage() {
                                                         </Tooltip>
                                                     </TooltipProvider>
 
-                                                    {(earning.status === "unpaid" ||
-                                                        earning.paidAmount < earning.totalAmount - 0.01 ||
-                                                        earning.payments?.some(p => !p.amountInBDT || p.amountInBDT <= p.amount + 0.01) ||
-                                                        (earning.paidAmount > (earning.payments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0) + 0.01)) && (
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                className="h-8 w-8 text-foreground/70 hover:text-green-600"
-                                                                onClick={() =>
-                                                                    handleWithdraw(
-                                                                        earning,
-                                                                    )
-                                                                }
-                                                            >
-                                                                <Wallet className="h-4 w-4" />
-                                                            </Button>
-                                                        )}
+                                                    {(earning.status ===
+                                                        'unpaid' ||
+                                                        earning.paidAmount <
+                                                            earning.totalAmount -
+                                                                0.01 ||
+                                                        earning.payments?.some(
+                                                            (p) =>
+                                                                !p.amountInBDT ||
+                                                                p.amountInBDT <=
+                                                                    p.amount +
+                                                                        0.01,
+                                                        ) ||
+                                                        earning.paidAmount >
+                                                            (earning.payments?.reduce(
+                                                                (sum, p) =>
+                                                                    sum +
+                                                                    (p.amount ||
+                                                                        0),
+                                                                0,
+                                                            ) || 0) +
+                                                                0.01) && (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-8 w-8 text-foreground/70 hover:text-green-600"
+                                                            onClick={() =>
+                                                                handleWithdraw(
+                                                                    earning,
+                                                                )
+                                                            }
+                                                        >
+                                                            <Wallet className="h-4 w-4" />
+                                                        </Button>
+                                                    )}
 
                                                     <Button
                                                         variant="ghost"
                                                         size="icon"
                                                         className="h-8 w-8 text-foreground/70 hover:text-blue-500"
                                                         onClick={() =>
-                                                            handleSync(earning._id)
+                                                            handleSync(
+                                                                earning._id,
+                                                            )
                                                         }
                                                         disabled={isSyncing}
                                                         title="Sync with orders"
                                                     >
                                                         <RefreshCcw
                                                             className={cn(
-                                                                "h-4 w-4",
+                                                                'h-4 w-4',
                                                                 isSyncing &&
-                                                                "animate-spin",
+                                                                    'animate-spin',
                                                             )}
                                                         />
                                                     </Button>
@@ -1167,6 +1338,54 @@ export default function EarningsPage() {
                                     ))
                                 )}
                             </TableBody>
+                            {earnings.length > 0 && (
+                                <TableFooter className="bg-muted/30 font-bold border-t-2 border-border/50">
+                                    <TableRow>
+                                        <TableCell
+                                            colSpan={3}
+                                            className="py-3 text-sm"
+                                        >
+                                            Totals
+                                        </TableCell>
+                                        <TableCell className="text-right py-3">
+                                            {formatCurrency(
+                                                earnings.reduce(
+                                                    (sum, e) =>
+                                                        sum + e.totalAmount,
+                                                    0,
+                                                ),
+                                                earnings[0]?.currency || 'USD',
+                                            )}
+                                        </TableCell>
+                                        <TableCell className="text-right py-3 text-destructive">
+                                            -
+                                            {formatCurrency(
+                                                earnings.reduce(
+                                                    (sum, e) =>
+                                                        sum +
+                                                        (e.fees || 0) +
+                                                        (e.tax || 0),
+                                                    0,
+                                                ),
+                                                earnings[0]?.currency || 'USD',
+                                            )}
+                                        </TableCell>
+                                        <TableCell className="text-right py-3" />
+                                        <TableCell className="py-3" />
+                                        <TableCell className="text-right py-3 text-green-600 font-mono">
+                                            {formatCurrency(
+                                                earnings.reduce(
+                                                    (sum, e) =>
+                                                        sum +
+                                                        (e.amountInBDT || 0),
+                                                    0,
+                                                ),
+                                            )}
+                                        </TableCell>
+                                        <TableCell className="py-3" />
+                                    </TableRow>
+                                </TableFooter>
+                            )}
                         </Table>
                     </div>
 
@@ -1175,8 +1394,8 @@ export default function EarningsPage() {
                         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t">
                             <div className="flex items-center gap-2">
                                 <p className="text-sm text-muted-foreground">
-                                    Showing {(page - 1) * limit + 1} to{" "}
-                                    {Math.min(page * limit, meta.total)} of{" "}
+                                    Showing {(page - 1) * limit + 1} to{' '}
+                                    {Math.min(page * limit, meta.total)} of{' '}
                                     {meta.total} entries
                                 </p>
                                 <Select
@@ -1242,13 +1461,13 @@ export default function EarningsPage() {
                                                     2,
                                                     3,
                                                     4,
-                                                    "...",
+                                                    '...',
                                                     totalPages,
                                                 );
                                             } else if (page >= totalPages - 2) {
                                                 pageNumbers.push(
                                                     1,
-                                                    "...",
+                                                    '...',
                                                     totalPages - 3,
                                                     totalPages - 2,
                                                     totalPages - 1,
@@ -1257,17 +1476,17 @@ export default function EarningsPage() {
                                             } else {
                                                 pageNumbers.push(
                                                     1,
-                                                    "...",
+                                                    '...',
                                                     page - 1,
                                                     page,
                                                     page + 1,
-                                                    "...",
+                                                    '...',
                                                     totalPages,
                                                 );
                                             }
                                         }
                                         return pageNumbers.map((num, idx) =>
-                                            num === "..." ? (
+                                            num === '...' ? (
                                                 <span
                                                     key={`ellipsis-${idx}`}
                                                     className="px-2 text-muted-foreground"
@@ -1279,8 +1498,8 @@ export default function EarningsPage() {
                                                     key={num}
                                                     variant={
                                                         page === num
-                                                            ? "default"
-                                                            : "outline"
+                                                            ? 'default'
+                                                            : 'outline'
                                                     }
                                                     size="icon"
                                                     className="h-8 w-8"
@@ -1366,81 +1585,175 @@ export default function EarningsPage() {
                                         </div>
                                         <div className="text-xl font-bold text-orange-600">
                                             {formatCurrency(
-                                                Math.max(0, selectedEarning.totalAmount - selectedEarning.paidAmount),
+                                                Math.max(
+                                                    0,
+                                                    selectedEarning.totalAmount -
+                                                        selectedEarning.paidAmount,
+                                                ),
                                                 selectedEarning.currency,
                                             )}
                                         </div>
                                     </div>
                                 </div>
 
-                                <Tabs value={withdrawTab} onValueChange={(val) => {
-                                    setWithdrawTab(val);
-                                    if (val === "payment") {
-                                        setWithdrawAmount(Math.max(0, selectedEarning.totalAmount - selectedEarning.paidAmount).toFixed(2));
-                                        setWithdrawInvoiceNumber("manual");
-                                        setWithdrawTransactionId("");
-                                        setWithdrawMethod("Cash");
-                                        setSelectedPaymentId("manual");
-                                    } else {
-                                        const unconverted = selectedEarning.payments?.filter(p => !p.amountInBDT || p.amountInBDT <= p.amount + 0.01 || p.conversionRate <= 1.1) || [];
-                                        const paymentsTotal = selectedEarning.payments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
-                                        const gap = selectedEarning.paidAmount - paymentsTotal;
+                                <Tabs
+                                    value={withdrawTab}
+                                    onValueChange={(val) => {
+                                        setWithdrawTab(val);
+                                        if (val === 'payment') {
+                                            setWithdrawAmount(
+                                                Math.max(
+                                                    0,
+                                                    selectedEarning.totalAmount -
+                                                        selectedEarning.paidAmount,
+                                                ).toFixed(2),
+                                            );
+                                            setWithdrawInvoiceNumber('manual');
+                                            setWithdrawTransactionId('');
+                                            setWithdrawMethod('Cash');
+                                            setSelectedPaymentId('manual');
+                                        } else {
+                                            const unconverted =
+                                                selectedEarning.payments?.filter(
+                                                    (p) =>
+                                                        !p.amountInBDT ||
+                                                        p.amountInBDT <=
+                                                            p.amount + 0.01 ||
+                                                        p.conversionRate <= 1.1,
+                                                ) || [];
+                                            const paymentsTotal =
+                                                selectedEarning.payments?.reduce(
+                                                    (sum, p) =>
+                                                        sum + (p.amount || 0),
+                                                    0,
+                                                ) || 0;
+                                            const gap =
+                                                selectedEarning.paidAmount -
+                                                paymentsTotal;
 
-                                        if (unconverted.length > 0) {
-                                            const firstP = unconverted[0];
-                                            setSelectedPaymentId(firstP._id || "manual");
-                                            setWithdrawAmount(firstP.amount.toString());
-                                            setWithdrawInvoiceNumber(firstP.invoiceNumber || "manual");
-                                            setWithdrawTransactionId(firstP.transactionId || "");
-                                            setWithdrawMethod(firstP.method || "Cash");
-                                        } else if (gap > 0.01) {
-                                            setSelectedPaymentId("manual-gap");
-                                            setWithdrawAmount(gap.toFixed(2));
-                                            setWithdrawInvoiceNumber("manual");
-                                            setWithdrawTransactionId("");
-                                            setWithdrawMethod("Cash");
+                                            if (unconverted.length > 0) {
+                                                const firstP = unconverted[0];
+                                                setSelectedPaymentId(
+                                                    firstP._id || 'manual',
+                                                );
+                                                setWithdrawAmount(
+                                                    firstP.amount.toString(),
+                                                );
+                                                setWithdrawInvoiceNumber(
+                                                    firstP.invoiceNumber ||
+                                                        'manual',
+                                                );
+                                                setWithdrawTransactionId(
+                                                    firstP.transactionId || '',
+                                                );
+                                                setWithdrawMethod(
+                                                    firstP.method || 'Cash',
+                                                );
+                                            } else if (gap > 0.01) {
+                                                setSelectedPaymentId(
+                                                    'manual-gap',
+                                                );
+                                                setWithdrawAmount(
+                                                    gap.toFixed(2),
+                                                );
+                                                setWithdrawInvoiceNumber(
+                                                    'manual',
+                                                );
+                                                setWithdrawTransactionId('');
+                                                setWithdrawMethod('Cash');
+                                            }
                                         }
-                                    }
-                                }}>
+                                    }}
+                                >
                                     <TabsList className="grid w-full grid-cols-2 mb-6">
-                                        <TabsTrigger value="payment">New Payment</TabsTrigger>
+                                        <TabsTrigger value="payment">
+                                            New Payment
+                                        </TabsTrigger>
                                         <TabsTrigger
                                             value="conversion"
-                                            disabled={(selectedEarning.payments?.filter(p => !p.amountInBDT || p.amountInBDT <= p.amount + 0.01 || p.conversionRate <= 1.1) || []).length === 0 &&
-                                                (selectedEarning.paidAmount - (selectedEarning.payments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0)) <= 0.01
+                                            disabled={
+                                                (
+                                                    selectedEarning.payments?.filter(
+                                                        (p) =>
+                                                            !p.amountInBDT ||
+                                                            p.amountInBDT <=
+                                                                p.amount +
+                                                                    0.01 ||
+                                                            p.conversionRate <=
+                                                                1.1,
+                                                    ) || []
+                                                ).length === 0 &&
+                                                selectedEarning.paidAmount -
+                                                    (selectedEarning.payments?.reduce(
+                                                        (sum, p) =>
+                                                            sum +
+                                                            (p.amount || 0),
+                                                        0,
+                                                    ) || 0) <=
+                                                    0.01
                                             }
                                         >
                                             Convert Existing
                                         </TabsTrigger>
                                     </TabsList>
 
-                                    <TabsContent value="payment" className="space-y-4 pt-1 outline-none">
+                                    <TabsContent
+                                        value="payment"
+                                        className="space-y-4 pt-1 outline-none"
+                                    >
                                         <div className="grid grid-cols-2 gap-4">
                                             <div className="space-y-1.5">
-                                                <Label className="text-xs font-semibold">Amount to Pay</Label>
+                                                <Label className="text-xs font-semibold">
+                                                    Amount to Pay
+                                                </Label>
                                                 <div className="relative">
                                                     <Input
                                                         type="number"
                                                         value={withdrawAmount}
-                                                        onChange={(e) => setWithdrawAmount(e.target.value)}
+                                                        onChange={(e) =>
+                                                            setWithdrawAmount(
+                                                                e.target.value,
+                                                            )
+                                                        }
                                                         className="pl-6 h-9"
                                                     />
-                                                    <span className="absolute left-2.5 top-2.5 text-muted-foreground text-xs">$</span>
+                                                    <span className="absolute left-2.5 top-2.5 text-muted-foreground text-xs">
+                                                        $
+                                                    </span>
                                                 </div>
                                             </div>
                                             <div className="space-y-1.5">
-                                                <Label className="text-xs font-semibold">Method</Label>
-                                                <Select value={withdrawMethod} onValueChange={setWithdrawMethod}>
+                                                <Label className="text-xs font-semibold">
+                                                    Method
+                                                </Label>
+                                                <Select
+                                                    value={withdrawMethod}
+                                                    onValueChange={
+                                                        setWithdrawMethod
+                                                    }
+                                                >
                                                     <SelectTrigger className="w-full h-9">
                                                         <SelectValue />
                                                     </SelectTrigger>
                                                     <SelectContent>
-                                                        <SelectItem value="Cash">Cash</SelectItem>
-                                                        <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
-                                                        <SelectItem value="PayPal">PayPal (Manual)</SelectItem>
-                                                        <SelectItem value="Stripe">Stripe (Manual)</SelectItem>
-                                                        <SelectItem value="Check">Check</SelectItem>
-                                                        <SelectItem value="Other">Other</SelectItem>
+                                                        <SelectItem value="Cash">
+                                                            Cash
+                                                        </SelectItem>
+                                                        <SelectItem value="Bank Transfer">
+                                                            Bank Transfer
+                                                        </SelectItem>
+                                                        <SelectItem value="PayPal">
+                                                            PayPal (Manual)
+                                                        </SelectItem>
+                                                        <SelectItem value="Stripe">
+                                                            Stripe (Manual)
+                                                        </SelectItem>
+                                                        <SelectItem value="Check">
+                                                            Check
+                                                        </SelectItem>
+                                                        <SelectItem value="Other">
+                                                            Other
+                                                        </SelectItem>
                                                     </SelectContent>
                                                 </Select>
                                             </div>
@@ -1448,33 +1761,74 @@ export default function EarningsPage() {
 
                                         <div className="grid grid-cols-2 gap-4">
                                             <div className="space-y-1.5">
-                                                <Label className="text-xs font-semibold">Select Invoice (Optional)</Label>
+                                                <Label className="text-xs font-semibold">
+                                                    Select Invoice (Optional)
+                                                </Label>
                                                 <Select
-                                                    value={withdrawInvoiceNumber}
+                                                    value={
+                                                        withdrawInvoiceNumber
+                                                    }
                                                     onValueChange={(val) => {
-                                                        setWithdrawInvoiceNumber(val);
-                                                        const selectedInv = pendingInvoices.find((i) => i.invoiceNumber === val);
-                                                        if (selectedInv) setWithdrawAmount(selectedInv.totalAmount.toString());
+                                                        setWithdrawInvoiceNumber(
+                                                            val,
+                                                        );
+                                                        const selectedInv =
+                                                            pendingInvoices.find(
+                                                                (i) =>
+                                                                    i.invoiceNumber ===
+                                                                    val,
+                                                            );
+                                                        if (selectedInv)
+                                                            setWithdrawAmount(
+                                                                selectedInv.totalAmount.toString(),
+                                                            );
                                                     }}
                                                 >
                                                     <SelectTrigger className="w-full h-9">
                                                         <SelectValue placeholder="Manual Entry" />
                                                     </SelectTrigger>
                                                     <SelectContent>
-                                                        <SelectItem value="manual">None / Manual</SelectItem>
-                                                        {pendingInvoices.map((inv) => (
-                                                            <SelectItem key={inv.invoiceNumber} value={inv.invoiceNumber}>
-                                                                #{inv.invoiceNumber} - {formatCurrency(inv.totalAmount, inv.currency)}
-                                                            </SelectItem>
-                                                        ))}
+                                                        <SelectItem value="manual">
+                                                            None / Manual
+                                                        </SelectItem>
+                                                        {pendingInvoices.map(
+                                                            (inv) => (
+                                                                <SelectItem
+                                                                    key={
+                                                                        inv.invoiceNumber
+                                                                    }
+                                                                    value={
+                                                                        inv.invoiceNumber
+                                                                    }
+                                                                >
+                                                                    #
+                                                                    {
+                                                                        inv.invoiceNumber
+                                                                    }{' '}
+                                                                    -{' '}
+                                                                    {formatCurrency(
+                                                                        inv.totalAmount,
+                                                                        inv.currency,
+                                                                    )}
+                                                                </SelectItem>
+                                                            ),
+                                                        )}
                                                     </SelectContent>
                                                 </Select>
                                             </div>
                                             <div className="space-y-1.5">
-                                                <Label className="text-xs font-semibold">Reference ID / Inv #</Label>
+                                                <Label className="text-xs font-semibold">
+                                                    Reference ID / Inv #
+                                                </Label>
                                                 <Input
-                                                    value={withdrawTransactionId}
-                                                    onChange={(e) => setWithdrawTransactionId(e.target.value)}
+                                                    value={
+                                                        withdrawTransactionId
+                                                    }
+                                                    onChange={(e) =>
+                                                        setWithdrawTransactionId(
+                                                            e.target.value,
+                                                        )
+                                                    }
                                                     placeholder="e.g. PayPal-998"
                                                     className="h-9"
                                                 />
@@ -1482,28 +1836,70 @@ export default function EarningsPage() {
                                         </div>
                                     </TabsContent>
 
-                                    <TabsContent value="conversion" className="space-y-4 pt-1 outline-none">
+                                    <TabsContent
+                                        value="conversion"
+                                        className="space-y-4 pt-1 outline-none"
+                                    >
                                         <div className="space-y-3">
                                             <div className="space-y-1.5">
-                                                <Label className="text-xs font-semibold">Select Payment to Convert</Label>
+                                                <Label className="text-xs font-semibold">
+                                                    Select Payment to Convert
+                                                </Label>
                                                 <Select
                                                     value={selectedPaymentId}
                                                     onValueChange={(val) => {
-                                                        setSelectedPaymentId(val);
-                                                        if (val === "manual-gap") {
-                                                            const pTotal = selectedEarning.payments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
-                                                            const gap = selectedEarning.paidAmount - pTotal;
-                                                            setWithdrawAmount(gap.toFixed(2));
-                                                            setWithdrawInvoiceNumber("manual");
-                                                            setWithdrawTransactionId("");
-                                                            setWithdrawMethod("Cash");
+                                                        setSelectedPaymentId(
+                                                            val,
+                                                        );
+                                                        if (
+                                                            val === 'manual-gap'
+                                                        ) {
+                                                            const pTotal =
+                                                                selectedEarning.payments?.reduce(
+                                                                    (sum, p) =>
+                                                                        sum +
+                                                                        (p.amount ||
+                                                                            0),
+                                                                    0,
+                                                                ) || 0;
+                                                            const gap =
+                                                                selectedEarning.paidAmount -
+                                                                pTotal;
+                                                            setWithdrawAmount(
+                                                                gap.toFixed(2),
+                                                            );
+                                                            setWithdrawInvoiceNumber(
+                                                                'manual',
+                                                            );
+                                                            setWithdrawTransactionId(
+                                                                '',
+                                                            );
+                                                            setWithdrawMethod(
+                                                                'Cash',
+                                                            );
                                                         } else {
-                                                            const p = selectedEarning.payments?.find(p => p._id === val);
+                                                            const p =
+                                                                selectedEarning.payments?.find(
+                                                                    (p) =>
+                                                                        p._id ===
+                                                                        val,
+                                                                );
                                                             if (p) {
-                                                                setWithdrawAmount(p.amount.toString());
-                                                                setWithdrawInvoiceNumber(p.invoiceNumber || "manual");
-                                                                setWithdrawTransactionId(p.transactionId || "");
-                                                                setWithdrawMethod(p.method || "Cash");
+                                                                setWithdrawAmount(
+                                                                    p.amount.toString(),
+                                                                );
+                                                                setWithdrawInvoiceNumber(
+                                                                    p.invoiceNumber ||
+                                                                        'manual',
+                                                                );
+                                                                setWithdrawTransactionId(
+                                                                    p.transactionId ||
+                                                                        '',
+                                                                );
+                                                                setWithdrawMethod(
+                                                                    p.method ||
+                                                                        'Cash',
+                                                                );
                                                             }
                                                         }
                                                     }}
@@ -1512,18 +1908,56 @@ export default function EarningsPage() {
                                                         <SelectValue />
                                                     </SelectTrigger>
                                                     <SelectContent>
-                                                        {selectedEarning.payments?.filter(p => !p.amountInBDT || p.amountInBDT <= p.amount + 0.01 || p.conversionRate <= 1.1).map((p) => (
-                                                            <SelectItem key={p._id} value={p._id}>
-                                                                {formatCurrency(p.amount, selectedEarning.currency)} via {p.method} ({p.invoiceNumber})
-                                                            </SelectItem>
-                                                        ))}
+                                                        {selectedEarning.payments
+                                                            ?.filter(
+                                                                (p) =>
+                                                                    !p.amountInBDT ||
+                                                                    p.amountInBDT <=
+                                                                        p.amount +
+                                                                            0.01 ||
+                                                                    p.conversionRate <=
+                                                                        1.1,
+                                                            )
+                                                            .map((p) => (
+                                                                <SelectItem
+                                                                    key={p._id}
+                                                                    value={
+                                                                        p._id
+                                                                    }
+                                                                >
+                                                                    {formatCurrency(
+                                                                        p.amount,
+                                                                        selectedEarning.currency,
+                                                                    )}{' '}
+                                                                    via{' '}
+                                                                    {p.method} (
+                                                                    {
+                                                                        p.invoiceNumber
+                                                                    }
+                                                                    )
+                                                                </SelectItem>
+                                                            ))}
                                                         {(() => {
-                                                            const pTotal = selectedEarning.payments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
-                                                            const gap = selectedEarning.paidAmount - pTotal;
+                                                            const pTotal =
+                                                                selectedEarning.payments?.reduce(
+                                                                    (sum, p) =>
+                                                                        sum +
+                                                                        (p.amount ||
+                                                                            0),
+                                                                    0,
+                                                                ) || 0;
+                                                            const gap =
+                                                                selectedEarning.paidAmount -
+                                                                pTotal;
                                                             if (gap > 0.01) {
                                                                 return (
                                                                     <SelectItem value="manual-gap">
-                                                                        {formatCurrency(gap, selectedEarning.currency)} (Manual/Marked Paid)
+                                                                        {formatCurrency(
+                                                                            gap,
+                                                                            selectedEarning.currency,
+                                                                        )}{' '}
+                                                                        (Manual/Marked
+                                                                        Paid)
                                                                     </SelectItem>
                                                                 );
                                                             }
@@ -1535,24 +1969,58 @@ export default function EarningsPage() {
 
                                             <div className="grid grid-cols-2 gap-4 bg-muted/30 p-4 rounded-xl border border-dashed border-border/60">
                                                 <div>
-                                                    <div className="text-[10px] text-muted-foreground uppercase font-bold mb-0.5">Amount</div>
+                                                    <div className="text-[10px] text-muted-foreground uppercase font-bold mb-0.5">
+                                                        Amount
+                                                    </div>
                                                     <div className="text-sm font-semibold">
-                                                        {selectedPaymentId === "manual-gap"
-                                                            ? formatCurrency(selectedEarning.paidAmount - (selectedEarning.payments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0), selectedEarning.currency)
-                                                            : formatCurrency(Number(withdrawAmount), selectedEarning.currency)}
+                                                        {selectedPaymentId ===
+                                                        'manual-gap'
+                                                            ? formatCurrency(
+                                                                  selectedEarning.paidAmount -
+                                                                      (selectedEarning.payments?.reduce(
+                                                                          (
+                                                                              sum,
+                                                                              p,
+                                                                          ) =>
+                                                                              sum +
+                                                                              (p.amount ||
+                                                                                  0),
+                                                                          0,
+                                                                      ) || 0),
+                                                                  selectedEarning.currency,
+                                                              )
+                                                            : formatCurrency(
+                                                                  Number(
+                                                                      withdrawAmount,
+                                                                  ),
+                                                                  selectedEarning.currency,
+                                                              )}
                                                     </div>
                                                 </div>
                                                 <div>
-                                                    <div className="text-[10px] text-muted-foreground uppercase font-bold mb-0.5">Method</div>
-                                                    <div className="text-sm font-semibold">{withdrawMethod}</div>
+                                                    <div className="text-[10px] text-muted-foreground uppercase font-bold mb-0.5">
+                                                        Method
+                                                    </div>
+                                                    <div className="text-sm font-semibold">
+                                                        {withdrawMethod}
+                                                    </div>
                                                 </div>
                                                 <div>
-                                                    <div className="text-[10px] text-muted-foreground uppercase font-bold mb-0.5">Invoice</div>
-                                                    <div className="text-sm font-semibold truncate">#{withdrawInvoiceNumber}</div>
+                                                    <div className="text-[10px] text-muted-foreground uppercase font-bold mb-0.5">
+                                                        Invoice
+                                                    </div>
+                                                    <div className="text-sm font-semibold truncate">
+                                                        #{withdrawInvoiceNumber}
+                                                    </div>
                                                 </div>
                                                 <div>
-                                                    <div className="text-[10px] text-muted-foreground uppercase font-bold mb-0.5">Reference</div>
-                                                    <div className="text-sm font-semibold truncate">{withdrawTransactionId || "N/A"}</div>
+                                                    <div className="text-[10px] text-muted-foreground uppercase font-bold mb-0.5">
+                                                        Reference
+                                                    </div>
+                                                    <div className="text-sm font-semibold truncate">
+                                                        {withdrawTransactionId ||
+                                                            'N/A'}
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
@@ -1561,30 +2029,42 @@ export default function EarningsPage() {
 
                                 <div className="grid grid-cols-3 gap-4 border-t border-border/50 pt-6">
                                     <div className="space-y-1.5">
-                                        <Label className="text-xs font-semibold">Conversion Rate</Label>
+                                        <Label className="text-xs font-semibold">
+                                            Conversion Rate
+                                        </Label>
                                         <Input
                                             type="number"
                                             value={withdrawRate}
-                                            onChange={(e) => setWithdrawRate(e.target.value)}
+                                            onChange={(e) =>
+                                                setWithdrawRate(e.target.value)
+                                            }
                                             placeholder="e.g. 120"
                                             className="h-9"
                                         />
                                     </div>
                                     <div className="space-y-1.5">
-                                        <Label className="text-xs font-semibold">Fees</Label>
+                                        <Label className="text-xs font-semibold">
+                                            Fees
+                                        </Label>
                                         <Input
                                             type="number"
                                             value={withdrawFees}
-                                            onChange={(e) => setWithdrawFees(e.target.value)}
+                                            onChange={(e) =>
+                                                setWithdrawFees(e.target.value)
+                                            }
                                             className="h-9"
                                         />
                                     </div>
                                     <div className="space-y-1.5">
-                                        <Label className="text-xs font-semibold">Tax</Label>
+                                        <Label className="text-xs font-semibold">
+                                            Tax
+                                        </Label>
                                         <Input
                                             type="number"
                                             value={withdrawTax}
-                                            onChange={(e) => setWithdrawTax(e.target.value)}
+                                            onChange={(e) =>
+                                                setWithdrawTax(e.target.value)
+                                            }
                                             className="h-9"
                                         />
                                     </div>
@@ -1601,17 +2081,25 @@ export default function EarningsPage() {
                                     </div>
                                     <div className="flex justify-between text-xs text-muted-foreground">
                                         <span>
-                                            Net: {formatCurrency(withdrawNetAmount, selectedEarning.currency)}
+                                            Net:{' '}
+                                            {formatCurrency(
+                                                withdrawNetAmount,
+                                                selectedEarning.currency,
+                                            )}
                                         </span>
                                         <span>Rate: {withdrawRateNum}</span>
                                     </div>
                                 </div>
 
                                 <div className="space-y-1.5">
-                                    <Label className="text-xs font-semibold">Internal Notes</Label>
+                                    <Label className="text-xs font-semibold">
+                                        Internal Notes
+                                    </Label>
                                     <Textarea
                                         value={withdrawNotes}
-                                        onChange={(e) => setWithdrawNotes(e.target.value)}
+                                        onChange={(e) =>
+                                            setWithdrawNotes(e.target.value)
+                                        }
                                         placeholder="Add any transaction details..."
                                         rows={2}
                                         className="resize-none"
@@ -1659,14 +2147,14 @@ export default function EarningsPage() {
                                 </span>
                                 <Badge
                                     variant={
-                                        selectedEarning.status === "paid"
-                                            ? "default"
-                                            : "secondary"
+                                        selectedEarning.status === 'paid'
+                                            ? 'default'
+                                            : 'secondary'
                                     }
                                     className={
-                                        selectedEarning.status === "paid"
-                                            ? "bg-green-500/15 text-green-600 hover:bg-green-500/25"
-                                            : "bg-orange-500/15 text-orange-600 hover:bg-orange-500/25"
+                                        selectedEarning.status === 'paid'
+                                            ? 'bg-green-500/15 text-green-600 hover:bg-green-500/25'
+                                            : 'bg-orange-500/15 text-orange-600 hover:bg-orange-500/25'
                                     }
                                 >
                                     {selectedEarning.status.toUpperCase()}
@@ -1686,7 +2174,7 @@ export default function EarningsPage() {
                                                         m.value ===
                                                         selectedEarning.month,
                                                 )?.label
-                                            }{" "}
+                                            }{' '}
                                             {selectedEarning.year}
                                         </div>
                                     </div>
@@ -1697,7 +2185,7 @@ export default function EarningsPage() {
                                         <div className="font-medium truncate">
                                             {selectedEarning.clientId?.name ||
                                                 selectedEarning.legacyClientCode ||
-                                                "N/A"}
+                                                'N/A'}
                                         </div>
                                     </div>
                                     <div>
@@ -1706,7 +2194,7 @@ export default function EarningsPage() {
                                         </div>
                                         <div className="font-medium">
                                             {selectedEarning.isLegacy
-                                                ? "Legacy"
+                                                ? 'Legacy'
                                                 : `${selectedEarning.orderIds?.length || 0} orders`}
                                         </div>
                                     </div>
@@ -1723,7 +2211,7 @@ export default function EarningsPage() {
                                     </div>
                                 </div>
 
-                                {selectedEarning.status === "paid" && (
+                                {selectedEarning.status === 'paid' && (
                                     <>
                                         <div className="h-px bg-border/50 my-2" />
                                         <div className="grid grid-cols-2 gap-4 text-sm">
@@ -1735,7 +2223,7 @@ export default function EarningsPage() {
                                                     -
                                                     {formatCurrency(
                                                         selectedEarning.fees +
-                                                        selectedEarning.tax,
+                                                            selectedEarning.tax,
                                                         selectedEarning.currency,
                                                     )}
                                                 </div>
@@ -1758,7 +2246,7 @@ export default function EarningsPage() {
                                                 <div className="font-medium">
                                                     {
                                                         selectedEarning.conversionRate
-                                                    }{" "}
+                                                    }{' '}
                                                     BDT
                                                 </div>
                                             </div>
@@ -1769,12 +2257,12 @@ export default function EarningsPage() {
                                                 <div className="font-medium">
                                                     {selectedEarning.paidAt
                                                         ? format(
-                                                            new Date(
-                                                                selectedEarning.paidAt,
-                                                            ),
-                                                            "P",
-                                                        )
-                                                        : "-"}
+                                                              new Date(
+                                                                  selectedEarning.paidAt,
+                                                              ),
+                                                              'P',
+                                                          )
+                                                        : '-'}
                                                 </div>
                                             </div>
                                         </div>
@@ -1791,38 +2279,60 @@ export default function EarningsPage() {
                                     </>
                                 )}
 
-                                {selectedEarning.payments && selectedEarning.payments.length > 0 && (
-                                    <div className="space-y-2">
-                                        <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                                            <HistoryIcon className="h-3 w-3" />
-                                            Payment Ledger
-                                        </div>
-                                        <div className="rounded-lg border overflow-hidden">
-                                            <Table className="text-[11px]">
-                                                <TableHeader className="bg-muted/30">
-                                                    <TableRow className="h-8">
-                                                        <TableHead className="h-8">Invoice</TableHead>
-                                                        <TableHead className="h-8">Method</TableHead>
-                                                        <TableHead className="h-8 text-right">Amount</TableHead>
-                                                    </TableRow>
-                                                </TableHeader>
-                                                <TableBody>
-                                                    {selectedEarning.payments.map((payment, idx) => (
-                                                        <TableRow key={idx} className="h-8">
-                                                            <TableCell className="h-8 font-mono py-1">
-                                                                #{payment.invoiceNumber}
-                                                            </TableCell>
-                                                            <TableCell className="h-8 py-1">{payment.method}</TableCell>
-                                                            <TableCell className="h-8 text-right py-1 font-medium">
-                                                                {formatCurrency(payment.amount, selectedEarning.currency)}
-                                                            </TableCell>
+                                {selectedEarning.payments &&
+                                    selectedEarning.payments.length > 0 && (
+                                        <div className="space-y-2">
+                                            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                                                <HistoryIcon className="h-3 w-3" />
+                                                Payment Ledger
+                                            </div>
+                                            <div className="rounded-lg border overflow-hidden">
+                                                <Table className="text-[11px]">
+                                                    <TableHeader className="bg-muted/30">
+                                                        <TableRow className="h-8">
+                                                            <TableHead className="h-8">
+                                                                Invoice
+                                                            </TableHead>
+                                                            <TableHead className="h-8">
+                                                                Method
+                                                            </TableHead>
+                                                            <TableHead className="h-8 text-right">
+                                                                Amount
+                                                            </TableHead>
                                                         </TableRow>
-                                                    ))}
-                                                </TableBody>
-                                            </Table>
+                                                    </TableHeader>
+                                                    <TableBody>
+                                                        {selectedEarning.payments.map(
+                                                            (payment, idx) => (
+                                                                <TableRow
+                                                                    key={idx}
+                                                                    className="h-8"
+                                                                >
+                                                                    <TableCell className="h-8 font-mono py-1">
+                                                                        #
+                                                                        {
+                                                                            payment.invoiceNumber
+                                                                        }
+                                                                    </TableCell>
+                                                                    <TableCell className="h-8 py-1">
+                                                                        {
+                                                                            payment.method
+                                                                        }
+                                                                    </TableCell>
+                                                                    <TableCell className="h-8 text-right py-1 font-medium">
+                                                                        {formatCurrency(
+                                                                            payment.amount,
+                                                                            selectedEarning.currency,
+                                                                        )}
+                                                                    </TableCell>
+                                                                </TableRow>
+                                                            ),
+                                                        )}
+                                                    </TableBody>
+                                                </Table>
+                                            </div>
                                         </div>
-                                    </div>
-                                )}
+                                    )}
 
                                 {selectedEarning.notes && (
                                     <div className="text-xs bg-muted/20 p-2.5 rounded italic text-muted-foreground border border-border/50">
@@ -1841,10 +2351,10 @@ export default function EarningsPage() {
                 onOpenChange={(open) => {
                     setIsBulkWithdrawDialogOpen(open);
                     if (!open) {
-                        setBulkClientId("");
-                        setBulkFees("0");
-                        setBulkTax("0");
-                        setBulkNotes("");
+                        setBulkClientId('');
+                        setBulkFees('0');
+                        setBulkTax('0');
+                        setBulkNotes('');
                     }
                 }}
             >
@@ -1855,10 +2365,10 @@ export default function EarningsPage() {
                             Monthly Payout Statement
                         </DialogTitle>
                         <DialogDescription>
-                            Generate and process withdrawal for{" "}
+                            Generate and process withdrawal for{' '}
                             {format(
                                 new Date(bulkYear, bulkMonth - 1),
-                                "MMMM yyyy",
+                                'MMMM yyyy',
                             )}
                         </DialogDescription>
                     </DialogHeader>
@@ -1925,15 +2435,15 @@ export default function EarningsPage() {
                                 >
                                     <SelectTrigger
                                         className={cn(
-                                            "bg-background transition-colors",
-                                            !bulkClientId && "border-dashed",
+                                            'bg-background transition-colors',
+                                            !bulkClientId && 'border-dashed',
                                         )}
                                     >
                                         <SelectValue
                                             placeholder={
                                                 isFetchingClients
-                                                    ? "Loading clients..."
-                                                    : "Select client to generate statement..."
+                                                    ? 'Loading clients...'
+                                                    : 'Select client to generate statement...'
                                             }
                                         />
                                     </SelectTrigger>
@@ -1947,13 +2457,13 @@ export default function EarningsPage() {
                                                     No results found
                                                 </div>
                                                 <p className="text-xs text-muted-foreground">
-                                                    No unpaid earnings found for{" "}
+                                                    No unpaid earnings found for{' '}
                                                     {format(
                                                         new Date(
                                                             bulkYear,
                                                             bulkMonth - 1,
                                                         ),
-                                                        "MMMM yyyy",
+                                                        'MMMM yyyy',
                                                     )}
                                                 </p>
                                             </div>
@@ -1974,7 +2484,7 @@ export default function EarningsPage() {
                                                                 className="text-[10px] h-5"
                                                             >
                                                                 {client.currency ||
-                                                                    "USD"}
+                                                                    'USD'}
                                                             </Badge>
                                                         </div>
                                                     </SelectItem>
@@ -2001,7 +2511,7 @@ export default function EarningsPage() {
                                     <Card className="bg-primary/5 border-primary/20 shadow-sm">
                                         <CardContent className="p-4">
                                             <p className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
-                                                <FileText className="h-3.5 w-3.5" />{" "}
+                                                <FileText className="h-3.5 w-3.5" />{' '}
                                                 Total Orders
                                             </p>
                                             <p className="text-2xl font-bold mt-1 text-foreground">
@@ -2014,7 +2524,7 @@ export default function EarningsPage() {
                                             <div className="flex justify-between items-start">
                                                 <div>
                                                     <p className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
-                                                        <CreditCard className="h-3.5 w-3.5" />{" "}
+                                                        <CreditCard className="h-3.5 w-3.5" />{' '}
                                                         Gross Revenue
                                                     </p>
                                                     <p className="text-2xl font-bold mt-1 text-primary">
@@ -2049,8 +2559,8 @@ export default function EarningsPage() {
                                                 <span className="absolute left-3 top-2.5 text-muted-foreground text-sm font-medium">
                                                     {CURRENCY_SYMBOLS[
                                                         bulkOrdersData?.currency ||
-                                                        "USD"
-                                                    ] || "$"}
+                                                            'USD'
+                                                    ] || '$'}
                                                 </span>
                                                 <Input
                                                     type="number"
@@ -2073,8 +2583,8 @@ export default function EarningsPage() {
                                                 <span className="absolute left-3 top-2.5 text-muted-foreground text-sm font-medium">
                                                     {CURRENCY_SYMBOLS[
                                                         bulkOrdersData?.currency ||
-                                                        "USD"
-                                                    ] || "$"}
+                                                            'USD'
+                                                    ] || '$'}
                                                 </span>
                                                 <Input
                                                     type="number"
@@ -2098,10 +2608,10 @@ export default function EarningsPage() {
                                                             <Info className="h-3 w-3 text-muted-foreground/50 cursor-pointer" />
                                                         </TooltipTrigger>
                                                         <TooltipContent>
-                                                            1{" "}
+                                                            1{' '}
                                                             {
                                                                 bulkOrdersData?.currency
-                                                            }{" "}
+                                                            }{' '}
                                                             = ? BDT
                                                         </TooltipContent>
                                                     </Tooltip>
@@ -2153,7 +2663,7 @@ export default function EarningsPage() {
                                         </div>
                                         <div className="w-full sm:w-auto">
                                             <div className="text-right text-xs text-muted-foreground mb-1">
-                                                Net:{" "}
+                                                Net:{' '}
                                                 {formatCurrency(
                                                     bulkNetAmount,
                                                     bulkOrdersData.currency,
@@ -2218,12 +2728,12 @@ export default function EarningsPage() {
                             >
                                 {isWithdrawing ? (
                                     <>
-                                        <Loader className=" h-4 w-4 animate-spin" />{" "}
+                                        <Loader className=" h-4 w-4 animate-spin" />{' '}
                                         Processing...
                                     </>
                                 ) : (
                                     <>
-                                        Process Payout{" "}
+                                        Process Payout{' '}
                                         <ArrowRight className="ml-2 h-4 w-4" />
                                     </>
                                 )}
@@ -2278,10 +2788,10 @@ export default function EarningsPage() {
                                         selectedEarning.totalAmount,
                                         selectedEarning.currency,
                                     )}
-                                    ) from{" "}
+                                    ) from{' '}
                                     <span className="font-medium text-foreground">
                                         {selectedEarning.clientId?.name ||
-                                            "Unknown"}
+                                            'Unknown'}
                                     </span>
                                 </p>
                             </div>
@@ -2336,6 +2846,12 @@ export default function EarningsPage() {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+            <ExportEarningDialog
+                open={isExportDialogOpen}
+                onOpenChange={setIsExportDialogOpen}
+                availableYears={availableYears}
+                clients={clients}
+            />
         </div>
     );
 }

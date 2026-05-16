@@ -83,13 +83,15 @@ const styles = StyleSheet.create({
   },
 
   // Column widths
-  cClient: { width: "22%" },
-  cPeriod: { width: "15%" },
-  cImages: { width: "10%", textAlign: "center" },
-  cAmount: { width: "15%", textAlign: "right" },
-  cPaid: { width: "15%", textAlign: "right" },
-  cBDT: { width: "13%", textAlign: "right" },
-  cStatus: { width: "10%", textAlign: "right" },
+  cClient: { width: "16%" },
+  cPeriod: { width: "10%" },
+  cImages: { width: "6%", textAlign: "center" },
+  cAmount: { width: "10%", textAlign: "right" },
+  cCharges: { width: "10%", textAlign: "right" },
+  cRate: { width: "8%", textAlign: "right" },
+  cPaid: { width: "10%", textAlign: "right" },
+  cBDT: { width: "18%", textAlign: "right" },
+  cStatus: { width: "12%", textAlign: "right" },
 
   headCell: {
     fontSize: 7,
@@ -245,10 +247,16 @@ export const EarningReportPDF = ({
               <Text style={styles.headCell}>Period</Text>
             </View>
             <View style={styles.cImages}>
-              <Text style={styles.headCell}>Images</Text>
+              <Text style={styles.headCell}>Img</Text>
             </View>
             <View style={styles.cAmount}>
               <Text style={styles.headCell}>Amount</Text>
+            </View>
+            <View style={styles.cCharges}>
+              <Text style={styles.headCell}>Charges</Text>
+            </View>
+            <View style={styles.cRate}>
+              <Text style={styles.headCell}>Rate</Text>
             </View>
             <View style={styles.cPaid}>
               <Text style={styles.headCell}>Paid</Text>
@@ -278,17 +286,27 @@ export const EarningReportPDF = ({
               </View>
               <View style={styles.cAmount}>
                 <Text style={styles.cellAmount}>
-                  {CURRENCY_SYMBOLS[earning.currency] || "$"}{fmt(earning.totalAmount, earning.currency)}
+                  {fmt(earning.totalAmount, earning.currency)}
+                </Text>
+              </View>
+              <View style={styles.cCharges}>
+                <Text style={styles.cell}>
+                  {fmt((earning.fees || 0) + (earning.tax || 0), earning.currency)}
+                </Text>
+              </View>
+              <View style={styles.cRate}>
+                <Text style={styles.cell}>
+                  {earning.conversionRate || "—"}
                 </Text>
               </View>
               <View style={styles.cPaid}>
                 <Text style={styles.cell}>
-                  {CURRENCY_SYMBOLS[earning.currency] || "$"}{fmt(earning.paidAmount, earning.currency)}
+                  {fmt(earning.paidAmount, earning.currency)}
                 </Text>
               </View>
               <View style={styles.cBDT}>
                 <Text style={styles.cell}>
-                  ৳{fmt(earning.paidAmountBDT, "BDT")}
+                  {fmt(earning.paidAmountBDT, "BDT")}
                 </Text>
               </View>
               <View style={styles.cStatus}>
@@ -314,12 +332,12 @@ export const EarningReportPDF = ({
             </View>
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>Total USD Amount</Text>
-              <Text style={styles.summaryValue}>${fmt(totalAmountUSD, "USD")}</Text>
+              <Text style={styles.summaryValue}>{fmt(totalAmountUSD, "USD")}</Text>
             </View>
             <View style={styles.divider} />
             <View style={[styles.summaryRow, { marginBottom: 0 }]}>
               <Text style={styles.totalLabel}>Total Paid (BDT)</Text>
-              <Text style={styles.totalAmount}>৳{fmt(totalPaidBDT, "BDT")}</Text>
+              <Text style={styles.totalAmount}>{fmt(totalPaidBDT, "BDT")}</Text>
             </View>
           </View>
         </View>

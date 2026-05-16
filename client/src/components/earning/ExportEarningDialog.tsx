@@ -136,9 +136,11 @@ export function ExportEarningDialog({
                     'Image Qty': earn.imageQty || 0,
                     'Total Amount': earn.totalAmount,
                     'Currency': earn.currency,
+                    'Fees': earn.fees || 0,
+                    'Tax': earn.tax || 0,
                     'Paid Amount': earn.paidAmount,
-                    'Paid BDT': earn.paidAmountBDT,
                     'Conversion Rate': earn.conversionRate,
+                    'Paid BDT': earn.paidAmountBDT,
                     'Status': earn.status.toUpperCase(),
                     'Paid At': earn.paidAt ? format(new Date(earn.paidAt), 'dd MMM yyyy') : 'N/A'
                 }));
@@ -150,18 +152,20 @@ export function ExportEarningDialog({
                 // Auto-width columns
                 const max_client_width = excelData.reduce((w, r) => Math.max(w, (r.Client as string).length), 10);
                 worksheet['!cols'] = [
-                    { wch: 8 },
-                    { wch: 15 },
-                    { wch: Math.max(max_client_width, 20) },
-                    { wch: 15 },
-                    { wch: 12 },
-                    { wch: 15 },
-                    { wch: 10 },
-                    { wch: 15 },
-                    { wch: 15 },
-                    { wch: 15 },
-                    { wch: 12 },
-                    { wch: 15 }
+                    { wch: 8 }, // Sl No
+                    { wch: 15 }, // Period
+                    { wch: Math.max(max_client_width, 20) }, // Client
+                    { wch: 15 }, // Client ID
+                    { wch: 12 }, // Image Qty
+                    { wch: 15 }, // Total Amount
+                    { wch: 10 }, // Currency
+                    { wch: 12 }, // Fees
+                    { wch: 12 }, // Tax
+                    { wch: 15 }, // Paid Amount
+                    { wch: 18 }, // Conversion Rate
+                    { wch: 15 }, // Paid BDT
+                    { wch: 12 }, // Status
+                    { wch: 15 }  // Paid At
                 ];
 
                 XLSX.writeFile(workbook, `${filename}.xlsx`);
