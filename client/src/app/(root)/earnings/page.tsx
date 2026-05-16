@@ -98,6 +98,7 @@ import type {
 import { CURRENCY_SYMBOLS, MONTHS } from "@/types/earning.type";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
+import { ExportEarningDialog } from "@/components/earning/ExportEarningDialog";
 
 type FilterType = "all" | "today" | "week" | "month" | "year";
 
@@ -121,6 +122,7 @@ export default function EarningsPage() {
     const [selectedYear, setSelectedYear] = useState(currentYear);
 
     // Dialog states
+    const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
     const [isWithdrawDialogOpen, setIsWithdrawDialogOpen] = useState(false);
     const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
     const [isBulkWithdrawDialogOpen, setIsBulkWithdrawDialogOpen] =
@@ -691,6 +693,14 @@ export default function EarningsPage() {
                         >
                             <Download className=" h-4 w-4" />
                             Monthly Withdraw
+                        </Button>
+                        <Button
+                            variant="outline"
+                            className="border-primary text-primary hover:bg-primary/10 shadow-sm"
+                            onClick={() => setIsExportDialogOpen(true)}
+                        >
+                            <Download className=" h-4 w-4" />
+                            Export
                         </Button>
                     </div>
                 </CardHeader>
