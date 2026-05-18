@@ -62,6 +62,7 @@ async function createEarningForOrder(
         return (existingEarning as any).save({ session: session || null });
     }
 
+    const defaultRate = await (await import('./currency-rate.service.js')).default.getRateForCurrency(month, year, data.currency);
     // Create new monthly earning
     const earning = new EarningModel({
         clientId: data.clientId,
@@ -73,7 +74,7 @@ async function createEarningForOrder(
         currency: data.currency,
         fees: 0,
         tax: 0,
-        conversionRate: 1,
+        conversionRate: defaultRate,
         netAmount: roundAmount(data.orderAmount),
         amountInBDT: 0,
         status: 'unpaid',
@@ -280,7 +281,7 @@ async function withdrawEarning(
 
         updatedEarning = await EarningModel.findByIdAndUpdate(
             earningId,
-            { $inc: incValues, $push: { payments: paymentRecord }, $set: { paidBy: new Types.ObjectId(data.paidBy) } },
+            { $inc: incValues, $push: { payments: paymentRecord }, $set: { paidBy: new Types.ObjectId(data.paidBy), conversionRate: conversionRate } },
             { new: true, session: session || null },
         );
     }
@@ -376,9 +377,10 @@ async function toggleEarningStatus(
                 return result;
             }) as any;
     } else {
+        const defaultRate = await (await import('./currency-rate.service.js')).default.getRateForCurrency(earning.month, earning.year, earning.currency);
         const updated = await EarningModel.findByIdAndUpdate(
             earningId,
-            { $set: { fees: 0, tax: 0, conversionRate: 1, amountInBDT: 0, status: 'unpaid', paidAmount: 0, paidAmountBDT: 0, payments: [] }, $unset: { paidAt: 1, paidBy: 1 } },
+            { $set: { fees: 0, tax: 0, conversionRate: defaultRate, amountInBDT: 0, status: 'unpaid', paidAmount: 0, paidAmountBDT: 0, payments: [] }, $unset: { paidAt: 1, paidBy: 1 } },
             { new: true, session: session || null }
         ).populate('clientId', 'clientId name email currency').then(async (result: any) => {
             if (result?.orderIds?.length > 0) {
