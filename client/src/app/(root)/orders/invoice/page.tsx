@@ -289,6 +289,7 @@ export default function InvoicePage() {
                             price: order.perImagePrice * order.imageQuantity,
                             quantity: order.imageQuantity,
                         })),
+                        orderIds: Array.from(selectedOrders),
                     }).unwrap();
 
                     const invoiceData = recordResult.invoice as { paymentToken: string };

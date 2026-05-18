@@ -422,7 +422,8 @@ async function updateOrderInDB(
         if (
             data.totalPrice !== undefined ||
             data.imageQuantity !== undefined ||
-            data.orderDate
+            data.orderDate ||
+            data.clientId !== undefined
         ) {
             oldOrder = (await OrderModel.findById(id).session(session).lean()) as IOrder | null;
         }
@@ -440,18 +441,59 @@ async function updateOrderInDB(
             .populate('returnFileFormat', 'name extension')
             .lean();
 
-        // Update monthly earning if order amount, imageQty or date changes
+        // Update monthly earning if order amount, imageQty, date or clientId changes
         if (order && oldOrder) {
-            const updateData: any = {
-                orderAmount: data.totalPrice !== undefined ? data.totalPrice : order.totalPrice,
-                oldOrderAmount: oldOrder.totalPrice,
-                imageQty: data.imageQuantity !== undefined ? data.imageQuantity : order.imageQuantity,
-                oldImageQty: oldOrder.imageQuantity,
-                orderDate: data.orderDate !== undefined ? data.orderDate : order.orderDate,
-                oldOrderDate: oldOrder.orderDate,
-            };
+            const isClientChanged = data.clientId && oldOrder.clientId && data.clientId.toString() !== oldOrder.clientId.toString();
 
-            await earningService.updateEarningForOrder(id, updateData, session);
+            if (isClientChanged) {
+                // Delete from old client's earning
+                await earningService.deleteEarningForOrder(
+                    id,
+                    oldOrder.totalPrice,
+                    oldOrder.imageQuantity,
+                    session,
+                );
+
+                // Add to new client's earning
+                const currency = (order.clientId as any)?.currency || 'USD';
+                await earningService.createEarningForOrder({
+                    orderId: id,
+                    clientId: data.clientId as string,
+                    orderDate: data.orderDate || order.orderDate,
+                    orderAmount: data.totalPrice !== undefined ? data.totalPrice : order.totalPrice,
+                    imageQty: data.imageQuantity !== undefined ? data.imageQuantity : order.imageQuantity,
+                    currency,
+                    createdBy: order.createdBy ? order.createdBy.toString() : '',
+                }, session);
+
+                // Unlink from old InvoiceRecord if it was part of one
+                if (oldOrder.invoiceNumber) {
+                    const { InvoiceRecord } = await import('../models/invoice-record.model.js');
+                    await InvoiceRecord.updateOne(
+                        { invoiceNumber: oldOrder.invoiceNumber },
+                        { $pull: { orderIds: id, items: { _id: id } } },
+                        { session }
+                    );
+                    
+                    // Unset invoiceNumber on the order
+                    await OrderModel.updateOne(
+                        { _id: id },
+                        { $unset: { invoiceNumber: "" } },
+                        { session }
+                    );
+                }
+            } else {
+                const updateData: any = {
+                    orderAmount: data.totalPrice !== undefined ? data.totalPrice : order.totalPrice,
+                    oldOrderAmount: oldOrder.totalPrice,
+                    imageQty: data.imageQuantity !== undefined ? data.imageQuantity : order.imageQuantity,
+                    oldImageQty: oldOrder.imageQuantity,
+                    orderDate: data.orderDate !== undefined ? data.orderDate : order.orderDate,
+                    oldOrderDate: oldOrder.orderDate,
+                };
+
+                await earningService.updateEarningForOrder(id, updateData, session);
+            }
         }
 
         await session.commitTransaction();
