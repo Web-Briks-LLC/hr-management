@@ -69,6 +69,7 @@ import {
     ArrowRight,
     History as HistoryIcon,
     RefreshCcw,
+    Edit,
 } from 'lucide-react';
 import {
     Tooltip,
@@ -100,6 +101,7 @@ import { CURRENCY_SYMBOLS, MONTHS } from '@/types/earning.type';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { ExportEarningDialog } from '@/components/earning/ExportEarningDialog';
+import { EditEarningDialog } from '@/components/earning/EditEarningDialog';
 
 type FilterType = 'all' | 'today' | 'week' | 'month' | 'year';
 
@@ -132,9 +134,8 @@ export default function EarningsPage() {
         null,
     );
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-    // Edit Client Dialog state
-    const [isEditClientDialogOpen, setIsEditClientDialogOpen] = useState(false);
-    const [editClientId, setEditClientId] = useState('');
+    // Edit Earning Dialog state
+    const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
     const [updateEarning, { isLoading: isUpdating }] =
         useUpdateEarningMutation();
@@ -315,29 +316,26 @@ export default function EarningsPage() {
     };
 
     // Handlers
-    const handleEditClient = (earning: IEarning) => {
+    const handleEditEarning = (earning: IEarning) => {
         setSelectedEarning(earning);
-        setEditClientId(earning.clientId?._id || '');
-        setIsEditClientDialogOpen(true);
+        setIsEditDialogOpen(true);
     };
 
-    const handleConfirmEditClient = async () => {
-        if (!selectedEarning || !editClientId) return;
-
+    const handleSaveEarning = async (id: string, data: Partial<IEarning>) => {
         try {
             await updateEarning({
-                id: selectedEarning._id,
-                data: { clientId: editClientId },
+                id,
+                data,
             }).unwrap();
 
-            toast.success('Client updated successfully');
-            setIsEditClientDialogOpen(false);
+            toast.success('Earning updated successfully');
+            setIsEditDialogOpen(false);
             setSelectedEarning(null);
         } catch (error: unknown) {
-            console.error('Error updating client:', error);
+            console.error('Error updating earning:', error);
             const message =
                 (error as { data?: { message?: string } })?.data?.message ||
-                'Failed to update client';
+                'Failed to update earning';
             toast.error(message);
         }
     };
@@ -1233,7 +1231,7 @@ export default function EarningsPage() {
                                                         <Eye className="h-4 w-4" />
                                                     </Button>
 
-                                                    {/* Edit Client Button */}
+                                                    {/* Edit Earning Button */}
                                                     <TooltipProvider>
                                                         <Tooltip>
                                                             <TooltipTrigger
@@ -1242,20 +1240,19 @@ export default function EarningsPage() {
                                                                 <Button
                                                                     variant="ghost"
                                                                     size="icon"
-                                                                    className="h-8 w-8 text-foreground/70 hover:text-blue-600"
+                                                                    className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
                                                                     onClick={() =>
-                                                                        handleEditClient(
+                                                                        handleEditEarning(
                                                                             earning,
                                                                         )
                                                                     }
                                                                 >
-                                                                    <Settings2 className="h-4 w-4" />
+                                                                    <Edit className="h-4 w-4" />
                                                                 </Button>
                                                             </TooltipTrigger>
                                                             <TooltipContent>
                                                                 <p>
-                                                                    Change
-                                                                    Client
+                                                                    Edit Earning
                                                                 </p>
                                                             </TooltipContent>
                                                         </Tooltip>
@@ -2743,80 +2740,16 @@ export default function EarningsPage() {
                 </DialogContent>
             </Dialog>
 
-            {/* Edit Client Dialog */}
-            <Dialog
-                open={isEditClientDialogOpen}
-                onOpenChange={setIsEditClientDialogOpen}
-            >
-                <DialogContent className="max-w-sm">
-                    <DialogHeader>
-                        <DialogTitle>Update Client</DialogTitle>
-                        <DialogDescription>
-                            Change the client associated with this earning
-                            record.
-                        </DialogDescription>
-                    </DialogHeader>
 
-                    <div className="space-y-4 py-4">
-                        <div className="space-y-2">
-                            <Label>Select Client</Label>
-                            <Select
-                                value={editClientId}
-                                onValueChange={setEditClientId}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select a client" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {clients.map((client) => (
-                                        <SelectItem
-                                            key={client._id}
-                                            value={client._id}
-                                        >
-                                            {client.name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
 
-                        {selectedEarning && (
-                            <div className="text-sm rounded-md bg-muted p-3 text-muted-foreground">
-                                <p>
-                                    Moving this earning (
-                                    {formatCurrency(
-                                        selectedEarning.totalAmount,
-                                        selectedEarning.currency,
-                                    )}
-                                    ) from{' '}
-                                    <span className="font-medium text-foreground">
-                                        {selectedEarning.clientId?.name ||
-                                            'Unknown'}
-                                    </span>
-                                </p>
-                            </div>
-                        )}
-                    </div>
-
-                    <DialogFooter>
-                        <Button
-                            variant="ghost"
-                            onClick={() => setIsEditClientDialogOpen(false)}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            onClick={handleConfirmEditClient}
-                            disabled={isUpdating || !editClientId}
-                        >
-                            {isUpdating && (
-                                <Loader className="mr-2 h-4 w-4 animate-spin" />
-                            )}
-                            Update Client
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+            {/* Edit Earning Dialog */}
+            <EditEarningDialog
+                open={isEditDialogOpen}
+                onOpenChange={setIsEditDialogOpen}
+                earning={selectedEarning}
+                onSave={handleSaveEarning}
+                isLoading={isUpdating}
+            />
 
             <AlertDialog
                 open={isDeleteDialogOpen}

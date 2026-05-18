@@ -323,7 +323,7 @@ async function getClientsWithEarnings(req: Request, res: Response) {
     }
 }
 
-// Update earning (e.g. update client)
+// Update earning (e.g. update client, amounts, status)
 async function updateEarning(req: Request, res: Response) {
     try {
         const id = req.params.id;
@@ -331,7 +331,21 @@ async function updateEarning(req: Request, res: Response) {
             return res.status(400).json({ message: "Earning ID is required" });
         }
 
-        const { clientId } = req.body;
+        const {
+            clientId,
+            imageQty,
+            totalAmount,
+            fees,
+            tax,
+            conversionRate,
+            netAmount,
+            amountInBDT,
+            paidAmount,
+            paidAmountBDT,
+            status,
+            notes,
+        } = req.body;
+        
         const updates: any = {};
 
         if (clientId) {
@@ -342,6 +356,18 @@ async function updateEarning(req: Request, res: Response) {
             }
             updates.clientId = clientId;
         }
+
+        if (imageQty !== undefined) updates.imageQty = Number(imageQty);
+        if (totalAmount !== undefined) updates.totalAmount = Number(totalAmount);
+        if (fees !== undefined) updates.fees = Number(fees);
+        if (tax !== undefined) updates.tax = Number(tax);
+        if (conversionRate !== undefined) updates.conversionRate = Number(conversionRate);
+        if (netAmount !== undefined) updates.netAmount = Number(netAmount);
+        if (amountInBDT !== undefined) updates.amountInBDT = Number(amountInBDT);
+        if (paidAmount !== undefined) updates.paidAmount = Number(paidAmount);
+        if (paidAmountBDT !== undefined) updates.paidAmountBDT = Number(paidAmountBDT);
+        if (status !== undefined) updates.status = status;
+        if (notes !== undefined) updates.notes = notes;
 
         const updatedEarning = await earningService.updateEarning(id, updates);
 

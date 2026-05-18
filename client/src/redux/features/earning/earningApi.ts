@@ -8,6 +8,7 @@ import type {
     ToggleStatusInput,
     ClientOrdersResponse,
     YearsResponse,
+    IEarning,
 } from '@/types/earning.type';
 
 const earningApi = apiSlice.injectEndpoints({
@@ -132,7 +133,7 @@ const earningApi = apiSlice.injectEndpoints({
         // Update earning
         updateEarning: builder.mutation<
             EarningResponse,
-            { id: string; data: Partial<{ clientId: string }> }
+            { id: string; data: Partial<IEarning> }
         >({
             query: ({ id, data }) => ({
                 url: `/earnings/${id}`,
