@@ -530,11 +530,17 @@ function compileReportHTML(data: ITransactionReportData, startDate: string, endD
 async function generatePDFBuffer(data: ITransactionReportData, startDate: string, endDate: string): Promise<Buffer> {
     const htmlContent = compileReportHTML(data, startDate, endDate);
     
-    // Launch headless Chromium via Puppeteer
-    const browser = await puppeteer.launch({
+    const launchOptions: any = {
         headless: true,
         args: ["--no-sandbox", "--disable-setuid-sandbox"]
-    });
+    };
+
+    if (process.platform === "linux") {
+        launchOptions.executablePath = "/usr/bin/google-chrome";
+    }
+
+    // Launch headless Chromium via Puppeteer
+    const browser = await puppeteer.launch(launchOptions);
 
     try {
         const page = await browser.newPage();
