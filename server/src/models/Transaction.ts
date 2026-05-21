@@ -1,48 +1,45 @@
 import { model, Schema, Types } from 'mongoose';
 
-export enum TransactionType {
-    BORROW = 'Borrow',
-    RETURN = 'Return',
-}
-
 export interface ITransaction {
-    personId: Types.ObjectId | string;
+    sourceId: Types.ObjectId | string;
+    sourceType: 'earning' | 'expense' | 'debit' | 'wallet' | 'profit_share' | 'profit_transfer';
+    title: string;
     amount: number;
+    currency: string;
+    amountInBDT: number;
+    flow: 'inflow' | 'outflow';
     date: Date;
-    type: TransactionType;
-    description?: string;
-    createdBy: Types.ObjectId | string;
+    status: string;
+    referenceId?: Types.ObjectId | string;
+    createdBy?: Types.ObjectId | string;
+    note?: string;
+    branchId?: Types.ObjectId | string;
 }
 
 const TransactionSchema = new Schema<ITransaction>(
     {
-        personId: {
+        sourceId: {
             type: Schema.Types.ObjectId,
-            ref: 'Person',
             required: true,
             index: true,
         },
-        amount: {
-            type: Number,
-            required: true,
-            min: 0,
-        },
-        date: {
-            type: Date,
-            required: true,
-            default: Date.now,
-        },
-        type: {
+        sourceType: {
             type: String,
-            enum: Object.values(TransactionType),
             required: true,
+            enum: ['earning', 'expense', 'debit', 'wallet', 'profit_share', 'profit_transfer'],
+            index: true,
         },
-        description: { type: String, trim: true },
-        createdBy: {
-            type: Schema.Types.ObjectId,
-            ref: 'User',
-            required: true,
-        },
+        title: { type: String, required: true, trim: true },
+        amount: { type: Number, required: true, min: 0 },
+        currency: { type: String, required: true, default: 'BDT' },
+        amountInBDT: { type: Number, required: true, min: 0 },
+        flow: { type: String, required: true, enum: ['inflow', 'outflow'] },
+        date: { type: Date, required: true, index: true },
+        status: { type: String, required: true },
+        referenceId: { type: Schema.Types.ObjectId, index: true },
+        createdBy: { type: Schema.Types.ObjectId, ref: 'User' },
+        note: { type: String, trim: true },
+        branchId: { type: Schema.Types.ObjectId, ref: 'Branch', index: true }
     },
     { timestamps: true }
 );
