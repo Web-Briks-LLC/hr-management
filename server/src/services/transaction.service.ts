@@ -288,19 +288,27 @@ async function getUnifiedTransactions(params: TransactionQueryParams): Promise<I
     const rawTransactions = queryResults.flat();
 
     // Fetch and map user details (createdBy) directly from better-auth user collection
-    const creatorIds = Array.from(
-        new Set(
-            rawTransactions
-                .map(tx => tx.createdBy)
-                .filter(id => id && (typeof id === "string" || Types.ObjectId.isValid(id)))
-        )
-    ) as string[];
+    const rawCreatorIds: string[] = [];
+    rawTransactions.forEach(tx => {
+        if (!tx.createdBy) return;
+        if (typeof tx.createdBy === "string") {
+            rawCreatorIds.push(tx.createdBy);
+        } else if (typeof tx.createdBy === "object" && (tx.createdBy as any)._id) {
+            rawCreatorIds.push((tx.createdBy as any)._id.toString());
+        } else {
+            const str = tx.createdBy.toString();
+            if (str && str.length > 0) {
+                rawCreatorIds.push(str);
+            }
+        }
+    });
+
+    const creatorIds = Array.from(new Set(rawCreatorIds));
 
     if (creatorIds.length > 0) {
         try {
-            const queryIds = creatorIds.map(id => Types.ObjectId.isValid(id) ? new Types.ObjectId(id) : id);
             const dbUsers = await mongoose.connection.collection("user").find({
-                _id: { $in: queryIds }
+                _id: { $in: creatorIds as any }
             }).toArray();
 
             const usersMap = new Map<string, { _id: string; name: string }>();
@@ -313,8 +321,16 @@ async function getUnifiedTransactions(params: TransactionQueryParams): Promise<I
             });
 
             rawTransactions.forEach(tx => {
-                if (tx.createdBy && typeof tx.createdBy === "string") {
-                    tx.createdBy = usersMap.get(tx.createdBy) || tx.createdBy;
+                if (tx.createdBy) {
+                    const key = typeof tx.createdBy === "string" 
+                        ? tx.createdBy 
+                        : (typeof tx.createdBy === "object" && (tx.createdBy as any)._id)
+                            ? (tx.createdBy as any)._id.toString()
+                            : tx.createdBy.toString();
+                    
+                    if (usersMap.has(key)) {
+                        tx.createdBy = usersMap.get(key)!;
+                    }
                 }
             });
         } catch (err) {
