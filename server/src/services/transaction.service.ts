@@ -1,5 +1,5 @@
 import { startOfDay, endOfDay, startOfMonth } from "date-fns";
-import { Types } from "mongoose";
+import mongoose, { Types } from "mongoose";
 import puppeteer from "puppeteer";
 import EarningModel from "../models/earning.model.js";
 import ExpenseModel from "../models/expense.model.js";
@@ -143,7 +143,7 @@ async function getUnifiedTransactions(params: TransactionQueryParams): Promise<I
 
         queries.push(
             ExpenseModel.find(match)
-                .populate("categoryId createdBy")
+                .populate("categoryId")
                 .lean()
                 .then(records => records.map(ex => ({
                     id: ex._id.toString(),
@@ -157,10 +157,7 @@ async function getUnifiedTransactions(params: TransactionQueryParams): Promise<I
                     status: ex.status as any,
                     referenceId: ex.branchId,
                     note: ex.note,
-                    createdBy: ex.createdBy ? {
-                        _id: (ex.createdBy as any)._id,
-                        name: (ex.createdBy as any).name || (ex.createdBy as any).username || "User"
-                    } : undefined
+                    createdBy: ex.createdBy ? ex.createdBy.toString() : undefined
                 } as INormalizedTransaction)))
         );
     }
@@ -174,7 +171,7 @@ async function getUnifiedTransactions(params: TransactionQueryParams): Promise<I
 
         queries.push(
             DebitModel.find(match)
-                .populate("personId createdBy")
+                .populate("personId")
                 .lean()
                 .then(records => records.map(d => ({
                     id: d._id.toString(),
@@ -188,7 +185,8 @@ async function getUnifiedTransactions(params: TransactionQueryParams): Promise<I
                     flow: d.type === DebitType.BORROW ? "inflow" : "outflow",
                     status: "completed" as any,
                     referenceId: (d.personId as any)?._id || d.personId,
-                    note: d.description
+                    note: d.description,
+                    createdBy: d.createdBy ? d.createdBy.toString() : undefined
                 } as INormalizedTransaction)))
         );
     }
@@ -206,7 +204,7 @@ async function getUnifiedTransactions(params: TransactionQueryParams): Promise<I
 
         queries.push(
             WalletTransactionModel.find(match)
-                .populate("staffId createdBy")
+                .populate("staffId")
                 .lean()
                 .then(records => records.map(w => ({
                     id: w._id.toString(),
@@ -220,7 +218,8 @@ async function getUnifiedTransactions(params: TransactionQueryParams): Promise<I
                     flow: "outflow",
                     status: "completed",
                     referenceId: (w.staffId as any)?._id || w.staffId,
-                    note: w.description
+                    note: w.description,
+                    createdBy: w.createdBy ? w.createdBy.toString() : undefined
                 } as INormalizedTransaction)))
         );
     }
@@ -237,7 +236,7 @@ async function getUnifiedTransactions(params: TransactionQueryParams): Promise<I
 
         queries.push(
             ProfitDistributionModel.find(match)
-                .populate("shareholderId distributedBy")
+                .populate("shareholderId")
                 .lean()
                 .then(records => records.map(d => ({
                     id: d._id.toString(),
@@ -250,7 +249,8 @@ async function getUnifiedTransactions(params: TransactionQueryParams): Promise<I
                     flow: "outflow",
                     status: "distributed",
                     referenceId: (d.shareholderId as any)?._id || d.shareholderId,
-                    note: d.notes
+                    note: d.notes,
+                    createdBy: d.distributedBy ? d.distributedBy.toString() : undefined
                 } as INormalizedTransaction)))
         );
     }
@@ -264,7 +264,7 @@ async function getUnifiedTransactions(params: TransactionQueryParams): Promise<I
 
         queries.push(
             ProfitTransferModel.find(match)
-                .populate("businessId transferredBy")
+                .populate("businessId")
                 .lean()
                 .then(records => records.map(t => ({
                     id: t._id.toString(),
@@ -277,7 +277,8 @@ async function getUnifiedTransactions(params: TransactionQueryParams): Promise<I
                     flow: "outflow",
                     status: "completed" as any,
                     referenceId: (t.businessId as any)?._id || t.businessId,
-                    note: t.notes
+                    note: t.notes,
+                    createdBy: t.transferredBy ? t.transferredBy.toString() : undefined
                 } as INormalizedTransaction)))
         );
     }
@@ -285,6 +286,41 @@ async function getUnifiedTransactions(params: TransactionQueryParams): Promise<I
     // Resolve all fetch queries concurrently
     const queryResults = await Promise.all(queries);
     const rawTransactions = queryResults.flat();
+
+    // Fetch and map user details (createdBy) directly from better-auth user collection
+    const creatorIds = Array.from(
+        new Set(
+            rawTransactions
+                .map(tx => tx.createdBy)
+                .filter(id => id && (typeof id === "string" || Types.ObjectId.isValid(id)))
+        )
+    ) as string[];
+
+    if (creatorIds.length > 0) {
+        try {
+            const queryIds = creatorIds.map(id => Types.ObjectId.isValid(id) ? new Types.ObjectId(id) : id);
+            const dbUsers = await mongoose.connection.collection("user").find({
+                _id: { $in: queryIds }
+            }).toArray();
+
+            const usersMap = new Map<string, { _id: string; name: string }>();
+            dbUsers.forEach(u => {
+                const idStr = u._id.toString();
+                usersMap.set(idStr, {
+                    _id: idStr,
+                    name: u.name || u.username || "User"
+                });
+            });
+
+            rawTransactions.forEach(tx => {
+                if (tx.createdBy && typeof tx.createdBy === "string") {
+                    tx.createdBy = usersMap.get(tx.createdBy) || tx.createdBy;
+                }
+            });
+        } catch (err) {
+            console.error("Error populating raw users:", err);
+        }
+    }
 
     // 5. STEP 3: SORT CHRONOLOGICALLY (ASCENDING) TO COMPUTE RUNNING BALANCE CORRECTLY
     rawTransactions.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());

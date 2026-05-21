@@ -31,7 +31,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     useEffect(() => {
         if (session?.user?.id) {
-            const socketInstance = io(process.env.NEXT_PUBLIC_API_URL!, {
+            const socketInstance = io(process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_APP_URL || "", {
                 withCredentials: true,
             });
 
