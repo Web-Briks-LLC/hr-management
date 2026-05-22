@@ -77,9 +77,10 @@ async function getFinanceAnalytics(
         earningMatch.month = month;
     }
 
-    // Others use Date objects
+    // Others use Date objects (and only count paid/partial expenses)
     const expenseFilter: any = {
         date: { $gte: startDate, $lte: endDate },
+        status: { $in: ['paid', 'partial_paid'] },
     };
 
     // Parallel fetch all data
@@ -105,7 +106,7 @@ async function getFinanceAnalytics(
         // Total earnings (Paid)
         EarningModel.aggregate([
             { $match: earningMatch },
-            { $group: { _id: null, total: { $sum: '$amountInBDT' } } },
+            { $group: { _id: null, total: { $sum: { $ifNull: ["$paidAmountBDT", { $ifNull: ["$amountInBDT", 0] }] } } } },
         ]),
         // Total expenses
         ExpenseModel.aggregate([
@@ -123,7 +124,7 @@ async function getFinanceAnalytics(
             {
                 $group: {
                     _id: { month: '$month' },
-                    total: { $sum: '$amountInBDT' },
+                    total: { $sum: { $ifNull: ["$paidAmountBDT", { $ifNull: ["$amountInBDT", 0] }] } },
                 },
             },
         ]),
@@ -135,6 +136,7 @@ async function getFinanceAnalytics(
                         $gte: new Date(year, 0, 1),
                         $lte: new Date(year, 11, 31, 23, 59, 59, 999),
                     },
+                    status: { $in: ['paid', 'partial_paid'] },
                 },
             },
             {
@@ -174,7 +176,7 @@ async function getFinanceAnalytics(
                         $sum: {
                             $cond: [
                                 { $eq: ['$status', 'paid'] },
-                                '$amountInBDT',
+                                { $ifNull: ["$paidAmountBDT", { $ifNull: ["$amountInBDT", 0] }] },
                                 0,
                             ],
                         },
@@ -183,7 +185,7 @@ async function getFinanceAnalytics(
                         $sum: {
                             $cond: [
                                 { $eq: ['$status', 'unpaid'] },
-                                '$amountInBDT',
+                                { $ifNull: ["$paidAmountBDT", { $ifNull: ["$amountInBDT", 0] }] },
                                 0,
                             ],
                         },
@@ -248,7 +250,7 @@ async function getFinanceAnalytics(
                 $group: {
                     _id: '$currency',
                     amount: { $sum: '$totalAmount' },
-                    totalBDT: { $sum: '$amountInBDT' },
+                    totalBDT: { $sum: { $ifNull: ["$paidAmountBDT", { $ifNull: ["$amountInBDT", 0] }] } },
                 },
             },
         ]),
@@ -265,7 +267,7 @@ async function getFinanceAnalytics(
                 $group: {
                     _id: '$currency',
                     amount: { $sum: '$totalAmount' },
-                    totalBDT: { $sum: '$amountInBDT' },
+                    totalBDT: { $sum: { $ifNull: ["$paidAmountBDT", { $ifNull: ["$amountInBDT", 0] }] } },
                 },
             },
         ]),
@@ -406,10 +408,10 @@ async function getFinanceAnalytics(
     ] = await Promise.all([
         EarningModel.aggregate([
             { $match: cumulativeEarningMatch },
-            { $group: { _id: null, total: { $sum: '$amountInBDT' } } },
+            { $group: { _id: null, total: { $sum: { $ifNull: ["$paidAmountBDT", { $ifNull: ["$amountInBDT", 0] }] } } } },
         ]),
         ExpenseModel.aggregate([
-            { $match: { date: cumulativeDateFilter } },
+            { $match: { date: cumulativeDateFilter, status: { $in: ['paid', 'partial_paid'] } } },
             { $group: { _id: null, total: { $sum: '$amount' } } },
         ]),
         ProfitTransferModel.aggregate([
@@ -537,18 +539,16 @@ async function getFinanceTotalsForPeriod(year: number, month: number) {
 }
 
 async function getCurrentFinalAmount(session?: any): Promise<number> {
-    const now = new Date();
-    const currentYear = now.getFullYear();
-
-    // Cumulative Earnings
+    // Cumulative Earnings (Paid only, with paidAmountBDT || amountInBDT fallback)
     const cumEarningsResult = await EarningModel.aggregate([
         { $match: { status: 'paid' } },
-        { $group: { _id: null, total: { $sum: '$amountInBDT' } } },
+        { $group: { _id: null, total: { $sum: { $ifNull: ["$paidAmountBDT", { $ifNull: ["$amountInBDT", 0] }] } } } },
     ], { session });
     const cumEarnings = cumEarningsResult[0]?.total || 0;
 
-    // Cumulative Expenses
+    // Cumulative Expenses (Paid/Partial Paid only)
     const cumExpensesResult = await ExpenseModel.aggregate([
+        { $match: { status: { $in: ['paid', 'partial_paid'] } } },
         { $group: { _id: null, total: { $sum: '$amount' } } },
     ], { session });
     const cumExpenses = cumExpensesResult[0]?.total || 0;
@@ -568,7 +568,7 @@ async function getCurrentFinalAmount(session?: any): Promise<number> {
         (cumTransfersResult[0]?.total || 0) +
         (cumDistributionsResult[0]?.total || 0);
 
-    // All Time Debit
+    // All Time Debit (Borrow - Return)
     const [debitBorrowResult, debitReturnResult] = await Promise.all([
         DebitModel.aggregate([
             { $match: { type: DebitType.BORROW } },
@@ -583,10 +583,8 @@ async function getCurrentFinalAmount(session?: any): Promise<number> {
     const totalReturn = debitReturnResult[0]?.total || 0;
     const totalDebit = totalBorrow - totalReturn;
 
-    let finalAmount = cumEarnings - cumExpenses - cumShared;
-    if (currentYear >= 2025) {
-        finalAmount += totalDebit;
-    }
+    // Final Amount = (Earnings - Expenses) - Shared + Debit
+    const finalAmount = cumEarnings - cumExpenses - cumShared + totalDebit;
 
     return Math.max(0, finalAmount);
 }

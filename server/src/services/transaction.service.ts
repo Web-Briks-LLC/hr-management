@@ -1,18 +1,16 @@
-import { startOfDay, endOfDay, startOfMonth } from "date-fns";
-import mongoose, { Types } from "mongoose";
+import { startOfDay, endOfDay } from "date-fns";
+import mongoose from "mongoose";
 import puppeteer from "puppeteer";
 import EarningModel from "../models/earning.model.js";
 import ExpenseModel from "../models/expense.model.js";
 import DebitModel, { DebitType } from "../models/Debit.js";
 import ProfitTransferModel from "../models/profit-transfer.model.js";
 import ProfitDistributionModel from "../models/profit-distribution.model.js";
-import WalletTransactionModel from "../models/wallet-transaction.model.js";
 import type {
     INormalizedTransaction,
     TransactionQueryParams,
     ITransactionReportData,
 } from "../types/transaction.type.js";
-import { escapeRegex } from "../lib/sanitize.js";
 
 // Helper to format currency values to BDT
 const formatBDT = (amount: number) => {
@@ -27,28 +25,22 @@ async function getUnifiedTransactions(params: TransactionQueryParams): Promise<I
     const now = new Date();
     
     // 1. Date Range Handling
-    const start = params.startDate ? startOfDay(new Date(params.startDate)) : startOfMonth(now);
+    const start = params.startDate ? startOfDay(new Date(params.startDate)) : new Date(0);
     const end = params.endDate ? endOfDay(new Date(params.endDate)) : endOfDay(now);
 
-    // 2. Parse active transaction types to include
-    const activeTypes = params.type 
-        ? params.type.split(",").map(t => t.trim().toLowerCase()) 
-        : ["earning", "expense", "debit", "wallet", "profit_share", "profit_transfer"];
-
-    // 3. STEP 1: CALCULATE CUMULATIVE OPENING BALANCE (everything strictly before 'start')
+    // 2. STEP 1: CALCULATE CUMULATIVE OPENING BALANCE (everything strictly before 'start')
     const [
         earningsBefore,
         debitBorrowsBefore,
         debitReturnsBefore,
         expensesBefore,
         transfersBefore,
-        distributionsBefore,
-        walletWithdrawalsBefore
+        distributionsBefore
     ] = await Promise.all([
         // Inflows before 'start'
         EarningModel.aggregate([
             { $match: { status: "paid", paidAt: { $lt: start } } },
-            { $group: { _id: null, total: { $sum: "$amountInBDT" } } }
+            { $group: { _id: null, total: { $sum: { $ifNull: ["$paidAmountBDT", "$amountInBDT"] } } } }
         ]),
         DebitModel.aggregate([
             { $match: { type: DebitType.BORROW, date: { $lt: start } } },
@@ -70,10 +62,6 @@ async function getUnifiedTransactions(params: TransactionQueryParams): Promise<I
         ProfitDistributionModel.aggregate([
             { $match: { status: "distributed", distributedAt: { $lt: start } } },
             { $group: { _id: null, total: { $sum: "$shareAmount" } } }
-        ]),
-        WalletTransactionModel.aggregate([
-            { $match: { type: "withdrawal", status: "completed", createdAt: { $lt: start } } },
-            { $group: { _id: null, total: { $sum: "$amount" } } }
         ])
     ]);
 
@@ -83,209 +71,117 @@ async function getUnifiedTransactions(params: TransactionQueryParams): Promise<I
     const sumExpensesBefore = expensesBefore[0]?.total || 0;
     const sumTransfersBefore = transfersBefore[0]?.total || 0;
     const sumDistributionsBefore = distributionsBefore[0]?.total || 0;
-    const sumWalletWithdrawalsBefore = walletWithdrawalsBefore[0]?.total || 0;
 
     const openingBalance = (sumEarningsBefore + sumDebitBorrowsBefore) - 
-                           (sumExpensesBefore + sumTransfersBefore + sumDistributionsBefore + sumDebitReturnsBefore + sumWalletWithdrawalsBefore);
+                           (sumExpensesBefore + sumTransfersBefore + sumDistributionsBefore + sumDebitReturnsBefore);
 
-    // 4. STEP 2: FETCH RANGE DATA (filtering by date range, branch, search query, type)
-    const queries: Promise<INormalizedTransaction[]>[] = [];
-    const searchRegex = params.search ? { $regex: escapeRegex(params.search), $options: "i" } : null;
+    // 3. STEP 2: FETCH RANGE DATA UNFILTERED (to ensure chronological running balance continuity)
+    const [
+        earnings,
+        expenses,
+        debits,
+        distributions,
+        transfers
+    ] = await Promise.all([
+        EarningModel.find({ status: "paid", paidAt: { $gte: start, $lte: end } }).populate("clientId").lean(),
+        ExpenseModel.find({ status: { $in: ["paid", "partial_paid"] }, date: { $gte: start, $lte: end } }).populate("categoryId").lean(),
+        DebitModel.find({ date: { $gte: start, $lte: end } }).populate("personId").lean(),
+        ProfitDistributionModel.find({ status: "distributed", distributedAt: { $gte: start, $lte: end } }).populate("shareholderId").lean(),
+        ProfitTransferModel.find({ transferDate: { $gte: start, $lte: end } }).populate("businessId").lean()
+    ]);
 
-    // Filter helpers
-    const branchFilter = (modelField: string) => {
-        if (params.branchId && Types.ObjectId.isValid(params.branchId)) {
-            return { [modelField]: new Types.ObjectId(params.branchId) };
-        }
-        return {};
-    };
+    const rawTransactions: INormalizedTransaction[] = [];
 
     // A. Earnings (Inflow)
-    if (activeTypes.includes("earning")) {
-        const match: any = { status: "paid", paidAt: { $gte: start, $lte: end } };
-        if (searchRegex) {
-            match.notes = searchRegex;
-        }
-        
-        queries.push(
-            EarningModel.find(match)
-                .populate("clientId")
-                .lean()
-                .then(records => records.map(e => ({
-                    id: e._id.toString(),
-                    date: e.paidAt || e.createdAt,
-                    title: `Revenue Earning: ${(e.clientId as any)?.name || e.legacyClientCode || "Client"}`,
-                    type: "earning",
-                    amount: e.totalAmount,
-                    currency: e.currency,
-                    amountInBDT: e.amountInBDT,
-                    flow: "inflow",
-                    status: "paid",
-                    referenceId: (e.clientId as any)?._id || e.clientId,
-                    note: e.notes
-                } as INormalizedTransaction)))
-        );
-    }
+    earnings.forEach(e => {
+        rawTransactions.push({
+            id: e._id.toString(),
+            date: e.paidAt || e.createdAt,
+            title: `Revenue Earning: ${(e.clientId as any)?.name || e.legacyClientCode || "Client"}`,
+            type: "earning",
+            amount: e.totalAmount,
+            currency: e.currency,
+            amountInBDT: e.paidAmountBDT || e.amountInBDT || 0,
+            flow: "inflow",
+            status: "paid",
+            referenceId: (e.clientId as any)?._id?.toString() || e.clientId?.toString(),
+            note: e.notes,
+            createdBy: e.createdBy
+        } as any as INormalizedTransaction);
+    });
 
     // B. Expenses (Outflow)
-    if (activeTypes.includes("expense")) {
-        const match: any = { 
-            status: { $in: ["paid", "partial_paid"] }, 
-            date: { $gte: start, $lte: end },
-            ...branchFilter("branchId")
-        };
-        if (searchRegex) {
-            match.$or = [
-                { title: searchRegex },
-                { note: searchRegex }
-            ];
-        }
+    expenses.forEach(ex => {
+        rawTransactions.push({
+            id: ex._id.toString(),
+            date: ex.date,
+            title: `Expense: ${ex.title} (${(ex.categoryId as any)?.name || "Uncategorized"})`,
+            type: "expense",
+            amount: ex.amount,
+            currency: "BDT",
+            amountInBDT: ex.amount,
+            flow: "outflow",
+            status: ex.status as any,
+            referenceId: ex.branchId?.toString(),
+            note: ex.note,
+            createdBy: ex.createdBy
+        } as any as INormalizedTransaction);
+    });
 
-        queries.push(
-            ExpenseModel.find(match)
-                .populate("categoryId")
-                .lean()
-                .then(records => records.map(ex => ({
-                    id: ex._id.toString(),
-                    date: ex.date,
-                    title: `Expense: ${ex.title} (${(ex.categoryId as any)?.name || "Uncategorized"})`,
-                    type: "expense",
-                    amount: ex.amount,
-                    currency: "BDT",
-                    amountInBDT: ex.amount,
-                    flow: "outflow",
-                    status: ex.status as any,
-                    referenceId: ex.branchId,
-                    note: ex.note,
-                    createdBy: ex.createdBy ? ex.createdBy.toString() : undefined
-                } as INormalizedTransaction)))
-        );
-    }
+    // C. Debits (Borrow is Inflow, Return is Outflow)
+    debits.forEach(d => {
+        rawTransactions.push({
+            id: d._id.toString(),
+            date: d.date,
+            title: `Debit ${d.type}: ${(d.personId as any)?.name || "Unknown Person"}`,
+            type: "debit",
+            subType: d.type,
+            amount: d.amount,
+            currency: "BDT",
+            amountInBDT: d.amount,
+            flow: d.type === DebitType.BORROW ? "inflow" : "outflow",
+            status: "completed" as any,
+            referenceId: (d.personId as any)?._id?.toString() || d.personId?.toString(),
+            note: d.description,
+            createdBy: d.createdBy
+        } as any as INormalizedTransaction);
+    });
 
-    // C. Debits (Inflow/Outflow)
-    if (activeTypes.includes("debit")) {
-        const match: any = { date: { $gte: start, $lte: end } };
-        if (searchRegex) {
-            match.description = searchRegex;
-        }
+    // D. Profit Distributions (Outflow)
+    distributions.forEach(d => {
+        rawTransactions.push({
+            id: d._id.toString(),
+            date: d.distributedAt,
+            title: `Profit Payout to ${(d.shareholderId as any)?.name || "Shareholder"}`,
+            type: "profit_share",
+            amount: d.shareAmount,
+            currency: "BDT",
+            amountInBDT: d.shareAmount,
+            flow: "outflow",
+            status: "distributed",
+            referenceId: (d.shareholderId as any)?._id?.toString() || d.shareholderId?.toString(),
+            note: d.notes,
+            createdBy: d.distributedBy
+        } as any as INormalizedTransaction);
+    });
 
-        queries.push(
-            DebitModel.find(match)
-                .populate("personId")
-                .lean()
-                .then(records => records.map(d => ({
-                    id: d._id.toString(),
-                    date: d.date,
-                    title: `Debit ${d.type}: ${(d.personId as any)?.name || "Unknown Person"}`,
-                    type: "debit",
-                    subType: d.type,
-                    amount: d.amount,
-                    currency: "BDT",
-                    amountInBDT: d.amount,
-                    flow: d.type === DebitType.BORROW ? "inflow" : "outflow",
-                    status: "completed" as any,
-                    referenceId: (d.personId as any)?._id || d.personId,
-                    note: d.description,
-                    createdBy: d.createdBy ? d.createdBy.toString() : undefined
-                } as INormalizedTransaction)))
-        );
-    }
-
-    // D. Wallet Withdrawals (Outflow)
-    if (activeTypes.includes("wallet")) {
-        const match: any = { 
-            type: "withdrawal", 
-            status: "completed", 
-            createdAt: { $gte: start, $lte: end } 
-        };
-        if (searchRegex) {
-            match.description = searchRegex;
-        }
-
-        queries.push(
-            WalletTransactionModel.find(match)
-                .populate("staffId")
-                .lean()
-                .then(records => records.map(w => ({
-                    id: w._id.toString(),
-                    date: w.createdAt,
-                    title: `Staff Wallet Withdrawal: ${(w.staffId as any)?.name || "Staff"}`,
-                    type: "wallet",
-                    subType: w.type,
-                    amount: w.amount,
-                    currency: "BDT",
-                    amountInBDT: w.amount,
-                    flow: "outflow",
-                    status: "completed",
-                    referenceId: (w.staffId as any)?._id || w.staffId,
-                    note: w.description,
-                    createdBy: w.createdBy ? w.createdBy.toString() : undefined
-                } as INormalizedTransaction)))
-        );
-    }
-
-    // E. Profit Distributions (Outflow)
-    if (activeTypes.includes("profit_share")) {
-        const match: any = { 
-            status: "distributed", 
-            distributedAt: { $gte: start, $lte: end } 
-        };
-        if (searchRegex) {
-            match.notes = searchRegex;
-        }
-
-        queries.push(
-            ProfitDistributionModel.find(match)
-                .populate("shareholderId")
-                .lean()
-                .then(records => records.map(d => ({
-                    id: d._id.toString(),
-                    date: d.distributedAt,
-                    title: `Profit Payout to ${(d.shareholderId as any)?.name || "Shareholder"}`,
-                    type: "profit_share",
-                    amount: d.shareAmount,
-                    currency: "BDT",
-                    amountInBDT: d.shareAmount,
-                    flow: "outflow",
-                    status: "distributed",
-                    referenceId: (d.shareholderId as any)?._id || d.shareholderId,
-                    note: d.notes,
-                    createdBy: d.distributedBy ? d.distributedBy.toString() : undefined
-                } as INormalizedTransaction)))
-        );
-    }
-
-    // F. Profit Transfers (Outflow)
-    if (activeTypes.includes("profit_transfer")) {
-        const match: any = { transferDate: { $gte: start, $lte: end } };
-        if (searchRegex) {
-            match.notes = searchRegex;
-        }
-
-        queries.push(
-            ProfitTransferModel.find(match)
-                .populate("businessId")
-                .lean()
-                .then(records => records.map(t => ({
-                    id: t._id.toString(),
-                    date: t.transferDate,
-                    title: `Profit Transfer to ${(t.businessId as any)?.name || "External Business"}`,
-                    type: "profit_transfer",
-                    amount: t.amount,
-                    currency: "BDT",
-                    amountInBDT: t.amount,
-                    flow: "outflow",
-                    status: "completed" as any,
-                    referenceId: (t.businessId as any)?._id || t.businessId,
-                    note: t.notes,
-                    createdBy: t.transferredBy ? t.transferredBy.toString() : undefined
-                } as INormalizedTransaction)))
-        );
-    }
-
-    // Resolve all fetch queries concurrently
-    const queryResults = await Promise.all(queries);
-    const rawTransactions = queryResults.flat();
+    // E. Profit Transfers (Outflow)
+    transfers.forEach(t => {
+        rawTransactions.push({
+            id: t._id.toString(),
+            date: t.transferDate,
+            title: `Profit Transfer to ${(t.businessId as any)?.name || "External Business"}`,
+            type: "profit_transfer",
+            amount: t.amount,
+            currency: "BDT",
+            amountInBDT: t.amount,
+            flow: "outflow",
+            status: "completed" as any,
+            referenceId: (t.businessId as any)?._id?.toString() || t.businessId?.toString(),
+            note: t.notes,
+            createdBy: t.transferredBy
+        } as any as INormalizedTransaction);
+    });
 
     // Fetch and map user details (createdBy) directly from better-auth user collection
     const rawCreatorIds: string[] = [];
@@ -328,9 +224,9 @@ async function getUnifiedTransactions(params: TransactionQueryParams): Promise<I
                             ? (tx.createdBy as any)._id.toString()
                             : tx.createdBy.toString();
                     
-                    if (usersMap.has(key)) {
-                        tx.createdBy = usersMap.get(key)!;
-                    }
+                  if (usersMap.has(key)) {
+                      tx.createdBy = usersMap.get(key)!;
+                  }
                 }
             });
         } catch (err) {
@@ -338,30 +234,68 @@ async function getUnifiedTransactions(params: TransactionQueryParams): Promise<I
         }
     }
 
-    // 5. STEP 3: SORT CHRONOLOGICALLY (ASCENDING) TO COMPUTE RUNNING BALANCE CORRECTLY
+    // 4. STEP 3: SORT CHRONOLOGICALLY (ASCENDING) TO COMPUTE RUNNING BALANCE CORRECTLY
     rawTransactions.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     let running = openingBalance;
-    let totalInflow = 0;
-    let totalOutflow = 0;
 
     const processedTransactions = rawTransactions.map(tx => {
         if (tx.flow === "inflow") {
             running += tx.amountInBDT;
-            totalInflow += tx.amountInBDT;
         } else {
             running -= tx.amountInBDT;
-            totalOutflow += tx.amountInBDT;
         }
         tx.runningBalance = running;
         return tx;
     });
 
-    const closingBalance = running;
-    const netChange = totalInflow - totalOutflow;
+    // 5. STEP 4: APPLY IN-MEMORY FILTERS
+    let filteredTransactions = processedTransactions;
 
-    // 6. STEP 4: PRESENTATION SORT (DESCENDING)
-    processedTransactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    // A. Filter by Type
+    if (params.type) {
+        const activeTypes = params.type.split(",").map(t => t.trim().toLowerCase());
+        filteredTransactions = filteredTransactions.filter(tx => activeTypes.includes(tx.type));
+    }
+
+    // B. Filter by Branch (only applies to expenses)
+    if (params.branchId) {
+        filteredTransactions = filteredTransactions.filter(tx => {
+            if (tx.type === "expense") {
+                return tx.referenceId === params.branchId;
+            }
+            return true; // Keep other global types
+        });
+    }
+
+    // C. Filter by Search Query
+    if (params.search) {
+        const searchLower = params.search.toLowerCase();
+        filteredTransactions = filteredTransactions.filter(tx => {
+            return (
+                tx.title.toLowerCase().includes(searchLower) ||
+                (tx.note && tx.note.toLowerCase().includes(searchLower))
+            );
+        });
+    }
+
+    // Calculate dynamic range stats based on filtered list
+    let totalInflow = 0;
+    let totalOutflow = 0;
+
+    filteredTransactions.forEach(tx => {
+        if (tx.flow === "inflow") {
+            totalInflow += tx.amountInBDT;
+        } else {
+            totalOutflow += tx.amountInBDT;
+        }
+    });
+
+    const netChange = totalInflow - totalOutflow;
+    const closingBalance = openingBalance + netChange;
+
+    // 6. STEP 5: SORT FOR DISPLAY (DESCENDING CHRONOLOGICAL)
+    filteredTransactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
     return {
         summary: {
@@ -371,7 +305,7 @@ async function getUnifiedTransactions(params: TransactionQueryParams): Promise<I
             netChange,
             closingBalance,
         },
-        transactions: processedTransactions,
+        transactions: filteredTransactions,
     };
 }
 

@@ -40,7 +40,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { format, startOfMonth, endOfMonth } from "date-fns";
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek } from "date-fns";
 import {
     Loader,
     ChevronLeft,
@@ -73,6 +73,26 @@ const TRANSACTION_TYPES = [
     { value: "profit_transfer", label: "Profit Transfer" },
 ];
 
+const MONTHS = [
+    { value: 1, label: "January" },
+    { value: 2, label: "February" },
+    { value: 3, label: "March" },
+    { value: 4, label: "April" },
+    { value: 5, label: "May" },
+    { value: 6, label: "June" },
+    { value: 7, label: "July" },
+    { value: 8, label: "August" },
+    { value: 9, label: "September" },
+    { value: 10, label: "October" },
+    { value: 11, label: "November" },
+    { value: 12, label: "December" },
+];
+
+const YEARS = Array.from(
+    { length: new Date().getFullYear() - 2024 + 2 },
+    (_, i) => 2024 + i
+);
+
 export default function TransactionsClient() {
     const { data: session, isPending: sessionLoading } = useSession();
 
@@ -80,9 +100,15 @@ export default function TransactionsClient() {
     const [search, setSearch] = useState("");
     const [branchFilter, setBranchFilter] = useState("all");
     const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
+    
+    // New Period Filtering States
+    const [period, setPeriod] = useState<"all" | "yearly" | "monthly" | "weekly" | "daily" | "custom">("all");
+    const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+    const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
+
     const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>({
-        from: startOfMonth(new Date()),
-        to: endOfMonth(new Date()),
+        from: undefined,
+        to: undefined,
     });
 
     // 2. Pagination States
@@ -106,17 +132,41 @@ export default function TransactionsClient() {
         const params: any = {};
         if (search) params.search = search;
         if (branchFilter !== "all") params.branchId = branchFilter;
-        if (dateRange.from) {
-            params.startDate = format(dateRange.from, "yyyy-MM-dd");
+        
+        let startStr = "";
+        let endStr = "";
+        
+        if (period === "yearly") {
+            startStr = format(new Date(selectedYear, 0, 1), "yyyy-MM-dd");
+            endStr = format(new Date(selectedYear, 11, 31), "yyyy-MM-dd");
+        } else if (period === "monthly") {
+            startStr = format(new Date(selectedYear, selectedMonth - 1, 1), "yyyy-MM-dd");
+            endStr = format(new Date(selectedYear, selectedMonth, 0), "yyyy-MM-dd");
+        } else if (period === "weekly") {
+            const today = new Date();
+            startStr = format(startOfWeek(today, { weekStartsOn: 6 }), "yyyy-MM-dd");
+            endStr = format(endOfWeek(today, { weekStartsOn: 6 }), "yyyy-MM-dd");
+        } else if (period === "daily") {
+            const today = new Date();
+            startStr = format(today, "yyyy-MM-dd");
+            endStr = format(today, "yyyy-MM-dd");
+        } else if (period === "custom") {
+            if (dateRange.from) {
+                startStr = format(dateRange.from, "yyyy-MM-dd");
+            }
+            if (dateRange.to) {
+                endStr = format(dateRange.to, "yyyy-MM-dd");
+            }
         }
-        if (dateRange.to) {
-            params.endDate = format(dateRange.to, "yyyy-MM-dd");
-        }
+        
+        if (startStr) params.startDate = startStr;
+        if (endStr) params.endDate = endStr;
+        
         if (selectedTypes.length > 0) {
             params.type = selectedTypes.join(",");
         }
         return params;
-    }, [search, branchFilter, dateRange, selectedTypes]);
+    }, [search, branchFilter, period, selectedYear, selectedMonth, dateRange, selectedTypes]);
 
     // Fetch ledger data using RTK Query
     const {
@@ -489,47 +539,117 @@ export default function TransactionsClient() {
                             />
                         </div>
 
-                        {/* B. Date range popover */}
-                        <Popover>
-                            <PopoverTrigger asChild>
-                                <Button
-                                    variant="outline"
-                                    className="w-[280px] h-10 bg-background/60 justify-start text-left font-normal text-sm border-dashed shadow-xs"
-                                >
-                                    <CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground" />
-                                    {dateRange.from ? (
-                                        dateRange.to ? (
-                                            <>
-                                                {format(dateRange.from, "dd MMM yyyy")} -{" "}
-                                                {format(dateRange.to, "dd MMM yyyy")}
-                                            </>
+                        {/* Period Selector Select dropdown */}
+                        <Select
+                            value={period}
+                            onValueChange={(val) => {
+                                setPeriod(val as any);
+                                setCurrentPage(1);
+                                if (val !== "custom") {
+                                    setDateRange({ from: undefined, to: undefined });
+                                }
+                            }}
+                        >
+                            <SelectTrigger className="w-[150px] h-10 bg-background/60 text-sm font-semibold">
+                                <SelectValue placeholder="Select Period" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all" className="font-semibold">All Time</SelectItem>
+                                <SelectItem value="yearly" className="font-semibold">Yearly</SelectItem>
+                                <SelectItem value="monthly" className="font-semibold">Monthly</SelectItem>
+                                <SelectItem value="weekly" className="font-semibold">Weekly</SelectItem>
+                                <SelectItem value="daily" className="font-semibold">Daily</SelectItem>
+                                <SelectItem value="custom" className="font-semibold">Custom Range</SelectItem>
+                            </SelectContent>
+                        </Select>
+
+                        {/* Contextual Year Select */}
+                        {(period === "yearly" || period === "monthly") && (
+                            <Select
+                                value={selectedYear.toString()}
+                                onValueChange={(val) => {
+                                    setSelectedYear(parseInt(val));
+                                    setCurrentPage(1);
+                                }}
+                            >
+                                <SelectTrigger className="w-[100px] h-10 bg-background/60 text-sm font-semibold animate-in fade-in slide-in-from-left-2 duration-300">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {YEARS.map((y) => (
+                                        <SelectItem key={y} value={y.toString()} className="font-semibold">
+                                            {y}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        )}
+
+                        {/* Contextual Month Select */}
+                        {period === "monthly" && (
+                            <Select
+                                value={selectedMonth.toString()}
+                                onValueChange={(val) => {
+                                    setSelectedMonth(parseInt(val));
+                                    setCurrentPage(1);
+                                }}
+                            >
+                                <SelectTrigger className="w-[130px] h-10 bg-background/60 text-sm font-semibold animate-in fade-in slide-in-from-left-2 duration-300">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {MONTHS.map((m) => (
+                                        <SelectItem key={m.value} value={m.value.toString()} className="font-semibold">
+                                            {m.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        )}
+
+                        {/* Custom Date Range Popover */}
+                        {period === "custom" && (
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button
+                                        variant="outline"
+                                        className="w-[280px] h-10 bg-background/60 justify-start text-left font-normal text-sm border-dashed shadow-xs animate-in fade-in slide-in-from-left-2 duration-300"
+                                    >
+                                        <CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground" />
+                                        {dateRange.from ? (
+                                            dateRange.to ? (
+                                                <>
+                                                    {format(dateRange.from, "dd MMM yyyy")} -{" "}
+                                                    {format(dateRange.to, "dd MMM yyyy")}
+                                                </>
+                                            ) : (
+                                                format(dateRange.from, "PPP")
+                                            )
                                         ) : (
-                                            format(dateRange.from, "PPP")
-                                        )
-                                    ) : (
-                                        <span>Pick ledger range</span>
-                                    )}
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                                <Calendar
-                                    initialFocus
-                                    mode="range"
-                                    selected={{
-                                        from: dateRange.from,
-                                        to: dateRange.to,
-                                    }}
-                                    onSelect={(range) => {
-                                        setDateRange({
-                                            from: range?.from,
-                                            to: range?.to,
-                                        });
-                                        setCurrentPage(1);
-                                    }}
-                                    numberOfMonths={2}
-                                />
-                            </PopoverContent>
-                        </Popover>
+                                            <span>Pick custom range</span>
+                                        )}
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0" align="start">
+                                    <Calendar
+                                        initialFocus
+                                        mode="range"
+                                        selected={{
+                                            from: dateRange.from,
+                                            to: dateRange.to,
+                                        }}
+                                        onSelect={(range) => {
+                                            setDateRange({
+                                                from: range?.from,
+                                                to: range?.to,
+                                            });
+                                            setCurrentPage(1);
+                                        }}
+                                        numberOfMonths={2}
+                                    />
+                                </PopoverContent>
+                            </Popover>
+                        )}
 
                         {/* C. Branch select filter (for expense payouts) */}
                         <Select
@@ -622,12 +742,15 @@ export default function TransactionsClient() {
                                 setSearch("");
                                 setBranchFilter("all");
                                 setSelectedTypes([]);
+                                setPeriod("all");
+                                setSelectedYear(new Date().getFullYear());
+                                setSelectedMonth(new Date().getMonth() + 1);
                                 setDateRange({
-                                    from: startOfMonth(new Date()),
-                                    to: endOfMonth(new Date()),
+                                    from: undefined,
+                                    to: undefined,
                                 });
                                 setCurrentPage(1);
-                                toast.success("Filters reset to default!");
+                                toast.success("Filters reset to All Time!");
                             }}
                             className="text-xs text-muted-foreground font-semibold hover:text-foreground h-10 ml-auto"
                         >

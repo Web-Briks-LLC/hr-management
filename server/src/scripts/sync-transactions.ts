@@ -5,7 +5,6 @@ import ExpenseModel from '../models/expense.model.js';
 import DebitModel, { DebitType } from '../models/Debit.js';
 import ProfitTransferModel from '../models/profit-transfer.model.js';
 import ProfitDistributionModel from '../models/profit-distribution.model.js';
-import WalletTransactionModel from '../models/wallet-transaction.model.js';
 import TransactionModel from '../models/Transaction.js';
 
 // Schema registration imports to allow populate to function standalone
@@ -45,14 +44,12 @@ async function runMigration() {
         earnings,
         expenses,
         debits,
-        walletWithdrawals,
         distributions,
         transfers
     ] = await Promise.all([
         EarningModel.find({ status: "paid" }).populate("clientId").lean(),
         ExpenseModel.find({ status: { $in: ["paid", "partial_paid"] } }).populate("categoryId").lean(),
         DebitModel.find({}).populate("personId").lean(),
-        WalletTransactionModel.find({ type: "withdrawal", status: "completed" }).populate("staffId").lean(),
         ProfitDistributionModel.find({ status: "distributed" }).populate("shareholderId").lean(),
         ProfitTransferModel.find({}).populate("businessId").lean()
     ]);
@@ -61,7 +58,6 @@ async function runMigration() {
    - Earnings: ${earnings.length} records
    - Expenses: ${expenses.length} records
    - Debits: ${debits.length} records
-   - Staff Withdrawals: ${walletWithdrawals.length} records
    - Profit Share: ${distributions.length} records
    - Profit Transfers: ${transfers.length} records`);
 
@@ -75,7 +71,7 @@ async function runMigration() {
             title: `Revenue Earning: ${(e.clientId as any)?.name || e.legacyClientCode || "Client"}`,
             amount: e.totalAmount,
             currency: e.currency || "BDT",
-            amountInBDT: e.amountInBDT,
+            amountInBDT: e.paidAmountBDT || e.amountInBDT || 0,
             flow: "inflow",
             status: "paid",
             referenceId: (e.clientId as any)?._id || e.clientId,
@@ -123,25 +119,7 @@ async function runMigration() {
         });
     });
 
-    // 4. Wallet Withdrawals (Outflow)
-    walletWithdrawals.forEach(w => {
-        newTransactions.push({
-            sourceId: w._id,
-            sourceType: "wallet",
-            title: `Staff Wallet Withdrawal: ${(w.staffId as any)?.name || "Staff"}`,
-            amount: w.amount,
-            currency: "BDT",
-            amountInBDT: w.amount,
-            flow: "outflow",
-            status: "completed",
-            referenceId: (w.staffId as any)?._id || w.staffId,
-            note: w.description,
-            createdBy: w.createdBy,
-            date: w.createdAt
-        });
-    });
-
-    // 5. Profit Distributions (Outflow)
+    // 4. Profit Distributions (Outflow)
     distributions.forEach(d => {
         newTransactions.push({
             sourceId: d._id,
@@ -159,7 +137,7 @@ async function runMigration() {
         });
     });
 
-    // 6. Profit Transfers (Outflow)
+    // 5. Profit Transfers (Outflow)
     transfers.forEach(t => {
         newTransactions.push({
             sourceId: t._id,
