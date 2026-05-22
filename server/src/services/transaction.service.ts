@@ -25,57 +25,150 @@ async function getUnifiedTransactions(params: TransactionQueryParams): Promise<I
     const now = new Date();
     
     // 1. Date Range Handling
+    const isAllTime = !params.startDate && !params.endDate;
     const start = params.startDate ? startOfDay(new Date(params.startDate)) : new Date(0);
     const end = params.endDate ? endOfDay(new Date(params.endDate)) : endOfDay(now);
 
+    let openingBalance = 0;
+
     // 2. STEP 1: CALCULATE CUMULATIVE OPENING BALANCE (everything strictly before 'start')
-    const [
-        earningsBefore,
-        debitBorrowsBefore,
-        debitReturnsBefore,
-        expensesBefore,
-        transfersBefore,
-        distributionsBefore
-    ] = await Promise.all([
-        // Inflows before 'start'
-        EarningModel.aggregate([
-            { $match: { status: "paid", paidAt: { $lt: start } } },
-            { $group: { _id: null, total: { $sum: { $ifNull: ["$paidAmountBDT", "$amountInBDT"] } } } }
-        ]),
-        DebitModel.aggregate([
-            { $match: { type: DebitType.BORROW, date: { $lt: start } } },
-            { $group: { _id: null, total: { $sum: "$amount" } } }
-        ]),
-        // Outflows before 'start'
-        DebitModel.aggregate([
-            { $match: { type: DebitType.RETURN, date: { $lt: start } } },
-            { $group: { _id: null, total: { $sum: "$amount" } } }
-        ]),
-        ExpenseModel.aggregate([
-            { $match: { status: { $in: ["paid", "partial_paid"] }, date: { $lt: start } } },
-            { $group: { _id: null, total: { $sum: "$amount" } } }
-        ]),
-        ProfitTransferModel.aggregate([
-            { $match: { transferDate: { $lt: start } } },
-            { $group: { _id: null, total: { $sum: "$amount" } } }
-        ]),
-        ProfitDistributionModel.aggregate([
-            { $match: { status: "distributed", distributedAt: { $lt: start } } },
-            { $group: { _id: null, total: { $sum: "$shareAmount" } } }
-        ])
-    ]);
+    // Only calculated if not in All Time mode (since opening balance is 0 at the beginning of time)
+    if (!isAllTime) {
+        const [
+            earningsBefore,
+            debitBorrowsBefore,
+            debitReturnsBefore,
+            expensesBefore,
+            transfersBefore,
+            distributionsBefore
+        ] = await Promise.all([
+            // Inflows before 'start'
+            EarningModel.aggregate([
+                {
+                    $match: {
+                        status: "paid",
+                        $or: [
+                            { paidAt: { $lt: start } },
+                            { paidAt: null, createdAt: { $lt: start } },
+                            { paidAt: { $exists: false }, createdAt: { $lt: start } }
+                        ]
+                    }
+                },
+                { $group: { _id: null, total: { $sum: { $ifNull: ["$paidAmountBDT", "$amountInBDT"] } } } }
+            ]),
+            DebitModel.aggregate([
+                {
+                    $match: {
+                        type: DebitType.BORROW,
+                        $or: [
+                            { date: { $lt: start } },
+                            { date: null, createdAt: { $lt: start } },
+                            { date: { $exists: false }, createdAt: { $lt: start } }
+                        ]
+                    }
+                },
+                { $group: { _id: null, total: { $sum: "$amount" } } }
+            ]),
+            // Outflows before 'start'
+            DebitModel.aggregate([
+                {
+                    $match: {
+                        type: DebitType.RETURN,
+                        $or: [
+                            { date: { $lt: start } },
+                            { date: null, createdAt: { $lt: start } },
+                            { date: { $exists: false }, createdAt: { $lt: start } }
+                        ]
+                    }
+                },
+                { $group: { _id: null, total: { $sum: "$amount" } } }
+            ]),
+            ExpenseModel.aggregate([
+                {
+                    $match: {
+                        status: { $in: ["paid", "partial_paid"] },
+                        $or: [
+                            { date: { $lt: start } },
+                            { date: null, createdAt: { $lt: start } },
+                            { date: { $exists: false }, createdAt: { $lt: start } }
+                        ]
+                    }
+                },
+                { $group: { _id: null, total: { $sum: "$amount" } } }
+            ]),
+            ProfitTransferModel.aggregate([
+                {
+                    $match: {
+                        $or: [
+                            { transferDate: { $lt: start } },
+                            { transferDate: null, createdAt: { $lt: start } },
+                            { transferDate: { $exists: false }, createdAt: { $lt: start } }
+                        ]
+                    }
+                },
+                { $group: { _id: null, total: { $sum: "$amount" } } }
+            ]),
+            ProfitDistributionModel.aggregate([
+                {
+                    $match: {
+                        status: "distributed",
+                        $or: [
+                            { distributedAt: { $lt: start } },
+                            { distributedAt: null, createdAt: { $lt: start } },
+                            { distributedAt: { $exists: false }, createdAt: { $lt: start } }
+                        ]
+                    }
+                },
+                { $group: { _id: null, total: { $sum: "$shareAmount" } } }
+            ])
+        ]);
 
-    const sumEarningsBefore = earningsBefore[0]?.total || 0;
-    const sumDebitBorrowsBefore = debitBorrowsBefore[0]?.total || 0;
-    const sumDebitReturnsBefore = debitReturnsBefore[0]?.total || 0;
-    const sumExpensesBefore = expensesBefore[0]?.total || 0;
-    const sumTransfersBefore = transfersBefore[0]?.total || 0;
-    const sumDistributionsBefore = distributionsBefore[0]?.total || 0;
+        const sumEarningsBefore = earningsBefore[0]?.total || 0;
+        const sumDebitBorrowsBefore = debitBorrowsBefore[0]?.total || 0;
+        const sumDebitReturnsBefore = debitReturnsBefore[0]?.total || 0;
+        const sumExpensesBefore = expensesBefore[0]?.total || 0;
+        const sumTransfersBefore = transfersBefore[0]?.total || 0;
+        const sumDistributionsBefore = distributionsBefore[0]?.total || 0;
 
-    const openingBalance = (sumEarningsBefore + sumDebitBorrowsBefore) - 
-                           (sumExpensesBefore + sumTransfersBefore + sumDistributionsBefore + sumDebitReturnsBefore);
+        openingBalance = (sumEarningsBefore + sumDebitBorrowsBefore) - 
+                         (sumExpensesBefore + sumTransfersBefore + sumDistributionsBefore + sumDebitReturnsBefore);
+    }
 
-    // 3. STEP 2: FETCH RANGE DATA UNFILTERED (to ensure chronological running balance continuity)
+    // 3. STEP 2: FETCH RANGE DATA (to ensure chronological running balance continuity)
+    const earningRangeFilter: any = { status: "paid" };
+    const expenseRangeFilter: any = { status: { $in: ["paid", "partial_paid"] } };
+    const debitRangeFilter: any = {};
+    const distributionRangeFilter: any = { status: "distributed" };
+    const transferRangeFilter: any = {};
+
+    if (!isAllTime) {
+        earningRangeFilter.$or = [
+            { paidAt: { $gte: start, $lte: end } },
+            { paidAt: null, createdAt: { $gte: start, $lte: end } },
+            { paidAt: { $exists: false }, createdAt: { $gte: start, $lte: end } }
+        ];
+        expenseRangeFilter.$or = [
+            { date: { $gte: start, $lte: end } },
+            { date: null, createdAt: { $gte: start, $lte: end } },
+            { date: { $exists: false }, createdAt: { $gte: start, $lte: end } }
+        ];
+        debitRangeFilter.$or = [
+            { date: { $gte: start, $lte: end } },
+            { date: null, createdAt: { $gte: start, $lte: end } },
+            { date: { $exists: false }, createdAt: { $gte: start, $lte: end } }
+        ];
+        distributionRangeFilter.$or = [
+            { distributedAt: { $gte: start, $lte: end } },
+            { distributedAt: null, createdAt: { $gte: start, $lte: end } },
+            { distributedAt: { $exists: false }, createdAt: { $gte: start, $lte: end } }
+        ];
+        transferRangeFilter.$or = [
+            { transferDate: { $gte: start, $lte: end } },
+            { transferDate: null, createdAt: { $gte: start, $lte: end } },
+            { transferDate: { $exists: false }, createdAt: { $gte: start, $lte: end } }
+        ];
+    }
+
     const [
         earnings,
         expenses,
@@ -83,11 +176,11 @@ async function getUnifiedTransactions(params: TransactionQueryParams): Promise<I
         distributions,
         transfers
     ] = await Promise.all([
-        EarningModel.find({ status: "paid", paidAt: { $gte: start, $lte: end } }).populate("clientId").lean(),
-        ExpenseModel.find({ status: { $in: ["paid", "partial_paid"] }, date: { $gte: start, $lte: end } }).populate("categoryId").lean(),
-        DebitModel.find({ date: { $gte: start, $lte: end } }).populate("personId").lean(),
-        ProfitDistributionModel.find({ status: "distributed", distributedAt: { $gte: start, $lte: end } }).populate("shareholderId").lean(),
-        ProfitTransferModel.find({ transferDate: { $gte: start, $lte: end } }).populate("businessId").lean()
+        EarningModel.find(earningRangeFilter).populate("clientId").lean(),
+        ExpenseModel.find(expenseRangeFilter).populate("categoryId").lean(),
+        DebitModel.find(debitRangeFilter).populate("personId").lean(),
+        ProfitDistributionModel.find(distributionRangeFilter).populate("shareholderId").lean(),
+        ProfitTransferModel.find(transferRangeFilter).populate("businessId").lean()
     ]);
 
     const rawTransactions: INormalizedTransaction[] = [];
@@ -96,7 +189,7 @@ async function getUnifiedTransactions(params: TransactionQueryParams): Promise<I
     earnings.forEach(e => {
         rawTransactions.push({
             id: e._id.toString(),
-            date: e.paidAt || e.createdAt,
+            date: e.paidAt || e.createdAt || new Date(),
             title: `Revenue Earning: ${(e.clientId as any)?.name || e.legacyClientCode || "Client"}`,
             type: "earning",
             amount: e.totalAmount,
@@ -114,7 +207,7 @@ async function getUnifiedTransactions(params: TransactionQueryParams): Promise<I
     expenses.forEach(ex => {
         rawTransactions.push({
             id: ex._id.toString(),
-            date: ex.date,
+            date: ex.date || (ex as any).createdAt || new Date(),
             title: `Expense: ${ex.title} (${(ex.categoryId as any)?.name || "Uncategorized"})`,
             type: "expense",
             amount: ex.amount,
@@ -132,7 +225,7 @@ async function getUnifiedTransactions(params: TransactionQueryParams): Promise<I
     debits.forEach(d => {
         rawTransactions.push({
             id: d._id.toString(),
-            date: d.date,
+            date: d.date || (d as any).createdAt || new Date(),
             title: `Debit ${d.type}: ${(d.personId as any)?.name || "Unknown Person"}`,
             type: "debit",
             subType: d.type,
@@ -151,7 +244,7 @@ async function getUnifiedTransactions(params: TransactionQueryParams): Promise<I
     distributions.forEach(d => {
         rawTransactions.push({
             id: d._id.toString(),
-            date: d.distributedAt,
+            date: d.distributedAt || (d as any).createdAt || new Date(),
             title: `Profit Payout to ${(d.shareholderId as any)?.name || "Shareholder"}`,
             type: "profit_share",
             amount: d.shareAmount,
@@ -169,7 +262,7 @@ async function getUnifiedTransactions(params: TransactionQueryParams): Promise<I
     transfers.forEach(t => {
         rawTransactions.push({
             id: t._id.toString(),
-            date: t.transferDate,
+            date: t.transferDate || (t as any).createdAt || new Date(),
             title: `Profit Transfer to ${(t.businessId as any)?.name || "External Business"}`,
             type: "profit_transfer",
             amount: t.amount,
