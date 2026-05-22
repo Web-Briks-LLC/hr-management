@@ -6,6 +6,7 @@ import '../models/Person.js';
 import '../models/shareholder.model.js';
 import '../models/external-business.model.js';
 import transactionService from '../services/transaction.service.js';
+import analyticsService from '../services/analytics.service.js';
 
 dotenv.config();
 
@@ -18,10 +19,15 @@ async function run() {
     await mongoose.connect(mongoUri);
     console.log("🔌 Connected to database.");
 
-    const res = await transactionService.getUnifiedTransactions({});
+    const ledgerRes = await transactionService.getUnifiedTransactions({});
     console.log("\n📊 Unified Ledger Summary:");
-    console.log(JSON.stringify(res.summary, null, 2));
-    console.log(`\nTotal Transactions Normalized: ${res.transactions.length}`);
+    console.log(JSON.stringify(ledgerRes.summary, null, 2));
+
+    const finalAmount = await analyticsService.getCurrentFinalAmount();
+    console.log(`\n💎 Analytics getCurrentFinalAmount: ${finalAmount}`);
+
+    const difference = Math.abs(ledgerRes.summary.closingBalance - finalAmount);
+    console.log(`⚖️ Difference: ${difference}`);
 
     await mongoose.disconnect();
 }
