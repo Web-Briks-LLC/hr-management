@@ -199,7 +199,8 @@ async function getUnifiedTransactions(params: TransactionQueryParams): Promise<I
             status: "paid",
             referenceId: (e.clientId as any)?._id?.toString() || e.clientId?.toString(),
             note: e.notes,
-            createdBy: e.createdBy
+            createdBy: e.createdBy,
+            createdAt: e.createdAt
         } as any as INormalizedTransaction);
     });
 
@@ -217,7 +218,8 @@ async function getUnifiedTransactions(params: TransactionQueryParams): Promise<I
             status: ex.status as any,
             referenceId: ex.branchId?.toString(),
             note: ex.note,
-            createdBy: ex.createdBy
+            createdBy: ex.createdBy,
+            createdAt: (ex as any).createdAt
         } as any as INormalizedTransaction);
     });
 
@@ -236,7 +238,8 @@ async function getUnifiedTransactions(params: TransactionQueryParams): Promise<I
             status: "completed" as any,
             referenceId: (d.personId as any)?._id?.toString() || d.personId?.toString(),
             note: d.description,
-            createdBy: d.createdBy
+            createdBy: d.createdBy,
+            createdAt: (d as any).createdAt
         } as any as INormalizedTransaction);
     });
 
@@ -254,7 +257,8 @@ async function getUnifiedTransactions(params: TransactionQueryParams): Promise<I
             status: "distributed",
             referenceId: (d.shareholderId as any)?._id?.toString() || d.shareholderId?.toString(),
             note: d.notes,
-            createdBy: d.distributedBy
+            createdBy: d.distributedBy,
+            createdAt: (d as any).createdAt
         } as any as INormalizedTransaction);
     });
 
@@ -272,7 +276,8 @@ async function getUnifiedTransactions(params: TransactionQueryParams): Promise<I
             status: "completed" as any,
             referenceId: (t.businessId as any)?._id?.toString() || t.businessId?.toString(),
             note: t.notes,
-            createdBy: t.transferredBy
+            createdBy: t.transferredBy,
+            createdAt: (t as any).createdAt
         } as any as INormalizedTransaction);
     });
 
@@ -296,8 +301,15 @@ async function getUnifiedTransactions(params: TransactionQueryParams): Promise<I
 
     if (creatorIds.length > 0) {
         try {
+            const queryIds: any[] = [...creatorIds];
+            creatorIds.forEach(id => {
+                if (mongoose.Types.ObjectId.isValid(id)) {
+                    queryIds.push(new mongoose.Types.ObjectId(id));
+                }
+            });
+
             const dbUsers = await mongoose.connection.collection("user").find({
-                _id: { $in: creatorIds as any }
+                _id: { $in: queryIds }
             }).toArray();
 
             const usersMap = new Map<string, { _id: string; name: string }>();

@@ -19,6 +19,7 @@ export interface INormalizedTransaction {
     } | string;
     runningBalance?: number;
     note?: string;
+    createdAt?: Date;
 }
 
 export interface TransactionQueryParams {

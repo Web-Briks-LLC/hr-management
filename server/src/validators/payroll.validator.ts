@@ -20,7 +20,7 @@ export const payrollPreviewSchema = z.object({
 export const processPaymentSchema = z.object({
     staffId: objectId,
     month: monthFormat,
-    amount: z.number().positive("Amount must be positive"),
+    amount: z.number().nonnegative("Amount must be non-negative"),
     paymentMethod: z
         .enum(["cash", "bank_transfer", "bkash", "nagad"])
         .default("cash"),
@@ -36,7 +36,7 @@ export const bulkProcessSchema = z.object({
         .array(
             z.object({
                 staffId: objectId,
-                amount: z.number().positive(),
+                amount: z.number().nonnegative(),
                 bonus: z.number().min(0).optional().default(0),
                 deduction: z.number().min(0).optional().default(0),
                 note: z.string().max(500).optional(),
