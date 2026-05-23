@@ -138,11 +138,19 @@ const getPayrollPreview = async ({
     const categoryIds = expenseCategories.map((c) => c._id);
 
     let paidExpenses: any[] = [];
+    let bulkExpenses: any[] = [];
     if (categoryIds.length > 0) {
         // Strict matching: by staffId + categoryId + date range
         paidExpenses = await ExpenseModel.find({
             categoryId: { $in: categoryIds },
             staffId: { $in: staffIds },
+            date: { $gte: startDate, $lte: endDate },
+        });
+
+        // Fetch bulk expenses (where staffId is null)
+        bulkExpenses = await ExpenseModel.find({
+            categoryId: { $in: categoryIds },
+            staffId: null,
             date: { $gte: startDate, $lte: endDate },
         });
     }
@@ -280,19 +288,71 @@ const getPayrollPreview = async ({
         const otPayable = otMinutes > 0 ? (otMinutes / 60) * hourlyRate : 0;
 
         // E. Payment status — strict match by staffId + categoryId
-        const salaryExpense = paidExpenses.find(
+        let salaryExpense = paidExpenses.find(
             (e) =>
                 e.staffId?.toString() === staff._id.toString() &&
                 salaryCategory &&
                 e.categoryId.toString() === salaryCategory._id.toString(),
         );
 
-        const otExpense = paidExpenses.find(
+        if (!salaryExpense && salaryCategory) {
+            const bulkSalary = bulkExpenses.find(e => {
+                const note = e.note || '';
+                const match = note.match(/Bulk:\s*([0-9a-fA-F:,]+)/);
+                if (match && match[1]) {
+                    const pairs = match[1].split(',');
+                    return pairs.some((p: string) => p.startsWith(staff._id.toString()));
+                }
+                return false;
+            });
+
+            if (bulkSalary) {
+                const note = bulkSalary.note || '';
+                const match = note.match(/Bulk:\s*([0-9a-fA-F:,]+)/);
+                const pairs = match![1].split(',');
+                const targetPair = pairs.find((p: string) => p.startsWith(staff._id.toString()));
+                const individualAmount = targetPair ? parseFloat(targetPair.split(':')[1] || '0') : 0;
+                
+                salaryExpense = {
+                    _id: bulkSalary._id,
+                    amount: individualAmount,
+                    categoryId: bulkSalary.categoryId,
+                } as any;
+            }
+        }
+
+        let otExpense = paidExpenses.find(
             (e) =>
                 e.staffId?.toString() === staff._id.toString() &&
                 overtimeCategory &&
                 e.categoryId.toString() === overtimeCategory._id.toString(),
         );
+
+        if (!otExpense && overtimeCategory) {
+            const bulkOt = bulkExpenses.find(e => {
+                const note = e.note || '';
+                const match = note.match(/Bulk:\s*([0-9a-fA-F:,]+)/);
+                if (match && match[1]) {
+                    const pairs = match[1].split(',');
+                    return pairs.some((p: string) => p.startsWith(staff._id.toString()));
+                }
+                return false;
+            });
+
+            if (bulkOt) {
+                const note = bulkOt.note || '';
+                const match = note.match(/Bulk:\s*([0-9a-fA-F:,]+)/);
+                const pairs = match![1].split(',');
+                const targetPair = pairs.find((p: string) => p.startsWith(staff._id.toString()));
+                const individualAmount = targetPair ? parseFloat(targetPair.split(':')[1] || '0') : 0;
+                
+                otExpense = {
+                    _id: bulkOt._id,
+                    amount: individualAmount,
+                    categoryId: bulkOt.categoryId,
+                } as any;
+            }
+        }
 
         // F. Build daily attendance calendar with shift & check-in/out info
         const calendar = daysInMonth.map((day: Date) => {
@@ -756,39 +816,159 @@ const bulkProcessPayment = async ({
         );
     }
 
-    const results = [];
-    const errors = [];
+    const { year, monthNum, endDate } = parseMonthRange(month);
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
-    for (const payment of payments) {
-        try {
-            const result = await processPayroll({
-                staffId: payment.staffId,
-                month,
-                amount: payment.amount,
-                paymentMethod,
-                note: payment.note || '',
-                bonus: payment.bonus ?? 0,
-                deduction: payment.deduction ?? 0,
-                createdBy,
-                paymentType,
-                ipAddress,
-                userAgent,
-            });
-            results.push({
-                staffId: payment.staffId,
-                status: 'success',
-                expenseId: result._id,
-            });
-        } catch (error: any) {
-            errors.push({
-                staffId: payment.staffId,
-                status: 'failed',
-                message: error.message,
-            });
+    try {
+        // 1. Fetch category
+        const categoryName = paymentType === 'overtime' ? 'Overtime' : 'Salary & Wages';
+        const categoryRegex = paymentType === 'overtime' ? /^Overtime/i : /^Salary/i;
+        let category = await ExpenseCategoryModel.findOne({
+            name: { $regex: categoryRegex },
+        }).session(session);
+
+        if (!category) {
+            category = await ExpenseCategoryModel.create(
+                [{ name: categoryName }],
+                { session },
+            ).then((res) => res[0] as any);
         }
-    }
 
-    return { results, errors };
+        // 2. Resolve staff names and branches
+        const staffIds = payments.map((p) => new Types.ObjectId(p.staffId));
+        const staffs = await StaffModel.find({ _id: { $in: staffIds } }).session(session);
+
+        // Calculate total amount
+        const totalBulkAmount = payments.reduce((sum, p) => sum + Math.round(p.amount), 0);
+
+        // 3. Wallet balance check (Guard: Wallet must not go below 0!)
+        const currentFinalAmount = await analyticsService.getCurrentFinalAmount(session);
+        if (totalBulkAmount > currentFinalAmount) {
+            throw new Error("Insufficient balance. Expense exceeds available amount.");
+        }
+
+        // Get Month Name
+        const monthName = getMonthName(year, monthNum);
+
+        // Build consolidated note parts
+        const paidDetails: string[] = [];
+        const metadataPairs: string[] = [];
+
+        for (const payment of payments) {
+            const staff = staffs.find((s) => s._id.toString() === payment.staffId);
+            const staffName = staff ? (staff as any).name : 'Unknown Staff';
+            const roundedAmount = Math.round(payment.amount);
+            
+            paidDetails.push(`${staffName} (${roundedAmount})`);
+            metadataPairs.push(`${payment.staffId}:${roundedAmount}`);
+        }
+
+        const consolidatedNote = `${categoryName} Bulk Payment for ${monthName} - ${paidDetails.join(', ')} | Bulk: ${metadataPairs.join(',')}`;
+        const expenseTitle = `${paymentType === 'overtime' ? 'Overtime' : 'Salary'} Bulk Payment - ${monthName}`;
+
+        // First staff's branch for the bulk record
+        const defaultBranchId = staffs[0]?.branchId;
+        if (!defaultBranchId) {
+            throw new Error("Could not determine branch for bulk payment.");
+        }
+
+        const createdExpenseArray = await ExpenseModel.create(
+            [
+                {
+                    date: endDate,
+                    title: expenseTitle,
+                    categoryId: category!._id,
+                    branchId: defaultBranchId,
+                    staffId: null as any, // represents a bulk record
+                    amount: totalBulkAmount,
+                    status: 'paid',
+                    paymentMethod: paymentMethod || 'cash',
+                    note: consolidatedNote,
+                    createdBy: createdBy,
+                },
+            ],
+            { session },
+        ) as any[];
+        const createdExpense = createdExpenseArray[0];
+
+        if (!createdExpense) {
+            throw new Error('Failed to create bulk expense record');
+        }
+
+        // 5. Log individual Salary Adjustment Logs (Audit Trail)
+        if (paymentType === 'salary') {
+            for (const payment of payments) {
+                const bonus = payment.bonus ?? 0;
+                const deduction = payment.deduction ?? 0;
+                const note = payment.note ?? '';
+
+                if (bonus || deduction) {
+                    const existingLog = await SalaryAdjustmentLogModel.findOne({
+                        staffId: payment.staffId,
+                        month,
+                    }).session(session);
+
+                    if (existingLog) {
+                        existingLog.previousBonus = existingLog.bonus;
+                        existingLog.previousDeduction = existingLog.deduction;
+                        existingLog.bonus = bonus;
+                        existingLog.deduction = deduction;
+                        if (note) existingLog.note = note;
+                        existingLog.performedBy = new Types.ObjectId(createdBy);
+                        existingLog.expenseId = createdExpense._id;
+                        await existingLog.save({ session });
+                    } else {
+                        await SalaryAdjustmentLogModel.create(
+                            [
+                                {
+                                    staffId: new Types.ObjectId(payment.staffId),
+                                    month,
+                                    bonus,
+                                    deduction,
+                                    ...(note ? { note } : {}),
+                                    performedBy: new Types.ObjectId(createdBy),
+                                    expenseId: createdExpense._id,
+                                },
+                            ],
+                            { session },
+                        );
+                    }
+                }
+            }
+        }
+
+        await session.commitTransaction();
+
+        // Single audit log for whole bulk operation
+        await auditService.createLog({
+            userId: createdBy,
+            action: 'BULK_PAYMENT_PROCESS',
+            entity: 'Staff',
+            entityId: createdBy,
+            ipAddress,
+            userAgent,
+            details: {
+                month,
+                totalAmount: totalBulkAmount,
+                staffCount: payments.length,
+                expenseId: createdExpense._id,
+            },
+        });
+
+        const results = payments.map((p) => ({
+            staffId: p.staffId,
+            status: 'success',
+            expenseId: createdExpense._id,
+        }));
+
+        return { results, errors: [] };
+    } catch (error: any) {
+        await session.abortTransaction();
+        throw error;
+    } finally {
+        session.endSession();
+    }
 };
 
 // ── Grace Attendance ───────────────────────────────────────────────────
@@ -1037,33 +1217,103 @@ const undoPayroll = async (
         );
     }
 
-    // Strict match by staffId + categoryId + date range
-    const expense = await ExpenseModel.findOneAndDelete({
-        staffId,
-        categoryId: category._id,
-        date: { $gte: startDate, $lte: endDate },
-    });
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
-    if (!expense) {
-        throw new Error('Payroll record not found for this month');
-    }
+    try {
+        // 1. Try to find and delete an individual expense
+        let expense = await ExpenseModel.findOneAndDelete(
+            {
+                staffId,
+                categoryId: category._id,
+                date: { $gte: startDate, $lte: endDate },
+            },
+            { session }
+        );
 
-    // Log Payment Undo
-    await auditService.createLog({
-        userId: context.userId,
-        action: 'PAYMENT_UNDO',
-        entity: 'Staff',
-        entityId: staffId,
-        ipAddress: context.ipAddress,
-        userAgent: context.userAgent,
-        details: {
-            month,
-            paymentType,
-            expenseId: expense._id
+        if (!expense) {
+            // 2. Try to find a bulk expense containing this staff member's payment
+            const bulkExpense = await ExpenseModel.findOne({
+                staffId: null,
+                categoryId: category._id,
+                date: { $gte: startDate, $lte: endDate },
+                note: { $regex: new RegExp(staffId) },
+            }).session(session);
+
+            if (bulkExpense) {
+                const note = bulkExpense.note || '';
+                const match = note.match(/Bulk:\s*([0-9a-fA-F:,]+)/);
+                if (match && match[1]) {
+                    const pairs = match[1].split(',');
+                    const filteredPairs = pairs.filter(p => !p.startsWith(staffId));
+                    
+                    // Find individual amount
+                    const targetPair = pairs.find(p => p.startsWith(staffId));
+                    const individualAmount = targetPair ? parseFloat(targetPair.split(':')[1] || '0') : 0;
+
+                    if (filteredPairs.length === 0) {
+                        // No other payments left, delete the bulk expense
+                        await ExpenseModel.findByIdAndDelete(bulkExpense._id).session(session);
+                    } else {
+                        // Reconstruct note
+                        const [humanPart = ''] = note.split(' | Bulk:');
+                        
+                        const staffObj = await StaffModel.findById(staffId).session(session);
+                        const staffName = staffObj ? (staffObj as any).name : '';
+                        
+                        let newHumanPart = humanPart;
+                        if (staffName) {
+                            newHumanPart = humanPart
+                                .replace(new RegExp(`${staffName}\\s*\\(\\d+\\)(,\\s*)?`), '')
+                                .replace(/,\s*$/, '')
+                                .trim();
+                        }
+
+                        bulkExpense.note = `${newHumanPart} | Bulk: ${filteredPairs.join(',')}`;
+                        bulkExpense.amount = Math.max(0, bulkExpense.amount - individualAmount);
+                        await bulkExpense.save({ session });
+                    }
+                    expense = bulkExpense; // to satisfy audited log and logic
+                }
+            }
         }
-    });
 
-    return { success: true };
+        if (!expense) {
+            throw new Error('Payroll record not found for this month');
+        }
+
+        // Delete any salary adjustment logs for this month & staff
+        if (paymentType === 'salary') {
+            await SalaryAdjustmentLogModel.findOneAndDelete(
+                { staffId, month },
+                { session }
+            );
+        }
+
+        await session.commitTransaction();
+
+        // Log Payment Undo
+        await auditService.createLog({
+            userId: context.userId,
+            action: 'PAYMENT_UNDO',
+            entity: 'Staff',
+            entityId: staffId,
+            ipAddress: context.ipAddress,
+            userAgent: context.userAgent,
+            details: {
+                month,
+                paymentType,
+                expenseId: expense._id
+            }
+        });
+
+        return { success: true };
+    } catch (error) {
+        await session.abortTransaction();
+        throw error;
+    } finally {
+        session.endSession();
+    }
 };
 
 // ── Payroll Lock Management ────────────────────────────────────────────
