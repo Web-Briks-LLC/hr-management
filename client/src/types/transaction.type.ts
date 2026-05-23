@@ -17,6 +17,7 @@ export interface INormalizedTransaction {
     } | string;
     runningBalance?: number;
     note?: string;
+    createdAt?: string | Date;
 }
 
 export interface TransactionQueryParams {
@@ -44,3 +45,4 @@ export interface TransactionsResponse {
     success: boolean;
     data: ITransactionReportData;
 }
+

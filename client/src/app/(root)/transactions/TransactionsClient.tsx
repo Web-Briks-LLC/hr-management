@@ -781,7 +781,8 @@ export default function TransactionsClient() {
                             <TableHeader className="bg-muted/30">
                                 <TableRow>
                                     <TableHead className="w-[180px] font-semibold text-center border-r">Date & Time</TableHead>
-                                    <TableHead className="w-[320px] font-semibold border-r">Transaction Details</TableHead>
+                                    <TableHead className="w-[180px] font-semibold text-center border-r">Created At</TableHead>
+                                    <TableHead className="w-[280px] font-semibold border-r">Transaction Details</TableHead>
                                     <TableHead className="w-[140px] font-semibold border-r">Type</TableHead>
                                     <TableHead className="w-[130px] font-semibold text-center border-r">Direction</TableHead>
                                     <TableHead className="w-[180px] font-semibold text-right border-r">Amount</TableHead>
@@ -793,6 +794,7 @@ export default function TransactionsClient() {
                                 {isLoading ? (
                                     [...Array(6)].map((_, i) => (
                                         <TableRow key={i}>
+                                            <TableCell className="border-r"><Skeleton className="h-4 w-32 mx-auto" /></TableCell>
                                             <TableCell className="border-r"><Skeleton className="h-4 w-32 mx-auto" /></TableCell>
                                             <TableCell className="border-r">
                                                 <Skeleton className="h-4 w-48 mb-2" />
@@ -807,7 +809,7 @@ export default function TransactionsClient() {
                                     ))
                                 ) : transactions.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={7} className="h-36 text-center text-muted-foreground font-medium text-sm">
+                                        <TableCell colSpan={8} className="h-36 text-center text-muted-foreground font-medium text-sm">
                                             No transaction records found for the selected parameters.
                                         </TableCell>
                                     </TableRow>
@@ -821,11 +823,18 @@ export default function TransactionsClient() {
                                                     {formatDateTime(tx.date)}
                                                 </TableCell>
 
+                                                {/* 1.5. Created At */}
+                                                <TableCell className="border-r text-center text-xs font-semibold text-muted-foreground bg-muted/5">
+                                                    {tx.createdAt ? formatDateTime(tx.createdAt) : "N/A"}
+                                                </TableCell>
+
                                                 {/* 2. Details */}
-                                                <TableCell className="border-r font-medium">
-                                                    <div className="text-sm font-bold text-foreground">{tx.title}</div>
+                                                <TableCell className="border-r font-medium w-[280px] max-w-[280px]">
+                                                    <div className="text-sm font-bold text-foreground truncate" title={tx.title}>
+                                                        {tx.title}
+                                                    </div>
                                                     {tx.note && (
-                                                        <div className="text-xs text-muted-foreground mt-1 max-w-[300px] break-words italic line-clamp-2">
+                                                        <div className="text-xs text-muted-foreground mt-1 truncate" title={tx.note}>
                                                             {tx.note}
                                                         </div>
                                                     )}
@@ -863,7 +872,7 @@ export default function TransactionsClient() {
                                                     {formatCurrency(tx.runningBalance || 0)}
                                                 </TableCell>
 
-                                                {/* 7. CreatedBy */}
+                                                {/* 7. Creator */}
                                                 <TableCell className="text-xs font-semibold text-muted-foreground">
                                                     {typeof tx.createdBy === "object" ? tx.createdBy.name : tx.createdBy || "System"}
                                                 </TableCell>
@@ -917,3 +926,4 @@ export default function TransactionsClient() {
         </div>
     );
 }
+
