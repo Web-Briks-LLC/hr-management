@@ -1,10 +1,10 @@
 import mongoose from 'mongoose';
-import MainStaffModel from './models/staff.model.js';
-import ShiftModel from './models/shift.model.js';
-import ShiftAssignmentModel from './models/shift-assignment.model.js';
-import BranchModel from './models/branch.model.js';
-import UserModel from './models/user.model.js';
-import envConfig from './config/env.config.js';
+import MainStaffModel from '../models/staff.model.js';
+import ShiftModel from '../models/shift.model.js';
+import ShiftAssignmentModel from '../models/shift-assignment.model.js';
+import BranchModel from '../models/branch.model.js';
+import UserModel from '../models/user.model.js';
+import envConfig from '../config/env.config.js';
 
 async function seedAdminShift() {
     try {
