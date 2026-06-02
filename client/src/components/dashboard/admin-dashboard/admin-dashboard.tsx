@@ -6,12 +6,18 @@ import { AttendanceOverviewChart } from './attendance-overview-chart';
 import { OvertimeSummaryTable } from './overtime-summary-table';
 import { RecentActivities } from './recent-activities';
 import { AdminDashboardSkeleton } from './admin-dashboard-skeleton';
+import StaffTracking from '../staff-dashboard/staff-tracking';
+import { useSession } from '@/lib/auth-client';
+import { Role } from '@/constants/role';
 import { Users, UserCheck, Clock, TrendingUp, DollarSign, Receipt, Wallet, ArrowUpRight } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default function AdminDashboard() {
+    const { data: session } = useSession();
+    const isHRManager = session?.user?.role === Role.HR_MANAGER;
+
     const { data, isLoading, error, refetch } = useGetAdminDashboardQuery(undefined, {
         pollingInterval: 30000, // Refetch every 30 seconds
     });
@@ -45,6 +51,8 @@ export default function AdminDashboard() {
 
     return (
         <div className="space-y-6">
+            {isHRManager && <StaffTracking />}
+
             {/* Stats Cards */}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 <StatCard

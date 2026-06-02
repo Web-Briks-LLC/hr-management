@@ -119,6 +119,20 @@ const getAllOvertimeFromDB = async (query: Record<string, unknown>) => {
 
     const matchStage: any = {};
     if (query.status) matchStage.status = query.status;
+    if (query.type) matchStage.type = query.type;
+
+    if (query.month && query.year) {
+        const month = Number(query.month);
+        const year = Number(query.year);
+        const startDate = new Date(year, month - 1, 1);
+        const endDate = new Date(year, month, 0, 23, 59, 59, 999);
+        matchStage.date = { $gte: startDate, $lte: endDate };
+    } else if (query.year) {
+        const year = Number(query.year);
+        const startDate = new Date(year, 0, 1);
+        const endDate = new Date(year, 11, 31, 23, 59, 59, 999);
+        matchStage.date = { $gte: startDate, $lte: endDate };
+    }
 
     const postMatchStage: any = {};
     if (query.staffId) {
@@ -158,12 +172,37 @@ const getAllOvertimeFromDB = async (query: Record<string, unknown>) => {
             $facet: {
                 metadata: [{ $count: "total" }],
                 data: [{ $skip: skip }, { $limit: limit }],
+                stats: [
+                    {
+                        $group: {
+                            _id: null,
+                            totalRecords: { $sum: 1 },
+                            totalMinutes: { $sum: "$durationMinutes" },
+                            totalActualMinutes: { $sum: { $ifNull: ["$actualDurationMinutes", 0] } },
+                            approvedCount: {
+                                $sum: { $cond: [{ $eq: ["$status", "approved"] }, 1, 0] },
+                            },
+                            pendingCount: {
+                                $sum: { $cond: [{ $eq: ["$status", "pending"] }, 1, 0] },
+                            },
+                            rejectedCount: {
+                                $sum: { $cond: [{ $eq: ["$status", "rejected"] }, 1, 0] },
+                            },
+                            approvedMinutes: {
+                                $sum: {
+                                    $cond: [{ $eq: ["$status", "approved"] }, "$durationMinutes", 0],
+                                },
+                            },
+                        },
+                    },
+                ],
             },
         },
     ]);
 
     const total = result[0]?.metadata[0]?.total || 0;
     const overtimes = result[0]?.data || [];
+    const statsRaw = result[0]?.stats[0] || {};
 
     return {
         overtimes,
@@ -171,6 +210,15 @@ const getAllOvertimeFromDB = async (query: Record<string, unknown>) => {
         page,
         limit,
         totalPages: Math.ceil(total / limit),
+        stats: {
+            totalRecords: statsRaw.totalRecords || 0,
+            totalMinutes: statsRaw.totalMinutes || 0,
+            totalActualMinutes: statsRaw.totalActualMinutes || 0,
+            approvedCount: statsRaw.approvedCount || 0,
+            pendingCount: statsRaw.pendingCount || 0,
+            rejectedCount: statsRaw.rejectedCount || 0,
+            approvedMinutes: statsRaw.approvedMinutes || 0,
+        },
     };
 };
 
