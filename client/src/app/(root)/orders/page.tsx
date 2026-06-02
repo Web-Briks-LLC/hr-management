@@ -72,6 +72,8 @@ import {
     Loader,
     ChevronLeft,
     ChevronRight,
+    ChevronsLeft,
+    ChevronsRight,
     Plus,
     Trash2,
     Edit2,
@@ -107,6 +109,7 @@ import {
 import { format } from "date-fns";
 import { DateTimePicker } from "@/components/shared/DateTimePicker";
 import { cn } from "@/lib/utils";
+import { Separator } from "@/components/ui/separator";
 import { useSession } from "@/lib/auth-client";
 import { useGetMeQuery } from "@/redux/features/staff/staffApi";
 import { Role } from "@/constants/role";
@@ -820,13 +823,18 @@ export default function OrdersPage() {
                                     Add Order
                                 </Button>
                             </DialogTrigger>
-                            <DialogContent className="max-w-2xl! max-h-[90vh] overflow-y-auto">
-                                <DialogHeader>
-                                    <DialogTitle>Create New Order</DialogTitle>
-                                    <DialogDescription>
-                                        Fill in the order details
-                                    </DialogDescription>
-                                </DialogHeader>
+                            <DialogContent className="sm:max-w-[650px] p-0 gap-0 max-h-[85vh] overflow-hidden flex flex-col">
+                                <div className="px-6 pt-6 pb-4 shrink-0">
+                                    <DialogHeader>
+                                        <DialogTitle className="text-xl font-semibold">
+                                            Create New Order
+                                        </DialogTitle>
+                                        <DialogDescription>
+                                            Fill in the order details below.
+                                        </DialogDescription>
+                                    </DialogHeader>
+                                </div>
+                                <Separator className="shrink-0" />
                                 <OrderForm
                                     onSubmit={handleCreateOrder}
                                     isSubmitting={isCreating}
@@ -1533,76 +1541,105 @@ export default function OrdersPage() {
 
                     {/* Pagination */}
                     {meta && (
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-6">
-                                <div className="text-sm text-muted-foreground">
-                                    Page {meta.page} of{" "}
-                                    {Math.max(1, meta.totalPages)} ({meta.total}{" "}
-                                    total)
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <p className="text-sm font-medium">
-                                        Rows per page
-                                    </p>
-                                    <Select
-                                        value={`${filters.limit || 10}`}
-                                        onValueChange={(value) => {
-                                            handleFilterChange(
-                                                "limit",
-                                                Number(value),
-                                            );
-                                        }}
+                        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t">
+                            <div className="flex items-center gap-2">
+                                <p className="text-sm text-muted-foreground">
+                                    Showing {(page - 1) * (filters.limit || 10) + 1} to{" "}
+                                    {Math.min(page * (filters.limit || 10), meta.total)} of{" "}
+                                    {meta.total} entries
+                                </p>
+                                <Select
+                                    value={`${filters.limit || 10}`}
+                                    onValueChange={(value) => {
+                                        handleFilterChange("limit", Number(value));
+                                    }}
+                                >
+                                    <SelectTrigger className="h-8 w-[70px]">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {[10, 20, 50, 100].map((pageSize) => (
+                                            <SelectItem
+                                                key={pageSize}
+                                                value={`${pageSize}`}
+                                            >
+                                                {pageSize}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            {meta.totalPages > 1 && (
+                                <div className="flex items-center gap-1">
+                                    <Button
+                                        variant="outline"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        onClick={() => setPage(1)}
+                                        disabled={page === 1 || isFetching}
                                     >
-                                        <SelectTrigger className="h-8 w-[70px]">
-                                            <SelectValue
-                                                placeholder={
-                                                    filters.limit || 10
-                                                }
-                                            />
-                                        </SelectTrigger>
-                                        <SelectContent side="top">
-                                            {[10, 20, 30, 40, 50].map(
-                                                (pageSize) => (
-                                                    <SelectItem
-                                                        key={pageSize}
-                                                        value={`${pageSize}`}
-                                                    >
-                                                        {pageSize}
-                                                    </SelectItem>
-                                                ),
-                                            )}
-                                        </SelectContent>
-                                    </Select>
+                                        <ChevronsLeft className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        onClick={() => setPage((p) => Math.max(1, p - 1))}
+                                        disabled={page === 1 || isFetching}
+                                    >
+                                        <ChevronLeft className="h-4 w-4" />
+                                    </Button>
+                                    {(() => {
+                                        const totalPages = meta.totalPages;
+                                        const pageNumbers: (number | string)[] = [];
+                                        if (totalPages <= 7) {
+                                            for (let i = 1; i <= totalPages; i++) pageNumbers.push(i);
+                                        } else {
+                                            if (page <= 3) {
+                                                pageNumbers.push(1, 2, 3, 4, "...", totalPages);
+                                            } else if (page >= totalPages - 2) {
+                                                pageNumbers.push(1, "...", totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
+                                            } else {
+                                                pageNumbers.push(1, "...", page - 1, page, page + 1, "...", totalPages);
+                                            }
+                                        }
+                                        return pageNumbers.map((num, idx) =>
+                                            num === "..." ? (
+                                                <span key={`ellipsis-${idx}`} className="px-2 text-muted-foreground">...</span>
+                                            ) : (
+                                                <Button
+                                                    key={num}
+                                                    variant={page === num ? "default" : "outline"}
+                                                    size="icon"
+                                                    className="h-8 w-8"
+                                                    onClick={() => setPage(num as number)}
+                                                    disabled={isFetching}
+                                                >
+                                                    {num}
+                                                </Button>
+                                            ),
+                                        );
+                                    })()}
+                                    <Button
+                                        variant="outline"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        onClick={() => setPage((p) => Math.min(meta.totalPages, p + 1))}
+                                        disabled={page >= meta.totalPages || isFetching}
+                                    >
+                                        <ChevronRight className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        onClick={() => setPage(meta.totalPages)}
+                                        disabled={page >= meta.totalPages || isFetching}
+                                    >
+                                        <ChevronsRight className="h-4 w-4" />
+                                    </Button>
                                 </div>
-                            </div>
-                            <div className="flex gap-2">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() =>
-                                        setPage((p) => Math.max(1, p - 1))
-                                    }
-                                    disabled={page === 1 || isFetching}
-                                >
-                                    <ChevronLeft className="h-4 w-4 " />
-                                    Previous
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() =>
-                                        setPage((p) =>
-                                            Math.min(meta.totalPages, p + 1),
-                                        )
-                                    }
-                                    disabled={
-                                        page >= meta.totalPages || isFetching
-                                    }
-                                >
-                                    Next
-                                    <ChevronRight className="h-4 w-4 ml-2" />
-                                </Button>
-                            </div>
+                            )}
                         </div>
                     )}
                 </CardContent>
@@ -1616,13 +1653,18 @@ export default function OrdersPage() {
                     if (!open) setServerErrors(undefined);
                 }}
             >
-                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                    <DialogHeader>
-                        <DialogTitle>Edit Order</DialogTitle>
-                        <DialogDescription>
-                            Update the order details
-                        </DialogDescription>
-                    </DialogHeader>
+                <DialogContent className="sm:max-w-[650px] p-0 gap-0 max-h-[85vh] overflow-hidden flex flex-col">
+                    <div className="px-6 pt-6 pb-4 shrink-0">
+                        <DialogHeader>
+                            <DialogTitle className="text-xl font-semibold">
+                                Edit Order
+                            </DialogTitle>
+                            <DialogDescription>
+                                Update the order details below.
+                            </DialogDescription>
+                        </DialogHeader>
+                    </div>
+                    <Separator className="shrink-0" />
                     {editDefaultValues && (
                         <OrderForm
                             key={selectedOrder?._id}

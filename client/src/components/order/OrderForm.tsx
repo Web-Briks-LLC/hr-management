@@ -13,9 +13,9 @@ import {
     useGetReturnFileFormatsQuery,
     useCreateReturnFileFormatMutation,
 } from '@/redux/features/returnFileFormat/returnFileFormatApi';
-import { 
+import {
     useGetAllClientsQuery,
-    useGetAssignedServicesQuery 
+    useGetAssignedServicesQuery,
 } from '@/redux/features/client/clientApi';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -42,12 +42,30 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover';
-import { Loader, Plus, X, Check, ChevronsUpDown, Filter } from 'lucide-react';
+import {
+    Loader2,
+    Plus,
+    X,
+    Check,
+    ChevronsUpDown,
+    Filter,
+    Package,
+    Users,
+    CalendarDays,
+    ImageIcon,
+    DollarSign,
+    Layers,
+    FileType,
+    Flag,
+    FileText,
+    StickyNote,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { DatePicker } from '@/components/shared/DatePicker';
 import { DateTimePicker } from '@/components/shared/DateTimePicker';
 import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
 import type { OrderPriority } from '@/types/order.type';
 
 export interface OrderFormData {
@@ -100,11 +118,7 @@ export function OrderForm({
     const [newServiceDescription, setNewServiceDescription] = useState('');
     const [newFormatName, setNewFormatName] = useState('');
     const [newFormatExtension, setNewFormatExtension] = useState('');
-
-    // Filter mode: 'assigned' or 'all'
     const [showAllServices, setShowAllServices] = useState(false);
-
-    // Service search with debounce
     const [serviceSearchInput, setServiceSearchInput] = useState('');
     const [debouncedServiceSearch, setDebouncedServiceSearch] = useState('');
     const [openClient, setOpenClient] = useState(false);
@@ -141,10 +155,9 @@ export function OrderForm({
     const priority = useWatch({ control, name: 'priority' });
     const returnFileFormat = useWatch({ control, name: 'returnFileFormat' });
 
-    // Queries
     const { data: servicesData, isLoading: isLoadingServices } =
         useGetServicesQuery({ isActive: true, limit: 1000 });
-    const { data: assignedServices, isLoading: isLoadingAssigned } = 
+    const { data: assignedServices, isLoading: isLoadingAssigned } =
         useGetAssignedServicesQuery(clientId, { skip: !clientId });
     const { data: formatsData, isLoading: isLoadingFormats } =
         useGetReturnFileFormatsQuery({ isActive: true });
@@ -160,7 +173,6 @@ export function OrderForm({
     const formats = useMemo(() => formatsData?.data || [], [formatsData]);
     const clients = useMemo(() => clientsData || [], [clientsData]);
 
-    // Determine derived services list
     const services = useMemo(() => {
         if (!clientId || showAllServices) return allServices;
         if (assignedServices && assignedServices.length > 0) {
@@ -168,16 +180,14 @@ export function OrderForm({
         }
         return allServices;
     }, [clientId, showAllServices, assignedServices, allServices]);
-    
+
     const selectedClient = useMemo(() => {
         return clients.find((c) => c._id === clientId);
     }, [clientId, clients]);
 
     const teamMembers = selectedClient?.teamMembers || [];
-
     const hasAssignedServices = assignedServices && assignedServices.length > 0;
 
-    // Debounce service search (300ms delay)
     useEffect(() => {
         const timer = setTimeout(() => {
             setDebouncedServiceSearch(serviceSearchInput);
@@ -185,7 +195,6 @@ export function OrderForm({
         return () => clearTimeout(timer);
     }, [serviceSearchInput]);
 
-    // Filter services based on debounced search
     const filteredServices = useMemo(() => {
         if (!debouncedServiceSearch.trim()) return services;
         const searchLower = debouncedServiceSearch.toLowerCase();
@@ -198,22 +207,17 @@ export function OrderForm({
     const perImagePrice = useWatch({ control, name: 'perImagePrice' });
     const totalPrice = useWatch({ control, name: 'totalPrice' });
 
-    // Track which field the user is editing - 'perImage' or 'total'
     const [priceMode, setPriceMode] = useState<'perImage' | 'total'>(
         'perImage',
     );
 
-    // Auto-calculate based on which field was last edited
     useEffect(() => {
         const qty = Number(imageQuantity) || 0;
-
         if (priceMode === 'perImage') {
-            // User entered per image price, calculate total
             const price = Number(perImagePrice) || 0;
             const calculatedTotal = Number((qty * price).toFixed(2));
             setValue('totalPrice', calculatedTotal);
         } else {
-            // User entered total price, calculate per image
             const total = Number(totalPrice) || 0;
             if (qty > 0) {
                 const calculatedPerImage = Number((total / qty).toFixed(2));
@@ -222,7 +226,6 @@ export function OrderForm({
         }
     }, [imageQuantity, perImagePrice, totalPrice, priceMode, setValue]);
 
-    // Set server errors
     useEffect(() => {
         if (serverErrors) {
             Object.entries(serverErrors).forEach(([key, messages]) => {
@@ -234,12 +237,10 @@ export function OrderForm({
         }
     }, [serverErrors, setError]);
 
-    // Update services in form
     useEffect(() => {
         setValue('services', selectedServices);
     }, [selectedServices, setValue]);
 
-    // Update dates in form
     useEffect(() => {
         if (orderDate) {
             setValue('orderDate', format(orderDate, 'yyyy-MM-dd'));
@@ -248,7 +249,6 @@ export function OrderForm({
 
     useEffect(() => {
         if (deadline) {
-            // Store full ISO string with time for deadline
             setValue('deadline', deadline.toISOString());
         }
     }, [deadline, setValue]);
@@ -311,509 +311,582 @@ export function OrderForm({
     };
 
     return (
-        <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-4">
-            {/* Order Name */}
-            <div className="space-y-2">
-                <Label htmlFor="orderName">Order Name *</Label>
-                <Input
-                    id="orderName"
-                    {...register('orderName')}
-                    placeholder="Product Photo Editing Batch 1"
-                />
-                {errors.orderName && (
-                    <p className="text-sm text-destructive">
-                        {errors.orderName.message}
-                    </p>
-                )}
-            </div>
-
-            {/* Client */}
-            <div className="space-y-2 flex flex-col">
-                <Label htmlFor="clientId">Client *</Label>
-                <Popover open={openClient} onOpenChange={setOpenClient}>
-                    <PopoverTrigger asChild>
-                        <Button
-                            variant="outline"
-                            role="combobox"
-                            aria-expanded={openClient}
-                            className={cn(
-                                'w-full justify-between',
-                                !clientId && 'text-muted-foreground',
-                            )}
-                            disabled={isLoadingClients}
-                        >
-                            {clientId
-                                ? (() => {
-                                      return clients.find(
-                                          (client: { _id: string }) =>
-                                              client._id === clientId,
-                                      )?.name;
-                                  })()
-                                : 'Select client'}
-                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                        </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                        <Command>
-                            <CommandInput placeholder="Search client..." />
-                            <CommandList>
-                                <CommandEmpty>No client found.</CommandEmpty>
-                                <CommandGroup>
-                                    {clients.map((client) => (
-                                        <CommandItem
-                                            key={client._id}
-                                            value={client.name}
-                                            keywords={[
-                                                client.name,
-                                                client.clientId,
-                                            ]} // Search by name and ID
-                                            onSelect={() => {
-                                                setValue(
-                                                    'clientId',
-                                                    client._id,
-                                                );
-                                                setValue('contactPersonId', '');
-                                                setOpenClient(false);
-                                                // Reset services filter when client changes
-                                                setShowAllServices(false);
-                                            }}
-                                        >
-                                            <Check
-                                                className={cn(
-                                                    ' h-4 w-4',
-                                                    clientId ===
-                                                        client._id
-                                                        ? 'opacity-100'
-                                                        : 'opacity-0',
-                                                )}
-                                            />
-                                            <span className="flex flex-col">
-                                                <span>{client.name}</span>
-                                                <span className="text-xs text-muted-foreground">
-                                                    {client.clientId}
-                                                </span>
-                                            </span>
-                                        </CommandItem>
-                                    ))}
-                                </CommandGroup>
-                            </CommandList>
-                        </Command>
-                    </PopoverContent>
-                </Popover>
-                {errors.clientId && (
-                    <p className="text-sm text-destructive">
-                        {errors.clientId.message}
-                    </p>
-                )}
-            </div>
-
-            {/* Contact Person */}
-            {clientId && teamMembers.length > 0 && (
-                <div className="space-y-2 animate-in fade-in slide-in-from-top-1">
-                    <Label htmlFor="contactPersonId">Team Member</Label>
-                    <Select
-                        value={contactPersonId || '_none'}
-                        onValueChange={(value) =>
-                            setValue(
-                                'contactPersonId',
-                                value === '_none' ? '' : value,
-                            )
-                        }
-                    >
-                        <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Select team member" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="_none">None</SelectItem>
-                            {teamMembers.map((member) => (
-                                <SelectItem key={member._id} value={member._id!}>
-                                    {member.name} {member.designation ? `(${member.designation})` : ''}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    {errors.contactPersonId && (
-                        <p className="text-sm text-destructive">
-                            {errors.contactPersonId.message}
-                        </p>
-                    )}
-                </div>
-            )}
-
-            <div className="grid grid-cols-2 gap-4">
-                {/* Order Date */}
-                <div className="space-y-2">
-                    <DatePicker
-                        label="Order Date *"
-                        value={orderDate}
-                        onChange={setOrderDate}
-                        placeholder="Select order date"
-                    />
-                    {errors.orderDate && (
-                        <p className="text-sm text-destructive">
-                            {errors.orderDate.message}
-                        </p>
-                    )}
-                </div>
-
-                {/* Deadline */}
-                <div className="space-y-2">
-                    <DateTimePicker
-                        label="Deadline *"
-                        value={deadline}
-                        onChange={setDeadline}
-                        placeholder="Select deadline with time"
-                        minDate={orderDate}
-                    />
-                    {errors.deadline && (
-                        <p className="text-sm text-destructive">
-                            {errors.deadline.message}
-                        </p>
-                    )}
-                </div>
-            </div>
-
-            <div className="grid grid-cols-3 gap-4">
-                {/* Image Quantity */}
-                <div className="space-y-2">
-                    <Label htmlFor="imageQuantity">Image Quantity *</Label>
-                    <Input
-                        id="imageQuantity"
-                        type="number"
-                        min="1"
-                        {...register('imageQuantity', { valueAsNumber: true })}
-                    />
-                    {errors.imageQuantity && (
-                        <p className="text-sm text-destructive">
-                            {errors.imageQuantity.message}
-                        </p>
-                    )}
-                </div>
-
-                {/* Per Image Price */}
-                <div className="space-y-2">
-                    <Label htmlFor="perImagePrice">Per Image Price ($) *</Label>
-                    <Input
-                        id="perImagePrice"
-                        type="number"
-                        step="any"
-                        min="0"
-                        value={perImagePrice || ''}
-                        onChange={(e) => {
-                            setPriceMode('perImage');
-                            setValue(
-                                'perImagePrice',
-                                Number(e.target.value) || 0,
-                            );
-                        }}
-                    />
-                    {errors.perImagePrice && (
-                        <p className="text-sm text-destructive">
-                            {errors.perImagePrice.message}
-                        </p>
-                    )}
-                </div>
-
-                {/* Total Price */}
-                <div className="space-y-2">
-                    <Label htmlFor="totalPrice">Total Price ($)</Label>
-                    <Input
-                        id="totalPrice"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={totalPrice || ''}
-                        onChange={(e) => {
-                            setPriceMode('total');
-                            setValue('totalPrice', Number(e.target.value) || 0);
-                        }}
-                    />
-                </div>
-            </div>
-
-            {/* Services */}
-            <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <Label>Services *</Label>
-                        {clientId && hasAssignedServices && (
-                            <Badge variant={showAllServices ? "outline" : "secondary"} className="text-[10px] cursor-pointer" onClick={() => setShowAllServices(!showAllServices)}>
-                                <Filter className="h-3 w-3 mr-1" />
-                                {showAllServices ? "Showing All" : "Assigned"}
-                            </Badge>
+        <form
+            onSubmit={handleSubmit(onFormSubmit)}
+            className="flex flex-col overflow-hidden h-full"
+        >
+            <div className="flex-1 min-h-0 overflow-y-auto px-6">
+                <div className="space-y-5 py-5">
+                    {/* Order Name */}
+                    <div className="space-y-2">
+                        <Label className="text-sm font-medium flex items-center gap-2">
+                            <Package className="h-3.5 w-3.5 text-muted-foreground" />
+                            Order Name <span className="text-destructive">*</span>
+                        </Label>
+                        <Input
+                            {...register('orderName')}
+                            placeholder="e.g. Product Photo Editing Batch 1"
+                            className="h-10"
+                        />
+                        {errors.orderName && (
+                            <p className="text-xs text-destructive">
+                                {errors.orderName.message}
+                            </p>
                         )}
                     </div>
-                    <Button
-                        type="button"
-                        variant={isNewServiceMode ? 'secondary' : 'outline'}
-                        size="sm"
-                        onClick={() => setIsNewServiceMode(!isNewServiceMode)}
-                    >
-                        {isNewServiceMode ? (
-                            <>
-                                <X className="h-4 w-4 mr-1" />
-                                Cancel
-                            </>
-                        ) : (
-                            <>
-                                <Plus className="h-4 w-4 mr-1" />
-                                New Service
-                            </>
-                        )}
-                    </Button>
-                </div>
 
-                {isNewServiceMode && (
-                    <div className="p-4 border rounded-lg bg-muted/50 space-y-4 animate-in fade-in slide-in-from-top-2">
+                    {/* Client Select */}
+                    <div className="space-y-2">
+                        <Label className="text-sm font-medium flex items-center gap-2">
+                            <Users className="h-3.5 w-3.5 text-muted-foreground" />
+                            Client <span className="text-destructive">*</span>
+                        </Label>
+                        <Popover open={openClient} onOpenChange={setOpenClient}>
+                            <PopoverTrigger asChild>
+                                <Button
+                                    variant="outline"
+                                    role="combobox"
+                                    aria-expanded={openClient}
+                                    className="w-full justify-between h-10 font-normal"
+                                    disabled={isLoadingClients}
+                                >
+                                    <span
+                                        className={cn(
+                                            'truncate',
+                                            !clientId && 'text-muted-foreground',
+                                        )}
+                                    >
+                                        {clientId
+                                            ? clients.find(
+                                                  (c: { _id: string }) =>
+                                                      c._id === clientId,
+                                              )?.name
+                                            : 'Select client...'}
+                                    </span>
+                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent
+                                className="p-0"
+                                style={{
+                                    width: 'var(--radix-popover-trigger-width)',
+                                }}
+                            >
+                                <Command>
+                                    <CommandInput placeholder="Search client..." />
+                                    <CommandList>
+                                        <CommandEmpty>
+                                            No client found.
+                                        </CommandEmpty>
+                                        <CommandGroup>
+                                            {clients.map((client) => (
+                                                <CommandItem
+                                                    key={client._id}
+                                                    value={client.name}
+                                                    keywords={[
+                                                        client.name,
+                                                        client.clientId,
+                                                    ]}
+                                                    onSelect={() => {
+                                                        setValue(
+                                                            'clientId',
+                                                            client._id,
+                                                        );
+                                                        setValue(
+                                                            'contactPersonId',
+                                                            '',
+                                                        );
+                                                        setOpenClient(false);
+                                                        setShowAllServices(
+                                                            false,
+                                                        );
+                                                    }}
+                                                >
+                                                    <Check
+                                                        className={cn(
+                                                            'mr-2 h-4 w-4',
+                                                            clientId ===
+                                                                client._id
+                                                                ? 'opacity-100'
+                                                                : 'opacity-0',
+                                                        )}
+                                                    />
+                                                    {client.name}
+                                                </CommandItem>
+                                            ))}
+                                        </CommandGroup>
+                                    </CommandList>
+                                </Command>
+                            </PopoverContent>
+                        </Popover>
+                        {errors.clientId && (
+                            <p className="text-xs text-destructive">
+                                {errors.clientId.message}
+                            </p>
+                        )}
+                    </div>
+
+                    {/* Contact Person */}
+                    {clientId && teamMembers.length > 0 && (
+                        <div className="space-y-2 animate-in fade-in slide-in-from-top-1">
+                            <Label className="text-sm font-medium">
+                                Team Member
+                            </Label>
+                            <Select
+                                value={contactPersonId || '_none'}
+                                onValueChange={(value) =>
+                                    setValue(
+                                        'contactPersonId',
+                                        value === '_none' ? '' : value,
+                                    )
+                                }
+                            >
+                                <SelectTrigger className="h-10">
+                                    <SelectValue placeholder="Select team member" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="_none">None</SelectItem>
+                                    {teamMembers.map((member) => (
+                                        <SelectItem
+                                            key={member._id}
+                                            value={member._id!}
+                                        >
+                                            {member.name}{' '}
+                                            {member.designation
+                                                ? `(${member.designation})`
+                                                : ''}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    )}
+
+                    <Separator />
+
+                    {/* Date & Deadline Row */}
+                    <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                            <Label htmlFor="new-service-name">
-                                Service Name *
+                            <Label className="text-sm font-medium flex items-center gap-2">
+                                <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
+                                Order Date{' '}
+                                <span className="text-destructive">*</span>
+                            </Label>
+                            <DatePicker
+                                value={orderDate}
+                                onChange={setOrderDate}
+                                placeholder="Select order date"
+                            />
+                            {errors.orderDate && (
+                                <p className="text-xs text-destructive">
+                                    {errors.orderDate.message}
+                                </p>
+                            )}
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label className="text-sm font-medium flex items-center gap-2">
+                                <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
+                                Deadline{' '}
+                                <span className="text-destructive">*</span>
+                            </Label>
+                            <DateTimePicker
+                                value={deadline}
+                                onChange={setDeadline}
+                                placeholder="Select deadline"
+                                minDate={orderDate}
+                            />
+                            {errors.deadline && (
+                                <p className="text-xs text-destructive">
+                                    {errors.deadline.message}
+                                </p>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Quantity & Pricing Row */}
+                    <div className="grid grid-cols-3 gap-4">
+                        <div className="space-y-2">
+                            <Label className="text-sm font-medium flex items-center gap-2">
+                                <ImageIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                                Quantity{' '}
+                                <span className="text-destructive">*</span>
                             </Label>
                             <Input
-                                id="new-service-name"
-                                value={newServiceName}
-                                onChange={(e) =>
-                                    setNewServiceName(e.target.value)
-                                }
-                                placeholder="e.g., Clipping Path"
+                                type="number"
+                                min="1"
+                                className="h-10"
+                                {...register('imageQuantity', {
+                                    valueAsNumber: true,
+                                })}
                             />
+                            {errors.imageQuantity && (
+                                <p className="text-xs text-destructive">
+                                    {errors.imageQuantity.message}
+                                </p>
+                            )}
                         </div>
+
                         <div className="space-y-2">
-                            <Label htmlFor="new-service-desc">
-                                Description
+                            <Label className="text-sm font-medium flex items-center gap-2">
+                                <DollarSign className="h-3.5 w-3.5 text-muted-foreground" />
+                                Per Image ($)
                             </Label>
-                            <Textarea
-                                id="new-service-desc"
-                                value={newServiceDescription}
-                                onChange={(e) =>
-                                    setNewServiceDescription(e.target.value)
-                                }
-                                placeholder="Optional description"
-                                rows={2}
+                            <Input
+                                type="number"
+                                step="any"
+                                min="0"
+                                className="h-10"
+                                value={perImagePrice || ''}
+                                onChange={(e) => {
+                                    setPriceMode('perImage');
+                                    setValue(
+                                        'perImagePrice',
+                                        Number(e.target.value) || 0,
+                                    );
+                                }}
                             />
                         </div>
-                        <div className="flex justify-end">
-                            <Button
-                                type="button"
-                                onClick={handleCreateService}
-                                disabled={isCreatingService}
-                                size="sm"
-                            >
-                                {isCreatingService && (
-                                    <Loader className="h-4 w-4  animate-spin" />
-                                )}
-                                Create Service
-                            </Button>
+
+                        <div className="space-y-2">
+                            <Label className="text-sm font-medium flex items-center gap-2">
+                                <DollarSign className="h-3.5 w-3.5 text-muted-foreground" />
+                                Total ($)
+                            </Label>
+                            <Input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                className="h-10"
+                                value={totalPrice || ''}
+                                onChange={(e) => {
+                                    setPriceMode('total');
+                                    setValue(
+                                        'totalPrice',
+                                        Number(e.target.value) || 0,
+                                    );
+                                }}
+                            />
                         </div>
                     </div>
-                )}
 
-                {/* Service Search Input */}
-                <Input
-                    placeholder="Search services..."
-                    value={serviceSearchInput}
-                    onChange={(e) => setServiceSearchInput(e.target.value)}
-                    className="h-9"
-                />
+                    <Separator />
 
-                {isLoadingServices || (clientId && isLoadingAssigned) ? (
-                    <div className="flex items-center justify-center p-6 border rounded-md">
-                         <Loader className="h-6 w-6 animate-spin text-muted-foreground" />
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-2 gap-2 p-3 border rounded-md max-h-40 overflow-y-auto">
-                        {filteredServices.length === 0 ? (
-                            <p className="text-sm text-muted-foreground col-span-2 text-center py-4">
-                                No services found
-                            </p>
-                        ) : (
-                            filteredServices.map((service) => (
-                                <div
-                                    key={service._id}
-                                    className="flex items-center space-x-2"
-                                >
-                                    <Checkbox
-                                        id={`service-${service._id}`}
-                                        checked={selectedServices.includes(
-                                            service._id,
-                                        )}
-                                        onCheckedChange={() =>
-                                            handleServiceToggle(service._id)
+                    {/* Services */}
+                    <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                            <Label className="text-sm font-medium flex items-center gap-2">
+                                <Layers className="h-3.5 w-3.5 text-muted-foreground" />
+                                Services{' '}
+                                <span className="text-destructive">*</span>
+                                {clientId && hasAssignedServices && (
+                                    <Badge
+                                        variant={
+                                            showAllServices
+                                                ? 'outline'
+                                                : 'secondary'
                                         }
-                                    />
-                                    <Label
-                                        htmlFor={`service-${service._id}`}
-                                        className="text-sm cursor-pointer"
+                                        className="text-[10px] cursor-pointer ml-1"
+                                        onClick={() =>
+                                            setShowAllServices(!showAllServices)
+                                        }
                                     >
-                                        {service.name}
-                                    </Label>
-                                </div>
-                            ))
-                        )}
-                    </div>
-                )}
-                {errors.services && (
-                    <p className="text-sm text-destructive">
-                        {errors.services.message}
-                    </p>
-                )}
-            </div>
-
-            {/* Return File Format */}
-            <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                    <Label>Return File Format *</Label>
-                    <Button
-                        type="button"
-                        variant={isNewFormatMode ? 'secondary' : 'outline'}
-                        size="sm"
-                        onClick={() => setIsNewFormatMode(!isNewFormatMode)}
-                    >
-                        {isNewFormatMode ? (
-                            <>
-                                <X className="h-4 w-4 mr-1" />
-                                Cancel
-                            </>
-                        ) : (
-                            <>
-                                <Plus className="h-4 w-4 mr-1" />
-                                New Format
-                            </>
-                        )}
-                    </Button>
-                </div>
-
-                {isNewFormatMode && (
-                    <div className="p-4 border rounded-lg bg-muted/50 space-y-4 animate-in fade-in slide-in-from-top-2">
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="new-format-name">
-                                    Format Name *
-                                </Label>
-                                <Input
-                                    id="new-format-name"
-                                    value={newFormatName}
-                                    onChange={(e) =>
-                                        setNewFormatName(e.target.value)
-                                    }
-                                    placeholder="e.g., JPEG"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="new-format-ext">
-                                    Extension *
-                                </Label>
-                                <Input
-                                    id="new-format-ext"
-                                    value={newFormatExtension}
-                                    onChange={(e) =>
-                                        setNewFormatExtension(e.target.value)
-                                    }
-                                    placeholder="e.g., jpg"
-                                />
-                            </div>
-                        </div>
-                        <div className="flex justify-end">
+                                        <Filter className="h-3 w-3 mr-1" />
+                                        {showAllServices
+                                            ? 'Showing All'
+                                            : 'Assigned'}
+                                    </Badge>
+                                )}
+                            </Label>
                             <Button
                                 type="button"
-                                onClick={handleCreateFormat}
-                                disabled={isCreatingFormat}
+                                variant={
+                                    isNewServiceMode ? 'secondary' : 'outline'
+                                }
                                 size="sm"
+                                className="h-7 text-xs"
+                                onClick={() =>
+                                    setIsNewServiceMode(!isNewServiceMode)
+                                }
                             >
-                                {isCreatingFormat && (
-                                    <Loader className="h-4 w-4  animate-spin" />
+                                {isNewServiceMode ? (
+                                    <>
+                                        <X className="h-3 w-3" /> Cancel
+                                    </>
+                                ) : (
+                                    <>
+                                        <Plus className="h-3 w-3" /> New
+                                    </>
                                 )}
-                                Create Format
                             </Button>
                         </div>
+
+                        {isNewServiceMode && (
+                            <div className="p-3 border rounded-lg bg-muted/30 space-y-3 animate-in fade-in slide-in-from-top-2">
+                                <Input
+                                    value={newServiceName}
+                                    onChange={(e) =>
+                                        setNewServiceName(e.target.value)
+                                    }
+                                    placeholder="Service name"
+                                    className="h-9"
+                                />
+                                <Textarea
+                                    value={newServiceDescription}
+                                    onChange={(e) =>
+                                        setNewServiceDescription(e.target.value)
+                                    }
+                                    placeholder="Description (optional)"
+                                    rows={2}
+                                    className="resize-none"
+                                />
+                                <div className="flex justify-end">
+                                    <Button
+                                        type="button"
+                                        onClick={handleCreateService}
+                                        disabled={isCreatingService}
+                                        size="sm"
+                                        className="h-8"
+                                    >
+                                        {isCreatingService && (
+                                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                        )}
+                                        Create
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+
+                        <Input
+                            placeholder="Search services..."
+                            value={serviceSearchInput}
+                            onChange={(e) =>
+                                setServiceSearchInput(e.target.value)
+                            }
+                            className="h-9"
+                        />
+
+                        {isLoadingServices ||
+                        (clientId && isLoadingAssigned) ? (
+                            <div className="flex items-center justify-center p-6 border rounded-md">
+                                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-2 gap-1.5 p-3 border rounded-md max-h-36 overflow-y-auto">
+                                {filteredServices.length === 0 ? (
+                                    <p className="text-sm text-muted-foreground col-span-2 text-center py-4">
+                                        No services found
+                                    </p>
+                                ) : (
+                                    filteredServices.map((service) => (
+                                        <div
+                                            key={service._id}
+                                            className={cn(
+                                                'flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer transition-colors',
+                                                selectedServices.includes(
+                                                    service._id,
+                                                )
+                                                    ? 'bg-primary/5'
+                                                    : 'hover:bg-accent',
+                                            )}
+                                            onClick={() =>
+                                                handleServiceToggle(service._id)
+                                            }
+                                        >
+                                            <Checkbox
+                                                checked={selectedServices.includes(
+                                                    service._id,
+                                                )}
+                                                className="pointer-events-none"
+                                            />
+                                            <span className="text-sm truncate">
+                                                {service.name}
+                                            </span>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        )}
+                        {errors.services && (
+                            <p className="text-xs text-destructive">
+                                {errors.services.message}
+                            </p>
+                        )}
                     </div>
-                )}
-                <Select
-                    value={returnFileFormat}
-                    onValueChange={(value) =>
-                        setValue('returnFileFormat', value)
-                    }
-                    disabled={isLoadingFormats}
+
+                    {/* Return File Format & Priority Row */}
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                                <Label className="text-sm font-medium flex items-center gap-2">
+                                    <FileType className="h-3.5 w-3.5 text-muted-foreground" />
+                                    File Format{' '}
+                                    <span className="text-destructive">*</span>
+                                </Label>
+                                <Button
+                                    type="button"
+                                    variant={
+                                        isNewFormatMode ? 'secondary' : 'outline'
+                                    }
+                                    size="sm"
+                                    className="h-6 text-[10px] px-2"
+                                    onClick={() =>
+                                        setIsNewFormatMode(!isNewFormatMode)
+                                    }
+                                >
+                                    {isNewFormatMode ? (
+                                        <X className="h-3 w-3" />
+                                    ) : (
+                                        <Plus className="h-3 w-3" />
+                                    )}
+                                </Button>
+                            </div>
+
+                            {isNewFormatMode && (
+                                <div className="p-3 border rounded-lg bg-muted/30 space-y-2 animate-in fade-in slide-in-from-top-2">
+                                    <Input
+                                        value={newFormatName}
+                                        onChange={(e) =>
+                                            setNewFormatName(e.target.value)
+                                        }
+                                        placeholder="Format name"
+                                        className="h-8 text-sm"
+                                    />
+                                    <Input
+                                        value={newFormatExtension}
+                                        onChange={(e) =>
+                                            setNewFormatExtension(e.target.value)
+                                        }
+                                        placeholder="Extension (e.g. jpg)"
+                                        className="h-8 text-sm"
+                                    />
+                                    <Button
+                                        type="button"
+                                        onClick={handleCreateFormat}
+                                        disabled={isCreatingFormat}
+                                        size="sm"
+                                        className="h-7 text-xs w-full"
+                                    >
+                                        {isCreatingFormat && (
+                                            <Loader2 className="h-3 w-3 animate-spin" />
+                                        )}
+                                        Create
+                                    </Button>
+                                </div>
+                            )}
+
+                            <Select
+                                value={returnFileFormat}
+                                onValueChange={(value) =>
+                                    setValue('returnFileFormat', value)
+                                }
+                                disabled={isLoadingFormats}
+                            >
+                                <SelectTrigger className="h-10">
+                                    <SelectValue placeholder="Select format" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {formats.map((fmt) => (
+                                        <SelectItem
+                                            key={fmt._id}
+                                            value={fmt._id}
+                                        >
+                                            {fmt.name} (.{fmt.extension})
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            {errors.returnFileFormat && (
+                                <p className="text-xs text-destructive">
+                                    {errors.returnFileFormat.message}
+                                </p>
+                            )}
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label className="text-sm font-medium flex items-center gap-2">
+                                <Flag className="h-3.5 w-3.5 text-muted-foreground" />
+                                Priority
+                            </Label>
+                            <Select
+                                value={priority}
+                                onValueChange={(value) =>
+                                    setValue(
+                                        'priority',
+                                        value as OrderPriority,
+                                    )
+                                }
+                            >
+                                <SelectTrigger className="h-10">
+                                    <SelectValue placeholder="Select priority" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="low">Low</SelectItem>
+                                    <SelectItem value="normal">
+                                        Normal
+                                    </SelectItem>
+                                    <SelectItem value="high">High</SelectItem>
+                                    <SelectItem value="urgent">
+                                        Urgent
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+
+                    <Separator />
+
+                    {/* Instructions */}
+                    <div className="space-y-2">
+                        <Label className="text-sm font-medium flex items-center gap-2">
+                            <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+                            Instructions
+                            <span className="text-muted-foreground font-normal text-xs">
+                                (optional)
+                            </span>
+                        </Label>
+                        <Textarea
+                            {...register('instruction')}
+                            placeholder="Special instructions for this order..."
+                            rows={3}
+                            className="resize-none"
+                        />
+                    </div>
+
+                    {/* Notes */}
+                    <div className="space-y-2">
+                        <Label className="text-sm font-medium flex items-center gap-2">
+                            <StickyNote className="h-3.5 w-3.5 text-muted-foreground" />
+                            Internal Notes
+                            <span className="text-muted-foreground font-normal text-xs">
+                                (optional)
+                            </span>
+                        </Label>
+                        <Textarea
+                            {...register('notes')}
+                            placeholder="Internal notes (not visible to client)..."
+                            rows={2}
+                            className="resize-none"
+                        />
+                    </div>
+                </div>
+            </div>
+
+            <Separator className="shrink-0" />
+
+            {/* Footer */}
+            <div className="px-6 py-4 shrink-0 flex justify-end gap-2">
+                <Button
+                    type="button"
+                    variant="outline"
+                    onClick={onCancel}
+                    disabled={isSubmitting}
                 >
-                    <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select file format" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {formats.map((format) => (
-                            <SelectItem key={format._id} value={format._id}>
-                                {format.name} (.{format.extension})
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-                {errors.returnFileFormat && (
-                    <p className="text-sm text-destructive">
-                        {errors.returnFileFormat.message}
-                    </p>
-                )}
-            </div>
-
-            {/* Priority */}
-            <div className="space-y-2">
-                <Label>Priority</Label>
-                <Select
-                    value={priority}
-                    onValueChange={(value) =>
-                        setValue('priority', value as OrderPriority)
-                    }
-                >
-                    <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select priority" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="low">Low</SelectItem>
-                        <SelectItem value="normal">Normal</SelectItem>
-                        <SelectItem value="high">High</SelectItem>
-                        <SelectItem value="urgent">Urgent</SelectItem>
-                    </SelectContent>
-                </Select>
-            </div>
-
-            {/* Instructions */}
-            <div className="space-y-2">
-                <Label htmlFor="instruction">Instructions</Label>
-                <Textarea
-                    id="instruction"
-                    {...register('instruction')}
-                    placeholder="Special instructions for this order..."
-                    rows={3}
-                />
-                {errors.instruction && (
-                    <p className="text-sm text-destructive">
-                        {errors.instruction.message}
-                    </p>
-                )}
-            </div>
-
-            {/* Notes */}
-            <div className="space-y-2">
-                <Label htmlFor="notes">Internal Notes</Label>
-                <Textarea
-                    id="notes"
-                    {...register('notes')}
-                    placeholder="Internal notes (not visible to client)..."
-                    rows={2}
-                />
-                {errors.notes && (
-                    <p className="text-sm text-destructive">
-                        {errors.notes.message}
-                    </p>
-                )}
-            </div>
-
-            {/* Actions */}
-            <div className="flex justify-end gap-3 pt-4">
-                <Button type="button" variant="outline" onClick={onCancel}>
                     Cancel
                 </Button>
                 <Button type="submit" disabled={isSubmitting}>
                     {isSubmitting && (
-                        <Loader className="h-4 w-4  animate-spin" />
+                        <Loader2 className="h-4 w-4 animate-spin" />
                     )}
                     {submitLabel}
                 </Button>
@@ -821,4 +894,3 @@ export function OrderForm({
         </form>
     );
 }
-
