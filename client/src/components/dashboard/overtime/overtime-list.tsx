@@ -19,13 +19,6 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
     Popover,
     PopoverContent,
     PopoverTrigger,
@@ -42,11 +35,11 @@ import {
     useDeleteOvertimeMutation,
     useGetAllOvertimeQuery,
     useExtendOvertimeMutation,
+    useUpdateOvertimeMutation,
 } from '@/redux/features/overtime/overtimeApi';
 import { useGetStaffsQuery } from '@/redux/features/staff/staffApi';
 import {
     Edit,
-    MoreHorizontal,
     Plus,
     Trash,
     ChevronLeft,
@@ -137,6 +130,7 @@ export default function OvertimeList() {
 
     const [deleteOvertime] = useDeleteOvertimeMutation();
     const [extendOvertime] = useExtendOvertimeMutation();
+    const [updateOvertime] = useUpdateOvertimeMutation();
 
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [selectedOvertime, setSelectedOvertime] = useState<IOvertime | null>(
@@ -152,6 +146,17 @@ export default function OvertimeList() {
                 (error as any)?.data?.message ||
                     (error as Error).message ||
                     'Failed to extend overtime',
+            );
+        }
+    };
+
+    const handleStatusChange = async (id: string, status: 'approved' | 'rejected') => {
+        try {
+            await updateOvertime({ id, status }).unwrap();
+            toast.success(`Overtime ${status}`);
+        } catch (error) {
+            toast.error(
+                (error as any)?.data?.message || `Failed to ${status === 'approved' ? 'approve' : 'reject'} overtime`,
             );
         }
     };
@@ -540,7 +545,7 @@ export default function OvertimeList() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {isLoading || isFetching ? (
+                                {isLoading ? (
                                     Array.from({ length: 8 }).map((_, i) => (
                                         <TableRow key={i}>
                                             <TableCell>
@@ -647,73 +652,65 @@ export default function OvertimeList() {
                                                     {ot.status}
                                                 </Badge>
                                             </TableCell>
-                                            <TableCell className="text-right">
-                                                <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild>
+                                            <TableCell>
+                                                <div className="flex items-center justify-end gap-1">
+                                                    {ot.status !== 'approved' && (
                                                         <Button
                                                             variant="ghost"
-                                                            className="h-8 w-8 p-0"
-                                                        >
-                                                            <span className="sr-only">
-                                                                Open menu
-                                                            </span>
-                                                            <MoreHorizontal className="h-4 w-4" />
-                                                        </Button>
-                                                    </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end">
-                                                        <DropdownMenuLabel>
-                                                            Actions
-                                                        </DropdownMenuLabel>
-                                                        {ot.actualStartTime &&
-                                                            !ot.endTime && (
-                                                                <>
-                                                                    <DropdownMenuItem
-                                                                        onClick={() =>
-                                                                            handleExtend(
-                                                                                ot._id,
-                                                                                30,
-                                                                            )
-                                                                        }
-                                                                    >
-                                                                        <Clock className="h-4 w-4" />
-                                                                        Extend by
-                                                                        30m
-                                                                    </DropdownMenuItem>
-                                                                    <DropdownMenuItem
-                                                                        onClick={() =>
-                                                                            handleExtend(
-                                                                                ot._id,
-                                                                                60,
-                                                                            )
-                                                                        }
-                                                                    >
-                                                                        <Clock className="h-4 w-4" />
-                                                                        Extend by
-                                                                        1h
-                                                                    </DropdownMenuItem>
-                                                                </>
-                                                            )}
-                                                        <DropdownMenuItem
+                                                            size="icon"
+                                                            className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-500/10"
                                                             onClick={() =>
-                                                                handleEdit(ot)
-                                                            }
-                                                        >
-                                                            <Edit className="h-4 w-4" />
-                                                            Edit
-                                                        </DropdownMenuItem>
-                                                        <DropdownMenuItem
-                                                            onClick={() =>
-                                                                handleDelete(
+                                                                handleStatusChange(
                                                                     ot._id,
+                                                                    'approved',
                                                                 )
                                                             }
-                                                            className="text-red-600"
+                                                            title="Approve"
                                                         >
-                                                            <Trash className="h-4 w-4" />
-                                                            Delete
-                                                        </DropdownMenuItem>
-                                                    </DropdownMenuContent>
-                                                </DropdownMenu>
+                                                            <CheckCircle2 className="h-4 w-4" />
+                                                        </Button>
+                                                    )}
+                                                    {ot.status !== 'rejected' && (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-500/10"
+                                                            onClick={() =>
+                                                                handleStatusChange(
+                                                                    ot._id,
+                                                                    'rejected',
+                                                                )
+                                                            }
+                                                            title="Reject"
+                                                        >
+                                                            <XCircle className="h-4 w-4" />
+                                                        </Button>
+                                                    )}
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                                                        onClick={() =>
+                                                            handleEdit(ot)
+                                                        }
+                                                        title="Edit"
+                                                    >
+                                                        <Edit className="h-4 w-4" />
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-8 w-8 text-muted-foreground hover:text-red-600 hover:bg-red-500/10"
+                                                        onClick={() =>
+                                                            handleDelete(
+                                                                ot._id,
+                                                            )
+                                                        }
+                                                        title="Delete"
+                                                    >
+                                                        <Trash className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
                                             </TableCell>
                                         </TableRow>
                                     ))

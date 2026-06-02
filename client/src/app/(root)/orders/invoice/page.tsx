@@ -150,12 +150,18 @@ export default function InvoicePage() {
         );
     }, [allOrders]);
 
-    // Filter orders for selected client
+    // Filter orders for selected client, sorted by order date
     const orders = useMemo(() => {
         if (!selectedClientId) return [];
-        return allOrders.filter(
-            (order: IOrder) => order.clientId?._id === selectedClientId,
-        );
+        return allOrders
+            .filter(
+                (order: IOrder) => order.clientId?._id === selectedClientId,
+            )
+            .sort(
+                (a: IOrder, b: IOrder) =>
+                    new Date(a.orderDate).getTime() -
+                    new Date(b.orderDate).getTime(),
+            );
     }, [allOrders, selectedClientId]);
 
     const selectedClient = useMemo(() => {

@@ -270,7 +270,7 @@ async function getAllOrdersFromDB(filters: GetOrdersFilters): Promise<{
     });
 
     // Sort
-    pipeline.push({ $sort: { createdAt: -1 } });
+    pipeline.push({ $sort: { orderDate: -1 } });
 
     // Pagination
     const skip = (page - 1) * limit;
