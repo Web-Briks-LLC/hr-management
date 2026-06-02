@@ -14,7 +14,7 @@ import {
     useCreateReturnFileFormatMutation,
 } from '@/redux/features/returnFileFormat/returnFileFormatApi';
 import { 
-    useGetClientsQuery,
+    useGetAllClientsQuery,
     useGetAssignedServicesQuery 
 } from '@/redux/features/client/clientApi';
 import { Button } from '@/components/ui/button';
@@ -149,7 +149,7 @@ export function OrderForm({
     const { data: formatsData, isLoading: isLoadingFormats } =
         useGetReturnFileFormatsQuery({ isActive: true });
     const { data: clientsData, isLoading: isLoadingClients } =
-        useGetClientsQuery({ limit: 100 });
+        useGetAllClientsQuery({ status: 'active' });
 
     const [createService, { isLoading: isCreatingService }] =
         useCreateServiceMutation();
@@ -158,7 +158,7 @@ export function OrderForm({
 
     const allServices = useMemo(() => servicesData?.data || [], [servicesData]);
     const formats = useMemo(() => formatsData?.data || [], [formatsData]);
-    const clients = useMemo(() => clientsData?.clients || [], [clientsData]);
+    const clients = useMemo(() => clientsData || [], [clientsData]);
 
     // Determine derived services list
     const services = useMemo(() => {

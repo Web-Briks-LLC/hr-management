@@ -13,7 +13,7 @@ import {
     useLazyGetOrdersQuery,
     useGetOrderYearsQuery,
 } from "@/redux/features/order/orderApi";
-import { useGetClientsQuery } from "@/redux/features/client/clientApi";
+import { useGetAllClientsQuery } from "@/redux/features/client/clientApi";
 import type {
     IOrder,
     OrderStatus,
@@ -297,7 +297,7 @@ export default function OrdersPage() {
         year: selectedYear ? parseInt(selectedYear) : undefined,
     });
     const { data: statsData } = useGetOrderStatsQuery();
-    const { data: clientsData } = useGetClientsQuery({ limit: 100 });
+    const { data: clientsData } = useGetAllClientsQuery();
 
     // Mutations
     const [createOrder, { isLoading: isCreating }] = useCreateOrderMutation();
@@ -315,7 +315,7 @@ export default function OrdersPage() {
     const orders = useMemo(() => orderData?.data || [], [orderData]);
     const meta = orderData?.meta;
     const stats = statsData?.data;
-    const clients = useMemo(() => clientsData?.clients || [], [clientsData]);
+    const clients = useMemo(() => clientsData || [], [clientsData]);
 
     // Check if all current page orders are selected
     const allOrdersSelected = useMemo(() => {

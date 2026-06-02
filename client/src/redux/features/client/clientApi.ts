@@ -18,6 +18,15 @@ export const clientApi = apiSlice.injectEndpoints({
                 response.data,
             providesTags: ['Client'],
         }),
+        getAllClients: builder.query<Client[], { status?: string } | void>({
+            query: (params) => ({
+                url: '/clients/all',
+                method: 'GET',
+                params: params || undefined,
+            }),
+            transformResponse: (response: { data: Client[] }) => response.data,
+            providesTags: ['Client'],
+        }),
         getClientById: builder.query<Client, string>({
             query: (id) => ({
                 url: `/clients/${id}`,
@@ -120,6 +129,7 @@ export const clientApi = apiSlice.injectEndpoints({
 
 export const {
     useGetClientsQuery,
+    useGetAllClientsQuery,
     useGetClientByIdQuery,
     useCreateClientMutation,
     useUpdateClientMutation,

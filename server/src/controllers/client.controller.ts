@@ -412,6 +412,41 @@ const getClientEmails = async (req: Request, res: Response) => {
     }
 };
 
+const getAllClientsWithoutPagination = async (req: Request, res: Response) => {
+    try {
+        const userId = req.user?.id;
+        const params: { createdBy?: string; status?: string } = {};
+
+        if (req.query.status) {
+            params.status = req.query.status as string;
+        }
+
+        // Ownership filtering: Telemarketers only see their own clients
+        if (
+            userId &&
+            req.user &&
+            [Role.STAFF, Role.TEAM_LEADER].includes(req.user.role as Role)
+        ) {
+            const isTM = await isTelemarketer(userId);
+            if (isTM) {
+                params.createdBy = userId;
+            }
+        }
+
+        const result = await ClientServices.getAllClientsWithoutPaginationFromDB(params);
+        res.status(200).json({
+            success: true,
+            data: result,
+        });
+    } catch (error: unknown) {
+        const err = error as Error;
+        res.status(500).json({
+            success: false,
+            message: err.message || 'Failed to fetch all clients',
+        });
+    }
+};
+
 export default {
     getAllClients,
     getClientById,
@@ -421,4 +456,5 @@ export default {
     getClientStats,
     getAssignedServices,
     getClientEmails,
+    getAllClientsWithoutPagination,
 };

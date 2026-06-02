@@ -7,6 +7,13 @@ const router: Router = Router();
 // Get all clients
 router.get('/', authorizeTelemarketer, ClientController.getAllClients);
 
+// Get all clients without pagination (for selector dropdowns)
+router.get(
+    '/all',
+    authorizeTelemarketer,
+    ClientController.getAllClientsWithoutPagination,
+);
+
 // Check client ID availability (must be before :id route)
 router.get(
     '/check-id/:clientId',

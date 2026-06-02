@@ -91,7 +91,7 @@ import {
     useSyncEarningMutation,
 } from '@/redux/features/earning/earningApi';
 import { useGetInvoicesQuery } from '@/redux/features/invoice/invoiceApi';
-import { useGetClientsQuery } from '@/redux/features/client/clientApi';
+import { useGetAllClientsQuery } from '@/redux/features/client/clientApi';
 import type {
     IEarning,
     EarningFilters,
@@ -202,7 +202,7 @@ export default function EarningsPage() {
     } = useGetEarningsQuery(filters);
     const { data: statsData, isLoading: isLoadingStats } =
         useGetEarningStatsQuery(filters);
-    const { data: clientsData } = useGetClientsQuery({ limit: 100 });
+    const { data: clientsData } = useGetAllClientsQuery();
     const { data: yearsData } = useGetEarningYearsQuery();
 
     const availableYears = yearsData?.data || YEARS;
@@ -271,7 +271,7 @@ export default function EarningsPage() {
     const earnings = earningsData?.data || [];
     const meta = earningsData?.meta;
     const stats = statsData?.data;
-    const clients = clientsData?.clients || [];
+    const clients = clientsData || [];
 
     // Withdraw calculations
     const rawAmount = parseFloat(withdrawAmount);

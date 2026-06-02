@@ -425,6 +425,26 @@ const getClientStatsFromDB = async (
     };
 };
 
+// Get all clients without pagination
+const getAllClientsWithoutPaginationFromDB = async (params: { createdBy?: string; status?: string }) => {
+    const query: Record<string, any> = {};
+    if (params.createdBy) {
+        query.createdBy = new Types.ObjectId(params.createdBy);
+    }
+    if (params.status) {
+        query.status = params.status;
+    }
+
+    return ClientModel.find(query)
+        .populate('assignedServices')
+        .populate({
+            path: 'createdBy',
+            select: '-password -passwordHistory',
+        })
+        .sort({ name: 1 })
+        .lean();
+};
+
 export default {
     getAllClientsFromDB,
     getClientByIdFromDB,
@@ -433,6 +453,7 @@ export default {
     deleteClientFromDB,
     checkClientIdAvailability,
     getClientStatsFromDB,
+    getAllClientsWithoutPaginationFromDB,
 };
 
 export { ClientIdExistsError };
