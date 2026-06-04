@@ -1,8 +1,6 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { useForm, useWatch } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
 import { format } from 'date-fns';
 import { createOrderSchema } from '@/validators/order.validator';
 import {
@@ -101,17 +99,121 @@ export function OrderForm({
     onCancel,
     serverErrors,
 }: OrderFormProps) {
-    const [selectedServices, setSelectedServices] = useState<string[]>(
-        defaultValues?.services || [],
-    );
+    // Form fields local state
+    const [orderName, setOrderName] = useState(defaultValues?.orderName || '');
+    const [clientId, setClientId] = useState(defaultValues?.clientId || '');
     const [orderDate, setOrderDate] = useState<Date | undefined>(
-        defaultValues?.orderDate
-            ? new Date(defaultValues.orderDate)
-            : new Date(),
+        defaultValues?.orderDate ? new Date(defaultValues.orderDate) : new Date(),
     );
     const [deadline, setDeadline] = useState<Date | undefined>(
         defaultValues?.deadline ? new Date(defaultValues.deadline) : undefined,
     );
+    const [imageQuantity, setImageQuantity] = useState<number>(
+        defaultValues?.imageQuantity !== undefined ? defaultValues.imageQuantity : 1,
+    );
+    const [perImagePrice, setPerImagePrice] = useState<number>(
+        defaultValues?.perImagePrice !== undefined ? defaultValues.perImagePrice : 0,
+    );
+    const [totalPrice, setTotalPrice] = useState<number>(
+        defaultValues?.totalPrice !== undefined ? defaultValues.totalPrice : 0,
+    );
+    const [selectedServices, setSelectedServices] = useState<string[]>(
+        defaultValues?.services || [],
+    );
+    const [returnFileFormat, setReturnFileFormat] = useState(
+        defaultValues?.returnFileFormat || '',
+    );
+    const [instruction, setInstruction] = useState(defaultValues?.instruction || '');
+    const [priority, setPriority] = useState<OrderPriority>(
+        defaultValues?.priority || 'normal',
+    );
+    const [contactPersonId, setContactPersonId] = useState(
+        defaultValues?.contactPersonId || '',
+    );
+    const [notes, setNotes] = useState(defaultValues?.notes || '');
+
+    // Form errors state
+    const [errors, setErrors] = useState<Record<string, string>>({});
+
+    const clearError = (field: string) => {
+        if (errors[field]) {
+            setErrors((prev) => {
+                const copy = { ...prev };
+                delete copy[field];
+                return copy;
+            });
+        }
+    };
+
+    // Sync defaultValues if they change
+    useEffect(() => {
+        if (defaultValues) {
+            setOrderName(defaultValues.orderName || '');
+            setClientId(defaultValues.clientId || '');
+            setOrderDate(defaultValues.orderDate ? new Date(defaultValues.orderDate) : new Date());
+            setDeadline(defaultValues.deadline ? new Date(defaultValues.deadline) : undefined);
+            setImageQuantity(defaultValues.imageQuantity !== undefined ? defaultValues.imageQuantity : 1);
+            setPerImagePrice(defaultValues.perImagePrice !== undefined ? defaultValues.perImagePrice : 0);
+            setTotalPrice(defaultValues.totalPrice !== undefined ? defaultValues.totalPrice : 0);
+            setSelectedServices(defaultValues.services || []);
+            setReturnFileFormat(defaultValues.returnFileFormat || '');
+            setInstruction(defaultValues.instruction || '');
+            setPriority(defaultValues.priority || 'normal');
+            setContactPersonId(defaultValues.contactPersonId || '');
+            setNotes(defaultValues.notes || '');
+        }
+    }, [defaultValues]);
+
+    // Handle serverErrors
+    useEffect(() => {
+        if (serverErrors) {
+            const mappedErrors: Record<string, string> = {};
+            Object.entries(serverErrors).forEach(([key, messages]) => {
+                mappedErrors[key] = messages[0];
+            });
+            setErrors((prev) => ({ ...prev, ...mappedErrors }));
+        }
+    }, [serverErrors]);
+
+    // Pricing calculation logic
+    const [priceMode, setPriceMode] = useState<'perImage' | 'total'>('perImage');
+
+    const handleQtyChange = (val: number) => {
+        setImageQuantity(val);
+        clearError('imageQuantity');
+        if (priceMode === 'perImage') {
+            const calculatedTotal = Number((val * perImagePrice).toFixed(2));
+            setTotalPrice(calculatedTotal);
+            clearError('totalPrice');
+        } else {
+            if (val > 0) {
+                const calculatedPerImage = Number((totalPrice / val).toFixed(2));
+                setPerImagePrice(calculatedPerImage);
+                clearError('perImagePrice');
+            }
+        }
+    };
+
+    const handlePerImagePriceChange = (val: number) => {
+        setPriceMode('perImage');
+        setPerImagePrice(val);
+        clearError('perImagePrice');
+        const calculatedTotal = Number((imageQuantity * val).toFixed(2));
+        setTotalPrice(calculatedTotal);
+        clearError('totalPrice');
+    };
+
+    const handleTotalPriceChange = (val: number) => {
+        setPriceMode('total');
+        setTotalPrice(val);
+        clearError('totalPrice');
+        if (imageQuantity > 0) {
+            const calculatedPerImage = Number((val / imageQuantity).toFixed(2));
+            setPerImagePrice(calculatedPerImage);
+            clearError('perImagePrice');
+        }
+    };
+
     const [isNewServiceMode, setIsNewServiceMode] = useState(false);
     const [isNewFormatMode, setIsNewFormatMode] = useState(false);
     const [newServiceName, setNewServiceName] = useState('');
@@ -123,38 +225,7 @@ export function OrderForm({
     const [debouncedServiceSearch, setDebouncedServiceSearch] = useState('');
     const [openClient, setOpenClient] = useState(false);
 
-    const {
-        register,
-        handleSubmit,
-        formState: { errors, isSubmitted },
-        setValue,
-        setError,
-        control,
-    } = useForm<OrderFormData>({
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        resolver: zodResolver(createOrderSchema) as any,
-        defaultValues: defaultValues || {
-            orderName: '',
-            clientId: '',
-            orderDate: new Date().toISOString().split('T')[0],
-            deadline: '',
-            imageQuantity: 1,
-            perImagePrice: 0,
-            totalPrice: 0,
-            services: [],
-            returnFileFormat: '',
-            instruction: '',
-            priority: 'normal',
-            contactPersonId: '',
-            notes: '',
-        },
-    });
-
-    const clientId = useWatch({ control, name: 'clientId' });
-    const contactPersonId = useWatch({ control, name: 'contactPersonId' });
-    const priority = useWatch({ control, name: 'priority' });
-    const returnFileFormat = useWatch({ control, name: 'returnFileFormat' });
-
+    // Queries
     const { data: servicesData, isLoading: isLoadingServices } =
         useGetServicesQuery({ isActive: true, limit: 1000 });
     const { data: assignedServices, isLoading: isLoadingAssigned } =
@@ -164,6 +235,7 @@ export function OrderForm({
     const { data: clientsData, isLoading: isLoadingClients } =
         useGetAllClientsQuery({ status: 'active' });
 
+    // Mutations
     const [createService, { isLoading: isCreatingService }] =
         useCreateServiceMutation();
     const [createFormat, { isLoading: isCreatingFormat }] =
@@ -203,81 +275,13 @@ export function OrderForm({
         );
     }, [services, debouncedServiceSearch]);
 
-    const imageQuantity = useWatch({ control, name: 'imageQuantity' });
-    const perImagePrice = useWatch({ control, name: 'perImagePrice' });
-    const totalPrice = useWatch({ control, name: 'totalPrice' });
-
-    const [priceMode, setPriceMode] = useState<'perImage' | 'total'>(
-        'perImage',
-    );
-
-    useEffect(() => {
-        const qty = Number(imageQuantity) || 0;
-        if (priceMode === 'perImage') {
-            const price = Number(perImagePrice) || 0;
-            const calculatedTotal = Number((qty * price).toFixed(2));
-            if (Number(totalPrice) !== calculatedTotal) {
-                setValue('totalPrice', calculatedTotal, {
-                    shouldValidate: isSubmitted,
-                    shouldDirty: true,
-                });
-            }
-        } else {
-            const total = Number(totalPrice) || 0;
-            if (qty > 0) {
-                const calculatedPerImage = Number((total / qty).toFixed(2));
-                if (Number(perImagePrice) !== calculatedPerImage) {
-                    setValue('perImagePrice', calculatedPerImage, {
-                        shouldValidate: isSubmitted,
-                        shouldDirty: true,
-                    });
-                }
-            }
-        }
-    }, [imageQuantity, perImagePrice, totalPrice, priceMode, setValue, isSubmitted]);
-
-    useEffect(() => {
-        if (serverErrors) {
-            Object.entries(serverErrors).forEach(([key, messages]) => {
-                setError(key as keyof OrderFormData, {
-                    type: 'server',
-                    message: messages[0],
-                });
-            });
-        }
-    }, [serverErrors, setError]);
-
-    useEffect(() => {
-        setValue('services', selectedServices, {
-            shouldValidate: isSubmitted,
-            shouldDirty: true,
-        });
-    }, [selectedServices, setValue, isSubmitted]);
-
-    useEffect(() => {
-        if (orderDate) {
-            setValue('orderDate', format(orderDate, 'yyyy-MM-dd'), {
-                shouldValidate: isSubmitted,
-                shouldDirty: true,
-            });
-        }
-    }, [orderDate, setValue, isSubmitted]);
-
-    useEffect(() => {
-        if (deadline) {
-            setValue('deadline', deadline.toISOString(), {
-                shouldValidate: isSubmitted,
-                shouldDirty: true,
-            });
-        }
-    }, [deadline, setValue, isSubmitted]);
-
     const handleServiceToggle = (serviceId: string) => {
-        setSelectedServices((prev) =>
-            prev.includes(serviceId)
+        setSelectedServices((prev) => {
+            return prev.includes(serviceId)
                 ? prev.filter((id) => id !== serviceId)
-                : [...prev, serviceId],
-        );
+                : [...prev, serviceId];
+        });
+        clearError('services');
     };
 
     const handleCreateService = async () => {
@@ -292,6 +296,7 @@ export function OrderForm({
             }).unwrap();
             toast.success('Service created successfully');
             setSelectedServices((prev) => [...prev, result.data._id]);
+            clearError('services');
             setNewServiceName('');
             setNewServiceDescription('');
             setIsNewServiceMode(false);
@@ -312,10 +317,8 @@ export function OrderForm({
                 extension: newFormatExtension,
             }).unwrap();
             toast.success('File format created successfully');
-            setValue('returnFileFormat', result.data._id, {
-                shouldValidate: isSubmitted,
-                shouldDirty: true,
-            });
+            setReturnFileFormat(result.data._id);
+            clearError('returnFileFormat');
             setNewFormatName('');
             setNewFormatExtension('');
             setIsNewFormatMode(false);
@@ -325,16 +328,70 @@ export function OrderForm({
         }
     };
 
-    const onFormSubmit = (data: OrderFormData) => {
-        onSubmit({
-            ...data,
+    // Manual Zod validation
+    const validateForm = (): boolean => {
+        const payload = {
+            orderName,
+            clientId,
+            orderDate: orderDate ? format(orderDate, 'yyyy-MM-dd') : '',
+            deadline: deadline ? deadline.toISOString() : '',
+            imageQuantity,
+            perImagePrice,
+            totalPrice,
             services: selectedServices,
+            returnFileFormat,
+            instruction: instruction || undefined,
+            priority,
+            contactPersonId: contactPersonId || undefined,
+            notes: notes || undefined,
+        };
+
+        const result = createOrderSchema.safeParse(payload);
+        if (!result.success) {
+            const fieldErrors: Record<string, string> = {};
+            result.error.issues.forEach((issue) => {
+                const path = issue.path[0] as string;
+                if (!fieldErrors[path]) {
+                    fieldErrors[path] = issue.message;
+                }
+            });
+            setErrors(fieldErrors);
+            return false;
+        }
+
+        setErrors({});
+        return true;
+    };
+
+    const handleFormSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        
+        const isValid = validateForm();
+        if (!isValid) {
+            toast.error('Please fix the validation errors in the form.');
+            return;
+        }
+
+        onSubmit({
+            orderName,
+            clientId,
+            orderDate: orderDate ? format(orderDate, 'yyyy-MM-dd') : '',
+            deadline: deadline ? deadline.toISOString() : '',
+            imageQuantity,
+            perImagePrice,
+            totalPrice,
+            services: selectedServices,
+            returnFileFormat,
+            instruction,
+            priority,
+            contactPersonId: contactPersonId || undefined,
+            notes,
         });
     };
 
     return (
         <form
-            onSubmit={handleSubmit(onFormSubmit)}
+            onSubmit={handleFormSubmit}
             className="flex flex-col overflow-hidden h-full"
         >
             <div className="flex-1 min-h-0 overflow-y-auto px-6">
@@ -346,13 +403,17 @@ export function OrderForm({
                             Order Name <span className="text-destructive">*</span>
                         </Label>
                         <Input
-                            {...register('orderName')}
+                            value={orderName}
+                            onChange={(e) => {
+                                setOrderName(e.target.value);
+                                clearError('orderName');
+                            }}
                             placeholder="e.g. Product Photo Editing Batch 1"
                             className="h-10"
                         />
                         {errors.orderName && (
                             <p className="text-xs text-destructive">
-                                {errors.orderName.message}
+                                {errors.orderName}
                             </p>
                         )}
                     </div>
@@ -368,6 +429,7 @@ export function OrderForm({
                                 <Button
                                     variant="outline"
                                     role="combobox"
+                                    type="button"
                                     aria-expanded={openClient}
                                     className="w-full justify-between h-10 font-normal"
                                     disabled={isLoadingClients}
@@ -410,23 +472,11 @@ export function OrderForm({
                                                         client.clientId,
                                                     ]}
                                                     onSelect={() => {
-                                                        setValue(
-                                                            'clientId',
-                                                            client._id,
-                                                            {
-                                                                shouldValidate: isSubmitted,
-                                                                shouldDirty: true,
-                                                            }
-                                                        );
-                                                        setValue(
-                                                            'contactPersonId',
-                                                            '',
-                                                            {
-                                                                shouldValidate: isSubmitted,
-                                                                shouldDirty: true,
-                                                            }
-                                                        );
+                                                        setClientId(client._id);
+                                                        clearError('clientId');
+                                                        setContactPersonId('');
                                                         setSelectedServices([]);
+                                                        clearError('services');
                                                         setOpenClient(false);
                                                         setShowAllServices(
                                                             false,
@@ -452,7 +502,7 @@ export function OrderForm({
                         </Popover>
                         {errors.clientId && (
                             <p className="text-xs text-destructive">
-                                {errors.clientId.message}
+                                {errors.clientId}
                             </p>
                         )}
                     </div>
@@ -465,16 +515,10 @@ export function OrderForm({
                             </Label>
                             <Select
                                 value={contactPersonId || '_none'}
-                                onValueChange={(value) =>
-                                    setValue(
-                                        'contactPersonId',
-                                        value === '_none' ? '' : value,
-                                        {
-                                            shouldValidate: isSubmitted,
-                                            shouldDirty: true,
-                                        }
-                                    )
-                                }
+                                onValueChange={(value) => {
+                                    setContactPersonId(value === '_none' ? '' : value);
+                                    clearError('contactPersonId');
+                                }}
                             >
                                 <SelectTrigger className="h-10">
                                     <SelectValue placeholder="Select team member" />
@@ -509,12 +553,15 @@ export function OrderForm({
                             </Label>
                             <DatePicker
                                 value={orderDate}
-                                onChange={setOrderDate}
+                                onChange={(date) => {
+                                    setOrderDate(date);
+                                    clearError('orderDate');
+                                }}
                                 placeholder="Select order date"
                             />
                             {errors.orderDate && (
                                 <p className="text-xs text-destructive">
-                                    {errors.orderDate.message}
+                                    {errors.orderDate}
                                 </p>
                             )}
                         </div>
@@ -527,13 +574,16 @@ export function OrderForm({
                             </Label>
                             <DateTimePicker
                                 value={deadline}
-                                onChange={setDeadline}
+                                onChange={(date) => {
+                                    setDeadline(date);
+                                    clearError('deadline');
+                                }}
                                 placeholder="Select deadline"
                                 minDate={orderDate}
                             />
                             {errors.deadline && (
                                 <p className="text-xs text-destructive">
-                                    {errors.deadline.message}
+                                    {errors.deadline}
                                 </p>
                             )}
                         </div>
@@ -551,13 +601,12 @@ export function OrderForm({
                                 type="number"
                                 min="1"
                                 className="h-10"
-                                {...register('imageQuantity', {
-                                    valueAsNumber: true,
-                                })}
+                                value={imageQuantity}
+                                onChange={(e) => handleQtyChange(Number(e.target.value) || 0)}
                             />
                             {errors.imageQuantity && (
                                 <p className="text-xs text-destructive">
-                                    {errors.imageQuantity.message}
+                                    {errors.imageQuantity}
                                 </p>
                             )}
                         </div>
@@ -573,18 +622,13 @@ export function OrderForm({
                                 min="0"
                                 className="h-10"
                                 value={perImagePrice || ''}
-                                onChange={(e) => {
-                                    setPriceMode('perImage');
-                                    setValue(
-                                        'perImagePrice',
-                                        Number(e.target.value) || 0,
-                                        {
-                                            shouldValidate: isSubmitted,
-                                            shouldDirty: true,
-                                        }
-                                    );
-                                }}
+                                onChange={(e) => handlePerImagePriceChange(Number(e.target.value) || 0)}
                             />
+                            {errors.perImagePrice && (
+                                <p className="text-xs text-destructive">
+                                    {errors.perImagePrice}
+                                </p>
+                            )}
                         </div>
 
                         <div className="space-y-2">
@@ -598,18 +642,13 @@ export function OrderForm({
                                 min="0"
                                 className="h-10"
                                 value={totalPrice || ''}
-                                onChange={(e) => {
-                                    setPriceMode('total');
-                                    setValue(
-                                        'totalPrice',
-                                        Number(e.target.value) || 0,
-                                        {
-                                            shouldValidate: isSubmitted,
-                                            shouldDirty: true,
-                                        }
-                                    );
-                                }}
+                                onChange={(e) => handleTotalPriceChange(Number(e.target.value) || 0)}
                             />
+                            {errors.totalPrice && (
+                                <p className="text-xs text-destructive">
+                                    {errors.totalPrice}
+                                </p>
+                            )}
                         </div>
                     </div>
 
@@ -740,7 +779,10 @@ export function OrderForm({
                                                 checked={selectedServices.includes(
                                                     service._id,
                                                 )}
-                                                className="pointer-events-none"
+                                                onCheckedChange={() =>
+                                                    handleServiceToggle(service._id)
+                                                }
+                                                onClick={(e) => e.stopPropagation()}
                                             />
                                             <span className="text-sm truncate">
                                                 {service.name}
@@ -752,7 +794,7 @@ export function OrderForm({
                         )}
                         {errors.services && (
                             <p className="text-xs text-destructive">
-                                {errors.services.message}
+                                {errors.services}
                             </p>
                         )}
                     </div>
@@ -820,12 +862,10 @@ export function OrderForm({
 
                             <Select
                                 value={returnFileFormat}
-                                onValueChange={(value) =>
-                                    setValue('returnFileFormat', value, {
-                                        shouldValidate: isSubmitted,
-                                        shouldDirty: true,
-                                    })
-                                }
+                                onValueChange={(value) => {
+                                    setReturnFileFormat(value);
+                                    clearError('returnFileFormat');
+                                }}
                                 disabled={isLoadingFormats}
                             >
                                 <SelectTrigger className="h-10">
@@ -844,7 +884,7 @@ export function OrderForm({
                             </Select>
                             {errors.returnFileFormat && (
                                 <p className="text-xs text-destructive">
-                                    {errors.returnFileFormat.message}
+                                    {errors.returnFileFormat}
                                 </p>
                             )}
                         </div>
@@ -856,16 +896,7 @@ export function OrderForm({
                             </Label>
                             <Select
                                 value={priority}
-                                onValueChange={(value) =>
-                                    setValue(
-                                        'priority',
-                                        value as OrderPriority,
-                                        {
-                                            shouldValidate: isSubmitted,
-                                            shouldDirty: true,
-                                        }
-                                    )
-                                }
+                                onValueChange={(value) => setPriority(value as OrderPriority)}
                             >
                                 <SelectTrigger className="h-10">
                                     <SelectValue placeholder="Select priority" />
@@ -896,11 +927,20 @@ export function OrderForm({
                             </span>
                         </Label>
                         <Textarea
-                            {...register('instruction')}
+                            value={instruction}
+                            onChange={(e) => {
+                                setInstruction(e.target.value);
+                                clearError('instruction');
+                            }}
                             placeholder="Special instructions for this order..."
                             rows={3}
                             className="resize-none"
                         />
+                        {errors.instruction && (
+                            <p className="text-xs text-destructive">
+                                {errors.instruction}
+                            </p>
+                        )}
                     </div>
 
                     {/* Notes */}
@@ -913,11 +953,20 @@ export function OrderForm({
                             </span>
                         </Label>
                         <Textarea
-                            {...register('notes')}
+                            value={notes}
+                            onChange={(e) => {
+                                setNotes(e.target.value);
+                                clearError('notes');
+                            }}
                             placeholder="Internal notes (not visible to client)..."
                             rows={2}
                             className="resize-none"
                         />
+                        {errors.notes && (
+                            <p className="text-xs text-destructive">
+                                {errors.notes}
+                            </p>
+                        )}
                     </div>
                 </div>
             </div>
