@@ -216,18 +216,22 @@ export function OrderForm({
         if (priceMode === 'perImage') {
             const price = Number(perImagePrice) || 0;
             const calculatedTotal = Number((qty * price).toFixed(2));
-            setValue('totalPrice', calculatedTotal, {
-                shouldValidate: isSubmitted,
-                shouldDirty: true,
-            });
+            if (Number(totalPrice) !== calculatedTotal) {
+                setValue('totalPrice', calculatedTotal, {
+                    shouldValidate: isSubmitted,
+                    shouldDirty: true,
+                });
+            }
         } else {
             const total = Number(totalPrice) || 0;
             if (qty > 0) {
                 const calculatedPerImage = Number((total / qty).toFixed(2));
-                setValue('perImagePrice', calculatedPerImage, {
-                    shouldValidate: isSubmitted,
-                    shouldDirty: true,
-                });
+                if (Number(perImagePrice) !== calculatedPerImage) {
+                    setValue('perImagePrice', calculatedPerImage, {
+                        shouldValidate: isSubmitted,
+                        shouldDirty: true,
+                    });
+                }
             }
         }
     }, [imageQuantity, perImagePrice, totalPrice, priceMode, setValue, isSubmitted]);
