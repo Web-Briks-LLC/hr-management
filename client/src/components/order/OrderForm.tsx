@@ -126,7 +126,7 @@ export function OrderForm({
     const {
         register,
         handleSubmit,
-        formState: { errors },
+        formState: { errors, isSubmitted },
         setValue,
         setError,
         control,
@@ -216,15 +216,21 @@ export function OrderForm({
         if (priceMode === 'perImage') {
             const price = Number(perImagePrice) || 0;
             const calculatedTotal = Number((qty * price).toFixed(2));
-            setValue('totalPrice', calculatedTotal);
+            setValue('totalPrice', calculatedTotal, {
+                shouldValidate: isSubmitted,
+                shouldDirty: true,
+            });
         } else {
             const total = Number(totalPrice) || 0;
             if (qty > 0) {
                 const calculatedPerImage = Number((total / qty).toFixed(2));
-                setValue('perImagePrice', calculatedPerImage);
+                setValue('perImagePrice', calculatedPerImage, {
+                    shouldValidate: isSubmitted,
+                    shouldDirty: true,
+                });
             }
         }
-    }, [imageQuantity, perImagePrice, totalPrice, priceMode, setValue]);
+    }, [imageQuantity, perImagePrice, totalPrice, priceMode, setValue, isSubmitted]);
 
     useEffect(() => {
         if (serverErrors) {
@@ -238,20 +244,29 @@ export function OrderForm({
     }, [serverErrors, setError]);
 
     useEffect(() => {
-        setValue('services', selectedServices);
-    }, [selectedServices, setValue]);
+        setValue('services', selectedServices, {
+            shouldValidate: isSubmitted,
+            shouldDirty: true,
+        });
+    }, [selectedServices, setValue, isSubmitted]);
 
     useEffect(() => {
         if (orderDate) {
-            setValue('orderDate', format(orderDate, 'yyyy-MM-dd'));
+            setValue('orderDate', format(orderDate, 'yyyy-MM-dd'), {
+                shouldValidate: isSubmitted,
+                shouldDirty: true,
+            });
         }
-    }, [orderDate, setValue]);
+    }, [orderDate, setValue, isSubmitted]);
 
     useEffect(() => {
         if (deadline) {
-            setValue('deadline', deadline.toISOString());
+            setValue('deadline', deadline.toISOString(), {
+                shouldValidate: isSubmitted,
+                shouldDirty: true,
+            });
         }
-    }, [deadline, setValue]);
+    }, [deadline, setValue, isSubmitted]);
 
     const handleServiceToggle = (serviceId: string) => {
         setSelectedServices((prev) =>
@@ -293,7 +308,10 @@ export function OrderForm({
                 extension: newFormatExtension,
             }).unwrap();
             toast.success('File format created successfully');
-            setValue('returnFileFormat', result.data._id);
+            setValue('returnFileFormat', result.data._id, {
+                shouldValidate: isSubmitted,
+                shouldDirty: true,
+            });
             setNewFormatName('');
             setNewFormatExtension('');
             setIsNewFormatMode(false);
@@ -391,11 +409,20 @@ export function OrderForm({
                                                         setValue(
                                                             'clientId',
                                                             client._id,
+                                                            {
+                                                                shouldValidate: isSubmitted,
+                                                                shouldDirty: true,
+                                                            }
                                                         );
                                                         setValue(
                                                             'contactPersonId',
                                                             '',
+                                                            {
+                                                                shouldValidate: isSubmitted,
+                                                                shouldDirty: true,
+                                                            }
                                                         );
+                                                        setSelectedServices([]);
                                                         setOpenClient(false);
                                                         setShowAllServices(
                                                             false,
@@ -438,6 +465,10 @@ export function OrderForm({
                                     setValue(
                                         'contactPersonId',
                                         value === '_none' ? '' : value,
+                                        {
+                                            shouldValidate: isSubmitted,
+                                            shouldDirty: true,
+                                        }
                                     )
                                 }
                             >
@@ -543,6 +574,10 @@ export function OrderForm({
                                     setValue(
                                         'perImagePrice',
                                         Number(e.target.value) || 0,
+                                        {
+                                            shouldValidate: isSubmitted,
+                                            shouldDirty: true,
+                                        }
                                     );
                                 }}
                             />
@@ -564,6 +599,10 @@ export function OrderForm({
                                     setValue(
                                         'totalPrice',
                                         Number(e.target.value) || 0,
+                                        {
+                                            shouldValidate: isSubmitted,
+                                            shouldDirty: true,
+                                        }
                                     );
                                 }}
                             />
@@ -778,7 +817,10 @@ export function OrderForm({
                             <Select
                                 value={returnFileFormat}
                                 onValueChange={(value) =>
-                                    setValue('returnFileFormat', value)
+                                    setValue('returnFileFormat', value, {
+                                        shouldValidate: isSubmitted,
+                                        shouldDirty: true,
+                                    })
                                 }
                                 disabled={isLoadingFormats}
                             >
@@ -814,6 +856,10 @@ export function OrderForm({
                                     setValue(
                                         'priority',
                                         value as OrderPriority,
+                                        {
+                                            shouldValidate: isSubmitted,
+                                            shouldDirty: true,
+                                        }
                                     )
                                 }
                             >
