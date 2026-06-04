@@ -26,7 +26,6 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
     Command,
     CommandEmpty,
@@ -763,8 +762,10 @@ export function OrderForm({
                                     filteredServices.map((service) => (
                                         <div
                                             key={service._id}
+                                            role="button"
+                                            tabIndex={0}
                                             className={cn(
-                                                'flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer transition-colors',
+                                                'flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer transition-colors outline-none focus-visible:bg-accent',
                                                 selectedServices.includes(
                                                     service._id,
                                                 )
@@ -774,16 +775,25 @@ export function OrderForm({
                                             onClick={() =>
                                                 handleServiceToggle(service._id)
                                             }
-                                        >
-                                            <Checkbox
-                                                checked={selectedServices.includes(
-                                                    service._id,
-                                                )}
-                                                onCheckedChange={() =>
-                                                    handleServiceToggle(service._id)
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter' || e.key === ' ') {
+                                                    e.preventDefault();
+                                                    handleServiceToggle(service._id);
                                                 }
-                                                onClick={(e) => e.stopPropagation()}
-                                            />
+                                            }}
+                                        >
+                                            <div
+                                                className={cn(
+                                                    'h-4 w-4 shrink-0 rounded-[4px] border flex items-center justify-center transition-colors',
+                                                    selectedServices.includes(service._id)
+                                                        ? 'bg-primary border-primary text-primary-foreground'
+                                                        : 'border-input bg-background',
+                                                )}
+                                            >
+                                                {selectedServices.includes(service._id) && (
+                                                    <Check className="h-3 w-3 stroke-[3]" />
+                                                )}
+                                            </div>
                                             <span className="text-sm truncate">
                                                 {service.name}
                                             </span>
