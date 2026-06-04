@@ -437,10 +437,6 @@ const getAllClientsWithoutPaginationFromDB = async (params: { createdBy?: string
 
     return ClientModel.find(query)
         .populate('assignedServices')
-        .populate({
-            path: 'createdBy',
-            select: '-password -passwordHistory',
-        })
         .sort({ name: 1 })
         .lean();
 };
