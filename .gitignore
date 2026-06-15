@@ -67,4 +67,4 @@ payment/.env
 payment/.env.*
 payment/node_modules/
 payment/.next/
-
+server/backup/

@@ -827,7 +827,7 @@ const bulkProcessPayment = async ({
         );
     }
 
-    const { year, monthNum, endDate } = parseMonthRange(month);
+    const { year, monthNum } = parseMonthRange(month);
     const session = await mongoose.startSession();
     session.startTransaction();
 
