@@ -48,7 +48,10 @@ const buildHybridDateFilter = (dateField: string, filterMode: 'lt' | 'range', st
                 ]
             },
             {
-                createdAt: { $gte: REALTIME_CUTOFF, $lte: end, $gte: start }
+                createdAt: { 
+                    $gte: start ? new Date(Math.max(REALTIME_CUTOFF.getTime(), start.getTime())) : REALTIME_CUTOFF, 
+                    $lte: end 
+                }
             }
         ];
     }
