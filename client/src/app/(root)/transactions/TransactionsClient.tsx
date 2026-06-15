@@ -45,6 +45,8 @@ import {
     Loader,
     ChevronLeft,
     ChevronRight,
+    ChevronsLeft,
+    ChevronsRight,
     Calendar as CalendarIcon,
     Download,
     RefreshCcw,
@@ -781,7 +783,6 @@ export default function TransactionsClient() {
                             <TableHeader className="bg-muted/30">
                                 <TableRow>
                                     <TableHead className="w-[180px] font-semibold text-center border-r">Date & Time</TableHead>
-                                    <TableHead className="w-[180px] font-semibold text-center border-r">Created At</TableHead>
                                     <TableHead className="w-[280px] font-semibold border-r">Transaction Details</TableHead>
                                     <TableHead className="w-[140px] font-semibold border-r">Type</TableHead>
                                     <TableHead className="w-[130px] font-semibold text-center border-r">Direction</TableHead>
@@ -821,11 +822,6 @@ export default function TransactionsClient() {
                                                 {/* 1. Date & Time */}
                                                 <TableCell className="border-r text-center text-xs font-semibold text-muted-foreground bg-muted/5">
                                                     {formatDateTime(tx.date)}
-                                                </TableCell>
-
-                                                {/* 1.5. Created At */}
-                                                <TableCell className="border-r text-center text-xs font-semibold text-muted-foreground bg-muted/5">
-                                                    {tx.createdAt ? formatDateTime(tx.createdAt) : "N/A"}
                                                 </TableCell>
 
                                                 {/* 2. Details */}
@@ -886,39 +882,127 @@ export default function TransactionsClient() {
 
                     {/* Pagination Bar */}
                     {transactions.length > 0 && (
-                        <div className="flex flex-col sm:flex-row items-center justify-between p-4 border-t border-border/50 gap-4">
-                            <span className="text-xs font-semibold text-muted-foreground">
-                                Showing <span className="text-foreground font-bold">{(currentPage - 1) * pageSize + 1}</span> to{" "}
-                                <span className="text-foreground font-bold">
-                                    {Math.min(currentPage * pageSize, transactions.length)}
-                                </span>{" "}
-                                of <span className="text-foreground font-bold">{transactions.length}</span> entries
-                            </span>
+                        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 pb-4 px-4 border-t">
                             <div className="flex items-center gap-2">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    disabled={currentPage === 1 || isLoading}
-                                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                                    className="h-8 text-xs font-bold shadow-xs"
+                                <p className="text-sm text-muted-foreground">
+                                    Showing {(currentPage - 1) * pageSize + 1} to{' '}
+                                    {Math.min(currentPage * pageSize, transactions.length)} of{' '}
+                                    {transactions.length} entries
+                                </p>
+                                <Select
+                                    value={pageSize.toString()}
+                                    onValueChange={(value) => {
+                                        setPageSize(parseInt(value));
+                                        setCurrentPage(1);
+                                    }}
                                 >
-                                    <ChevronLeft className="h-4 w-4 mr-1" />
-                                    Previous
-                                </Button>
-                                <div className="flex items-center text-xs font-bold px-3 py-1 bg-muted/50 rounded-lg border">
-                                    Page {currentPage} of {totalPages}
-                                </div>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    disabled={currentPage === totalPages || isLoading}
-                                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                                    className="h-8 text-xs font-bold shadow-xs"
-                                >
-                                    Next
-                                    <ChevronRight className="h-4 w-4 ml-1" />
-                                </Button>
+                                    <SelectTrigger className="h-8 w-[70px]">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {[10, 20, 50, 100].map((option) => (
+                                            <SelectItem
+                                                key={option}
+                                                value={option.toString()}
+                                            >
+                                                {option}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
+                            {totalPages > 1 && (
+                                <div className="flex items-center gap-1">
+                                    <Button
+                                        variant="outline"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        onClick={() => setCurrentPage(1)}
+                                        disabled={currentPage === 1 || isLoading}
+                                    >
+                                        <ChevronsLeft className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        onClick={() =>
+                                            setCurrentPage((p) => Math.max(1, p - 1))
+                                        }
+                                        disabled={currentPage === 1 || isLoading}
+                                    >
+                                        <ChevronLeft className="h-4 w-4" />
+                                    </Button>
+                                    {(() => {
+                                        const pageNumbers: (number | string)[] = [];
+                                        if (totalPages <= 7) {
+                                            for (let i = 1; i <= totalPages; i++) {
+                                                pageNumbers.push(i);
+                                            }
+                                        } else {
+                                            if (currentPage <= 3) {
+                                                pageNumbers.push(1, 2, 3, 4, '...', totalPages);
+                                            } else if (currentPage >= totalPages - 2) {
+                                                pageNumbers.push(
+                                                    1,
+                                                    '...',
+                                                    totalPages - 3,
+                                                    totalPages - 2,
+                                                    totalPages - 1,
+                                                    totalPages
+                                                );
+                                            } else {
+                                                pageNumbers.push(
+                                                    1,
+                                                    '...',
+                                                    currentPage - 1,
+                                                    currentPage,
+                                                    currentPage + 1,
+                                                    '...',
+                                                    totalPages
+                                                );
+                                            }
+                                        }
+
+                                        return pageNumbers.map((pageNumber, i) => (
+                                            <Button
+                                                key={i}
+                                                variant={currentPage === pageNumber ? "default" : "outline"}
+                                                size="icon"
+                                                className={`h-8 w-8 ${pageNumber === '...' ? 'cursor-default hover:bg-transparent' : ''}`}
+                                                onClick={() => {
+                                                    if (pageNumber !== '...') {
+                                                        setCurrentPage(pageNumber as number);
+                                                    }
+                                                }}
+                                                disabled={pageNumber === '...' || isLoading}
+                                            >
+                                                {pageNumber}
+                                            </Button>
+                                        ));
+                                    })()}
+                                    <Button
+                                        variant="outline"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        onClick={() =>
+                                            setCurrentPage((p) => Math.min(totalPages, p + 1))
+                                        }
+                                        disabled={currentPage === totalPages || isLoading}
+                                    >
+                                        <ChevronRight className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        onClick={() => setCurrentPage(totalPages)}
+                                        disabled={currentPage === totalPages || isLoading}
+                                    >
+                                        <ChevronsRight className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            )}
                         </div>
                     )}
                 </CardContent>
