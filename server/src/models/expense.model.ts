@@ -49,6 +49,14 @@ const expenseSchema = new Schema<IExpense>(
             type: String,
             trim: true,
         },
+        billingMonth: {
+            type: Number,
+            min: 1,
+            max: 12,
+        },
+        billingYear: {
+            type: Number,
+        },
         createdBy: {
             type: Schema.Types.ObjectId,
             ref: "User",

@@ -18,6 +18,8 @@ export interface IExpense extends Document {
     status: "pending" | "paid" | "partial_paid";
     paymentMethod?: string;
     note?: string;
+    billingMonth?: number;
+    billingYear?: number;
     createdBy: Types.ObjectId;
     createdAt: Date;
     updatedAt: Date;
