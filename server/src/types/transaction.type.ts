@@ -30,6 +30,7 @@ export interface TransactionQueryParams {
     branchId?: string;
     page?: number;
     limit?: number;
+    sortByDate?: 'createdAt' | 'date';
 }
 
 export interface ITransactionReportData {

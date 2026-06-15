@@ -113,6 +113,8 @@ export default function TransactionsClient() {
         to: undefined,
     });
 
+    const [sortByDate, setSortByDate] = useState<"createdAt" | "date">("createdAt");
+
     // 2. Pagination States
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
@@ -134,6 +136,7 @@ export default function TransactionsClient() {
         const params: any = {};
         if (search) params.search = search;
         if (branchFilter !== "all") params.branchId = branchFilter;
+        if (sortByDate) params.sortByDate = sortByDate;
         
         let startStr = "";
         let endStr = "";
@@ -168,7 +171,7 @@ export default function TransactionsClient() {
             params.type = selectedTypes.join(",");
         }
         return params;
-    }, [search, branchFilter, period, selectedYear, selectedMonth, dateRange, selectedTypes]);
+    }, [search, branchFilter, period, selectedYear, selectedMonth, dateRange, selectedTypes, sortByDate]);
 
     // Fetch ledger data using RTK Query
     const {
@@ -247,6 +250,7 @@ export default function TransactionsClient() {
         if (queryParams.type) query.append("type", queryParams.type);
         if (queryParams.search) query.append("search", queryParams.search);
         if (queryParams.branchId) query.append("branchId", queryParams.branchId);
+        if (queryParams.sortByDate) query.append("sortByDate", queryParams.sortByDate);
 
         const downloadUrl = `${baseUrl}?${query.toString()}`;
         window.open(downloadUrl, "_blank");
@@ -262,6 +266,7 @@ export default function TransactionsClient() {
 
         const excelRows = transactions.map((tx, idx) => ({
             "Sl No": idx + 1,
+            "Created At": tx.createdAt ? formatDateTime(tx.createdAt) : "N/A",
             "Date": formatDateTime(tx.date),
             "Title / Description": tx.title,
             "Type": tx.type.toUpperCase().replace("_", " "),
@@ -278,6 +283,7 @@ export default function TransactionsClient() {
         // Set column widths
         worksheet["!cols"] = [
             { wch: 8 },
+            { wch: 22 },
             { wch: 22 },
             { wch: 45 },
             { wch: 18 },
@@ -527,6 +533,26 @@ export default function TransactionsClient() {
                             <span>Quick Filters:</span>
                         </div>
 
+                        {/* Sort By Dropdown */}
+                        <div className="flex items-center gap-2 ml-1">
+                            <span className="text-sm font-semibold text-muted-foreground">Sort By:</span>
+                            <Select
+                                value={sortByDate}
+                                onValueChange={(val) => {
+                                    setSortByDate(val as any);
+                                    setCurrentPage(1);
+                                }}
+                            >
+                                <SelectTrigger className="w-[140px] h-10 bg-background/60 text-sm font-semibold border-primary/20">
+                                    <SelectValue placeholder="Sort By" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="createdAt" className="font-semibold text-primary">Created At (Real-time)</SelectItem>
+                                    <SelectItem value="date" className="font-semibold text-muted-foreground">Date & Time (Manual)</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
                         {/* A. Search description */}
                         <div className="relative max-w-[240px] w-full">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -747,6 +773,7 @@ export default function TransactionsClient() {
                                 setPeriod("all");
                                 setSelectedYear(new Date().getFullYear());
                                 setSelectedMonth(new Date().getMonth() + 1);
+                                setSortByDate("createdAt");
                                 setDateRange({
                                     from: undefined,
                                     to: undefined,
@@ -782,6 +809,7 @@ export default function TransactionsClient() {
                         <Table>
                             <TableHeader className="bg-muted/30">
                                 <TableRow>
+                                    <TableHead className="w-[180px] font-semibold text-center border-r">Created At</TableHead>
                                     <TableHead className="w-[180px] font-semibold text-center border-r">Date & Time</TableHead>
                                     <TableHead className="w-[280px] font-semibold border-r">Transaction Details</TableHead>
                                     <TableHead className="w-[140px] font-semibold border-r">Type</TableHead>
@@ -795,6 +823,7 @@ export default function TransactionsClient() {
                                 {isLoading ? (
                                     [...Array(6)].map((_, i) => (
                                         <TableRow key={i}>
+                                            <TableCell className="border-r"><Skeleton className="h-4 w-32 mx-auto" /></TableCell>
                                             <TableCell className="border-r"><Skeleton className="h-4 w-32 mx-auto" /></TableCell>
                                             <TableCell className="border-r"><Skeleton className="h-4 w-32 mx-auto" /></TableCell>
                                             <TableCell className="border-r">
@@ -819,6 +848,11 @@ export default function TransactionsClient() {
                                         const isInflow = tx.flow === "inflow";
                                         return (
                                             <TableRow key={tx.id} className="hover:bg-muted/20 transition-colors">
+                                                {/* 0. Created At */}
+                                                <TableCell className="border-r text-center text-xs font-semibold text-muted-foreground bg-primary/5">
+                                                    {tx.createdAt ? formatDateTime(tx.createdAt) : "N/A"}
+                                                </TableCell>
+
                                                 {/* 1. Date & Time */}
                                                 <TableCell className="border-r text-center text-xs font-semibold text-muted-foreground bg-muted/5">
                                                     {formatDateTime(tx.date)}

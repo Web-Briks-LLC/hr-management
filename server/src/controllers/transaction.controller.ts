@@ -4,7 +4,7 @@ import transactionService from "../services/transaction.service.js";
 // Retrieve unified transactions in JSON format
 async function getUnifiedTransactions(req: Request, res: Response): Promise<void> {
     try {
-        const { startDate, endDate, type, search, branchId } = req.query;
+        const { startDate, endDate, type, search, branchId, sortByDate } = req.query;
 
         const transactionsData = await transactionService.getUnifiedTransactions({
             startDate: startDate as string,
@@ -12,6 +12,7 @@ async function getUnifiedTransactions(req: Request, res: Response): Promise<void
             type: type as string,
             search: search as string,
             branchId: branchId as string,
+            sortByDate: (sortByDate as 'createdAt' | 'date') || 'createdAt',
         });
 
         res.status(200).json({
@@ -30,7 +31,7 @@ async function getUnifiedTransactions(req: Request, res: Response): Promise<void
 // Generate and stream PDF report using Puppeteer
 async function exportTransactionsPDF(req: Request, res: Response): Promise<void> {
     try {
-        const { startDate, endDate, type, search, branchId } = req.query;
+        const { startDate, endDate, type, search, branchId, sortByDate } = req.query;
 
         const startStr = startDate ? (startDate as string) : "Beginning";
         const endStr = endDate ? (endDate as string) : new Date().toLocaleDateString();
@@ -42,6 +43,7 @@ async function exportTransactionsPDF(req: Request, res: Response): Promise<void>
             type: type as string,
             search: search as string,
             branchId: branchId as string,
+            sortByDate: (sortByDate as 'createdAt' | 'date') || 'createdAt',
         });
 
         // 2. Generate PDF binary buffer

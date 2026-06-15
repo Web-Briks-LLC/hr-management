@@ -20,45 +20,26 @@ const formatBDT = (amount: number) => {
     });
 };
 
-const REALTIME_CUTOFF = new Date("2026-06-15T18:00:00Z");
-
-const buildHybridDateFilter = (dateField: string, filterMode: 'lt' | 'range', start?: Date, end?: Date) => {
+const buildDynamicDateFilter = (dateField: string, filterMode: 'lt' | 'range', sortByDate: 'createdAt' | 'date', start?: Date, end?: Date) => {
+    const targetField = sortByDate === 'createdAt' ? 'createdAt' : dateField;
+    
     if (filterMode === 'lt') {
         return [
-            {
-                createdAt: { $lt: REALTIME_CUTOFF },
-                $or: [
-                    { [dateField]: { $lt: start } },
-                    { [dateField]: null, createdAt: { $lt: start } },
-                    { [dateField]: { $exists: false }, createdAt: { $lt: start } }
-                ]
-            },
-            {
-                createdAt: { $gte: REALTIME_CUTOFF, $lt: start }
-            }
+            { [targetField]: { $lt: start } },
+            { [targetField]: null, createdAt: { $lt: start } },
+            { [targetField]: { $exists: false }, createdAt: { $lt: start } }
         ];
     } else {
         return [
-            {
-                createdAt: { $lt: REALTIME_CUTOFF },
-                $or: [
-                    { [dateField]: { $gte: start, $lte: end } },
-                    { [dateField]: null, createdAt: { $gte: start, $lte: end } },
-                    { [dateField]: { $exists: false }, createdAt: { $gte: start, $lte: end } }
-                ]
-            },
-            {
-                createdAt: { 
-                    $gte: start ? new Date(Math.max(REALTIME_CUTOFF.getTime(), start.getTime())) : REALTIME_CUTOFF, 
-                    $lte: end 
-                }
-            }
+            { [targetField]: { $gte: start, $lte: end } },
+            { [targetField]: null, createdAt: { $gte: start, $lte: end } },
+            { [targetField]: { $exists: false }, createdAt: { $gte: start, $lte: end } }
         ];
     }
 };
 
-const getTransactionDate = (legacyDate: Date | string | undefined | null, createdAt: Date | string | undefined | null) => {
-    if (createdAt && new Date(createdAt).getTime() >= REALTIME_CUTOFF.getTime()) {
+const getTransactionDate = (legacyDate: Date | string | undefined | null, createdAt: Date | string | undefined | null, sortByDate: 'createdAt' | 'date') => {
+    if (sortByDate === 'createdAt' && createdAt) {
         return new Date(createdAt);
     }
     return legacyDate ? new Date(legacyDate) : (createdAt ? new Date(createdAt) : new Date());
@@ -91,7 +72,7 @@ async function getUnifiedTransactions(params: TransactionQueryParams): Promise<I
                 {
                     $match: {
                         status: "paid",
-                        $or: buildHybridDateFilter("paidAt", "lt", start)
+                        $or: buildDynamicDateFilter("paidAt", "lt", params.sortByDate || "createdAt", start)
                     }
                 },
                 { $group: { _id: null, total: { $sum: { $ifNull: ["$paidAmountBDT", "$amountInBDT"] } } } }
@@ -100,7 +81,7 @@ async function getUnifiedTransactions(params: TransactionQueryParams): Promise<I
                 {
                     $match: {
                         type: DebitType.BORROW,
-                        $or: buildHybridDateFilter("date", "lt", start)
+                        $or: buildDynamicDateFilter("date", "lt", params.sortByDate || "createdAt", start)
                     }
                 },
                 { $group: { _id: null, total: { $sum: "$amount" } } }
@@ -110,7 +91,7 @@ async function getUnifiedTransactions(params: TransactionQueryParams): Promise<I
                 {
                     $match: {
                         type: DebitType.RETURN,
-                        $or: buildHybridDateFilter("date", "lt", start)
+                        $or: buildDynamicDateFilter("date", "lt", params.sortByDate || "createdAt", start)
                     }
                 },
                 { $group: { _id: null, total: { $sum: "$amount" } } }
@@ -119,7 +100,7 @@ async function getUnifiedTransactions(params: TransactionQueryParams): Promise<I
                 {
                     $match: {
                         status: { $in: ["paid", "partial_paid"] },
-                        $or: buildHybridDateFilter("date", "lt", start)
+                        $or: buildDynamicDateFilter("date", "lt", params.sortByDate || "createdAt", start)
                     }
                 },
                 { $group: { _id: null, total: { $sum: "$amount" } } }
@@ -127,7 +108,7 @@ async function getUnifiedTransactions(params: TransactionQueryParams): Promise<I
             ProfitTransferModel.aggregate([
                 {
                     $match: {
-                        $or: buildHybridDateFilter("transferDate", "lt", start)
+                        $or: buildDynamicDateFilter("transferDate", "lt", params.sortByDate || "createdAt", start)
                     }
                 },
                 { $group: { _id: null, total: { $sum: "$amount" } } }
@@ -136,7 +117,7 @@ async function getUnifiedTransactions(params: TransactionQueryParams): Promise<I
                 {
                     $match: {
                         status: "distributed",
-                        $or: buildHybridDateFilter("distributedAt", "lt", start)
+                        $or: buildDynamicDateFilter("distributedAt", "lt", params.sortByDate || "createdAt", start)
                     }
                 },
                 { $group: { _id: null, total: { $sum: "$shareAmount" } } }
@@ -162,11 +143,11 @@ async function getUnifiedTransactions(params: TransactionQueryParams): Promise<I
     const transferRangeFilter: any = {};
 
     if (!isAllTime) {
-        earningRangeFilter.$or = buildHybridDateFilter("paidAt", "range", start, end);
-        expenseRangeFilter.$or = buildHybridDateFilter("date", "range", start, end);
-        debitRangeFilter.$or = buildHybridDateFilter("date", "range", start, end);
-        distributionRangeFilter.$or = buildHybridDateFilter("distributedAt", "range", start, end);
-        transferRangeFilter.$or = buildHybridDateFilter("transferDate", "range", start, end);
+        earningRangeFilter.$or = buildDynamicDateFilter("paidAt", "range", params.sortByDate || "createdAt", start, end);
+        expenseRangeFilter.$or = buildDynamicDateFilter("date", "range", params.sortByDate || "createdAt", start, end);
+        debitRangeFilter.$or = buildDynamicDateFilter("date", "range", params.sortByDate || "createdAt", start, end);
+        distributionRangeFilter.$or = buildDynamicDateFilter("distributedAt", "range", params.sortByDate || "createdAt", start, end);
+        transferRangeFilter.$or = buildDynamicDateFilter("transferDate", "range", params.sortByDate || "createdAt", start, end);
     }
 
     const [
@@ -189,7 +170,7 @@ async function getUnifiedTransactions(params: TransactionQueryParams): Promise<I
     earnings.forEach(e => {
         rawTransactions.push({
             id: e._id.toString(),
-            date: getTransactionDate(e.paidAt, e.createdAt),
+            date: getTransactionDate(e.paidAt, e.createdAt, params.sortByDate || "createdAt"),
             title: `Revenue Earning: ${(e.clientId as any)?.name || e.legacyClientCode || "Client"}`,
             type: "earning",
             amount: e.totalAmount,
@@ -208,7 +189,7 @@ async function getUnifiedTransactions(params: TransactionQueryParams): Promise<I
     expenses.forEach(ex => {
         rawTransactions.push({
             id: ex._id.toString(),
-            date: getTransactionDate(ex.date, (ex as any).createdAt),
+            date: getTransactionDate(ex.date, (ex as any).createdAt, params.sortByDate || "createdAt"),
             title: `Expense: ${ex.title} (${(ex.categoryId as any)?.name || "Uncategorized"})`,
             type: "expense",
             amount: ex.amount,
@@ -227,7 +208,7 @@ async function getUnifiedTransactions(params: TransactionQueryParams): Promise<I
     debits.forEach(d => {
         rawTransactions.push({
             id: d._id.toString(),
-            date: getTransactionDate(d.date, (d as any).createdAt),
+            date: getTransactionDate(d.date, (d as any).createdAt, params.sortByDate || "createdAt"),
             title: `Debit ${d.type}: ${(d.personId as any)?.name || "Unknown Person"}`,
             type: "debit",
             subType: d.type,
@@ -247,7 +228,7 @@ async function getUnifiedTransactions(params: TransactionQueryParams): Promise<I
     distributions.forEach(d => {
         rawTransactions.push({
             id: d._id.toString(),
-            date: getTransactionDate(d.distributedAt, (d as any).createdAt),
+            date: getTransactionDate(d.distributedAt, (d as any).createdAt, params.sortByDate || "createdAt"),
             title: `Profit Distributed to ${(d.shareholderId as any)?.name || "Shareholder"}`,
             type: "profit_share",
             amount: d.shareAmount,
@@ -266,7 +247,7 @@ async function getUnifiedTransactions(params: TransactionQueryParams): Promise<I
     transfers.forEach(t => {
         rawTransactions.push({
             id: t._id.toString(),
-            date: getTransactionDate(t.transferDate, (t as any).createdAt),
+            date: getTransactionDate(t.transferDate, (t as any).createdAt, params.sortByDate || "createdAt"),
             title: `Capital Transfer to ${(t.businessId as any)?.name || "Business"}`,
             type: "profit_transfer",
             amount: t.amount,
