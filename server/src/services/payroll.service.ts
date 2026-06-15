@@ -39,7 +39,7 @@ const getPayrollPreview = async ({
     month,
     branchId,
 }: IPayrollPreviewParams) => {
-    const { startDate, endDate } = parseMonthRange(month);
+    const { startDate, endDate, year, monthNum } = parseMonthRange(month);
 
     const matchStage: any = {
         status: 'active',
@@ -144,14 +144,20 @@ const getPayrollPreview = async ({
         paidExpenses = await ExpenseModel.find({
             categoryId: { $in: categoryIds },
             staffId: { $in: staffIds },
-            date: { $gte: startDate, $lte: endDate },
+            $or: [
+                { billingMonth: monthNum, billingYear: year },
+                { date: { $gte: startDate, $lte: endDate } }
+            ]
         });
 
         // Fetch bulk expenses (where staffId is null)
         bulkExpenses = await ExpenseModel.find({
             categoryId: { $in: categoryIds },
             staffId: null,
-            date: { $gte: startDate, $lte: endDate },
+            $or: [
+                { billingMonth: monthNum, billingYear: year },
+                { date: { $gte: startDate, $lte: endDate } }
+            ]
         });
     }
 
@@ -674,7 +680,10 @@ const processPayroll = async ({
         const existingExpense = await ExpenseModel.findOne({
             categoryId: category!._id,
             staffId: staffId,
-            date: { $gte: startDate, $lte: endDate },
+            $or: [
+                { billingMonth: monthNum, billingYear: year },
+                { date: { $gte: startDate, $lte: endDate } }
+            ]
         }).session(session);
 
         let createdExpense;
@@ -697,7 +706,7 @@ const processPayroll = async ({
             const expense = await ExpenseModel.create(
                 [
                     {
-                        date: endDate,
+                        date: getBDNow(),
                         title: expenseTitle,
                         categoryId: category!._id,
                         branchId: staff.branchId,
@@ -706,6 +715,8 @@ const processPayroll = async ({
                         status: 'paid',
                         paymentMethod: paymentMethod || 'cash',
                         note: finalNote,
+                        billingMonth: monthNum,
+                        billingYear: year,
                         createdBy: createdBy,
                     },
                 ],
@@ -876,7 +887,7 @@ const bulkProcessPayment = async ({
         const createdExpenseArray = await ExpenseModel.create(
             [
                 {
-                    date: endDate,
+                    date: getBDNow(),
                     title: expenseTitle,
                     categoryId: category!._id,
                     branchId: defaultBranchId,
@@ -885,6 +896,8 @@ const bulkProcessPayment = async ({
                     status: 'paid',
                     paymentMethod: paymentMethod || 'cash',
                     note: consolidatedNote,
+                    billingMonth: monthNum,
+                    billingYear: year,
                     createdBy: createdBy,
                 },
             ],
@@ -1202,7 +1215,7 @@ const undoPayroll = async (
         );
     }
 
-    const { startDate, endDate } = parseMonthRange(month);
+    const { startDate, endDate, year, monthNum } = parseMonthRange(month);
 
     const categoryRegex =
         paymentType === 'overtime' ? /^Overtime/i : /^Salary/i;
@@ -1226,7 +1239,10 @@ const undoPayroll = async (
             {
                 staffId,
                 categoryId: category._id,
-                date: { $gte: startDate, $lte: endDate },
+                $or: [
+                    { billingMonth: monthNum, billingYear: year },
+                    { date: { $gte: startDate, $lte: endDate } }
+                ]
             },
             { session }
         );
@@ -1236,7 +1252,10 @@ const undoPayroll = async (
             const bulkExpense = await ExpenseModel.findOne({
                 staffId: null,
                 categoryId: category._id,
-                date: { $gte: startDate, $lte: endDate },
+                $or: [
+                    { billingMonth: monthNum, billingYear: year },
+                    { date: { $gte: startDate, $lte: endDate } }
+                ],
                 note: { $regex: new RegExp(staffId) },
             }).session(session);
 
