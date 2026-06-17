@@ -10,7 +10,7 @@ const userSockets = new Map<string, string[]>();
 export const initSocket = (server: HttpServer) => {
     io = new SocketIOServer(server, {
         cors: {
-            origin: envConfig.client_url,
+            origin: envConfig.trusted_origins.split(','),
             methods: ['GET', 'POST'],
             credentials: true,
         },

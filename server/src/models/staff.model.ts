@@ -8,7 +8,6 @@ const StaffSchema = new Schema<IStaff>(
             type: Schema.Types.ObjectId,
             ref: 'User',
             required: false,
-            index: true,
         },
 
         staffId: {

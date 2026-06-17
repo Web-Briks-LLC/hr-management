@@ -176,6 +176,7 @@ async function generatePDF(params: AnalyticsQueryParams): Promise<Buffer> {
     <html lang="en">
     <head>
         <meta charset="UTF-8">
+        <title>Finance Report - ${data.periodLabel}</title>
         <style>
             @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
@@ -507,7 +508,7 @@ async function generatePDF(params: AnalyticsQueryParams): Promise<Buffer> {
         <!-- Footer -->
         <footer class="report-footer">
             <span>This report was auto-generated. All amounts are in Bangladeshi Taka (BDT).</span>
-            <span class="footer-brand">HR Management</span>
+            <span class="footer-brand">HR MANAGEMENT</span>
         </footer>
 
     </body>

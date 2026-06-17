@@ -77,7 +77,6 @@ const EarningSchema = new Schema<IEarning>(
             type: String,
             enum: ['unpaid', 'paid'],
             default: 'unpaid',
-            index: true,
         },
         paidAmount: {
             type: Number,

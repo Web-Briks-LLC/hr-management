@@ -187,7 +187,6 @@ orderSchema.virtual('earning', {
 // Compound indexes for common queries
 orderSchema.index({ clientId: 1, orderDate: -1 });
 orderSchema.index({ status: 1, deadline: 1 });
-orderSchema.index({ status: 1 });
 
 // Text search index
 orderSchema.index({ orderName: 'text' });
