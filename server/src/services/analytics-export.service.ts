@@ -74,16 +74,39 @@ async function getExportData(params: AnalyticsQueryParams) {
         status: { $in: ['paid', 'partial_paid'] },
     };
 
-    const expenses = await ExpenseModel.find(expenseFilter)
-        .populate('branchId', 'name')
-        .sort({ date: 1 })
-        .lean();
-
-    // Fetch user details manually since User is a raw collection
-    const userIds = [...new Set(expenses.map(e => e.createdBy?.toString()))].filter(Boolean);
-    const { default: UserModel } = await import('../models/user.model.js');
-    const users = await UserModel.find({ _id: { $in: userIds as any } }).toArray();
-    const userMap = new Map(users.map(u => [u._id.toString(), u.name]));
+    // Expenses query with $lookup join for user (better-auth collection) and branch
+    const expenses = await ExpenseModel.aggregate([
+        { $match: expenseFilter },
+        {
+            $lookup: {
+                from: 'user',
+                localField: 'createdBy',
+                foreignField: '_id',
+                as: 'creatorDetails'
+            }
+        },
+        {
+            $unwind: {
+                path: '$creatorDetails',
+                preserveNullAndEmptyArrays: true
+            }
+        },
+        {
+            $lookup: {
+                from: 'branches',
+                localField: 'branchId',
+                foreignField: '_id',
+                as: 'branchDetails'
+            }
+        },
+        {
+            $unwind: {
+                path: '$branchDetails',
+                preserveNullAndEmptyArrays: true
+            }
+        },
+        { $sort: { date: 1 } }
+    ]);
 
     // Summary calculation
     let totalEarningsBDT = 0;
@@ -104,11 +127,11 @@ async function getExportData(params: AnalyticsQueryParams) {
 
     const formattedExpenses = expenses.map((e: any) => {
         totalExpensesBDT += e.amount || 0;
-        const createdByName = userMap.get(e.createdBy?.toString()) || 'Unknown User';
+        const createdByName = e.creatorDetails?.name || 'Unknown User';
         return {
             date: e.date,
             title: e.title,
-            branchName: e.branchId?.name || 'Unknown Branch',
+            branchName: e.branchDetails?.name || 'Unknown Branch',
             amount: e.amount || 0,
             createdBy: createdByName,
         };
