@@ -145,25 +145,31 @@ async function getExportData(params: AnalyticsQueryParams) {
 async function generatePDF(params: AnalyticsQueryParams): Promise<Buffer> {
     const data = await getExportData(params);
 
-    const earningsRows = data.earnings.map((e, idx) => `
-        <tr class="${idx % 2 === 0 ? 'even' : 'odd'}">
+    const earningsRows = data.earnings.map((e) => `
+        <tr>
             <td>${e.clientName}</td>
-            <td class="text-right">${e.images}</td>
-            <td class="text-right">${formatCurrency(e.price)} ${e.currency}</td>
-            <td class="text-right">${formatCurrency(e.convertedPrice)}</td>
-            <td class="text-right font-semibold">BDT ${formatBDT(e.totalBDT)}</td>
+            <td class="text-right font-mono">${e.images}</td>
+            <td class="text-right font-mono">${formatCurrency(e.price)} ${e.currency}</td>
+            <td class="text-right font-mono">${formatCurrency(e.convertedPrice)}</td>
+            <td class="text-right font-mono">${formatBDT(e.totalBDT)}</td>
         </tr>
     `).join('');
 
-    const expensesRows = data.expenses.map((e, idx) => `
-        <tr class="${idx % 2 === 0 ? 'even' : 'odd'}">
+    const expensesRows = data.expenses.map((e) => `
+        <tr>
             <td>${formatDate(e.date)}</td>
             <td>${e.title}</td>
             <td>${e.branchName}</td>
-            <td class="text-right font-semibold">BDT ${formatBDT(e.amount)}</td>
+            <td class="text-right font-mono">${formatBDT(e.amount)}</td>
             <td>${e.createdBy}</td>
         </tr>
     `).join('');
+
+    const netProfit = data.summary.netProfitBDT;
+    const isNegativeProfit = netProfit < 0;
+    const netProfitValue = isNegativeProfit 
+        ? `(BDT ${formatBDT(Math.abs(netProfit))})`
+        : `BDT ${formatBDT(netProfit)}`;
 
     const htmlContent = `
     <!DOCTYPE html>
@@ -171,176 +177,339 @@ async function generatePDF(params: AnalyticsQueryParams): Promise<Buffer> {
     <head>
         <meta charset="UTF-8">
         <style>
-            :root {
-                --primary: #0f172a;
-                --primary-light: #f8fafc;
-                --border: #e2e8f0;
-                --text-main: #334155;
-                --text-muted: #64748b;
-                --green: #16a34a;
-                --red: #dc2626;
-                --blue: #2563eb;
-            }
-            body {
-                font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
-                font-size: 11px;
-                color: var(--text-main);
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+            *, *::before, *::after {
+                box-sizing: border-box;
                 margin: 0;
                 padding: 0;
             }
-            .header {
-                text-align: center;
-                margin-bottom: 25px;
-                padding-bottom: 15px;
-                border-bottom: 2px solid var(--primary);
-            }
-            .header h1 {
-                font-size: 24px;
-                color: var(--primary);
-                margin: 0 0 5px 0;
-                font-weight: 700;
-            }
-            .header p {
-                margin: 0;
-                color: var(--text-muted);
+
+            body {
+                font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
                 font-size: 13px;
+                font-weight: 400;
+                color: #111827;
+                background: #FFFFFF;
+                padding: 40px;
+                line-height: 1.5;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
             }
-            .summary-box {
+
+            /* ── Header ─────────────────────────── */
+
+            .report-header {
                 display: flex;
                 justify-content: space-between;
-                background: var(--primary-light);
-                border: 1px solid var(--border);
-                border-radius: 8px;
-                padding: 15px;
-                margin-bottom: 30px;
+                align-items: flex-end;
+                padding-bottom: 24px;
+                margin-bottom: 40px;
+                border-bottom: 1px solid #E5E7EB;
             }
-            .summary-item {
-                text-align: center;
-                flex: 1;
-            }
-            .summary-item:not(:last-child) {
-                border-right: 1px solid var(--border);
-            }
-            .summary-label {
-                font-size: 10px;
-                text-transform: uppercase;
-                color: var(--text-muted);
-                letter-spacing: 0.5px;
-                margin-bottom: 5px;
-            }
-            .summary-value {
-                font-size: 16px;
-                font-weight: 700;
-            }
-            .value-green { color: var(--green); }
-            .value-red { color: var(--red); }
-            .value-blue { color: var(--blue); }
             
-            .section-title {
-                font-size: 16px;
-                color: var(--primary);
-                margin: 20px 0 10px 0;
+            .header-left .brand {
+                font-size: 10px;
                 font-weight: 600;
+                text-transform: uppercase;
+                letter-spacing: 0.15em;
+                color: #1E0078; /* Accent */
+                margin-bottom: 8px;
+                display: block;
             }
-            table {
+            
+            .header-left h1 {
+                font-size: 24px;
+                font-weight: 600;
+                color: #111827;
+                letter-spacing: -0.02em;
+                line-height: 1.2;
+            }
+
+            .header-right {
+                text-align: right;
+                font-size: 12px;
+                color: #6B7280;
+                line-height: 1.6;
+            }
+            
+            .header-right strong {
+                color: #111827;
+                font-weight: 500;
+            }
+
+            /* ── Financial Summary ────────────── */
+
+            .summary-container {
+                margin-bottom: 40px;
+                max-width: 380px;
+            }
+            
+            .summary-title {
+                font-size: 11px;
+                font-weight: 600;
+                text-transform: uppercase;
+                letter-spacing: 0.1em;
+                color: #6B7280;
+                margin-bottom: 12px;
+            }
+
+            .summary-table {
                 width: 100%;
                 border-collapse: collapse;
-                margin-bottom: 30px;
             }
-            th, td {
-                border: 1px solid var(--border);
-                padding: 8px 10px;
+            
+            .summary-table td {
+                padding: 10px 0;
+                font-size: 13px;
+                color: #111827;
+                border-bottom: 1px solid #E5E7EB;
+            }
+            
+            .summary-table td.label {
+                color: #6B7280;
+            }
+            
+            .summary-table td.value {
+                text-align: right;
+                font-weight: 500;
+            }
+
+            .summary-table tr.total-row td {
+                border-bottom: 3px double #111827;
+                font-weight: 600;
+                color: #111827;
+                padding-top: 12px;
+                padding-bottom: 12px;
+            }
+            
+            .summary-table tr.total-row td.label {
+                color: #111827;
+            }
+            
+            .summary-table tr.total-row td.value {
+                color: #1E0078; /* Positive net profit gets accent */
+                font-weight: 700;
+            }
+            
+            .summary-table tr.total-row td.value.negative {
+                color: #111827; /* Negative net profit (loss) in parentheses, black */
+            }
+
+            /* ── Sections & Tables ─────────────── */
+
+            .section {
+                margin-bottom: 40px;
+                page-break-inside: auto;
+            }
+            
+            .section-title {
+                font-size: 14px;
+                font-weight: 600;
+                color: #111827;
+                letter-spacing: -0.01em;
+                margin-bottom: 16px;
+                page-break-after: avoid;
+            }
+
+            table.data-table {
+                width: 100%;
+                border-collapse: collapse;
+                border-spacing: 0;
+            }
+            
+            table.data-table th {
+                padding: 10px 12px;
+                font-size: 10px;
+                font-weight: 600;
+                text-transform: uppercase;
+                letter-spacing: 0.08em;
+                color: #6B7280;
+                border: 1px solid #E5E7EB;
+                background: #FFFFFF;
                 text-align: left;
             }
-            th {
-                background-color: var(--primary);
-                color: white;
-                font-weight: 500;
-                font-size: 10px;
-                text-transform: uppercase;
-                letter-spacing: 0.5px;
+            
+            table.data-table td {
+                padding: 12px;
+                font-size: 12px;
+                color: #111827;
+                border: 1px solid #E5E7EB;
+                background: #FFFFFF;
             }
-            tr.even { background-color: #fcfcfc; }
-            tr.odd { background-color: #ffffff; }
-            .text-right { text-align: right; }
-            .text-center { text-align: center; }
-            .font-semibold { font-weight: 600; }
-            .footer-row td {
-                background-color: var(--primary-light);
+            
+            table.data-table tbody tr {
+                page-break-inside: avoid;
+            }
+
+            table.data-table tfoot tr {
+                font-weight: 600;
+                background: #FFFFFF;
+            }
+            
+            table.data-table tfoot td {
+                border: 1px solid #E5E7EB;
+                padding: 12px;
+                font-weight: 600;
+                color: #111827;
+            }
+
+            .total-value {
+                color: #111827;
+            }
+
+            .accent-value {
+                color: #1E0078;
                 font-weight: 700;
-                color: var(--primary);
+            }
+
+            /* ── Empty State ─────────────────── */
+
+            .empty-row td {
+                padding: 40px 12px;
+                text-align: center;
+                color: #6B7280;
+                font-style: italic;
+            }
+
+            /* ── Utilities ───────────────────── */
+
+            .text-right { text-align: right; }
+            .text-left { text-align: left; }
+            .text-center { text-align: center; }
+            .font-mono {
+                font-variant-numeric: tabular-nums;
+            }
+
+            /* ── Footer ──────────────────────── */
+
+            .report-footer {
+                margin-top: 60px;
+                padding-top: 20px;
+                border-top: 1px solid #E5E7EB;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                font-size: 11px;
+                color: #6B7280;
+            }
+            
+            .footer-brand {
+                font-weight: 600;
+                color: #111827;
+                letter-spacing: 0.05em;
+                text-transform: uppercase;
+            }
+
+            /* ── Print ───────────────────────── */
+
+            @media print {
+                body { padding: 0; }
+                .section { page-break-inside: auto; }
+                table.data-table { page-break-inside: auto; }
+                thead { display: table-header-group; }
+                tfoot { display: table-footer-group; }
+                tr { page-break-inside: avoid; }
             }
         </style>
     </head>
     <body>
-        <div class="header">
-            <h1>Finance Analytics Report</h1>
-            <p>Period: <strong>${data.periodLabel}</strong></p>
-            <p style="font-size: 10px; margin-top: 5px;">Generated: ${new Date().toLocaleString()}</p>
+
+        <!-- Header -->
+        <header class="report-header">
+            <div class="header-left">
+                <span class="brand">HR Management</span>
+                <h1>Finance Analytics Report</h1>
+            </div>
+            <div class="header-right">
+                <div>Period: <strong>${data.periodLabel}</strong></div>
+                <div>Generated: <strong>${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</strong></div>
+            </div>
+        </header>
+
+        <!-- Financial Summary (Statement Style) -->
+        <section class="summary-container">
+            <h3 class="summary-title">Financial Summary</h3>
+            <table class="summary-table">
+                <tbody>
+                    <tr>
+                        <td class="label">Gross Revenue</td>
+                        <td class="value font-mono">BDT ${formatBDT(data.summary.totalEarningsBDT)}</td>
+                    </tr>
+                    <tr>
+                        <td class="label">Operating Expenses</td>
+                        <td class="value font-mono">(BDT ${formatBDT(data.summary.totalExpensesBDT)})</td>
+                    </tr>
+                    <tr class="total-row">
+                        <td class="label">Net Profit</td>
+                        <td class="value font-mono ${isNegativeProfit ? 'negative' : ''}">${netProfitValue}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- Earnings Section -->
+        <div class="section">
+            <h2 class="section-title">Earnings Breakdown</h2>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Client Name</th>
+                        <th class="text-right">Total Images</th>
+                        <th class="text-right">Total Price</th>
+                        <th class="text-right">Converted Price</th>
+                        <th class="text-right">Total BDT</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${earningsRows || `<tr class="empty-row"><td colspan="5">No earnings available for this reporting period.</td></tr>`}
+                </tbody>
+                ${earningsRows ? `
+                <tfoot>
+                    <tr>
+                        <td>Total</td>
+                        <td class="text-right font-mono">${data.earningsNet.images}</td>
+                        <td class="text-right font-mono">${formatCurrency(data.earningsNet.price)}</td>
+                        <td></td>
+                        <td class="text-right accent-value font-mono">BDT ${formatBDT(data.earningsNet.totalBDT)}</td>
+                    </tr>
+                </tfoot>` : ''}
+            </table>
         </div>
 
-        <div class="summary-box">
-            <div class="summary-item">
-                <div class="summary-label">Total Earnings</div>
-                <div class="summary-value value-green">BDT ${formatBDT(data.summary.totalEarningsBDT)}</div>
-            </div>
-            <div class="summary-item">
-                <div class="summary-label">Total Expenses</div>
-                <div class="summary-value value-red">BDT ${formatBDT(data.summary.totalExpensesBDT)}</div>
-            </div>
-            <div class="summary-item">
-                <div class="summary-label">Net Profit</div>
-                <div class="summary-value value-blue">BDT ${formatBDT(data.summary.netProfitBDT)}</div>
-            </div>
+        <!-- Expenses Section -->
+        <div class="section">
+            <h2 class="section-title">Expenses Breakdown</h2>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Expense Title</th>
+                        <th>Branch Name</th>
+                        <th class="text-right">Amount</th>
+                        <th>By</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${expensesRows || `<tr class="empty-row"><td colspan="5">No expenses available for this reporting period.</td></tr>`}
+                </tbody>
+                ${expensesRows ? `
+                <tfoot>
+                    <tr>
+                        <td colspan="3" class="text-right">Total</td>
+                        <td class="text-right total-value font-mono">BDT ${formatBDT(data.expensesNet)}</td>
+                        <td></td>
+                    </tr>
+                </tfoot>` : ''}
+            </table>
         </div>
 
-        <div class="section-title">Earnings Breakdown</div>
-        <table>
-            <thead>
-                <tr>
-                    <th>Client Name</th>
-                    <th class="text-right">Total Images</th>
-                    <th class="text-right">Total Price</th>
-                    <th class="text-right">Converted Price</th>
-                    <th class="text-right">Total BDT</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${earningsRows || '<tr><td colspan="5" class="text-center">No earnings data for this period.</td></tr>'}
-            </tbody>
-            <tfoot>
-                <tr class="footer-row">
-                    <td>NET TOTAL</td>
-                    <td class="text-right">${data.earningsNet.images}</td>
-                    <td class="text-right">${formatCurrency(data.earningsNet.price)}</td>
-                    <td></td>
-                    <td class="text-right">BDT ${formatBDT(data.earningsNet.totalBDT)}</td>
-                </tr>
-            </tfoot>
-        </table>
+        <!-- Footer -->
+        <footer class="report-footer">
+            <span>This report was auto-generated. All amounts are in Bangladeshi Taka (BDT).</span>
+            <span class="footer-brand">HR Management</span>
+        </footer>
 
-        <div class="section-title">Expenses Breakdown</div>
-        <table>
-            <thead>
-                <tr>
-                    <th>Date</th>
-                    <th>Expense Title</th>
-                    <th>Branch Name</th>
-                    <th class="text-right">Amount</th>
-                    <th>By</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${expensesRows || '<tr><td colspan="5" class="text-center">No expense data for this period.</td></tr>'}
-            </tbody>
-            <tfoot>
-                <tr class="footer-row">
-                    <td colspan="3" class="text-right">NET TOTAL</td>
-                    <td class="text-right">BDT ${formatBDT(data.expensesNet)}</td>
-                    <td></td>
-                </tr>
-            </tfoot>
-        </table>
     </body>
     </html>
     `;
@@ -381,6 +550,46 @@ async function generateExcel(params: AnalyticsQueryParams): Promise<Buffer> {
     const data = await getExportData(params);
     const workbook = new exceljs.Workbook();
 
+    const headerFill: exceljs.Fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFF3F4F6' } // Light gray background
+    };
+
+    const headerFont: Partial<exceljs.Font> = {
+        bold: true,
+        size: 11,
+        color: { argb: 'FF111827' }, // Dark text
+        name: 'Arial'
+    };
+
+    const titleFont: Partial<exceljs.Font> = {
+        bold: true,
+        size: 14,
+        color: { argb: 'FF111827' },
+        name: 'Arial'
+    };
+
+    const dataFont: Partial<exceljs.Font> = {
+        size: 10,
+        color: { argb: 'FF111827' },
+        name: 'Arial'
+    };
+
+    const borderStyle: Partial<exceljs.Borders> = {
+        top: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+        left: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+        bottom: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+        right: { style: 'thin', color: { argb: 'FFE5E7EB' } }
+    };
+
+    const doubleBottomBorder: Partial<exceljs.Borders> = {
+        top: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+        left: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+        bottom: { style: 'double', color: { argb: 'FF111827' } }, // Classic accounting double border
+        right: { style: 'thin', color: { argb: 'FFE5E7EB' } }
+    };
+
     // -- EARNINGS SHEET --
     const earningsSheet = workbook.addWorksheet('Earnings');
     
@@ -388,24 +597,19 @@ async function generateExcel(params: AnalyticsQueryParams): Promise<Buffer> {
     earningsSheet.mergeCells('A1:E1');
     const titleCell = earningsSheet.getCell('A1');
     titleCell.value = `Earnings Report - ${data.periodLabel}`;
-    titleCell.font = { size: 16, bold: true };
-    titleCell.alignment = { vertical: 'middle', horizontal: 'center' };
+    titleCell.font = titleFont;
+    titleCell.alignment = { vertical: 'middle', horizontal: 'left' };
 
     // Headers
     earningsSheet.getRow(3).values = ['Client Name', 'Total Images', 'Total Price', 'Converted Price', 'Total BDT'];
-    earningsSheet.getRow(3).font = { bold: true, color: { argb: 'FFFFFFFF' } };
-    earningsSheet.getRow(3).alignment = { vertical: 'middle', horizontal: 'center' };
+    earningsSheet.getRow(3).font = headerFont;
+    earningsSheet.getRow(3).alignment = { vertical: 'middle', horizontal: 'left' };
     
     // Header Style
     for (let i = 1; i <= 5; i++) {
         const cell = earningsSheet.getCell(3, i);
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F172A' } };
-        cell.border = {
-            top: { style: 'thin' },
-            left: { style: 'thin' },
-            bottom: { style: 'thin' },
-            right: { style: 'thin' }
-        };
+        cell.fill = headerFill;
+        cell.border = borderStyle;
     }
 
     // Data Rows
@@ -413,12 +617,10 @@ async function generateExcel(params: AnalyticsQueryParams): Promise<Buffer> {
     data.earnings.forEach((e) => {
         const row = earningsSheet.getRow(rowNum);
         row.values = [e.clientName, e.images, `${e.price} ${e.currency}`, e.convertedPrice, e.totalBDT];
+        row.font = dataFont;
         
         for (let i = 1; i <= 5; i++) {
-            row.getCell(i).border = {
-                top: { style: 'thin' }, left: { style: 'thin' },
-                bottom: { style: 'thin' }, right: { style: 'thin' }
-            };
+            row.getCell(i).border = borderStyle;
         }
         rowNum++;
     });
@@ -426,12 +628,9 @@ async function generateExcel(params: AnalyticsQueryParams): Promise<Buffer> {
     // Net Row
     const netRow = earningsSheet.getRow(rowNum);
     netRow.values = ['NET TOTAL', data.earningsNet.images, data.earningsNet.price, '', data.earningsNet.totalBDT];
-    netRow.font = { bold: true };
+    netRow.font = { bold: true, size: 10, color: { argb: 'FF111827' }, name: 'Arial' };
     for (let i = 1; i <= 5; i++) {
-        netRow.getCell(i).border = {
-            top: { style: 'medium' }, left: { style: 'thin' },
-            bottom: { style: 'medium' }, right: { style: 'thin' }
-        };
+        netRow.getCell(i).border = doubleBottomBorder;
     }
 
     // Column Widths
@@ -445,21 +644,18 @@ async function generateExcel(params: AnalyticsQueryParams): Promise<Buffer> {
     expensesSheet.mergeCells('A1:E1');
     const exTitleCell = expensesSheet.getCell('A1');
     exTitleCell.value = `Expenses Report - ${data.periodLabel}`;
-    exTitleCell.font = { size: 16, bold: true };
-    exTitleCell.alignment = { vertical: 'middle', horizontal: 'center' };
+    exTitleCell.font = titleFont;
+    exTitleCell.alignment = { vertical: 'middle', horizontal: 'left' };
 
     // Headers
     expensesSheet.getRow(3).values = ['Date', 'Expense Title', 'Branch Name', 'Amount', 'By'];
-    expensesSheet.getRow(3).font = { bold: true, color: { argb: 'FFFFFFFF' } };
-    expensesSheet.getRow(3).alignment = { vertical: 'middle', horizontal: 'center' };
+    expensesSheet.getRow(3).font = headerFont;
+    expensesSheet.getRow(3).alignment = { vertical: 'middle', horizontal: 'left' };
     
     for (let i = 1; i <= 5; i++) {
         const cell = expensesSheet.getCell(3, i);
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F172A' } };
-        cell.border = {
-            top: { style: 'thin' }, left: { style: 'thin' },
-            bottom: { style: 'thin' }, right: { style: 'thin' }
-        };
+        cell.fill = headerFill;
+        cell.border = borderStyle;
     }
 
     // Data Rows
@@ -467,12 +663,10 @@ async function generateExcel(params: AnalyticsQueryParams): Promise<Buffer> {
     data.expenses.forEach((e) => {
         const row = expensesSheet.getRow(rowNum);
         row.values = [formatDate(e.date), e.title, e.branchName, e.amount, e.createdBy];
+        row.font = dataFont;
         
         for (let i = 1; i <= 5; i++) {
-            row.getCell(i).border = {
-                top: { style: 'thin' }, left: { style: 'thin' },
-                bottom: { style: 'thin' }, right: { style: 'thin' }
-            };
+            row.getCell(i).border = borderStyle;
         }
         rowNum++;
     });
@@ -480,12 +674,9 @@ async function generateExcel(params: AnalyticsQueryParams): Promise<Buffer> {
     // Net Row
     const exNetRow = expensesSheet.getRow(rowNum);
     exNetRow.values = ['', '', 'NET TOTAL', data.expensesNet, ''];
-    exNetRow.font = { bold: true };
+    exNetRow.font = { bold: true, size: 10, color: { argb: 'FF111827' }, name: 'Arial' };
     for (let i = 1; i <= 5; i++) {
-        exNetRow.getCell(i).border = {
-            top: { style: 'medium' }, left: { style: 'thin' },
-            bottom: { style: 'medium' }, right: { style: 'thin' }
-        };
+        exNetRow.getCell(i).border = doubleBottomBorder;
     }
 
     expensesSheet.columns = [

@@ -24,6 +24,7 @@ router.get(
 // GET /api/analytics/finance/export/pdf - Export finance analytics as PDF
 router.get(
     "/finance/export/pdf",
+    authorize(...allowedRoles),
     analyticsController.exportFinancePDF,
 );
 
