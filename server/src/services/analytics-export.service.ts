@@ -432,7 +432,7 @@ async function generatePDF(params: AnalyticsQueryParams): Promise<Buffer> {
                 .section { page-break-inside: auto; }
                 table.data-table { page-break-inside: auto; }
                 thead { display: table-header-group; }
-                tfoot { display: table-footer-group; }
+                tfoot { display: table-row-group; }
                 tr { page-break-inside: avoid; }
             }
         </style>
