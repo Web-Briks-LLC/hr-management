@@ -21,4 +21,17 @@ router.get(
     analyticsController.getFinanceAnalytics,
 );
 
+// GET /api/analytics/finance/export/pdf - Export finance analytics as PDF
+router.get(
+    "/finance/export/pdf",
+    analyticsController.exportFinancePDF,
+);
+
+// GET /api/analytics/finance/export/excel - Export finance analytics as Excel
+router.get(
+    "/finance/export/excel",
+    authorize(...allowedRoles),
+    analyticsController.exportFinanceExcel,
+);
+
 export const analyticsRoute = router;
