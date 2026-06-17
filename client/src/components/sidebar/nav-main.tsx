@@ -10,21 +10,13 @@ import { Role } from "@/constants/role";
 import { useGetMeQuery } from "@/redux/features/staff/staffApi";
 import { Skeleton } from "../ui/skeleton";
 import { Input } from "@/components/ui/input";
-import { Search, ChevronRight } from "lucide-react";
+import { Search } from "lucide-react";
 import {
     SidebarGroup,
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
-    SidebarMenuSub,
-    SidebarMenuSubButton,
-    SidebarMenuSubItem,
 } from "@/components/ui/sidebar";
-import {
-    Collapsible,
-    CollapsibleContent,
-    CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 
 export function NavMain() {
     const {
@@ -135,10 +127,10 @@ export function NavMain() {
     }
 
     return (
-        <SidebarGroup className="py-0">
+        <SidebarGroup className="py-2 px-1">
             {/* Real-time Search Input Bar */}
-            <div className="px-3 mb-4 relative group/search">
-                <Search className="absolute left-6 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/50 transition-colors group-focus-within/search:text-primary" />
+            <div className="px-2 mb-4 relative group/search">
+                <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/50 transition-colors group-focus-within/search:text-primary" />
                 <Input
                     placeholder="Search navigation..."
                     value={search}
@@ -147,74 +139,55 @@ export function NavMain() {
                 />
             </div>
 
-            <SidebarMenu className="space-y-1 px-1">
+            <div className="space-y-5">
                 {filteredGroups.length === 0 ? (
                     <div className="text-center text-xs font-medium text-muted-foreground py-8 italic bg-muted/10 rounded-lg border border-dashed border-border/40 mx-2">
                         No matches found.
                     </div>
                 ) : (
-                    filteredGroups.map((group) => {
-                        const isGroupActive = group.items.some((item) =>
-                            item.url === activeItemUrl
-                        );
-
-                        return (
-                            <Collapsible
-                                key={`${group.groupLabel}-${search ? "searching" : "normal"}`}
-                                defaultOpen={isGroupActive || !!search}
-                                className="group/collapsible"
-                            >
-                                <SidebarMenuItem>
-                                    <CollapsibleTrigger asChild>
-                                        <SidebarMenuButton className="flex items-center justify-between py-2.5 px-3 rounded-lg hover:bg-sidebar-accent/50 text-muted-foreground hover:text-foreground font-semibold text-xs tracking-wide transition-all">
-                                            <span className="uppercase text-[10px] tracking-widest opacity-85">
-                                                {group.groupLabel}
-                                            </span>
-                                            <ChevronRight className="h-3 w-3 shrink-0 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90 text-muted-foreground/50" />
-                                        </SidebarMenuButton>
-                                    </CollapsibleTrigger>
-                                    <CollapsibleContent className="space-y-0.5 mt-0.5">
-                                        <SidebarMenuSub className="border-sidebar-border/30">
-                                            {group.items.map((item) => {
-                                                const isActive = item.url === activeItemUrl;
-                                                return (
-                                                    <SidebarMenuSubItem key={item.title}>
-                                                        <SidebarMenuSubButton
-                                                            asChild
-                                                            isActive={isActive}
+                    filteredGroups.map((group) => (
+                        <div key={group.groupLabel} className="space-y-1">
+                            <div className="px-2.5 text-[9px] font-bold text-muted-foreground/45 uppercase tracking-widest select-none">
+                                {group.groupLabel}
+                            </div>
+                            <SidebarMenu className="space-y-0.5">
+                                {group.items.map((item) => {
+                                    const isActive = item.url === activeItemUrl;
+                                    return (
+                                        <SidebarMenuItem key={item.title}>
+                                            <SidebarMenuButton
+                                                asChild
+                                                isActive={isActive}
+                                                className={cn(
+                                                    "w-full flex items-center gap-2.5 py-1.5 px-2.5 text-xs font-medium rounded-lg transition-all duration-200",
+                                                    isActive
+                                                        ? "bg-sidebar-accent text-sidebar-accent-foreground font-semibold shadow-xs"
+                                                        : "text-muted-foreground/80 hover:bg-sidebar-accent/50 hover:text-foreground"
+                                                )}
+                                            >
+                                                <Link href={item.url}>
+                                                    {item.icon && (
+                                                        <item.icon
+                                                            strokeWidth={2}
                                                             className={cn(
-                                                                "w-full flex items-center gap-2.5 py-1.5 px-2.5 text-xs font-medium rounded-md transition-all duration-200",
+                                                                "size-4 shrink-0 transition-colors",
                                                                 isActive
-                                                                    ? "bg-primary text-primary-foreground hover:bg-primary/95 hover:text-primary-foreground shadow-xs"
-                                                                    : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
+                                                                    ? "text-foreground"
+                                                                    : "text-muted-foreground/60 group-hover:text-foreground"
                                                             )}
-                                                        >
-                                                            <Link href={item.url}>
-                                                                {item.icon && (
-                                                                    <item.icon
-                                                                        strokeWidth={2.2}
-                                                                        className={cn(
-                                                                            "size-3.5 shrink-0 transition-colors",
-                                                                            isActive
-                                                                                ? "text-primary-foreground"
-                                                                                : "text-muted-foreground/75 group-hover/menu-sub-item:text-foreground"
-                                                                        )}
-                                                                    />
-                                                                )}
-                                                                <span className="truncate">{item.title}</span>
-                                                            </Link>
-                                                        </SidebarMenuSubButton>
-                                                    </SidebarMenuSubItem>
-                                                );
-                                            })}
-                                        </SidebarMenuSub>
-                                    </CollapsibleContent>
-                                </SidebarMenuItem>
-                            </Collapsible>
-                        );
-                    })
+                                                        />
+                                                    )}
+                                                    <span className="truncate">{item.title}</span>
+                                                </Link>
+                                            </SidebarMenuButton>
+                                        </SidebarMenuItem>
+                                    );
+                                })}
+                            </SidebarMenu>
+                        </div>
+                    ))
                 )}
-            </SidebarMenu>
+            </div>
         </SidebarGroup>
     );
 }
