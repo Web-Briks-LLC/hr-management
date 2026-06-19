@@ -246,7 +246,7 @@ export default function TransactionsClient() {
     };
 
     // PDF head-less Puppeteer download
-    const handleExportPDF = async () => {
+    const handleExportPDF = () => {
         const baseUrl = `${process.env.NEXT_PUBLIC_APP_URL || ""}/api/transactions/export-pdf`;
         const query = new URLSearchParams();
 
@@ -258,34 +258,10 @@ export default function TransactionsClient() {
         if (queryParams.sortByDate) query.append("sortByDate", queryParams.sortByDate);
 
         const downloadUrl = `${baseUrl}?${query.toString()}`;
-        const toastId = toast.loading("Compiling high-fidelity A4 PDF report...");
         
-        try {
-            const response = await fetch(downloadUrl, {
-                method: "GET",
-                credentials: "include",
-            });
-            if (!response.ok) throw new Error("Failed to export PDF");
-
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const link = document.createElement("a");
-            link.href = url;
-            
-            const startStr = queryParams.startDate || "Beginning";
-            const endStr = queryParams.endDate || format(new Date(), "yyyy-MM-dd");
-            link.setAttribute("download", `Ledger_Report_${startStr}_to_${endStr}.pdf`);
-            
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            window.URL.revokeObjectURL(url);
-            
-            toast.success("PDF ledger downloaded successfully!", { id: toastId });
-        } catch (error) {
-            console.error("PDF export error:", error);
-            toast.error("Failed to generate PDF report", { id: toastId });
-        }
+        // Trigger browser native file download on the same tab
+        window.location.href = downloadUrl;
+        toast.success("Initiating backend Puppeteer A4 PDF compile...");
     };
 
     // Client-side Excel export
