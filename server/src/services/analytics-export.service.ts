@@ -4,6 +4,7 @@ import ExpenseModel from '../models/expense.model.js';
 import '../models/user.model.js';
 import '../models/branch.model.js';
 import '../models/client.model.js';
+import '../models/expense-category.model.js';
 import puppeteer from 'puppeteer';
 import exceljs from 'exceljs';
 import type { AnalyticsQueryParams } from '../types/analytics.type.js';
@@ -74,7 +75,7 @@ async function getExportData(params: AnalyticsQueryParams) {
         status: { $in: ['paid', 'partial_paid'] },
     };
 
-    // Expenses query with $lookup join for user (better-auth collection) and branch
+    // Expenses query with $lookup join for user (better-auth collection), branch and category
     const expenses = await ExpenseModel.aggregate([
         { $match: expenseFilter },
         {
@@ -105,6 +106,20 @@ async function getExportData(params: AnalyticsQueryParams) {
                 preserveNullAndEmptyArrays: true
             }
         },
+        {
+            $lookup: {
+                from: 'expensecategories',
+                localField: 'categoryId',
+                foreignField: '_id',
+                as: 'categoryDetails'
+            }
+        },
+        {
+            $unwind: {
+                path: '$categoryDetails',
+                preserveNullAndEmptyArrays: true
+            }
+        },
         { $sort: { date: 1 } }
     ]);
 
@@ -132,6 +147,7 @@ async function getExportData(params: AnalyticsQueryParams) {
             date: e.date,
             title: e.title,
             branchName: e.branchDetails?.name || 'Unknown Branch',
+            categoryName: e.categoryDetails?.name || 'Uncategorized',
             amount: e.amount || 0,
             createdBy: createdByName,
         };
@@ -178,15 +194,71 @@ async function generatePDF(params: AnalyticsQueryParams): Promise<Buffer> {
         </tr>
     `).join('');
 
-    const expensesRows = data.expenses.map((e) => `
-        <tr>
-            <td>${formatDate(e.date)}</td>
-            <td>${e.title}</td>
-            <td>${e.branchName}</td>
-            <td class="text-right font-mono">${formatBDT(e.amount)}</td>
-            <td>${e.createdBy}</td>
-        </tr>
-    `).join('');
+    // Group expenses by branchName, and then by categoryName
+    const groupedExpenses: Record<string, Record<string, number>> = {};
+    for (const exp of data.expenses) {
+        const branch = exp.branchName || 'Unknown Branch';
+        const category = exp.categoryName || 'Uncategorized';
+        if (!groupedExpenses[branch]) {
+            groupedExpenses[branch] = {};
+        }
+        groupedExpenses[branch][category] = (groupedExpenses[branch][category] || 0) + exp.amount;
+    }
+
+    let expensesHtml = '';
+    const branches = Object.keys(groupedExpenses).sort();
+
+    if (branches.length === 0) {
+        expensesHtml = `
+            <table class="data-table">
+                <tbody>
+                    <tr class="empty-row">
+                        <td>No expenses available for this reporting period.</td>
+                    </tr>
+                </tbody>
+            </table>
+        `;
+    } else {
+        for (const branch of branches) {
+            const categories = groupedExpenses[branch] || {};
+            const categoryNames = Object.keys(categories).sort();
+            let branchTotal = 0;
+
+            const categoryRows = categoryNames.map((catName) => {
+                const amount = categories[catName] || 0;
+                branchTotal += amount;
+                return `
+                    <tr>
+                        <td>${catName}</td>
+                        <td class="text-right font-mono">BDT ${formatBDT(amount)}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            expensesHtml += `
+                <div class="branch-expenses-block" style="margin-bottom: 24px; page-break-inside: avoid;">
+                    <h3 class="subsection-title">${branch} Branch</h3>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Category Name</th>
+                                <th class="text-right" style="width: 200px;">Total Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${categoryRows}
+                        </tbody>
+                        <tfoot>
+                            <tr style="font-weight: 600;">
+                                <td>Total for ${branch}</td>
+                                <td class="text-right total-value font-mono">BDT ${formatBDT(branchTotal)}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            `;
+        }
+    }
 
     const netProfit = data.summary.netProfitBDT;
     const isNegativeProfit = netProfit < 0;
@@ -333,6 +405,17 @@ async function generatePDF(params: AnalyticsQueryParams): Promise<Buffer> {
                 color: #111827;
                 letter-spacing: -0.01em;
                 margin-bottom: 16px;
+                page-break-after: avoid;
+            }
+
+            .subsection-title {
+                font-size: 11px;
+                font-weight: 600;
+                color: #4B5563;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                margin-top: 16px;
+                margin-bottom: 8px;
                 page-break-after: avoid;
             }
 
@@ -504,28 +587,11 @@ async function generatePDF(params: AnalyticsQueryParams): Promise<Buffer> {
         <!-- Expenses Section -->
         <div class="section">
             <h2 class="section-title">Expenses Breakdown</h2>
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>Expense Title</th>
-                        <th>Branch Name</th>
-                        <th class="text-right">Amount</th>
-                        <th>By</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${expensesRows || `<tr class="empty-row"><td colspan="5">No expenses available for this reporting period.</td></tr>`}
-                </tbody>
-                ${expensesRows ? `
-                <tfoot>
-                    <tr>
-                        <td colspan="3" class="text-right">Total</td>
-                        <td class="text-right total-value font-mono">BDT ${formatBDT(data.expensesNet)}</td>
-                        <td></td>
-                    </tr>
-                </tfoot>` : ''}
-            </table>
+            ${expensesHtml}
+            ${branches.length > 0 ? `
+            <div style="margin-top: 16px; text-align: right; font-weight: 600; font-size: 13px;">
+                Total Expenses: <span class="accent-value font-mono">BDT ${formatBDT(data.expensesNet)}</span>
+            </div>` : ''}
         </div>
 
         <!-- Footer -->
