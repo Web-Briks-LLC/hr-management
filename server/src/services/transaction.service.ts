@@ -403,22 +403,21 @@ function compileReportHTML(data: ITransactionReportData, startDate: string, endD
         return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "2-digit" });
     };
 
-    const tableRows = transactions.map((t, idx) => {
-        const isEven = idx % 2 === 0;
+    const tableRows = transactions.map((t) => {
         const typeLabel = t.type.toUpperCase().replace("_", " ");
         const flowSign = t.flow === "inflow" ? "+" : "-";
         const flowClass = t.flow === "inflow" ? "inflow" : "outflow";
         
         return `
-            <tr class="${isEven ? 'even' : 'odd'}">
-                <td>${dateFormatted(t.date)}</td>
+            <tr>
+                <td class="font-mono">${dateFormatted(t.date)}</td>
                 <td>
-                    <div style="font-weight: 600; color: #2d3748;">${t.title}</div>
-                    ${t.note ? `<div style="font-size: 11px; color: #718096; margin-top: 2px;">${t.note}</div>` : ""}
+                    <div style="font-weight: 500; color: #111827;">${t.title}</div>
+                    ${t.note ? `<div style="font-size: 11px; color: #6B7280; margin-top: 2px;">${t.note}</div>` : ""}
                 </td>
                 <td><span class="badge badge-${t.type}">${typeLabel}</span></td>
-                <td class="${flowClass} text-right">${flowSign} BDT ${formatBDT(t.amountInBDT)}</td>
-                <td class="text-right" style="font-weight: 600; color: #1a202c;">BDT ${formatBDT(t.runningBalance || 0)}</td>
+                <td class="${flowClass} text-right font-mono">${flowSign} ${formatBDT(t.amountInBDT)}</td>
+                <td class="text-right font-mono" style="font-weight: 500; color: #111827;">${formatBDT(t.runningBalance || 0)}</td>
             </tr>
         `;
     }).join("");
@@ -428,171 +427,291 @@ function compileReportHTML(data: ITransactionReportData, startDate: string, endD
     <html lang="en">
     <head>
         <meta charset="UTF-8">
+        <title>Unified Financial Ledger - ${startDate} to ${endDate}</title>
         <style>
-            body {
-                font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-                font-size: 13px;
-                color: #2d3748;
-                line-height: 1.5;
-                padding: 0;
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+            *, *::before, *::after {
+                box-sizing: border-box;
                 margin: 0;
+                padding: 0;
             }
-            .header-container {
-                border-bottom: 2px solid #e2e8f0;
-                padding-bottom: 15px;
-                margin-bottom: 20px;
-            }
-            .title-block h1 {
-                font-size: 22px;
-                font-weight: 700;
-                color: #1a365d;
-                margin: 0 0 5px 0;
-            }
-            .meta-info {
-                color: #718096;
-                font-size: 12px;
-            }
-            .summary-grid {
-                display: grid;
-                grid-template-columns: repeat(5, 1fr);
-                gap: 10px;
-                margin-bottom: 25px;
-            }
-            .summary-card {
-                background: #f7fafc;
-                border: 1px solid #edf2f7;
-                border-radius: 6px;
-                padding: 10px;
-                text-align: center;
-            }
-            .summary-card.accent {
-                background: #ebf8ff;
-                border-color: #bee3f8;
-            }
-            .summary-card .label {
-                font-size: 10px;
-                text-transform: uppercase;
-                color: #718096;
-                font-weight: 600;
-                margin-bottom: 5px;
-            }
-            .summary-card .value {
+
+            body {
+                font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
                 font-size: 13px;
-                font-weight: 700;
-                color: #2d3748;
+                font-weight: 400;
+                color: #111827;
+                background: #FFFFFF;
+                padding: 40px;
+                line-height: 1.5;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
             }
-            .summary-card .value.green {
-                color: #2f855a;
+
+            /* ── Header ─────────────────────────── */
+
+            .report-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: flex-end;
+                padding-bottom: 24px;
+                margin-bottom: 40px;
+                border-bottom: 1px solid #E5E7EB;
             }
-            .summary-card .value.red {
-                color: #9b2c2c;
+            
+            .header-left .brand {
+                font-size: 10px;
+                font-weight: 600;
+                text-transform: uppercase;
+                letter-spacing: 0.15em;
+                color: #1E0078; /* Accent */
+                margin-bottom: 8px;
+                display: block;
             }
-            .summary-card .value.blue {
-                color: #2b6cb0;
+            
+            .header-left h1 {
+                font-size: 24px;
+                font-weight: 600;
+                color: #111827;
+                letter-spacing: -0.02em;
+                line-height: 1.2;
             }
-            table {
+
+            .header-right {
+                text-align: right;
+                font-size: 12px;
+                color: #6B7280;
+                line-height: 1.6;
+            }
+            
+            .header-right strong {
+                color: #111827;
+                font-weight: 500;
+            }
+
+            /* ── Financial Summary ────────────── */
+
+            .summary-container {
+                margin-bottom: 40px;
+                max-width: 380px;
+            }
+            
+            .summary-title {
+                font-size: 11px;
+                font-weight: 600;
+                text-transform: uppercase;
+                letter-spacing: 0.1em;
+                color: #6B7280;
+                margin-bottom: 12px;
+            }
+
+            .summary-table {
                 width: 100%;
                 border-collapse: collapse;
-                margin-top: 10px;
             }
-            th {
-                background-color: #1a365d;
-                color: #ffffff;
-                font-weight: 600;
-                text-align: left;
-                padding: 8px 10px;
-                font-size: 11px;
-                text-transform: uppercase;
+            
+            .summary-table td {
+                padding: 10px 0;
+                font-size: 13px;
+                color: #111827;
+                border-bottom: 1px solid #E5E7EB;
             }
-            td {
-                padding: 10px;
-                border-bottom: 1px solid #edf2f7;
-                vertical-align: top;
+            
+            .summary-table td.label {
+                color: #6B7280;
             }
-            tr.even {
-                background-color: #fcfdfd;
-            }
-            tr.odd {
-                background-color: #ffffff;
-            }
-            .text-right {
+            
+            .summary-table td.value {
                 text-align: right;
+                font-weight: 500;
+            }
+
+            .summary-table tr.total-row td {
+                border-bottom: 3px double #111827;
+                font-weight: 600;
+                color: #111827;
+                padding-top: 12px;
+                padding-bottom: 12px;
+            }
+            
+            .summary-table tr.total-row td.label {
+                color: #111827;
+            }
+            
+            .summary-table tr.total-row td.value {
+                color: #1E0078; /* Positive gets accent */
+                font-weight: 700;
+            }
+
+            /* ── Sections & Tables ─────────────── */
+
+            .section-title {
+                font-size: 14px;
+                font-weight: 600;
+                color: #111827;
+                letter-spacing: -0.01em;
+                margin-bottom: 16px;
+                page-break-after: avoid;
+            }
+
+            table.data-table {
+                width: 100%;
+                border-collapse: collapse;
+                border-spacing: 0;
+            }
+            
+            table.data-table th {
+                padding: 10px 12px;
+                font-size: 10px;
+                font-weight: 600;
+                text-transform: uppercase;
+                letter-spacing: 0.08em;
+                color: #6B7280;
+                border: 1px solid #E5E7EB;
+                background: #FFFFFF;
+                text-align: left;
+            }
+            
+            table.data-table td {
+                padding: 12px;
+                font-size: 12px;
+                color: #111827;
+                border: 1px solid #E5E7EB;
+                background: #FFFFFF;
+            }
+            
+            table.data-table tbody tr {
+                page-break-inside: avoid;
+            }
+
+            /* ── Utilities ───────────────────── */
+
+            .text-right { text-align: right; }
+            .text-left { text-align: left; }
+            .text-center { text-align: center; }
+            .font-mono {
+                font-family: Menlo, Monaco, Consolas, "Courier New", monospace;
+                font-variant-numeric: tabular-nums;
             }
             .inflow {
-                color: #2f855a;
-                font-weight: 600;
+                color: #137333;
+                font-weight: 500;
             }
             .outflow {
-                color: #9b2c2c;
-                font-weight: 600;
+                color: #C5221F;
+                font-weight: 500;
             }
+            
             .badge {
                 display: inline-block;
-                padding: 2px 6px;
+                padding: 3px 8px;
                 font-size: 9px;
-                font-weight: 700;
+                font-weight: 600;
                 border-radius: 4px;
                 text-transform: uppercase;
+                letter-spacing: 0.05em;
             }
-            .badge-earning { background: #c6f6d5; color: #22543d; }
-            .badge-expense { background: #fed7d7; color: #742a2a; }
-            .badge-debit { background: #feebc8; color: #7b341e; }
-            .badge-wallet { background: #e2e8f0; color: #4a5568; }
-            .badge-profit_share { background: #e9d8fd; color: #44337a; }
-            .badge-profit_transfer { background: #ebf8ff; color: #2b6cb0; }
+            .badge-earning { background: #E6F4EA; color: #137333; }
+            .badge-expense { background: #FCE8E6; color: #C5221F; }
+            .badge-debit { background: #FEF7E0; color: #B06000; }
+            .badge-wallet { background: #F1F3F4; color: #3C4043; }
+            .badge-profit_share { background: #F3E8FD; color: #681DA8; }
+            .badge-profit_transfer { background: #E8F0FE; color: #1A73E8; }
+
+            /* ── Footer ──────────────────────── */
+
+            .report-footer {
+                margin-top: 60px;
+                padding-top: 20px;
+                border-top: 1px solid #E5E7EB;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                font-size: 11px;
+                color: #6B7280;
+            }
+            
+            .footer-brand {
+                font-weight: 600;
+                color: #111827;
+                letter-spacing: 0.05em;
+                text-transform: uppercase;
+            }
+
+            /* ── Print ───────────────────────── */
+
+            @media print {
+                body { padding: 0; }
+                thead { display: table-header-group; }
+                tr { page-break-inside: avoid; }
+            }
         </style>
-        <title>Unified Financial Ledger Report</title>
     </head>
     <body>
-        <div class="header-container">
-            <div class="title-block">
+
+        <!-- Header -->
+        <header class="report-header">
+            <div class="header-left">
+                <span class="brand">HR Management</span>
                 <h1>Unified Financial Ledger Report</h1>
-                <div class="meta-info">
-                    <span>Period: <strong>${startDate}</strong> to <strong>${endDate}</strong></span>
-                    <span style="margin-left: 20px;">Generated: <strong>${new Date().toLocaleString()}</strong></span>
-                </div>
             </div>
+            <div class="header-right">
+                <div>Period: <strong>${startDate}</strong> to <strong>${endDate}</strong></div>
+                <div>Generated: <strong>${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</strong></div>
+            </div>
+        </header>
+
+        <!-- Financial Summary (Statement Style) -->
+        <section class="summary-container">
+            <h3 class="summary-title">Financial Summary</h3>
+            <table class="summary-table">
+                <tbody>
+                    <tr>
+                        <td class="label">Opening Balance</td>
+                        <td class="value font-mono">BDT ${formatBDT(summary.openingBalance)}</td>
+                    </tr>
+                    <tr>
+                        <td class="label">Total Inflow</td>
+                        <td class="value font-mono">+ BDT ${formatBDT(summary.totalInflow)}</td>
+                    </tr>
+                    <tr>
+                        <td class="label">Total Outflow</td>
+                        <td class="value font-mono">(BDT ${formatBDT(summary.totalOutflow)})</td>
+                    </tr>
+                    <tr>
+                        <td class="label">Net Change</td>
+                        <td class="value font-mono ${summary.netChange < 0 ? 'outflow' : 'inflow'}">
+                            ${summary.netChange >= 0 ? '+' : '-'} BDT ${formatBDT(Math.abs(summary.netChange))}
+                        </td>
+                    </tr>
+                    <tr class="total-row">
+                        <td class="label">Closing Balance</td>
+                        <td class="value font-mono">BDT ${formatBDT(summary.closingBalance)}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- Ledger Table Section -->
+        <div>
+            <h2 class="section-title">Transactions List</h2>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th style="width: 15%;">Date</th>
+                        <th style="width: 43%;">Description</th>
+                        <th style="width: 15%;">Type</th>
+                        <th style="width: 13%; text-align: right;">Amount (BDT)</th>
+                        <th style="width: 14%; text-align: right;">Balance (BDT)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${tableRows || `<tr><td colspan="5" class="text-center" style="color: #6B7280; font-style: italic; padding: 40px 10px;">No transactions available for this period.</td></tr>`}
+                </tbody>
+            </table>
         </div>
 
-        <div class="summary-grid">
-            <div class="summary-card">
-                <div class="label">Opening Balance</div>
-                <div class="value">BDT ${formatBDT(summary.openingBalance)}</div>
-            </div>
-            <div class="summary-card">
-                <div class="label">Total Inflow</div>
-                <div class="value green">+ BDT ${formatBDT(summary.totalInflow)}</div>
-            </div>
-            <div class="summary-card">
-                <div class="label">Total Outflow</div>
-                <div class="value red">- BDT ${formatBDT(summary.totalOutflow)}</div>
-            </div>
-            <div class="summary-card">
-                <div class="label">Net Change</div>
-                <div class="value ${summary.netChange >= 0 ? 'green' : 'red'}">
-                    ${summary.netChange >= 0 ? '+' : ''} BDT ${formatBDT(summary.netChange)}
-                </div>
-            </div>
-            <div class="summary-card accent">
-                <div class="label" style="color: #2b6cb0;">Closing Balance</div>
-                <div class="value blue">BDT ${formatBDT(summary.closingBalance)}</div>
-            </div>
-        </div>
-
-        <table>
-            <thead>
-                <tr>
-                    <th style="width: 15%;">Date</th>
-                    <th style="width: 45%;">Description</th>
-                    <th style="width: 15%;">Type</th>
-                    <th style="width: 13%; text-align: right;">Amount (BDT)</th>
-                    <th style="width: 12%; text-align: right;">Balance</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${tableRows}
-            </tbody>
-        </table>
     </body>
     </html>
     `;

@@ -104,7 +104,8 @@ export default function TransactionsClient() {
     const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
     
     // New Period Filtering States
-    const [period, setPeriod] = useState<"all" | "yearly" | "monthly" | "weekly" | "daily" | "custom">("all");
+    const [period, setPeriod] = useState<"all" | "yearly" | "monthly" | "weekly" | "daily" | "single-date" | "custom">("all");
+    const [singleDate, setSingleDate] = useState<Date | undefined>(undefined);
     const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
     const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
 
@@ -155,6 +156,10 @@ export default function TransactionsClient() {
             const today = new Date();
             startStr = format(today, "yyyy-MM-dd");
             endStr = format(today, "yyyy-MM-dd");
+        } else if (period === "single-date") {
+            const targetDate = singleDate || new Date();
+            startStr = format(targetDate, "yyyy-MM-dd");
+            endStr = format(targetDate, "yyyy-MM-dd");
         } else if (period === "custom") {
             if (dateRange.from) {
                 startStr = format(dateRange.from, "yyyy-MM-dd");
@@ -171,7 +176,7 @@ export default function TransactionsClient() {
             params.type = selectedTypes.join(",");
         }
         return params;
-    }, [search, branchFilter, period, selectedYear, selectedMonth, dateRange, selectedTypes, sortByDate]);
+    }, [search, branchFilter, period, selectedYear, selectedMonth, dateRange, singleDate, selectedTypes, sortByDate]);
 
     // Fetch ledger data using RTK Query
     const {
@@ -241,7 +246,7 @@ export default function TransactionsClient() {
     };
 
     // PDF head-less Puppeteer download
-    const handleExportPDF = () => {
+    const handleExportPDF = async () => {
         const baseUrl = `${process.env.NEXT_PUBLIC_APP_URL || ""}/api/transactions/export-pdf`;
         const query = new URLSearchParams();
 
@@ -253,8 +258,34 @@ export default function TransactionsClient() {
         if (queryParams.sortByDate) query.append("sortByDate", queryParams.sortByDate);
 
         const downloadUrl = `${baseUrl}?${query.toString()}`;
-        window.open(downloadUrl, "_blank");
-        toast.success("Initiating backend Puppeteer A4 PDF compile...");
+        const toastId = toast.loading("Compiling high-fidelity A4 PDF report...");
+        
+        try {
+            const response = await fetch(downloadUrl, {
+                method: "GET",
+                credentials: "include",
+            });
+            if (!response.ok) throw new Error("Failed to export PDF");
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            
+            const startStr = queryParams.startDate || "Beginning";
+            const endStr = queryParams.endDate || format(new Date(), "yyyy-MM-dd");
+            link.setAttribute("download", `Ledger_Report_${startStr}_to_${endStr}.pdf`);
+            
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+            
+            toast.success("PDF ledger downloaded successfully!", { id: toastId });
+        } catch (error) {
+            console.error("PDF export error:", error);
+            toast.error("Failed to generate PDF report", { id: toastId });
+        }
     };
 
     // Client-side Excel export
@@ -576,6 +607,9 @@ export default function TransactionsClient() {
                                 if (val !== "custom") {
                                     setDateRange({ from: undefined, to: undefined });
                                 }
+                                if (val !== "single-date") {
+                                    setSingleDate(undefined);
+                                }
                             }}
                         >
                             <SelectTrigger className="w-[150px] h-10 bg-background/60 text-sm font-semibold">
@@ -587,6 +621,7 @@ export default function TransactionsClient() {
                                 <SelectItem value="monthly" className="font-semibold">Monthly</SelectItem>
                                 <SelectItem value="weekly" className="font-semibold">Weekly</SelectItem>
                                 <SelectItem value="daily" className="font-semibold">Daily</SelectItem>
+                                <SelectItem value="single-date" className="font-semibold">Single Date</SelectItem>
                                 <SelectItem value="custom" className="font-semibold">Custom Range</SelectItem>
                             </SelectContent>
                         </Select>
@@ -633,6 +668,36 @@ export default function TransactionsClient() {
                                     ))}
                                 </SelectContent>
                             </Select>
+                        )}
+
+                        {/* Custom Single Date Popover */}
+                        {period === "single-date" && (
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button
+                                        variant="outline"
+                                        className="w-[200px] h-10 bg-background/60 justify-start text-left font-normal text-sm border-dashed shadow-xs animate-in fade-in slide-in-from-left-2 duration-300"
+                                    >
+                                        <CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground" />
+                                        {singleDate ? (
+                                            format(singleDate, "dd MMM yyyy")
+                                        ) : (
+                                            <span>Pick custom date</span>
+                                        )}
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0" align="start">
+                                    <Calendar
+                                        initialFocus
+                                        mode="single"
+                                        selected={singleDate}
+                                        onSelect={(date) => {
+                                            setSingleDate(date);
+                                            setCurrentPage(1);
+                                        }}
+                                    />
+                                </PopoverContent>
+                            </Popover>
                         )}
 
                         {/* Custom Date Range Popover */}
@@ -778,6 +843,7 @@ export default function TransactionsClient() {
                                     from: undefined,
                                     to: undefined,
                                 });
+                                setSingleDate(undefined);
                                 setCurrentPage(1);
                                 toast.success("Filters reset to All Time!");
                             }}
