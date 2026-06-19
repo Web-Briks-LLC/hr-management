@@ -412,8 +412,10 @@ function compileReportHTML(data: ITransactionReportData, startDate: string, endD
             <tr>
                 <td class="font-mono">${dateFormatted(t.date)}</td>
                 <td>
-                    <div style="font-weight: 500; color: #111827;">${t.title}</div>
-                    ${t.note ? `<div style="font-size: 11px; color: #6B7280; margin-top: 2px;">${t.note}</div>` : ""}
+                    <div class="description-cell">
+                        <div class="description-title" title="${t.title}">${t.title}</div>
+                        ${t.note ? `<div class="description-note" title="${t.note}">${t.note}</div>` : ""}
+                    </div>
                 </td>
                 <td><span class="badge badge-${t.type}">${typeLabel}</span></td>
                 <td class="${flowClass} text-right font-mono">${flowSign} ${formatBDT(t.amountInBDT)}</td>
@@ -559,6 +561,7 @@ function compileReportHTML(data: ITransactionReportData, startDate: string, endD
                 width: 100%;
                 border-collapse: collapse;
                 border-spacing: 0;
+                table-layout: fixed;
             }
             
             table.data-table th {
@@ -583,6 +586,28 @@ function compileReportHTML(data: ITransactionReportData, startDate: string, endD
             
             table.data-table tbody tr {
                 page-break-inside: avoid;
+            }
+
+            .description-cell {
+                width: 100%;
+                overflow: hidden;
+            }
+            
+            .description-title {
+                font-weight: 500;
+                color: #111827;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+            
+            .description-note {
+                font-size: 11px;
+                color: #6B7280;
+                margin-top: 2px;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
             }
 
             /* ── Utilities ───────────────────── */
