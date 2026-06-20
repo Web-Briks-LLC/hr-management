@@ -57,6 +57,14 @@ import {
     exportAnalyticsToExcel,
     exportAnalyticsToPDF,
 } from '@/utils/export-analytics';
+import { format } from 'date-fns';
+import { CalendarIcon } from 'lucide-react';
+import { Calendar } from '@/components/ui/calendar';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
 
 const formatCurrency = (amount: number, currency: string = 'BDT') => {
     try {
@@ -98,6 +106,12 @@ export default function FinanceAnalyticsPage() {
         currentYear.toString(),
     );
     const [selectedMonth, setSelectedMonth] = useState<string>('all');
+    const [filterMode, setFilterMode] = useState<'year-month' | 'single-date' | 'custom-range'>('year-month');
+    const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+    const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>({
+        from: undefined,
+        to: undefined,
+    });
 
     // Fetch available years
     const { data: availableYears = [] } = useGetAnalyticsYearsQuery();
@@ -107,11 +121,30 @@ export default function FinanceAnalyticsPage() {
         (a, b) => b - a,
     );
 
-    const { data, isLoading } = useGetFinanceAnalyticsQuery({
-        year: parseInt(selectedYear),
-        month: selectedMonth === 'all' ? undefined : parseInt(selectedMonth),
-        months: 12, // Default for compatibility, though service might ignore it if year is set
-    });
+    const queryParams = {
+        year: filterMode === 'year-month' ? parseInt(selectedYear) : undefined,
+        month: filterMode === 'year-month' && selectedMonth !== 'all' ? parseInt(selectedMonth) : undefined,
+        startDate: filterMode === 'single-date' && selectedDate 
+            ? format(selectedDate, "yyyy-MM-dd") 
+            : (filterMode === 'custom-range' && dateRange.from 
+                ? format(dateRange.from, "yyyy-MM-dd") 
+                : undefined),
+        endDate: filterMode === 'single-date' && selectedDate 
+            ? format(selectedDate, "yyyy-MM-dd") 
+            : (filterMode === 'custom-range' && dateRange.from
+                ? format(dateRange.to || dateRange.from, "yyyy-MM-dd") 
+                : undefined),
+    };
+
+    const { data, isLoading } = useGetFinanceAnalyticsQuery(queryParams);
+
+    const periodLabel = filterMode === 'year-month'
+        ? (selectedMonth === 'all' ? selectedYear.toString() : `${format(new Date(0, parseInt(selectedMonth) - 1), 'MMMM')}, ${selectedYear}`)
+        : (filterMode === 'single-date' && selectedDate
+            ? format(selectedDate, 'PPP')
+            : (filterMode === 'custom-range' && dateRange.from
+                ? `${format(dateRange.from, 'LLL dd, y')} - ${format(dateRange.to || dateRange.from, 'LLL dd, y')}`
+                : 'Selected Period'));
 
     if (isLoading) {
         return (
@@ -170,8 +203,126 @@ export default function FinanceAnalyticsPage() {
                     <p className="text-muted-foreground">
                         Track your earnings, expenses, and profit trends
                     </p>
-                </div>
-                <div className="flex gap-2">
+                </div>                <div className="flex flex-wrap items-center gap-2">
+                    {/* Filter Mode Selector */}
+                    <Select
+                        value={filterMode}
+                        onValueChange={(val: any) => setFilterMode(val)}
+                    >
+                        <SelectTrigger className="w-[160px]">
+                            <SelectValue placeholder="Filter Mode" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="year-month">Yearly/Monthly</SelectItem>
+                            <SelectItem value="single-date">Single Date</SelectItem>
+                            <SelectItem value="custom-range">Custom Range</SelectItem>
+                        </SelectContent>
+                    </Select>
+
+                    {/* Dynamic Filters depending on Filter Mode */}
+                    {filterMode === 'year-month' && (
+                        <>
+                            <Select
+                                value={selectedMonth}
+                                onValueChange={setSelectedMonth}
+                            >
+                                <SelectTrigger className="w-[140px]">
+                                    <SelectValue placeholder="Month" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Months</SelectItem>
+                                    {Array.from({ length: 12 }, (_, i) => i + 1).map(
+                                        (m) => (
+                                            <SelectItem key={m} value={m.toString()}>
+                                                {new Date(0, m - 1).toLocaleString(
+                                                    'default',
+                                                    { month: 'long' },
+                                                )}
+                                            </SelectItem>
+                                        ),
+                                    )}
+                                </SelectContent>
+                            </Select>
+
+                            <Select
+                                value={selectedYear}
+                                onValueChange={setSelectedYear}
+                            >
+                                <SelectTrigger className="w-[100px]">
+                                    <SelectValue placeholder="Year" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {years.map((y) => (
+                                        <SelectItem key={y} value={y.toString()}>
+                                            {y}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </>
+                    )}
+
+                    {filterMode === 'single-date' && (
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <Button variant="outline" className="flex gap-2">
+                                    <CalendarIcon className="h-4 w-4" />
+                                    {selectedDate ? format(selectedDate, 'PPP') : 'Pick a date'}
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="end">
+                                <Calendar
+                                    mode="single"
+                                    selected={selectedDate}
+                                    onSelect={setSelectedDate}
+                                    initialFocus
+                                />
+                            </PopoverContent>
+                        </Popover>
+                    )}
+
+                    {filterMode === 'custom-range' && (
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <Button variant="outline" className="flex gap-2">
+                                    <CalendarIcon className="h-4 w-4" />
+                                    {dateRange.from ? (
+                                        dateRange.to ? (
+                                            <>
+                                                {format(dateRange.from, 'LLL dd, y')} -{' '}
+                                                {format(dateRange.to, 'LLL dd, y')}
+                                            </>
+                                        ) : (
+                                            format(dateRange.from, 'PPP')
+                                        )
+                                    ) : (
+                                        'Pick a date range'
+                                    )}
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="end">
+                                <Calendar
+                                    initialFocus
+                                    mode="range"
+                                    selected={{
+                                        from: dateRange.from,
+                                        to: dateRange.to,
+                                    }}
+                                    onSelect={(range) =>
+                                        setDateRange({
+                                            from: range?.from,
+                                            to: range?.to,
+                                        })
+                                    }
+                                    numberOfMonths={2}
+                                />
+                            </PopoverContent>
+                        </Popover>
+                    )}
+
+                    <div className="w-px h-6 bg-border mx-1 hidden md:block" />
+
+                    {/* Download dropdown */}
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button variant="outline" className="flex gap-2">
@@ -184,8 +335,12 @@ export default function FinanceAnalyticsPage() {
                                 onClick={() =>
                                     exportAnalyticsToExcel(
                                         data,
-                                        selectedYear,
-                                        selectedMonth,
+                                        filterMode === 'year-month'
+                                            ? { year: selectedYear, month: selectedMonth }
+                                            : {
+                                                startDate: queryParams.startDate,
+                                                endDate: queryParams.endDate,
+                                              }
                                     )
                                 }
                                 className="flex gap-2 cursor-pointer"
@@ -197,8 +352,12 @@ export default function FinanceAnalyticsPage() {
                                 onClick={() =>
                                     exportAnalyticsToPDF(
                                         data,
-                                        selectedYear,
-                                        selectedMonth,
+                                        filterMode === 'year-month'
+                                            ? { year: selectedYear, month: selectedMonth }
+                                            : {
+                                                startDate: queryParams.startDate,
+                                                endDate: queryParams.endDate,
+                                              }
                                     )
                                 }
                                 className="flex gap-2 cursor-pointer"
@@ -208,44 +367,6 @@ export default function FinanceAnalyticsPage() {
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
-
-                    <Select
-                        value={selectedMonth}
-                        onValueChange={setSelectedMonth}
-                    >
-                        <SelectTrigger className="w-[140px]">
-                            <SelectValue placeholder="Month" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All Months</SelectItem>
-                            {Array.from({ length: 12 }, (_, i) => i + 1).map(
-                                (m) => (
-                                    <SelectItem key={m} value={m.toString()}>
-                                        {new Date(0, m - 1).toLocaleString(
-                                            'default',
-                                            { month: 'long' },
-                                        )}
-                                    </SelectItem>
-                                ),
-                            )}
-                        </SelectContent>
-                    </Select>
-
-                    <Select
-                        value={selectedYear}
-                        onValueChange={setSelectedYear}
-                    >
-                        <SelectTrigger className="w-[100px]">
-                            <SelectValue placeholder="Year" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {years.map((y) => (
-                                <SelectItem key={y} value={y.toString()}>
-                                    {y}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
                 </div>
             </div>
 
@@ -386,7 +507,7 @@ export default function FinanceAnalyticsPage() {
                     <CardHeader>
                         <CardTitle>Earnings vs Expenses</CardTitle>
                         <CardDescription>
-                            Monthly comparison for {selectedYear}
+                            Monthly comparison for {periodLabel}
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -442,7 +563,7 @@ export default function FinanceAnalyticsPage() {
                     <CardHeader>
                         <CardTitle>Profit Trend</CardTitle>
                         <CardDescription>
-                            Monthly profit for {selectedYear}
+                            Monthly profit for {periodLabel}
                         </CardDescription>
                     </CardHeader>
                     <CardContent>

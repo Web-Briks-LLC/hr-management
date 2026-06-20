@@ -1,4 +1,4 @@
-import { endOfMonth, endOfYear } from 'date-fns';
+import { endOfMonth, endOfYear, startOfDay, endOfDay } from 'date-fns';
 import EarningModel from '../models/earning.model.js';
 import ExpenseModel from '../models/expense.model.js';
 import ProfitTransferModel from '../models/profit-transfer.model.js';
@@ -53,28 +53,65 @@ async function getFinanceAnalytics(
     params: AnalyticsQueryParams,
 ): Promise<IFinanceAnalytics> {
     const now = new Date();
-    const year = params.year || now.getFullYear();
-    const month = params.month; // Optional: 1-12
-
-    // Determine date range for expense/transfer lookups
+    const hasDateRange = !!(params.startDate && params.endDate);
+    
     let startDate: Date;
     let endDate: Date;
+    let year = params.year || now.getFullYear();
+    const month = params.month; // Optional: 1-12
 
-    if (month) {
-        startDate = new Date(year, month - 1, 1);
-        endDate = endOfMonth(startDate);
+    if (hasDateRange) {
+        startDate = startOfDay(new Date(params.startDate!));
+        endDate = endOfDay(new Date(params.endDate!));
     } else {
-        startDate = new Date(year, 0, 1);
-        endDate = endOfYear(startDate);
+        if (month) {
+            startDate = new Date(year, month - 1, 1);
+            endDate = endOfMonth(startDate);
+        } else {
+            startDate = new Date(year, 0, 1);
+            endDate = endOfYear(startDate);
+        }
     }
 
-    // Common Date Filters for Earnings (uses year/month fields)
+    // Common Date Filters for Earnings (uses year/month fields or date range)
     const earningMatch: any = {
         status: 'paid',
-        year: year,
     };
-    if (month) {
-        earningMatch.month = month;
+    if (hasDateRange) {
+        earningMatch.$or = [
+            { paidAt: { $gte: startDate, $lte: endDate } },
+            { paidAt: null, createdAt: { $gte: startDate, $lte: endDate } },
+            { paidAt: { $exists: false }, createdAt: { $gte: startDate, $lte: endDate } }
+        ];
+    } else {
+        earningMatch.year = year;
+        if (month) {
+            earningMatch.month = month;
+        }
+    }
+
+    // Dynamic filter for client breakdowns (both paid and unpaid in period)
+    let clientEarningMatch: any = {};
+    if (hasDateRange) {
+        clientEarningMatch.$or = [
+            {
+                status: 'paid',
+                $or: [
+                    { paidAt: { $gte: startDate, $lte: endDate } },
+                    { paidAt: null, createdAt: { $gte: startDate, $lte: endDate } },
+                    { paidAt: { $exists: false }, createdAt: { $gte: startDate, $lte: endDate } }
+                ]
+            },
+            {
+                status: 'unpaid',
+                createdAt: { $gte: startDate, $lte: endDate }
+            }
+        ];
+    } else {
+        clientEarningMatch.year = year;
+        if (month) {
+            clientEarningMatch.month = month;
+        }
     }
 
     // Others use Date objects (and only count paid/partial expenses)
@@ -113,49 +150,76 @@ async function getFinanceAnalytics(
             { $match: expenseFilter },
             { $group: { _id: null, total: { $sum: '$amount' } } },
         ]),
-        // Monthly earnings (Full Year for Trends)
+        // Monthly earnings (Full Year or Custom Range)
         EarningModel.aggregate([
             {
                 $match: {
                     status: 'paid',
-                    year: year,
+                    ...(hasDateRange
+                        ? {
+                            $or: [
+                                { paidAt: { $gte: startDate, $lte: endDate } },
+                                { paidAt: null, createdAt: { $gte: startDate, $lte: endDate } },
+                                { paidAt: { $exists: false }, createdAt: { $gte: startDate, $lte: endDate } }
+                            ]
+                          }
+                        : { year: year }
+                    ),
                 },
             },
             {
                 $group: {
-                    _id: { month: '$month' },
+                    _id: {
+                        year: hasDateRange ? { $year: { $ifNull: ["$paidAt", "$createdAt"] } } : "$year",
+                        month: hasDateRange ? { $month: { $ifNull: ["$paidAt", "$createdAt"] } } : "$month",
+                    },
                     total: { $sum: { $ifNull: ["$paidAmountBDT", { $ifNull: ["$amountInBDT", 0] }] } },
                 },
             },
         ]),
-        // Monthly expenses (Full Year)
+        // Monthly expenses (Full Year or Custom Range)
         ExpenseModel.aggregate([
             {
                 $match: {
                     date: {
-                        $gte: new Date(year, 0, 1),
-                        $lte: new Date(year, 11, 31, 23, 59, 59, 999),
+                        $gte: hasDateRange ? startDate : new Date(year, 0, 1),
+                        $lte: hasDateRange ? endDate : new Date(year, 11, 31, 23, 59, 59, 999),
                     },
                     status: { $in: ['paid', 'partial_paid'] },
                 },
             },
             {
                 $group: {
-                    _id: { month: { $month: '$date' } },
+                    _id: {
+                        year: { $year: '$date' },
+                        month: { $month: '$date' }
+                    },
                     total: { $sum: '$amount' },
                 },
             },
         ]),
-        // Monthly orders (Full Year) - Based on Earning records for accurate billing counts
+        // Monthly orders (Full Year or Custom Range)
         EarningModel.aggregate([
             {
                 $match: {
-                    year: year,
+                    ...(hasDateRange
+                        ? {
+                            $or: [
+                                { paidAt: { $gte: startDate, $lte: endDate } },
+                                { paidAt: null, createdAt: { $gte: startDate, $lte: endDate } },
+                                { paidAt: { $exists: false }, createdAt: { $gte: startDate, $lte: endDate } }
+                            ]
+                          }
+                        : { year: year }
+                    ),
                 },
             },
             {
                 $group: {
-                    _id: { month: '$month' },
+                    _id: {
+                        year: hasDateRange ? { $year: { $ifNull: ["$paidAt", "$createdAt"] } } : "$year",
+                        month: hasDateRange ? { $month: { $ifNull: ["$paidAt", "$createdAt"] } } : "$month",
+                    },
                     count: { $sum: { $size: { $ifNull: ['$orderIds', []] } } },
                     revenue: { $sum: '$amountInBDT' },
                 },
@@ -164,10 +228,7 @@ async function getFinanceAnalytics(
         // Client earnings (Filtered by selected period) - Includes all billing impact
         EarningModel.aggregate([
             {
-                $match: {
-                    year: year,
-                    ...(month && { month }),
-                },
+                $match: clientEarningMatch,
             },
             {
                 $group: {
@@ -242,8 +303,16 @@ async function getFinanceAnalytics(
             {
                 $match: {
                     status: 'paid',
-                    year: year,
-                    ...(month && { month }),
+                    ...(hasDateRange
+                        ? {
+                            $or: [
+                                { paidAt: { $gte: startDate, $lte: endDate } },
+                                { paidAt: null, createdAt: { $gte: startDate, $lte: endDate } },
+                                { paidAt: { $exists: false }, createdAt: { $gte: startDate, $lte: endDate } }
+                            ]
+                          }
+                        : { year, ...(month && { month }) }
+                    ),
                 },
             },
             {
@@ -259,8 +328,10 @@ async function getFinanceAnalytics(
             {
                 $match: {
                     status: 'unpaid',
-                    year: year,
-                    ...(month && { month }),
+                    ...(hasDateRange
+                        ? { createdAt: { $gte: startDate, $lte: endDate } }
+                        : { year, ...(month && { month }) }
+                    ),
                 },
             },
             {
@@ -274,10 +345,7 @@ async function getFinanceAnalytics(
         // Total Billable (Summary)
         EarningModel.aggregate([
             {
-                $match: {
-                    year: year,
-                    ...(month && { month }),
-                },
+                $match: clientEarningMatch,
             },
             {
                 $group: {
@@ -387,9 +455,15 @@ async function getFinanceAnalytics(
     const totalDebit = totalBorrow - totalReturn; // Net amount owed to us (All Time)
 
     // --- CUMULATIVE STATS FOR FINAL AMOUNT ---
-    // Final Amount = Cumulative Profit + All Time Debit up to selected year/month
+    // Final Amount = Cumulative Profit + All Time Debit up to selected year/month/endDate
     const cumulativeEarningMatch: any = { status: 'paid' };
-    if (month) {
+    if (hasDateRange) {
+        cumulativeEarningMatch.$or = [
+            { paidAt: { $lte: endDate } },
+            { paidAt: null, createdAt: { $lte: endDate } },
+            { paidAt: { $exists: false }, createdAt: { $lte: endDate } }
+        ];
+    } else if (month) {
         cumulativeEarningMatch.$or = [
             { year: { $lt: year } },
             { year: year, month: { $lte: month } },
@@ -455,29 +529,63 @@ async function getFinanceAnalytics(
         deliveredOrders: deliveredOrdersCount,
     };
 
-    // Build monthly trends (12 months of the selected year)
+    // Build monthly trends (12 months of the selected year or the months covered by date range)
     const monthlyTrends: IMonthlyFinance[] = [];
 
-    for (let m = 1; m <= 12; m++) {
-        const earningData = monthlyEarnings.find((e: any) => e._id.month === m);
-        const expenseData = monthlyExpenses.find((e: any) => e._id.month === m);
-        const orderData = monthlyOrdersResult.find(
-            (o: any) => o._id.month === m,
-        );
+    if (hasDateRange) {
+        // Generate list of months between startDate and endDate
+        let current = new Date(startDate);
+        const endMonthVal = new Date(endDate);
+        
+        while (current <= endMonthVal || (current.getFullYear() === endMonthVal.getFullYear() && current.getMonth() === endMonthVal.getMonth())) {
+            const m = current.getMonth() + 1;
+            const y = current.getFullYear();
+            
+            const earningData = monthlyEarnings.find((e: any) => e._id.month === m && e._id.year === y);
+            const expenseData = monthlyExpenses.find((e: any) => e._id.month === m && e._id.year === y);
+            const orderData = monthlyOrdersResult.find((o: any) => o._id.month === m && o._id.year === y);
+            
+            const earnings = earningData?.total || 0;
+            const expenses = expenseData?.total || 0;
+            
+            monthlyTrends.push({
+                month: m,
+                year: y,
+                monthName: `${MONTH_NAMES[m - 1]} ${y}`,
+                earnings,
+                expenses,
+                profit: earnings - expenses,
+                orderCount: orderData?.count || 0,
+                orderRevenue: orderData?.revenue || 0,
+            });
+            
+            // Advance by 1 month
+            current.setMonth(current.getMonth() + 1);
+            // Safety to prevent infinite loops if something goes wrong
+            if (current.getFullYear() > endMonthVal.getFullYear() + 2) break;
+        }
+    } else {
+        for (let m = 1; m <= 12; m++) {
+            const earningData = monthlyEarnings.find((e: any) => e._id.month === m);
+            const expenseData = monthlyExpenses.find((e: any) => e._id.month === m);
+            const orderData = monthlyOrdersResult.find(
+                (o: any) => o._id.month === m,
+            );
 
-        const earnings = earningData?.total || 0;
-        const expenses = expenseData?.total || 0;
+            const earnings = earningData?.total || 0;
+            const expenses = expenseData?.total || 0;
 
-        monthlyTrends.push({
-            month: m,
-            year: year,
-            monthName: MONTH_NAMES[m - 1] || '',
-            earnings,
-            expenses,
-            profit: earnings - expenses,
-            orderCount: orderData?.count || 0,
-            orderRevenue: orderData?.revenue || 0,
-        });
+            monthlyTrends.push({
+                month: m,
+                year: year,
+                monthName: MONTH_NAMES[m - 1] || '',
+                earnings,
+                expenses,
+                profit: earnings - expenses,
+                orderCount: orderData?.count || 0,
+                orderRevenue: orderData?.revenue || 0,
+            });
+        }
     }
 
     // Build client breakdown

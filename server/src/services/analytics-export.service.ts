@@ -1,4 +1,4 @@
-import { endOfMonth, endOfYear } from 'date-fns';
+import { endOfMonth, endOfYear, startOfDay, endOfDay } from 'date-fns';
 import EarningModel from '../models/earning.model.js';
 import ExpenseModel from '../models/expense.model.js';
 import '../models/user.model.js';
@@ -38,30 +38,47 @@ const formatDate = (date: Date) => {
 
 async function getExportData(params: AnalyticsQueryParams) {
     const now = new Date();
-    const year = params.year || now.getFullYear();
-    const month = params.month; // Optional: 1-12
-
+    const hasDateRange = !!(params.startDate && params.endDate);
+    
     let startDate: Date;
     let endDate: Date;
-    let periodLabel = `${year}`;
+    let periodLabel = '';
 
-    if (month) {
-        startDate = new Date(year, month - 1, 1);
-        endDate = endOfMonth(startDate);
-        periodLabel = `${MONTH_NAMES[month - 1]}, ${year}`;
+    if (hasDateRange) {
+        startDate = startOfDay(new Date(params.startDate!));
+        endDate = endOfDay(new Date(params.endDate!));
+        const startLabel = startDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+        const endLabel = endDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+        periodLabel = startLabel === endLabel ? startLabel : `${startLabel} - ${endLabel}`;
     } else {
-        startDate = new Date(year, 0, 1);
-        endDate = endOfYear(startDate);
-        periodLabel = `Year ${year}`;
+        const year = params.year || now.getFullYear();
+        const month = params.month; // Optional: 1-12
+        if (month) {
+            startDate = new Date(year, month - 1, 1);
+            endDate = endOfMonth(startDate);
+            periodLabel = `${MONTH_NAMES[month - 1]}, ${year}`;
+        } else {
+            startDate = new Date(year, 0, 1);
+            endDate = endOfYear(startDate);
+            periodLabel = `Year ${year}`;
+        }
     }
 
     // Earnings query
     const earningMatch: any = {
         status: 'paid',
-        year: year,
     };
-    if (month) {
-        earningMatch.month = month;
+    if (hasDateRange) {
+        earningMatch.$or = [
+            { paidAt: { $gte: startDate, $lte: endDate } },
+            { paidAt: null, createdAt: { $gte: startDate, $lte: endDate } },
+            { paidAt: { $exists: false }, createdAt: { $gte: startDate, $lte: endDate } }
+        ];
+    } else {
+        earningMatch.year = params.year || now.getFullYear();
+        if (params.month) {
+            earningMatch.month = params.month;
+        }
     }
 
     const earnings = await EarningModel.find(earningMatch)

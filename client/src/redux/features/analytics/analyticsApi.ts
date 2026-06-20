@@ -18,6 +18,10 @@ export const analyticsApi = apiSlice.injectEndpoints({
                     queryParams.append('month', params.month.toString());
                 if (params?.months)
                     queryParams.append('months', params.months.toString());
+                if (params?.startDate)
+                    queryParams.append('startDate', params.startDate);
+                if (params?.endDate)
+                    queryParams.append('endDate', params.endDate);
 
                 const queryString = queryParams.toString();
                 return {

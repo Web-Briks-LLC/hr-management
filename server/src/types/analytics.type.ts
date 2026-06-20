@@ -66,4 +66,6 @@ export interface AnalyticsQueryParams {
     year?: number | undefined;
     months?: number | undefined; // Deprecated but keeping for compatibility if needed
     month?: number | undefined;
+    startDate?: string | undefined;
+    endDate?: string | undefined;
 }

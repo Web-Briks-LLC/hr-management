@@ -66,4 +66,6 @@ export interface AnalyticsQueryParams {
     year?: number;
     months?: number;
     month?: number;
+    startDate?: string;
+    endDate?: string;
 }
