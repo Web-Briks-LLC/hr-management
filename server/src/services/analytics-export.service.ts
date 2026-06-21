@@ -1,6 +1,8 @@
 import { getBDStartOfDay, getBDEndOfDay } from '../utils/date.util.js';
 import EarningModel from '../models/earning.model.js';
 import ExpenseModel from '../models/expense.model.js';
+import DebitModel from '../models/Debit.js';
+import '../models/Person.js';
 import '../models/user.model.js';
 import '../models/branch.model.js';
 import '../models/client.model.js';
@@ -267,6 +269,38 @@ async function getExportData(params: AnalyticsQueryParams) {
 
     const expensesNet = formattedExpenses.reduce((acc, curr) => acc + curr.amount, 0);
 
+    // Debits query
+    const debitFilter = {
+        date: { $gte: startDate, $lte: endDate }
+    };
+    const debits = await DebitModel.find(debitFilter)
+        .populate('personId', 'name')
+        .populate('createdBy', 'name')
+        .sort({ date: 1 })
+        .lean();
+
+    const formattedDebits = debits.map((d: any) => {
+        const amount = d.amount || 0;
+        return {
+            date: d.date,
+            personName: d.personId?.name || 'Unknown Person',
+            amount: amount,
+            type: d.type || 'Borrow',
+            description: d.description || '',
+            createdBy: d.createdBy?.name || 'Unknown User'
+        };
+    });
+
+    let totalBorrowBDT = 0;
+    let totalReturnBDT = 0;
+    formattedDebits.forEach((d: any) => {
+        if (d.type === 'Borrow') {
+            totalBorrowBDT += d.amount;
+        } else if (d.type === 'Return') {
+            totalReturnBDT += d.amount;
+        }
+    });
+
     return {
         startDate,
         endDate,
@@ -274,12 +308,16 @@ async function getExportData(params: AnalyticsQueryParams) {
         summary: {
             totalEarningsBDT,
             totalExpensesBDT,
-            netProfitBDT: totalEarningsBDT - totalExpensesBDT
+            netProfitBDT: totalEarningsBDT - totalExpensesBDT,
+            totalBorrowBDT,
+            totalReturnBDT,
+            netDebitBDT: totalBorrowBDT - totalReturnBDT
         },
         earnings: formattedEarnings,
         earningsNet,
         expenses: formattedExpenses,
-        expensesNet
+        expensesNet,
+        debits: formattedDebits
     };
 }
 
@@ -292,11 +330,15 @@ async function generatePDF(params: AnalyticsQueryParams): Promise<Buffer> {
     const monthlySummaries = months.map(m => {
         const monthEarnings = data.earnings.filter((e: any) => getBDYearMonth(new Date(e.date)) === m.key);
         const monthExpenses = data.expenses.filter((e: any) => getBDYearMonth(new Date(e.date)) === m.key);
+        const monthDebits = data.debits.filter((d: any) => getBDYearMonth(new Date(d.date)) === m.key);
         
         const earningsBDT = monthEarnings.reduce((acc: number, curr: any) => acc + curr.totalBDT, 0);
         const expensesBDT = monthExpenses.reduce((acc: number, curr: any) => acc + curr.amount, 0);
         const profitBDT = earningsBDT - expensesBDT;
         
+        const monthBorrowBDT = monthDebits.reduce((acc: number, curr: any) => curr.type === 'Borrow' ? acc + curr.amount : acc, 0);
+        const monthReturnBDT = monthDebits.reduce((acc: number, curr: any) => curr.type === 'Return' ? acc + curr.amount : acc, 0);
+
         // Group expenses for this month by branchName and categoryName
         const groupedExpenses: Record<string, Record<string, number>> = {};
         for (const exp of monthExpenses) {
@@ -324,10 +366,13 @@ async function generatePDF(params: AnalyticsQueryParams): Promise<Buffer> {
             earningsBDT,
             expensesBDT,
             profitBDT,
+            monthBorrowBDT,
+            monthReturnBDT,
             earnings: monthEarnings,
             earningsNet,
             expenses: monthExpenses,
             groupedExpenses,
+            debits: monthDebits
         };
     });
 
@@ -544,6 +589,91 @@ async function generatePDF(params: AnalyticsQueryParams): Promise<Buffer> {
                     <div style="margin-top: 12px; text-align: right; font-weight: 600; font-size: 12px; margin-bottom: 8px;">
                         Total Expenses for ${m.label}: <span class="accent-value font-mono">BDT ${formatBDT(m.expensesBDT)}</span>
                     </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    // Generate Debits HTML
+    let debitsHtml = '';
+    if (months.length <= 1) {
+        const debitsRows = data.debits.map((d: any) => `
+            <tr>
+                <td>${formatDate(d.date)}</td>
+                <td>${d.personName}</td>
+                <td>${d.type}</td>
+                <td>${d.description}</td>
+                <td class="text-right font-mono">BDT ${formatBDT(d.amount)}</td>
+            </tr>
+        `).join('');
+
+        debitsHtml = `
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Person Name</th>
+                        <th>Type</th>
+                        <th>Description</th>
+                        <th class="text-right" style="width: 150px;">Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${debitsRows || `<tr class="empty-row"><td colspan="5">No debit records available for this reporting period.</td></tr>`}
+                </tbody>
+                ${debitsRows ? `
+                <tfoot>
+                    <tr style="font-weight: 600;">
+                        <td colspan="3">Total</td>
+                        <td class="text-right font-mono" style="font-size: 11px; color: #6B7280; font-weight: normal; line-height: 1.4;">
+                            Borrow: BDT ${formatBDT(data.summary.totalBorrowBDT)}<br/>
+                            Return: BDT ${formatBDT(data.summary.totalReturnBDT)}
+                        </td>
+                        <td class="text-right accent-value font-mono">Net: BDT ${formatBDT(data.summary.netDebitBDT)}</td>
+                    </tr>
+                </tfoot>` : ''}
+            </table>
+        `;
+    } else {
+        debitsHtml = monthlySummaries.map((m) => {
+            const debitsRows = m.debits.map((d: any) => `
+                <tr>
+                    <td>${formatDate(d.date)}</td>
+                    <td>${d.personName}</td>
+                    <td>${d.type}</td>
+                    <td>${d.description}</td>
+                    <td class="text-right font-mono">BDT ${formatBDT(d.amount)}</td>
+                </tr>
+            `).join('');
+
+            return `
+                <div class="month-debits-block" style="margin-bottom: 32px; page-break-inside: avoid;">
+                    <h3 class="subsection-title" style="font-size: 13px; font-weight: 600; color: #1E0078; border-bottom: 2px solid #E5E7EB; padding-bottom: 4px; margin-bottom: 12px; margin-top: 8px;">${m.label} Debits</h3>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Person Name</th>
+                                <th>Type</th>
+                                <th>Description</th>
+                                <th class="text-right" style="width: 150px;">Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${debitsRows || `<tr class="empty-row"><td colspan="5">No debit records available for this month.</td></tr>`}
+                        </tbody>
+                        ${debitsRows ? `
+                        <tfoot>
+                            <tr style="font-weight: 600;">
+                                <td colspan="3">Total for ${m.label}</td>
+                                <td class="text-right font-mono" style="font-size: 11px; color: #6B7280; font-weight: normal; line-height: 1.4;">
+                                    Borrow: BDT ${formatBDT(m.monthBorrowBDT)}<br/>
+                                    Return: BDT ${formatBDT(m.monthReturnBDT)}
+                                </td>
+                                <td class="text-right accent-value font-mono">Net: BDT ${formatBDT(m.monthBorrowBDT - m.monthReturnBDT)}</td>
+                            </tr>
+                        </tfoot>` : ''}
+                    </table>
                 </div>
             `;
         }).join('');
@@ -929,6 +1059,16 @@ async function generatePDF(params: AnalyticsQueryParams): Promise<Buffer> {
             ${data.expenses.length > 0 ? `
             <div style="margin-top: 16px; text-align: right; font-weight: 600; font-size: 13px;">
                 Total Expenses: <span class="accent-value font-mono">BDT ${formatBDT(data.expensesNet)}</span>
+            </div>` : ''}
+        </div>
+
+        <!-- Debits Section -->
+        <div class="section">
+            <h2 class="section-title">Debits Breakdown</h2>
+            ${debitsHtml}
+            ${data.debits.length > 0 ? `
+            <div style="margin-top: 16px; text-align: right; font-weight: 600; font-size: 13px;">
+                Total Net Debit: <span class="accent-value font-mono">BDT ${formatBDT(data.summary.netDebitBDT)}</span>
             </div>` : ''}
         </div>
 
