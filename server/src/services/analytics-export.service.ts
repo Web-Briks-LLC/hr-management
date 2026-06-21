@@ -36,6 +36,67 @@ const formatDate = (date: Date) => {
     });
 };
 
+const getBDYearMonth = (date: Date): string => {
+    const d = typeof date === 'string' || typeof date === 'number' ? new Date(date) : date;
+    const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Dhaka',
+        year: 'numeric',
+        month: '2-digit',
+    }).formatToParts(d);
+    const year = parts.find(p => p.type === 'year')?.value;
+    const month = parts.find(p => p.type === 'month')?.value;
+    return `${year}-${month}`; // e.g. "2026-06"
+};
+
+const getBDMonthLabel = (date: Date): string => {
+    const d = typeof date === 'string' || typeof date === 'number' ? new Date(date) : date;
+    const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Dhaka',
+        year: 'numeric',
+        month: 'long',
+    }).formatToParts(d);
+    const year = parts.find(p => p.type === 'year')?.value;
+    const month = parts.find(p => p.type === 'month')?.value;
+    return `${month} ${year}`; // e.g. "June 2026"
+};
+
+const getMonthsInInterval = (start: Date, end: Date) => {
+    const monthsList: { key: string; label: string; year: number; month: number; date: Date }[] = [];
+    let current = new Date(start.getTime());
+    const endKey = getBDYearMonth(end);
+    
+    while (true) {
+        const key = getBDYearMonth(current);
+        const label = getBDMonthLabel(current);
+        
+        const parts = new Intl.DateTimeFormat('en-US', {
+            timeZone: 'Asia/Dhaka',
+            year: 'numeric',
+            month: 'numeric',
+        }).formatToParts(current);
+        
+        const year = Number(parts.find(p => p.type === 'year')?.value);
+        const month = Number(parts.find(p => p.type === 'month')?.value);
+        
+        if (!monthsList.some(m => m.key === key)) {
+            monthsList.push({ key, label, year, month, date: new Date(current.getTime()) });
+        }
+        
+        if (key === endKey) {
+            break;
+        }
+        
+        let nextYear = year;
+        let nextMonth = month + 1;
+        if (nextMonth > 12) {
+            nextMonth = 1;
+            nextYear++;
+        }
+        current = new Date(`${nextYear}-${nextMonth.toString().padStart(2, '0')}-01T12:00:00+06:00`);
+    }
+    return monthsList;
+};
+
 async function getExportData(params: AnalyticsQueryParams) {
     const now = new Date();
     const hasDateRange = !!(params.startDate && params.endDate);
@@ -72,11 +133,11 @@ async function getExportData(params: AnalyticsQueryParams) {
         status: 'paid',
     };
     if (hasDateRange) {
-        earningMatch.$or = [
-            { paidAt: { $gte: startDate, $lte: endDate } },
-            { paidAt: null, createdAt: { $gte: startDate, $lte: endDate } },
-            { paidAt: { $exists: false }, createdAt: { $gte: startDate, $lte: endDate } }
-        ];
+        const monthsInInterval = getMonthsInInterval(startDate, endDate);
+        earningMatch.$or = monthsInInterval.map(m => ({
+            year: m.year,
+            month: m.month
+        }));
     } else {
         earningMatch.year = params.year || now.getFullYear();
         if (params.month) {
@@ -157,7 +218,7 @@ async function getExportData(params: AnalyticsQueryParams) {
             currency: e.currency || 'USD',
             convertedPrice: e.conversionRate || 0,
             totalBDT: totalBDT,
-            date: e.paidAt || e.createdAt,
+            date: new Date(`${e.year}-${e.month.toString().padStart(2, '0')}-01T12:00:00+06:00`),
         };
     });
 
@@ -206,69 +267,6 @@ async function getExportData(params: AnalyticsQueryParams) {
 // PDF Generation
 async function generatePDF(params: AnalyticsQueryParams): Promise<Buffer> {
     const data = await getExportData(params);
-
-    // Helpers to parse and format dates in Bangladesh time
-    const getBDYearMonth = (date: Date): string => {
-        const d = typeof date === 'string' || typeof date === 'number' ? new Date(date) : date;
-        const parts = new Intl.DateTimeFormat('en-US', {
-            timeZone: 'Asia/Dhaka',
-            year: 'numeric',
-            month: '2-digit',
-        }).formatToParts(d);
-        const year = parts.find(p => p.type === 'year')?.value;
-        const month = parts.find(p => p.type === 'month')?.value;
-        return `${year}-${month}`; // e.g. "2026-06"
-    };
-
-    const getBDMonthLabel = (date: Date): string => {
-        const d = typeof date === 'string' || typeof date === 'number' ? new Date(date) : date;
-        const parts = new Intl.DateTimeFormat('en-US', {
-            timeZone: 'Asia/Dhaka',
-            year: 'numeric',
-            month: 'long',
-        }).formatToParts(d);
-        const year = parts.find(p => p.type === 'year')?.value;
-        const month = parts.find(p => p.type === 'month')?.value;
-        return `${month} ${year}`; // e.g. "June 2026"
-    };
-
-    const getMonthsInInterval = (start: Date, end: Date) => {
-        const monthsList: { key: string; label: string; date: Date }[] = [];
-        let current = new Date(start.getTime());
-        const endKey = getBDYearMonth(end);
-        
-        while (true) {
-            const key = getBDYearMonth(current);
-            const label = getBDMonthLabel(current);
-            
-            if (!monthsList.some(m => m.key === key)) {
-                monthsList.push({ key, label, date: new Date(current.getTime()) });
-            }
-            
-            if (key === endKey) {
-                break;
-            }
-            
-            // Advance current month in BD Time
-            const parts = new Intl.DateTimeFormat('en-US', {
-                timeZone: 'Asia/Dhaka',
-                year: 'numeric',
-                month: 'numeric',
-            }).formatToParts(current);
-            
-            const year = Number(parts.find(p => p.type === 'year')?.value);
-            const month = Number(parts.find(p => p.type === 'month')?.value);
-            
-            let nextYear = year;
-            let nextMonth = month + 1;
-            if (nextMonth > 12) {
-                nextMonth = 1;
-                nextYear++;
-            }
-            current = new Date(`${nextYear}-${nextMonth.toString().padStart(2, '0')}-01T12:00:00+06:00`);
-        }
-        return monthsList;
-    };
 
     const months = getMonthsInInterval(data.startDate, data.endDate);
 
