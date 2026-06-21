@@ -273,21 +273,48 @@ async function getExportData(params: AnalyticsQueryParams) {
     const debitFilter = {
         date: { $gte: startDate, $lte: endDate }
     };
-    const debits = await DebitModel.find(debitFilter)
-        .populate('personId', 'name')
-        .populate('createdBy', 'name')
-        .sort({ date: 1 })
-        .lean();
+    const debits = await DebitModel.aggregate([
+        { $match: debitFilter },
+        {
+            $lookup: {
+                from: 'people',
+                localField: 'personId',
+                foreignField: '_id',
+                as: 'personDetails'
+            }
+        },
+        {
+            $unwind: {
+                path: '$personDetails',
+                preserveNullAndEmptyArrays: true
+            }
+        },
+        {
+            $lookup: {
+                from: 'user',
+                localField: 'createdBy',
+                foreignField: '_id',
+                as: 'creatorDetails'
+            }
+        },
+        {
+            $unwind: {
+                path: '$creatorDetails',
+                preserveNullAndEmptyArrays: true
+            }
+        },
+        { $sort: { date: 1 } }
+    ]);
 
     const formattedDebits = debits.map((d: any) => {
         const amount = d.amount || 0;
         return {
             date: d.date,
-            personName: d.personId?.name || 'Unknown Person',
+            personName: d.personDetails?.name || 'Unknown Person',
             amount: amount,
             type: d.type || 'Borrow',
             description: d.description || '',
-            createdBy: d.createdBy?.name || 'Unknown User'
+            createdBy: d.creatorDetails?.name || 'Unknown User'
         };
     });
 
