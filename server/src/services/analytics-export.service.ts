@@ -128,12 +128,13 @@ async function getExportData(params: AnalyticsQueryParams) {
         }
     }
 
+    const monthsInInterval = getMonthsInInterval(startDate, endDate);
+
     // Earnings query
     const earningMatch: any = {
         status: 'paid',
     };
     if (hasDateRange) {
-        const monthsInInterval = getMonthsInInterval(startDate, endDate);
         earningMatch.$or = monthsInInterval.map(m => ({
             year: m.year,
             month: m.month
@@ -152,8 +153,23 @@ async function getExportData(params: AnalyticsQueryParams) {
 
     // Expenses query
     const expenseFilter: any = {
-        date: { $gte: startDate, $lte: endDate },
         status: { $in: ['paid', 'partial_paid'] },
+        $or: [
+            {
+                $or: monthsInInterval.map(m => ({
+                    billingYear: m.year,
+                    billingMonth: m.month
+                }))
+            },
+            {
+                billingMonth: { $exists: false },
+                date: { $gte: startDate, $lte: endDate }
+            },
+            {
+                billingMonth: null,
+                date: { $gte: startDate, $lte: endDate }
+            }
+        ]
     };
 
     // Expenses query with $lookup join for user (better-auth collection), branch and category
@@ -225,8 +241,11 @@ async function getExportData(params: AnalyticsQueryParams) {
     const formattedExpenses = expenses.map((e: any) => {
         totalExpensesBDT += e.amount || 0;
         const createdByName = e.creatorDetails?.name || 'Unknown User';
+        const representedDate = e.billingMonth && e.billingYear
+            ? new Date(`${e.billingYear}-${e.billingMonth.toString().padStart(2, '0')}-01T12:00:00+06:00`)
+            : e.date;
         return {
-            date: e.date,
+            date: representedDate,
             title: e.title,
             branchName: e.branchDetails?.name || 'Unknown Branch',
             categoryName: e.categoryDetails?.name || 'Uncategorized',
