@@ -146,7 +146,7 @@ const getPayrollPreview = async ({
             staffId: { $in: staffIds },
             $or: [
                 { billingMonth: monthNum, billingYear: year },
-                { date: { $gte: startDate, $lte: endDate } }
+                { billingMonth: { $exists: false }, date: { $gte: startDate, $lte: endDate } }
             ]
         });
 
@@ -156,7 +156,7 @@ const getPayrollPreview = async ({
             staffId: null,
             $or: [
                 { billingMonth: monthNum, billingYear: year },
-                { date: { $gte: startDate, $lte: endDate } }
+                { billingMonth: { $exists: false }, date: { $gte: startDate, $lte: endDate } }
             ]
         });
     }
@@ -676,13 +676,12 @@ const processPayroll = async ({
 
         const currentFinalAmount = await analyticsService.getCurrentFinalAmount(session);
 
-        // Check for existing expense — strict match only
         const existingExpense = await ExpenseModel.findOne({
             categoryId: category!._id,
             staffId: staffId,
             $or: [
                 { billingMonth: monthNum, billingYear: year },
-                { date: { $gte: startDate, $lte: endDate } }
+                { billingMonth: { $exists: false }, date: { $gte: startDate, $lte: endDate } }
             ]
         }).session(session);
 
@@ -1234,27 +1233,25 @@ const undoPayroll = async (
     session.startTransaction();
 
     try {
-        // 1. Try to find and delete an individual expense
         let expense = await ExpenseModel.findOneAndDelete(
             {
                 staffId,
                 categoryId: category._id,
                 $or: [
                     { billingMonth: monthNum, billingYear: year },
-                    { date: { $gte: startDate, $lte: endDate } }
+                    { billingMonth: { $exists: false }, date: { $gte: startDate, $lte: endDate } }
                 ]
             },
             { session }
         );
 
         if (!expense) {
-            // 2. Try to find a bulk expense containing this staff member's payment
             const bulkExpense = await ExpenseModel.findOne({
                 staffId: null,
                 categoryId: category._id,
                 $or: [
                     { billingMonth: monthNum, billingYear: year },
-                    { date: { $gte: startDate, $lte: endDate } }
+                    { billingMonth: { $exists: false }, date: { $gte: startDate, $lte: endDate } }
                 ],
                 note: { $regex: new RegExp(staffId) },
             }).session(session);

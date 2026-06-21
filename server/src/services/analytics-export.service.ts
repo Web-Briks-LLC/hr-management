@@ -1,4 +1,4 @@
-import { endOfMonth, endOfYear, startOfDay, endOfDay } from 'date-fns';
+import { getBDStartOfDay, getBDEndOfDay } from '../utils/date.util.js';
 import EarningModel from '../models/earning.model.js';
 import ExpenseModel from '../models/expense.model.js';
 import '../models/user.model.js';
@@ -45,21 +45,24 @@ async function getExportData(params: AnalyticsQueryParams) {
     let periodLabel = '';
 
     if (hasDateRange) {
-        startDate = startOfDay(new Date(params.startDate!));
-        endDate = endOfDay(new Date(params.endDate!));
-        const startLabel = startDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-        const endLabel = endDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+        const startStr = params.startDate!.includes("T") ? params.startDate! : `${params.startDate!}T00:00:00`;
+        const endStr = params.endDate!.includes("T") ? params.endDate! : `${params.endDate!}T23:59:59.999`;
+        startDate = getBDStartOfDay(new Date(startStr));
+        endDate = getBDEndOfDay(new Date(endStr));
+        const startLabel = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Dhaka', year: 'numeric', month: 'short', day: 'numeric' }).format(startDate);
+        const endLabel = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Dhaka', year: 'numeric', month: 'short', day: 'numeric' }).format(endDate);
         periodLabel = startLabel === endLabel ? startLabel : `${startLabel} - ${endLabel}`;
     } else {
         const year = params.year || now.getFullYear();
         const month = params.month; // Optional: 1-12
         if (month) {
-            startDate = new Date(year, month - 1, 1);
-            endDate = endOfMonth(startDate);
+            startDate = new Date(`${year}-${month.toString().padStart(2, '0')}-01T00:00:00+06:00`);
+            const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+            endDate = new Date(`${year}-${month.toString().padStart(2, '0')}-${lastDay}T23:59:59.999+06:00`);
             periodLabel = `${MONTH_NAMES[month - 1]}, ${year}`;
         } else {
-            startDate = new Date(year, 0, 1);
-            endDate = endOfYear(startDate);
+            startDate = new Date(`${year}-01-01T00:00:00+06:00`);
+            endDate = new Date(`${year}-12-31T23:59:59.999+06:00`);
             periodLabel = `Year ${year}`;
         }
     }
@@ -154,6 +157,7 @@ async function getExportData(params: AnalyticsQueryParams) {
             currency: e.currency || 'USD',
             convertedPrice: e.conversionRate || 0,
             totalBDT: totalBDT,
+            date: e.paidAt || e.createdAt,
         };
     });
 
@@ -184,6 +188,8 @@ async function getExportData(params: AnalyticsQueryParams) {
     const expensesNet = formattedExpenses.reduce((acc, curr) => acc + curr.amount, 0);
 
     return {
+        startDate,
+        endDate,
         periodLabel,
         summary: {
             totalEarningsBDT,
@@ -201,80 +207,329 @@ async function getExportData(params: AnalyticsQueryParams) {
 async function generatePDF(params: AnalyticsQueryParams): Promise<Buffer> {
     const data = await getExportData(params);
 
-    const earningsRows = data.earnings.map((e) => `
-        <tr>
-            <td>${e.clientName}</td>
-            <td class="text-right font-mono">${e.images}</td>
-            <td class="text-right font-mono">${formatCurrency(e.price)} ${e.currency}</td>
-            <td class="text-right font-mono">${formatCurrency(e.convertedPrice)}</td>
-            <td class="text-right font-mono">${formatBDT(e.totalBDT)}</td>
-        </tr>
-    `).join('');
+    // Helpers to parse and format dates in Bangladesh time
+    const getBDYearMonth = (date: Date): string => {
+        const d = typeof date === 'string' || typeof date === 'number' ? new Date(date) : date;
+        const parts = new Intl.DateTimeFormat('en-US', {
+            timeZone: 'Asia/Dhaka',
+            year: 'numeric',
+            month: '2-digit',
+        }).formatToParts(d);
+        const year = parts.find(p => p.type === 'year')?.value;
+        const month = parts.find(p => p.type === 'month')?.value;
+        return `${year}-${month}`; // e.g. "2026-06"
+    };
 
-    // Group expenses by branchName, and then by categoryName
-    const groupedExpenses: Record<string, Record<string, number>> = {};
-    for (const exp of data.expenses) {
-        const branch = exp.branchName || 'Unknown Branch';
-        const category = exp.categoryName || 'Uncategorized';
-        if (!groupedExpenses[branch]) {
-            groupedExpenses[branch] = {};
+    const getBDMonthLabel = (date: Date): string => {
+        const d = typeof date === 'string' || typeof date === 'number' ? new Date(date) : date;
+        const parts = new Intl.DateTimeFormat('en-US', {
+            timeZone: 'Asia/Dhaka',
+            year: 'numeric',
+            month: 'long',
+        }).formatToParts(d);
+        const year = parts.find(p => p.type === 'year')?.value;
+        const month = parts.find(p => p.type === 'month')?.value;
+        return `${month} ${year}`; // e.g. "June 2026"
+    };
+
+    const getMonthsInInterval = (start: Date, end: Date) => {
+        const monthsList: { key: string; label: string; date: Date }[] = [];
+        let current = new Date(start.getTime());
+        const endKey = getBDYearMonth(end);
+        
+        while (true) {
+            const key = getBDYearMonth(current);
+            const label = getBDMonthLabel(current);
+            
+            if (!monthsList.some(m => m.key === key)) {
+                monthsList.push({ key, label, date: new Date(current.getTime()) });
+            }
+            
+            if (key === endKey) {
+                break;
+            }
+            
+            // Advance current month in BD Time
+            const parts = new Intl.DateTimeFormat('en-US', {
+                timeZone: 'Asia/Dhaka',
+                year: 'numeric',
+                month: 'numeric',
+            }).formatToParts(current);
+            
+            const year = Number(parts.find(p => p.type === 'year')?.value);
+            const month = Number(parts.find(p => p.type === 'month')?.value);
+            
+            let nextYear = year;
+            let nextMonth = month + 1;
+            if (nextMonth > 12) {
+                nextMonth = 1;
+                nextYear++;
+            }
+            current = new Date(`${nextYear}-${nextMonth.toString().padStart(2, '0')}-01T12:00:00+06:00`);
         }
-        groupedExpenses[branch][category] = (groupedExpenses[branch][category] || 0) + exp.amount;
-    }
+        return monthsList;
+    };
 
-    let expensesHtml = '';
-    const branches = Object.keys(groupedExpenses).sort();
+    const months = getMonthsInInterval(data.startDate, data.endDate);
 
-    if (branches.length === 0) {
-        expensesHtml = `
+    const monthlySummaries = months.map(m => {
+        const monthEarnings = data.earnings.filter((e: any) => getBDYearMonth(new Date(e.date)) === m.key);
+        const monthExpenses = data.expenses.filter((e: any) => getBDYearMonth(new Date(e.date)) === m.key);
+        
+        const earningsBDT = monthEarnings.reduce((acc: number, curr: any) => acc + curr.totalBDT, 0);
+        const expensesBDT = monthExpenses.reduce((acc: number, curr: any) => acc + curr.amount, 0);
+        const profitBDT = earningsBDT - expensesBDT;
+        
+        // Group expenses for this month by branchName and categoryName
+        const groupedExpenses: Record<string, Record<string, number>> = {};
+        for (const exp of monthExpenses) {
+            const branch = exp.branchName || 'Unknown Branch';
+            const category = exp.categoryName || 'Uncategorized';
+            if (!groupedExpenses[branch]) {
+                groupedExpenses[branch] = {};
+            }
+            groupedExpenses[branch][category] = (groupedExpenses[branch][category] || 0) + exp.amount;
+        }
+
+        const earningsNet = monthEarnings.reduce(
+            (acc: any, curr: any) => {
+                acc.images += curr.images;
+                acc.price += curr.price;
+                acc.totalBDT += curr.totalBDT;
+                return acc;
+            },
+            { images: 0, price: 0, totalBDT: 0 }
+        );
+
+        return {
+            key: m.key,
+            label: m.label,
+            earningsBDT,
+            expensesBDT,
+            profitBDT,
+            earnings: monthEarnings,
+            earningsNet,
+            expenses: monthExpenses,
+            groupedExpenses,
+        };
+    });
+
+    // Generate Earnings HTML
+    let earningsHtml = '';
+    if (months.length <= 1) {
+        const earningsRows = data.earnings.map((e) => `
+            <tr>
+                <td>${e.clientName}</td>
+                <td class="text-right font-mono">${e.images}</td>
+                <td class="text-right font-mono">${formatCurrency(e.price)} ${e.currency}</td>
+                <td class="text-right font-mono">${formatCurrency(e.convertedPrice)}</td>
+                <td class="text-right font-mono">${formatBDT(e.totalBDT)}</td>
+            </tr>
+        `).join('');
+        
+        earningsHtml = `
             <table class="data-table">
-                <tbody>
-                    <tr class="empty-row">
-                        <td>No expenses available for this reporting period.</td>
+                <thead>
+                    <tr>
+                        <th>Client Name</th>
+                        <th class="text-right">Total Images</th>
+                        <th class="text-right">Total Price</th>
+                        <th class="text-right">Converted Price</th>
+                        <th class="text-right">Total BDT</th>
                     </tr>
+                </thead>
+                <tbody>
+                    ${earningsRows || `<tr class="empty-row"><td colspan="5">No earnings available for this reporting period.</td></tr>`}
                 </tbody>
+                ${earningsRows ? `
+                <tfoot>
+                    <tr>
+                        <td>Total</td>
+                        <td class="text-right font-mono">${data.earningsNet.images}</td>
+                        <td class="text-right font-mono">${formatCurrency(data.earningsNet.price)}</td>
+                        <td></td>
+                        <td class="text-right accent-value font-mono">BDT ${formatBDT(data.earningsNet.totalBDT)}</td>
+                    </tr>
+                </tfoot>` : ''}
             </table>
         `;
     } else {
-        for (const branch of branches) {
-            const categories = groupedExpenses[branch] || {};
-            const categoryNames = Object.keys(categories).sort();
-            let branchTotal = 0;
+        earningsHtml = monthlySummaries.map((m) => {
+            const earningsRows = m.earnings.map((e) => `
+                <tr>
+                    <td>${e.clientName}</td>
+                    <td class="text-right font-mono">${e.images}</td>
+                    <td class="text-right font-mono">${formatCurrency(e.price)} ${e.currency}</td>
+                    <td class="text-right font-mono">${formatCurrency(e.convertedPrice)}</td>
+                    <td class="text-right font-mono">${formatBDT(e.totalBDT)}</td>
+                </tr>
+            `).join('');
 
-            const categoryRows = categoryNames.map((catName) => {
-                const amount = categories[catName] || 0;
-                branchTotal += amount;
-                return `
-                    <tr>
-                        <td>${catName}</td>
-                        <td class="text-right font-mono">BDT ${formatBDT(amount)}</td>
-                    </tr>
-                `;
-            }).join('');
-
-            expensesHtml += `
-                <div class="branch-expenses-block" style="margin-bottom: 24px; page-break-inside: avoid;">
-                    <h3 class="subsection-title">${branch} Branch</h3>
+            return `
+                <div class="month-earnings-block" style="margin-bottom: 32px; page-break-inside: avoid;">
+                    <h3 class="subsection-title" style="font-size: 13px; font-weight: 600; color: #1E0078; border-bottom: 2px solid #E5E7EB; padding-bottom: 4px; margin-bottom: 12px; margin-top: 8px;">${m.label} Earnings</h3>
                     <table class="data-table">
                         <thead>
                             <tr>
-                                <th>Category Name</th>
-                                <th class="text-right" style="width: 200px;">Total Amount</th>
+                                <th>Client Name</th>
+                                <th class="text-right">Total Images</th>
+                                <th class="text-right">Total Price</th>
+                                <th class="text-right">Converted Price</th>
+                                <th class="text-right">Total BDT</th>
                             </tr>
                         </thead>
                         <tbody>
-                            ${categoryRows}
+                            ${earningsRows || `<tr class="empty-row"><td colspan="5">No earnings available for this month.</td></tr>`}
                         </tbody>
+                        ${earningsRows ? `
                         <tfoot>
-                            <tr style="font-weight: 600;">
-                                <td>Total for ${branch}</td>
-                                <td class="text-right total-value font-mono">BDT ${formatBDT(branchTotal)}</td>
+                            <tr>
+                                <td>Total for ${m.label}</td>
+                                <td class="text-right font-mono">${m.earningsNet.images}</td>
+                                <td class="text-right font-mono">${formatCurrency(m.earningsNet.price)}</td>
+                                <td></td>
+                                <td class="text-right accent-value font-mono">BDT ${formatBDT(m.earningsBDT)}</td>
                             </tr>
-                        </tfoot>
+                        </tfoot>` : ''}
                     </table>
                 </div>
             `;
+        }).join('');
+    }
+
+    // Generate Expenses HTML
+    let expensesHtml = '';
+    if (months.length <= 1) {
+        // Group expenses by branchName, and then by categoryName
+        const groupedExpenses: Record<string, Record<string, number>> = {};
+        for (const exp of data.expenses) {
+            const branch = exp.branchName || 'Unknown Branch';
+            const category = exp.categoryName || 'Uncategorized';
+            if (!groupedExpenses[branch]) {
+                groupedExpenses[branch] = {};
+            }
+            groupedExpenses[branch][category] = (groupedExpenses[branch][category] || 0) + exp.amount;
         }
+
+        const branches = Object.keys(groupedExpenses).sort();
+        if (branches.length === 0) {
+            expensesHtml = `
+                <table class="data-table">
+                    <tbody>
+                        <tr class="empty-row">
+                            <td>No expenses available for this reporting period.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            `;
+        } else {
+            for (const branch of branches) {
+                const categories = groupedExpenses[branch] || {};
+                const categoryNames = Object.keys(categories).sort();
+                let branchTotal = 0;
+
+                const categoryRows = categoryNames.map((catName) => {
+                    const amount = categories[catName] || 0;
+                    branchTotal += amount;
+                    return `
+                        <tr>
+                            <td>${catName}</td>
+                            <td class="text-right font-mono">BDT ${formatBDT(amount)}</td>
+                        </tr>
+                    `;
+                }).join('');
+
+                expensesHtml += `
+                    <div class="branch-expenses-block" style="margin-bottom: 24px; page-break-inside: avoid;">
+                        <h3 class="subsection-title">${branch} Branch</h3>
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Category Name</th>
+                                    <th class="text-right" style="width: 200px;">Total Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${categoryRows}
+                            </tbody>
+                            <tfoot>
+                                <tr style="font-weight: 600;">
+                                    <td>Total for ${branch}</td>
+                                    <td class="text-right total-value font-mono">BDT ${formatBDT(branchTotal)}</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                `;
+            }
+        }
+    } else {
+        expensesHtml = monthlySummaries.map((m) => {
+            const branches = Object.keys(m.groupedExpenses).sort();
+            let monthBranchBlocks = '';
+
+            if (branches.length === 0) {
+                monthBranchBlocks = `
+                    <table class="data-table" style="margin-bottom: 16px;">
+                        <tbody>
+                            <tr class="empty-row">
+                                <td>No expenses available for this month.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                `;
+            } else {
+                for (const branch of branches) {
+                    const categories = m.groupedExpenses[branch] || {};
+                    const categoryNames = Object.keys(categories).sort();
+                    let branchTotal = 0;
+
+                    const categoryRows = categoryNames.map((catName) => {
+                        const amount = categories[catName] || 0;
+                        branchTotal += amount;
+                        return `
+                            <tr>
+                                <td>${catName}</td>
+                                <td class="text-right font-mono">BDT ${formatBDT(amount)}</td>
+                            </tr>
+                        `;
+                    }).join('');
+
+                    monthBranchBlocks += `
+                        <div class="branch-expenses-block" style="margin-bottom: 16px; page-break-inside: avoid;">
+                            <h4 style="font-size: 11px; font-weight: 600; color: #4B5563; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; margin-top: 10px;">${branch} Branch</h4>
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Category Name</th>
+                                        <th class="text-right" style="width: 200px;">Total Amount</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${categoryRows}
+                                </tbody>
+                                <tfoot>
+                                    <tr style="font-weight: 600;">
+                                        <td>Total for ${branch}</td>
+                                        <td class="text-right total-value font-mono">BDT ${formatBDT(branchTotal)}</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    `;
+                }
+            }
+
+            return `
+                <div class="month-expenses-block" style="margin-bottom: 32px; page-break-inside: avoid;">
+                    <h3 class="subsection-title" style="font-size: 13px; font-weight: 600; color: #1E0078; border-bottom: 2px solid #E5E7EB; padding-bottom: 4px; margin-bottom: 12px; margin-top: 8px;">${m.label} Expenses</h3>
+                    ${monthBranchBlocks}
+                    <div style="margin-top: 12px; text-align: right; font-weight: 600; font-size: 12px; margin-bottom: 8px;">
+                        Total Expenses for ${m.label}: <span class="accent-value font-mono">BDT ${formatBDT(m.expensesBDT)}</span>
+                    </div>
+                </div>
+            `;
+        }).join('');
     }
 
     const netProfit = data.summary.netProfitBDT;
@@ -282,6 +537,40 @@ async function generatePDF(params: AnalyticsQueryParams): Promise<Buffer> {
     const netProfitValue = isNegativeProfit 
         ? `(BDT ${formatBDT(Math.abs(netProfit))})`
         : `BDT ${formatBDT(netProfit)}`;
+
+    // Monthly breakdown table for the summary section
+    let monthlyBreakdownHtml = '';
+    if (months.length > 1) {
+        monthlyBreakdownHtml = `
+        <div class="monthly-breakdown-container" style="margin-top: 28px; width: 100%; max-width: 650px; page-break-inside: avoid;">
+            <h4 style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: #6B7280; margin-bottom: 10px;">Monthly Breakdown</h4>
+            <table class="monthly-breakdown-table">
+                <thead>
+                    <tr>
+                        <th>Month</th>
+                        <th class="text-right">Gross Revenue</th>
+                        <th class="text-right">Operating Expenses</th>
+                        <th class="text-right">Net Profit</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${monthlySummaries.map(m => {
+                        const isNeg = m.profitBDT < 0;
+                        const profitVal = isNeg ? `(BDT ${formatBDT(Math.abs(m.profitBDT))})` : `BDT ${formatBDT(m.profitBDT)}`;
+                        return `
+                            <tr>
+                                <td style="font-weight: 500;">${m.label}</td>
+                                <td class="text-right font-mono">BDT ${formatBDT(m.earningsBDT)}</td>
+                                <td class="text-right font-mono">(BDT ${formatBDT(m.expensesBDT)})</td>
+                                <td class="text-right font-mono ${isNeg ? 'negative-profit' : 'positive-profit'}" style="font-weight: 600;">${profitVal}</td>
+                            </tr>
+                        `;
+                    }).join('')}
+                </tbody>
+            </table>
+        </div>
+        `;
+    }
 
     const htmlContent = `
     <!DOCTYPE html>
@@ -355,7 +644,7 @@ async function generatePDF(params: AnalyticsQueryParams): Promise<Buffer> {
 
             .summary-container {
                 margin-bottom: 40px;
-                max-width: 380px;
+                max-width: 650px;
             }
             
             .summary-title {
@@ -369,6 +658,7 @@ async function generatePDF(params: AnalyticsQueryParams): Promise<Buffer> {
 
             .summary-table {
                 width: 100%;
+                max-width: 380px;
                 border-collapse: collapse;
             }
             
@@ -407,6 +697,42 @@ async function generatePDF(params: AnalyticsQueryParams): Promise<Buffer> {
             
             .summary-table tr.total-row td.value.negative {
                 color: #111827; /* Negative net profit (loss) in parentheses, black */
+            }
+
+            .monthly-breakdown-table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 16px;
+            }
+            
+            .monthly-breakdown-table th {
+                padding: 8px 12px;
+                font-size: 10px;
+                font-weight: 600;
+                text-transform: uppercase;
+                letter-spacing: 0.08em;
+                color: #6B7280;
+                border-bottom: 2px solid #E5E7EB;
+                text-align: left;
+            }
+            
+            .monthly-breakdown-table td {
+                padding: 10px 12px;
+                font-size: 12px;
+                color: #111827;
+                border-bottom: 1px solid #E5E7EB;
+            }
+            
+            .monthly-breakdown-table tr:last-child td {
+                border-bottom: none;
+            }
+            
+            .positive-profit {
+                color: #1E0078;
+            }
+            
+            .negative-profit {
+                color: #DC2626;
             }
 
             /* ── Sections & Tables ─────────────── */
@@ -570,42 +896,20 @@ async function generatePDF(params: AnalyticsQueryParams): Promise<Buffer> {
                     </tr>
                 </tbody>
             </table>
+            ${monthlyBreakdownHtml}
         </section>
 
         <!-- Earnings Section -->
         <div class="section">
             <h2 class="section-title">Earnings Breakdown</h2>
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Client Name</th>
-                        <th class="text-right">Total Images</th>
-                        <th class="text-right">Total Price</th>
-                        <th class="text-right">Converted Price</th>
-                        <th class="text-right">Total BDT</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${earningsRows || `<tr class="empty-row"><td colspan="5">No earnings available for this reporting period.</td></tr>`}
-                </tbody>
-                ${earningsRows ? `
-                <tfoot>
-                    <tr>
-                        <td>Total</td>
-                        <td class="text-right font-mono">${data.earningsNet.images}</td>
-                        <td class="text-right font-mono">${formatCurrency(data.earningsNet.price)}</td>
-                        <td></td>
-                        <td class="text-right accent-value font-mono">BDT ${formatBDT(data.earningsNet.totalBDT)}</td>
-                    </tr>
-                </tfoot>` : ''}
-            </table>
+            ${earningsHtml}
         </div>
 
         <!-- Expenses Section -->
         <div class="section">
             <h2 class="section-title">Expenses Breakdown</h2>
             ${expensesHtml}
-            ${branches.length > 0 ? `
+            ${data.expenses.length > 0 ? `
             <div style="margin-top: 16px; text-align: right; font-weight: 600; font-size: 13px;">
                 Total Expenses: <span class="accent-value font-mono">BDT ${formatBDT(data.expensesNet)}</span>
             </div>` : ''}
