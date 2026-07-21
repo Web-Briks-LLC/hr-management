@@ -2,7 +2,7 @@
 
 import { useSession } from '@/lib/auth-client';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo } from 'react';
 import { canAccess } from '@/utils/canAccess';
 import { Role } from '@/constants/role';
 
@@ -23,7 +23,6 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     const { data: session, isPending } = useSession();
     const pathname = usePathname();
     const router = useRouter();
-    const hasRedirected = useRef(false);
 
     // Memoize route checks to avoid unnecessary recalculations
     const isStaticRoute = useMemo(() => {
@@ -41,25 +40,18 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     }, [pathname]);
 
     useEffect(() => {
-        // Reset redirect flag when pathname changes
-        hasRedirected.current = false;
-    }, [pathname]);
-
-    useEffect(() => {
-        // Skip if still pending or already redirected
-        if (isPending || hasRedirected.current || isStaticRoute) return;
+        // Skip if still pending or static route
+        if (isPending || isStaticRoute) return;
 
         // ❌ Not logged in
         if (!session) {
             if (isPublicRoute) return;
-            hasRedirected.current = true;
             router.replace('/sign-in');
             return;
         }
 
         // ✅ Logged in user on public route → dashboard
         if (isPublicRoute || pathname === '/') {
-            hasRedirected.current = true;
             router.replace('/dashboard');
             return;
         }
@@ -67,7 +59,6 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
         // 🔐 Role based access
         const role = session.user?.role as Role | undefined;
         if (role && !canAccess(role, pathname)) {
-            hasRedirected.current = true;
             router.replace('/dashboard');
             return;
         }

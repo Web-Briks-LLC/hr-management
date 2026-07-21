@@ -18,6 +18,7 @@ import { Spinner } from '../ui/spinner';
 import { sendVerificationEmail, signIn } from '@/lib/auth-client';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
 const signinValidationSchema = z.object({
@@ -32,6 +33,7 @@ const signinValidationSchema = z.object({
 });
 
 export default function SigninForm() {
+    const router = useRouter();
     const form = useForm<z.infer<typeof signinValidationSchema>>({
         resolver: zodResolver(signinValidationSchema),
         defaultValues: {
@@ -73,6 +75,8 @@ export default function SigninForm() {
             if (res.data) {
                 toast.success('Signed in successfully.');
                 form.reset();
+                router.push('/dashboard');
+                router.refresh();
             }
         } catch (error) {
             toast.error((error as Error).message || 'Something went wrong.');

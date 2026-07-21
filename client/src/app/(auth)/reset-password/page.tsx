@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,18 +12,32 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
-import { Loader } from 'lucide-react';
+import { Loader, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { authClient } from '@/lib/auth-client';
+import Link from 'next/link';
 
-export default function ResetPasswordPage() {
+function ResetPasswordForm() {
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const token = searchParams.get('token');
+
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        if (!token) {
+            toast.error('Invalid or missing reset token. Please request a new password reset link.');
+            return;
+        }
+
+        if (password.length < 6) {
+            toast.error('Password must be at least 6 characters long');
+            return;
+        }
 
         if (password !== confirmPassword) {
             toast.error('Passwords do not match');
@@ -33,10 +47,17 @@ export default function ResetPasswordPage() {
         setIsLoading(true);
 
         try {
-            await authClient.resetPassword({
+            const res = await authClient.resetPassword({
                 newPassword: password,
+                token: token,
             });
-            toast.success('Password reset successfully! Please login.');
+
+            if (res.error) {
+                toast.error(res.error.message || 'Failed to reset password');
+                return;
+            }
+
+            toast.success('Password reset successfully! Please log in.');
             router.push('/sign-in');
         } catch (error: any) {
             toast.error(error?.message || 'Failed to reset password');
@@ -44,6 +65,29 @@ export default function ResetPasswordPage() {
             setIsLoading(false);
         }
     };
+
+    if (!token) {
+        return (
+            <div className="flex min-h-svh w-full items-center justify-center p-6 md:p-10">
+                <Card className="w-full max-w-md">
+                    <CardHeader>
+                        <div className="flex items-center gap-2 text-destructive mb-2">
+                            <AlertTriangle className="h-5 w-5" />
+                            <CardTitle className="text-xl">Invalid Reset Link</CardTitle>
+                        </div>
+                        <CardDescription>
+                            This password reset link is invalid or missing a token. Please request a new reset link.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <Link href="/forget-password">
+                            <Button className="w-full">Request New Reset Link</Button>
+                        </Link>
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
 
     return (
         <div className="flex min-h-svh w-full items-center justify-center p-6 md:p-10">
@@ -64,6 +108,7 @@ export default function ResetPasswordPage() {
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 required
+                                minLength={6}
                             />
                         </div>
                         <div className="space-y-2">
@@ -78,6 +123,7 @@ export default function ResetPasswordPage() {
                                     setConfirmPassword(e.target.value)
                                 }
                                 required
+                                minLength={6}
                             />
                         </div>
                         <Button
@@ -87,7 +133,7 @@ export default function ResetPasswordPage() {
                         >
                             {isLoading ? (
                                 <>
-                                    <Loader className=" h-4 w-4 animate-spin" />
+                                    <Loader className=" h-4 w-4 animate-spin mr-2" />
                                     Resetting Password...
                                 </>
                             ) : (
@@ -98,5 +144,19 @@ export default function ResetPasswordPage() {
                 </CardContent>
             </Card>
         </div>
+    );
+}
+
+export default function ResetPasswordPage() {
+    return (
+        <Suspense
+            fallback={
+                <div className="flex h-screen items-center justify-center">
+                    <Loader className="h-8 w-8 animate-spin text-primary" />
+                </div>
+            }
+        >
+            <ResetPasswordForm />
+        </Suspense>
     );
 }

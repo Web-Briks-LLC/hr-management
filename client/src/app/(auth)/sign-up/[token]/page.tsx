@@ -78,7 +78,7 @@ export default function SignupPage() {
             toast.success(
                 "Account created successfully! Please verify your email before logging in.",
             );
-            router.push("/login");
+            router.push("/sign-in");
         } catch (err: unknown) {
             const errorData = err as { data?: { message?: string } };
             toast.error(errorData?.data?.message || "Failed to create account");
@@ -124,7 +124,7 @@ export default function SignupPage() {
                         <Button
                             variant="outline"
                             className="w-full"
-                            onClick={() => router.push("/login")}
+                            onClick={() => router.push("/sign-in")}
                         >
                             Back to Login
                         </Button>

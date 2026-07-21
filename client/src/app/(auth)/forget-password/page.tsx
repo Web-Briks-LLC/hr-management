@@ -26,11 +26,17 @@ export default function ForgetPasswordPage() {
         setIsLoading(true);
 
         try {
-            await requestPasswordReset({
+            const res = await requestPasswordReset({
                 email,
                 redirectTo: `${process.env
                     .NEXT_PUBLIC_FRONTEND_URL!}/reset-password`,
             });
+
+            if (res.error) {
+                toast.error(res.error.message || 'Failed to send reset link');
+                return;
+            }
+
             setIsSuccess(true);
             toast.success('Reset link sent to your email!');
         } catch (error: any) {
