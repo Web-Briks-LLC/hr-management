@@ -3,6 +3,7 @@ import Main from "@/components/providers/main";
 import { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import { Toaster } from "sonner";
 
 const fontSans = Inter({
     subsets: ["latin"],
@@ -41,6 +42,7 @@ export default function RootLayout({
                 )}
             >
                 <Main>{children}</Main>
+                <Toaster closeButton position="bottom-right" />
             </body>
         </html>
     );
