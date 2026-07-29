@@ -224,6 +224,7 @@ export default function OrdersPage() {
         message: string,
         downloadLink?: string,
         selectedEmails?: string[],
+        sendEmail: boolean = true,
     ) => {
         if (!emailPendingOrder || !emailPendingStatus) return;
         setIsEmailSending(true);
@@ -234,12 +235,14 @@ export default function OrdersPage() {
                     status: emailPendingStatus,
                     customEmailMessage: message,
                     downloadLink,
-                    sendEmail: true,
+                    sendEmail,
                     selectedEmails,
                 } as UpdateStatusInput,
             }).unwrap();
             toast.success(
-                `Status updated to ${ORDER_STATUS_LABELS[emailPendingStatus]} and email sent!`,
+                sendEmail
+                    ? `Status updated to ${ORDER_STATUS_LABELS[emailPendingStatus]} and email sent!`
+                    : `Status updated to ${ORDER_STATUS_LABELS[emailPendingStatus]}!`,
             );
             setIsEmailDialogOpen(false);
             setEmailPendingOrder(null);
@@ -247,7 +250,7 @@ export default function OrdersPage() {
         } catch (error: unknown) {
             const err = error as ApiErrorResponse;
             toast.error(
-                err?.data?.message || "Failed to update status & send email",
+                err?.data?.message || "Failed to update status",
             );
         } finally {
             setIsEmailSending(false);
