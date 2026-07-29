@@ -87,6 +87,12 @@ const ClientSchema = new Schema<IClient>(
                 ref: 'Service',
             },
         ],
+        assignedTelemarketer: {
+            type: Schema.Types.ObjectId,
+            ref: 'User',
+            default: null,
+            index: true,
+        },
         createdBy: {
             type: Schema.Types.ObjectId,
             ref: 'User',

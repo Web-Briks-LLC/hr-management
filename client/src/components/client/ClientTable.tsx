@@ -179,16 +179,14 @@ export function ClientTable({
                         <Eye className="h-4 w-4" />
                       </Link>
                     </Button>
-                    {!isTelemarketer && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 hover:bg-muted border border-transparent hover:border-border transition-all"
-                        onClick={() => onEdit(client)}
-                      >
-                        <Edit2 className="h-4 w-4" />
-                      </Button>
-                    )}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 hover:bg-muted border border-transparent hover:border-border transition-all"
+                      onClick={() => onEdit(client)}
+                    >
+                      <Edit2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 </TableCell>
               </TableRow>

@@ -24,9 +24,11 @@ import {
 } from 'lucide-react';
 import { useLazyCheckClientIdQuery } from '@/redux/features/client/clientApi';
 import { useGetServicesQuery } from '@/redux/features/service/serviceApi';
+import { useGetStaffsQuery } from '@/redux/features/staff/staffApi';
 import { cn } from '@/lib/utils';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { Card, CardContent } from '@/components/ui/card';
+import { Combobox } from '@/components/ui/combobox';
 
 // Zod schema for client form validation
 // Team member schema needs _id to correctly handle existing records from the API
@@ -64,6 +66,7 @@ export const clientFormSchema = z.object({
     status: z.enum(['active', 'inactive']),
     teamMembers: z.array(teamMemberSchema),
     assignedServices: z.array(z.string()),
+    assignedTelemarketer: z.string().optional(),
 });
 
 // FormValues is the internal state that React Hook Form manages
@@ -88,6 +91,7 @@ export interface ClientFormData {
         designation?: string;
     }[];
     assignedServices: string[];
+    assignedTelemarketer?: string;
 }
 
 interface ClientFormProps {
@@ -125,6 +129,30 @@ export function ClientForm({
     const [checkClientId, { isFetching: isCheckingId, data: checkResult, originalArgs: lastCheckedClientId }] =
         useLazyCheckClientIdQuery();
     const { data: servicesData } = useGetServicesQuery({ isActive: true });
+    const { data: staffsData } = useGetStaffsQuery({ limit: 100 });
+    const staffs = staffsData?.staffs || staffsData?.data || [];
+    const telemarketers = useMemo(() => {
+        const filtered = staffs.filter((s: any) => {
+            const des = s.designation || s.user?.designation || s.userId?.designation || '';
+            return /telemarketer/i.test(des);
+        });
+        return filtered.length > 0 ? filtered : staffs;
+    }, [staffs]);
+
+    const telemarketerOptions = useMemo(() => {
+        const options = telemarketers.map((t: any) => {
+            const uId = t.user?._id || (typeof t.userId === 'object' ? t.userId?._id : t.userId) || t._id;
+            const name = t.user?.name || t.name || (typeof t.userId === 'object' ? t.userId?.name : '') || 'Unnamed Telemarketer';
+            const email = t.user?.email || t.email || (typeof t.userId === 'object' ? t.userId?.email : '') || '';
+            const designationStr = t.designation || t.user?.designation || '';
+            return {
+                value: uId,
+                label: name,
+                description: `${email ? email : ''}${designationStr ? ` [${designationStr}]` : ''}`.trim(),
+            };
+        });
+        return [{ value: '', label: 'Unassigned / None', description: 'No telemarketer assigned' }, ...options];
+    }, [telemarketers]);
     
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -142,6 +170,7 @@ export function ClientForm({
             status: defaultValues?.status || 'active',
             teamMembers: defaultValues?.teamMembers || [],
             assignedServices: defaultValues?.assignedServices || [],
+            assignedTelemarketer: defaultValues?.assignedTelemarketer || '',
         },
     });
 
@@ -167,6 +196,7 @@ export function ClientForm({
     const status = useWatch({ control, name: 'status' });
     const assignedServices = useWatch({ control, name: 'assignedServices' });
     const currency = useWatch({ control, name: 'currency' });
+    const assignedTelemarketer = useWatch({ control, name: 'assignedTelemarketer' });
 
     // Derived client ID error from API result
     const clientIdError = useMemo(() => {
@@ -392,6 +422,22 @@ export function ClientForm({
                                 ))}
                             </SelectContent>
                         </Select>
+                    </div>
+
+                    {/* Assigned Telemarketer (Handover) */}
+                    <div className="space-y-2 col-span-1 md:col-span-2">
+                        <Label>Assigned Telemarketer (Handover)</Label>
+                        <Combobox
+                            options={telemarketerOptions}
+                            value={assignedTelemarketer || ''}
+                            onChange={(val) => setValue('assignedTelemarketer', val)}
+                            placeholder="Select telemarketer to hand over..."
+                            searchPlaceholder="Search telemarketer by name or email..."
+                            emptyText="No telemarketer found"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                            Hand over client ownership to a telemarketer. The assigned telemarketer will see all orders for this client.
+                        </p>
                     </div>
                 </div>
             </div>

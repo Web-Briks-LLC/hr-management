@@ -158,6 +158,7 @@ export default function ClientsPage() {
       status: client.status,
       teamMembers: client.teamMembers || [],
       assignedServices: client.assignedServices || [],
+      assignedTelemarketer: typeof client.assignedTelemarketer === 'object' ? client.assignedTelemarketer?._id : (client.assignedTelemarketer || ""),
     });
     setIsEditDialogOpen(true);
   };
@@ -209,14 +210,12 @@ export default function ClientsPage() {
                 <RefreshCcw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
                 Refresh
               </Button>
-              {!isTelemarketer && (
-                <Button
-                  onClick={() => setIsAddDialogOpen(true)}
-                  className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-xs"
-                >
-                  <Plus className="h-4 w-4" /> Add Client
-                </Button>
-              )}
+              <Button
+                onClick={() => setIsAddDialogOpen(true)}
+                className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-xs"
+              >
+                <Plus className="h-4 w-4" /> Add Client
+              </Button>
             </div>
           </div>
         </CardHeader>

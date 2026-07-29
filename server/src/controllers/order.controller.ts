@@ -38,10 +38,14 @@ async function createOrder(req: Request, res: Response) {
             const isTM = await isTelemarketer(userId);
             if (isTM) {
                 const client = await ClientModel.findById(clientId).lean();
-                if (!client || client.createdBy?.toString() !== userId) {
+                const isOwner =
+                    client &&
+                    (client.createdBy?.toString() === userId ||
+                        client.assignedTelemarketer?.toString() === userId);
+                if (!client || !isOwner) {
                     return res.status(403).json({
                         message:
-                            'Forbidden: You can only create orders for your own clients',
+                            'Forbidden: You can only create orders for your own or assigned clients',
                     });
                 }
             }
@@ -136,11 +140,14 @@ async function getAllOrders(req: Request, res: Response) {
         ) {
             const isTM = await isTelemarketer(userId);
             if (isTM) {
-                const myClients = await ClientModel.find({ createdBy: userId })
+                const myClients = await ClientModel.find({
+                    $or: [{ createdBy: userId }, { assignedTelemarketer: userId }],
+                })
                     .select('_id')
                     .lean();
                 const myClientIds = myClients.map((c) => c._id.toString());
                 filters.clientIds = myClientIds;
+                filters.createdBy = userId;
             }
         }
 

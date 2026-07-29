@@ -11,27 +11,43 @@ import { escapeRegex } from '../lib/sanitize.js';
 const buildMatchStage = (
     params: ClientQueryParams,
 ): Record<string, unknown> => {
-    const match: Record<string, unknown> = {};
+    const conditions: Record<string, unknown>[] = [];
 
     if (params.search) {
         const escaped = escapeRegex(params.search);
-        match.$or = [
-            { name: { $regex: escaped, $options: 'i' } },
-            { emails: { $regex: escaped, $options: 'i' } },
-            { clientId: { $regex: escaped, $options: 'i' } },
-        ];
+        conditions.push({
+            $or: [
+                { name: { $regex: escaped, $options: 'i' } },
+                { emails: { $regex: escaped, $options: 'i' } },
+                { clientId: { $regex: escaped, $options: 'i' } },
+            ],
+        });
     }
 
     if (params.status) {
-        match.status = params.status;
+        conditions.push({ status: params.status });
     }
 
-    // Ownership filter: restrict to clients created by a specific user
+    // Ownership filter: restrict to clients created by or assigned to a specific user
     if (params.createdBy) {
-        match.createdBy = new Types.ObjectId(params.createdBy);
+        const userId = new Types.ObjectId(params.createdBy);
+        conditions.push({
+            $or: [
+                { createdBy: userId },
+                { assignedTelemarketer: userId },
+            ],
+        });
     }
 
-    return match;
+    if (params.assignedTelemarketer) {
+        conditions.push({
+            assignedTelemarketer: new Types.ObjectId(params.assignedTelemarketer),
+        });
+    }
+
+    if (conditions.length === 0) return {};
+    if (conditions.length === 1) return conditions[0] || {};
+    return { $and: conditions };
 };
 
 // Generate suggested client IDs based on the attempted ID
@@ -137,8 +153,25 @@ const getAllClientsFromDB = async (params: ClientQueryParams) => {
             },
         },
         {
+            $lookup: {
+                from: 'user',
+                localField: 'assignedTelemarketer',
+                foreignField: '_id',
+                as: 'assignedTelemarketer',
+            },
+        },
+        {
+            $unwind: {
+                path: '$assignedTelemarketer',
+                preserveNullAndEmptyArrays: true,
+            },
+        },
+        {
             $project: {
                 'createdBy.password': 0,
+                'createdBy.passwordHistory': 0,
+                'assignedTelemarketer.password': 0,
+                'assignedTelemarketer.passwordHistory': 0,
             },
         },
     );
@@ -179,6 +212,20 @@ const getClientByIdFromDB = async (id: string) => {
         },
         {
             $lookup: {
+                from: 'user',
+                localField: 'assignedTelemarketer',
+                foreignField: '_id',
+                as: 'assignedTelemarketer',
+            },
+        },
+        {
+            $unwind: {
+                path: '$assignedTelemarketer',
+                preserveNullAndEmptyArrays: true,
+            },
+        },
+        {
+            $lookup: {
                 from: 'services',
                 localField: 'assignedServices',
                 foreignField: '_id',
@@ -189,6 +236,8 @@ const getClientByIdFromDB = async (id: string) => {
             $project: {
                 'createdBy.password': 0,
                 'createdBy.passwordHistory': 0,
+                'assignedTelemarketer.password': 0,
+                'assignedTelemarketer.passwordHistory': 0,
             },
         },
     ]);
@@ -208,7 +257,7 @@ class ClientIdExistsError extends Error {
 
 // Create client
 const createClientInDB = async (
-    payload: CreateClientInput & { createdBy: string },
+    payload: CreateClientInput & { createdBy: string; assignedTelemarketer?: string | null | undefined },
 ) => {
     // Check if client ID already exists
     const clientIdExists = await checkClientIdExists(payload.clientId);
@@ -247,6 +296,11 @@ const createClientInDB = async (
             assignedServices: payload.assignedServices.map(
                 (id) => new Types.ObjectId(id),
             ),
+        }),
+        ...(payload.assignedTelemarketer !== undefined && {
+            assignedTelemarketer: payload.assignedTelemarketer
+                ? new Types.ObjectId(payload.assignedTelemarketer)
+                : null,
         }),
     };
 
@@ -287,6 +341,12 @@ const updateClientInDB = async (id: string, payload: UpdateClientInput) => {
         updateData.assignedServices = payload.assignedServices.map(
             (id) => new Types.ObjectId(id),
         );
+    }
+
+    if (payload.assignedTelemarketer !== undefined) {
+        updateData.assignedTelemarketer = payload.assignedTelemarketer
+            ? new Types.ObjectId(payload.assignedTelemarketer)
+            : null;
     }
 
     const result = await ClientModel.findByIdAndUpdate(id, updateData, {

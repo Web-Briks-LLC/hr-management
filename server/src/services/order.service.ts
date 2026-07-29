@@ -141,11 +141,24 @@ async function getAllOrdersFromDB(filters: GetOrdersFilters): Promise<{
         matchStage.clientId = new mongoose.Types.ObjectId(clientId);
     }
 
-    // Ownership filter: restrict to specific client IDs (used by Telemarketer role)
-    if (filters.clientIds && filters.clientIds.length > 0) {
-        matchStage.clientId = {
-            $in: filters.clientIds.map((id) => new mongoose.Types.ObjectId(id)),
-        };
+    // Ownership filter: restrict to specific client IDs or createdBy (used by Telemarketer role)
+    if (filters.clientIds || filters.createdBy) {
+        const clauses: Record<string, unknown>[] = [];
+        if (filters.createdBy) {
+            clauses.push({ createdBy: new mongoose.Types.ObjectId(filters.createdBy) });
+        }
+        if (filters.clientIds && filters.clientIds.length > 0) {
+            clauses.push({
+                clientId: {
+                    $in: filters.clientIds.map((id) => new mongoose.Types.ObjectId(id)),
+                },
+            });
+        }
+        if (clauses.length === 1) {
+            Object.assign(matchStage, clauses[0]);
+        } else if (clauses.length > 1) {
+            matchStage.$or = clauses;
+        }
     }
 
     if (status) {

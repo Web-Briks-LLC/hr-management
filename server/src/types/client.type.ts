@@ -19,6 +19,7 @@ export interface IClient extends Document {
     status: 'active' | 'inactive';
     teamMembers: ITeamMember[];
     assignedServices: Types.ObjectId[];
+    assignedTelemarketer?: Types.ObjectId;
     createdBy: Types.ObjectId;
     createdAt: Date;
     updatedAt: Date;
@@ -32,5 +33,6 @@ export interface ClientQueryParams {
     sortOrder?: 'asc' | 'desc';
     status?: string;
     createdBy?: string; // Ownership filter: restrict to clients created by a specific user
+    assignedTelemarketer?: string;
     hasOrdersOnly?: boolean;
 }

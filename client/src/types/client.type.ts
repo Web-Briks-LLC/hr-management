@@ -27,6 +27,7 @@ export interface Client {
     assignedServices?: string[];
     assignedServicesDetails?: { _id: string; name: string }[];
     createdBy?: { _id: string; name: string };
+    assignedTelemarketer?: { _id: string; name: string; email?: string } | string;
     createdAt: string;
     updatedAt: string;
 }

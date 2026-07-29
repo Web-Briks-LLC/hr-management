@@ -70,7 +70,11 @@ const getClientById = async (req: Request, res: Response) => {
             [Role.STAFF, Role.TEAM_LEADER].includes(req.user.role as Role)
         ) {
             const isTM = await isTelemarketer(userId);
-            if (isTM && result.createdBy?._id?.toString() !== userId) {
+            const isOwner =
+                result.createdBy?._id?.toString() === userId ||
+                result.assignedTelemarketer?._id?.toString() === userId ||
+                result.assignedTelemarketer?.toString() === userId;
+            if (isTM && !isOwner) {
                 res.status(403).json({
                     success: false,
                     message:
@@ -178,7 +182,11 @@ const updateClient = async (req: Request, res: Response) => {
             [Role.STAFF, Role.TEAM_LEADER].includes(req.user.role as Role)
         ) {
             const isTM = await isTelemarketer(userId);
-            if (isTM && existingClient.createdBy?._id?.toString() !== userId) {
+            const isOwner =
+                existingClient.createdBy?._id?.toString() === userId ||
+                existingClient.assignedTelemarketer?._id?.toString() === userId ||
+                existingClient.assignedTelemarketer?.toString() === userId;
+            if (isTM && !isOwner) {
                 res.status(403).json({
                     success: false,
                     message:
@@ -284,7 +292,11 @@ const getClientStats = async (req: Request, res: Response) => {
             [Role.STAFF, Role.TEAM_LEADER].includes(req.user.role as Role)
         ) {
             const isTM = await isTelemarketer(userId);
-            if (isTM && client.createdBy?._id?.toString() !== userId) {
+            const isOwner =
+                client.createdBy?._id?.toString() === userId ||
+                client.assignedTelemarketer?._id?.toString() === userId ||
+                client.assignedTelemarketer?.toString() === userId;
+            if (isTM && !isOwner) {
                 res.status(403).json({
                     success: false,
                     message:
