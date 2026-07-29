@@ -316,8 +316,8 @@ export function ClientForm({
 
     return (
         <form onSubmit={handleSubmit(handleFormSubmit)} className="flex flex-col flex-1 h-full min-h-0 overflow-hidden">
-            <ScrollArea className="flex-1 min-h-0 p-6">
-                <div className="space-y-6">
+            <ScrollArea className="flex-1 min-h-0 h-full w-full px-6">
+                <div className="py-6 pb-8 space-y-6">
                 <div className="flex items-center gap-2 pb-2 border-b border-muted">
                     <Users className="h-5 w-5 text-primary" />
                     <h3 className="font-semibold">Basic Information</h3>
@@ -330,10 +330,10 @@ export function ClientForm({
                         <div className="relative">
                             <Input
                                 id="clientId"
-                                placeholder="e.g., CLT-001"
+                                placeholder="Auto-generated (e.g. WB-10001)"
                                 {...register('clientId')}
-                                disabled={isEditMode}
-                                className={cn(getFieldError('clientId') && 'border-destructive')}
+                                disabled
+                                className={cn('bg-muted/60 cursor-not-allowed text-muted-foreground font-medium', getFieldError('clientId') && 'border-destructive')}
                             />
                             {isCheckingId && (
                                 <div className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -596,7 +596,7 @@ export function ClientForm({
                 </div>
 
                 {/* Description */}
-                <div className="space-y-2">
+                <div className="space-y-2 pb-6 mb-6">
                     <Label htmlFor="description">Notes</Label>
                     <Textarea
                         id="description"
@@ -608,7 +608,7 @@ export function ClientForm({
                 </div>
             </ScrollArea>
 
-            <div className="p-4 px-6 border-t border-border/60 bg-muted/20 shrink-0 flex items-center justify-end gap-3 font-semibold">
+            <div className="p-6 pb-8 border-t border-border/60 bg-slate-50/80 dark:bg-slate-900/80 shrink-0 flex items-center justify-end gap-3 font-semibold">
                 <Button type="button" variant="outline" onClick={onCancel}>
                     Cancel
                 </Button>

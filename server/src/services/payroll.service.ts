@@ -854,7 +854,9 @@ const processPayroll = async ({
 
         return createdExpense;
     } catch (error) {
-        await session.abortTransaction();
+        if (session.inTransaction()) {
+            await session.abortTransaction();
+        }
         throw error;
     } finally {
         session.endSession();

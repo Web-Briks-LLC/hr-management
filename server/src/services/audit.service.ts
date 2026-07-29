@@ -9,7 +9,11 @@ async function createLog(data: {
     ipAddress?: string | undefined;
     userAgent?: string | undefined;
 }) {
-    await (AuditLogModel.create as any)(data);
+    try {
+        await (AuditLogModel.create as any)(data);
+    } catch (err) {
+        console.error('Audit log failed:', err);
+    }
 }
 
 async function getLogs(filters?: {

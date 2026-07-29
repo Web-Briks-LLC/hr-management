@@ -28,7 +28,7 @@ const auditLogSchema = new Schema<IAuditLog>(
                 'INVITATION_CREATE', 'INVITATION_ACCEPT',
                 'PROFILE_UPDATE', 'PASSWORD_CHANGE',
                 'ATTENDANCE_UPDATE', 'GRACE_ATTENDANCE',
-                'PAYMENT_PROCESS', 'PAYMENT_UNDO',
+                'PAYMENT_PROCESS', 'BULK_PAYMENT_PROCESS', 'PAYMENT_UNDO',
                 'PAYROLL_LOCK', 'PAYROLL_UNLOCK'
             ],
         },
