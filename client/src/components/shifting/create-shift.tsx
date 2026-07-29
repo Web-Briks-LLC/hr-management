@@ -66,7 +66,7 @@ const createShiftSchema = z.object({
 type CreateShiftFormData = z.infer<typeof createShiftSchema>;
 
 export default function CreateShift() {
-    const { data: session, isPending, isRefetching } = useSession();
+    const { data: session, isPending } = useSession();
 
     const { data: branchData, isLoading: isBranchLoading } =
         useGetAllBranchesQuery(undefined);
@@ -99,8 +99,7 @@ export default function CreateShift() {
         formState: { errors },
     } = form;
 
-    const isLoading =
-        isPending || isRefetching || isCreating || isBranchLoading;
+    const isLoading = isPending || isCreating || isBranchLoading;
 
     const canCreate = session && session.user.role !== Role.TEAM_LEADER;
 
@@ -119,8 +118,9 @@ export default function CreateShift() {
             toast.success('Shift created successfully');
             reset();
             setOpen(false);
-        } catch (err: any) {
-            toast.error(err?.data?.message || 'Failed to create shift');
+        } catch (err) {
+            const error = err as { data?: { message?: string } };
+            toast.error(error?.data?.message || 'Failed to create shift');
         }
     };
 

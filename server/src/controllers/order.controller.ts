@@ -567,9 +567,26 @@ async function addRevision(req: Request, res: Response) {
     }
 }
 
-async function getOrderStats(_req: Request, res: Response) {
+async function getOrderStats(req: Request, res: Response) {
     try {
-        const stats = await orderService.getOrderStatsFromDB();
+        const userId = req.user?.id;
+        let clientIds: string[] | undefined = undefined;
+
+        if (
+            userId &&
+            req.user &&
+            [Role.STAFF, Role.TEAM_LEADER].includes(req.user.role as Role)
+        ) {
+            const isTM = await isTelemarketer(userId);
+            if (isTM) {
+                const myClients = await ClientModel.find({ createdBy: userId })
+                    .select('_id')
+                    .lean();
+                clientIds = myClients.map((c) => c._id.toString());
+            }
+        }
+
+        const stats = await orderService.getOrderStatsFromDB(clientIds);
 
         return res.status(200).json({
             message: 'Order stats retrieved successfully',

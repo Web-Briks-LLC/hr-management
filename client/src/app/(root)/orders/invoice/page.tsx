@@ -413,11 +413,11 @@ export default function InvoicePage() {
 
                         <div className="flex items-end gap-2">
                             <Button onClick={handleOpenEmailDialog} disabled={selectedOrders.size === 0 || isSending} className="flex-1 bg-orange-500 hover:bg-orange-600">
-                                {isSending ? <Loader className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4 mr-2" />}
+                                {isSending ? <Loader className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
                                 Send
                             </Button>
                             <Button onClick={handleGenerateInvoice} disabled={selectedOrders.size === 0 || isGeneratingInvoice || isRecording} className="flex-1 bg-teal-500 hover:bg-teal-600">
-                                {isGeneratingInvoice ? <Loader className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
+                                {isGeneratingInvoice ? <Loader className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
                                 Preview
                             </Button>
                         </div>

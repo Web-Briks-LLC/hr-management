@@ -10,7 +10,7 @@ import ShiftCardSkeleton from "./shift-card-skeleton";
 import AssignShift from "./assign-shift";
 
 export default function RootShifting() {
-    const { isPending, isRefetching } = useSession();
+    const { isPending } = useSession();
     const { data: shiftData, isLoading: isShiftLoading } = useGetAllShiftsQuery(
         {},
         {
@@ -18,7 +18,7 @@ export default function RootShifting() {
         },
     );
 
-    const isLoading = isShiftLoading || isPending || isRefetching;
+    const isLoading = isShiftLoading || isPending;
 
     return (
         <div className="space-y-6">

@@ -357,7 +357,7 @@ export function ClientForm({
                             onClick={() => appendEmail({ value: '' })}
                             className="w-full sm:w-auto"
                         >
-                            <Plus className="h-4 w-4 mr-2" />
+                            <Plus className="h-4 w-4" />
                             Add Email
                         </Button>
                     </div>
@@ -463,7 +463,7 @@ export function ClientForm({
                         onClick={() => appendTeam({ name: '', email: '' })}
                         className="w-full"
                     >
-                        <Plus className="h-4 w-4 mr-2" />
+                        <Plus className="h-4 w-4" />
                         Add Team Member
                     </Button>
                 </div>
@@ -560,7 +560,7 @@ export function ClientForm({
                     disabled={isSubmitting || (!!clientIdError && !isEditMode)}
                     className="min-w-[120px]"
                 >
-                    {isSubmitting ? <Loader className="h-4 w-4 animate-spin mr-2" /> : null}
+                    {isSubmitting ? <Loader className="h-4 w-4 animate-spin" /> : null}
                     {submitLabel}
                 </Button>
             </div>

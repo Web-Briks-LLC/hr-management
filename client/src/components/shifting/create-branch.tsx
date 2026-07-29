@@ -36,7 +36,7 @@ const branchSchema = z.object({
 type BranchFormValues = z.infer<typeof branchSchema>;
 
 export default function CreateBranch() {
-    const { data: session, isPending, isRefetching } = useSession();
+    const { data: session, isPending } = useSession();
     const [createBranch, { isLoading: isCreating }] = useCreateBranchMutation();
 
     const [open, setOpen] = useState<boolean>(false);
@@ -54,7 +54,7 @@ export default function CreateBranch() {
     const codeValue = useWatch({ control: form.control, name: 'code' });
     const isActiveValue = useWatch({ control: form.control, name: 'isActive' });
 
-    const isLoading = isPending || isRefetching || isCreating;
+    const isLoading = isPending || isCreating;
 
     const onSubmit = async (values: BranchFormValues) => {
         try {

@@ -16,9 +16,9 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
     ArrowLeft,
-    RefreshCw,
     Search,
     Filter,
     X,
@@ -26,6 +26,9 @@ import {
     ChevronRight,
     ChevronsLeft,
     ChevronsRight,
+    RefreshCcw,
+    Plus,
+    ShoppingBag,
 } from 'lucide-react';
 import Link from 'next/link';
 import type { OrderStatus, OrderPriority } from '@/types/order.type';
@@ -97,87 +100,105 @@ export default function ClientDetailsPage() {
 
     if (isLoadingClient) {
         return (
-            <div className="p-6 flex items-center justify-center min-h-[400px]">
-                <RefreshCw className="h-8 w-8 animate-spin text-primary/40" />
+            <div className="flex items-center justify-center min-h-[400px]">
+                <RefreshCcw className="h-8 w-8 animate-spin text-primary/40" />
             </div>
         );
     }
 
     if (!client) {
         return (
-            <div className="p-6 text-center">
+            <div className="p-6 text-center space-y-4">
                 <h2 className="text-xl font-bold">Client not found</h2>
-                <Button variant="link" asChild>
-                    <Link href="/clients">Back to Clients</Link>
+                <Button variant="outline" onClick={() => router.push('/clients')}>
+                    <ArrowLeft className="h-4 w-4" /> Back to Clients
                 </Button>
             </div>
         );
     }
 
+    const isFiltered = search !== '' || selectedMonth !== '' || selectedStatus !== '' || selectedPriority !== '';
+
     return (
-        <div className="p-6 space-y-8 max-w-[1600px] mx-auto animate-in fade-in duration-500">
-            {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => router.back()}
-                        className="rounded-full h-10 w-10 hover:bg-slate-100 dark:hover:bg-slate-800"
-                    >
-                        <ArrowLeft className="h-5 w-5" />
-                    </Button>
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                            {client.name}
-                            <span className="text-sm font-mono text-muted-foreground bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded uppercase">
-                                {client.clientId}
-                            </span>
-                        </h1>
-                        <p className="text-sm text-muted-foreground">
-                            Client overview and order history
-                        </p>
+        <div className="space-y-8 p-1">
+            {/* Header & Stats Overview (Matching Clients/Earnings Layout) */}
+            <div className="flex flex-col gap-6">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                        <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => router.back()}
+                            className="h-9 w-9 rounded-full border-border/60 hover:bg-accent"
+                        >
+                            <ArrowLeft className="h-4 w-4" />
+                        </Button>
+                        <div>
+                            <h2 className="text-3xl font-bold tracking-tight bg-linear-to-r from-foreground to-foreground/70 bg-clip-text flex items-center gap-2">
+                                {client.name}
+                                <span className="text-xs font-mono text-muted-foreground bg-muted px-2 py-0.5 rounded-md uppercase font-normal">
+                                    {client.clientId}
+                                </span>
+                            </h2>
+                            <p className="text-muted-foreground text-sm mt-0.5">
+                                Client profile details and complete order history.
+                            </p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <Button
+                            variant="outline"
+                            className="border-primary text-primary hover:bg-accent hover:text-accent-foreground shadow-xs"
+                            onClick={handleRefresh}
+                            disabled={isFetchingOrders || isLoadingStats}
+                        >
+                            <RefreshCcw className={`h-4 w-4 ${isFetchingOrders ? 'animate-spin' : ''}`} />
+                            Refresh Data
+                        </Button>
+                        <Button className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-xs" asChild>
+                            <Link href={`/orders?clientId=${client._id}`}>
+                                <Plus className="h-4 w-4" /> New Order
+                            </Link>
+                        </Button>
                     </div>
                 </div>
-                <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isFetchingOrders || isLoadingStats}>
-                        <RefreshCw className={`h-4 w-4 mr-2 ${isFetchingOrders ? 'animate-spin' : ''}`} />
-                        Refresh Data
-                    </Button>
-                    <Button variant="default" size="sm" asChild>
-                        <Link href={`/orders?clientId=${client._id}`}>
-                            New Order
-                        </Link>
-                    </Button>
-                </div>
+
+                {/* Client Info Overview Card */}
+                <ClientInfoCard client={client} />
+
+                {/* Order Stats Row */}
+                <ClientOrderStats 
+                    stats={stats} 
+                    isLoading={isLoadingStats} 
+                    currency={client.currency} 
+                />
             </div>
 
-            {/* Client Info Card */}
-            <ClientInfoCard client={client} />
-
-            {/* Order Stats */}
-            <ClientOrderStats 
-                stats={stats} 
-                isLoading={isLoadingStats} 
-                currency={client.currency} 
-            />
-
-            {/* Orders Section */}
-            <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                    <h2 className="text-lg font-bold flex items-center gap-2">
+            {/* Orders Section Card */}
+            <Card className="border-border/60 shadow-md">
+                <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-xl">
+                        <ShoppingBag className="h-5 w-5 text-primary" />
                         Order History
-                        <span className="text-sm font-normal text-muted-foreground ml-2">
-                            ({pagination.total} total)
+                        <span className="text-xs font-normal text-muted-foreground">
+                            ({pagination.total} total orders)
                         </span>
-                    </h2>
-                </div>
+                    </CardTitle>
+                </CardHeader>
 
-                {/* Filters */}
-                <div className="bg-card p-4 rounded-xl border shadow-sm space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-3">
-                        <div className="relative group lg:col-span-2">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                <CardContent className="space-y-6">
+                    {/* Filters Toolbar */}
+                    <div className="flex flex-wrap items-center gap-3 p-4 bg-muted/30 rounded-lg border border-border/50">
+                        <div className="flex items-center gap-2 shrink-0">
+                            <div className="bg-primary/10 p-2 rounded-full">
+                                <Filter className="h-4 w-4 text-primary" />
+                            </div>
+                            <span className="text-sm font-medium">Filters:</span>
+                        </div>
+
+                        {/* Search Input */}
+                        <div className="relative flex-1 min-w-[200px]">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <Input
                                 placeholder="Search orders..."
                                 value={search}
@@ -185,10 +206,20 @@ export default function ClientDetailsPage() {
                                     setSearch(e.target.value);
                                     setPage(1);
                                 }}
-                                className="pl-9 h-9 bg-muted/40 border-slate-200"
+                                className="pl-9 pr-8 h-9 bg-background/60 border-input text-sm"
                             />
+                            {search && (
+                                <button
+                                    onClick={() => setSearch('')}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/60 hover:text-foreground transition-colors"
+                                    type="button"
+                                >
+                                    <X className="h-3.5 w-3.5" />
+                                </button>
+                            )}
                         </div>
 
+                        {/* Month Filter */}
                         <Select
                             value={selectedMonth}
                             onValueChange={(val) => {
@@ -196,18 +227,19 @@ export default function ClientDetailsPage() {
                                 setPage(1);
                             }}
                         >
-                            <SelectTrigger className="h-9 bg-muted/40 border-slate-200">
+                            <SelectTrigger className="w-[130px] h-9 bg-background/60 text-xs font-medium">
                                 <SelectValue placeholder="Month" />
                             </SelectTrigger>
                             <SelectContent>
                                 {MONTH_OPTIONS.map((m) => (
-                                    <SelectItem key={m.value} value={m.value}>
+                                    <SelectItem key={m.value} value={m.value} className="text-xs">
                                         {m.label}
                                     </SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
 
+                        {/* Status Filter */}
                         <Select
                             value={selectedStatus}
                             onValueChange={(val) => {
@@ -215,19 +247,19 @@ export default function ClientDetailsPage() {
                                 setPage(1);
                             }}
                         >
-                            <SelectTrigger className="h-9 bg-muted/40 border-slate-200 uppercase text-[11px] font-bold">
-                                <Filter className="h-3 w-3 mr-2" />
+                            <SelectTrigger className="w-[130px] h-9 bg-background/60 text-xs font-medium">
                                 <SelectValue placeholder="Status" />
                             </SelectTrigger>
                             <SelectContent>
                                 {Object.entries(ORDER_STATUS_LABELS).map(([value, label]) => (
-                                    <SelectItem key={value} value={value}>
+                                    <SelectItem key={value} value={value} className="text-xs">
                                         {label}
                                     </SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
 
+                        {/* Priority Filter */}
                         <Select
                             value={selectedPriority}
                             onValueChange={(val) => {
@@ -235,117 +267,114 @@ export default function ClientDetailsPage() {
                                 setPage(1);
                             }}
                         >
-                            <SelectTrigger className="h-9 bg-muted/40 border-slate-200 uppercase text-[11px] font-bold">
+                            <SelectTrigger className="w-[130px] h-9 bg-background/60 text-xs font-medium">
                                 <SelectValue placeholder="Priority" />
                             </SelectTrigger>
                             <SelectContent>
                                 {Object.entries(ORDER_PRIORITY_LABELS).map(([value, label]) => (
-                                    <SelectItem key={value} value={value}>
+                                    <SelectItem key={value} value={value} className="text-xs">
                                         {label}
                                     </SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
 
-                        <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            onClick={handleClearFilters}
-                            disabled={!search && !selectedMonth && !selectedStatus && !selectedPriority}
-                            className="h-9 text-muted-foreground"
-                        >
-                            <X className="h-4 w-4 mr-2" />
-                            Clear
-                        </Button>
-                    </div>
-                </div>
-
-                {/* Table */}
-                <OrderHistoryTable 
-                    orders={orders} 
-                    isLoading={isLoadingOrders} 
-                    currency={client.currency} 
-                />
-
-                {/* Pagination */}
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-6 py-4 border rounded-xl bg-muted/20">
-                    <div className="flex items-center gap-4">
-                        <div className="text-sm text-muted-foreground">
-                            Showing <span className="font-medium text-foreground">{orders.length}</span> of <span className="font-medium text-foreground">{pagination.total}</span> orders
-                        </div>
-                        <div className="h-4 w-px bg-slate-300 hidden sm:block" />
-                        <div className="flex items-center gap-2">
-                            <span className="text-xs text-muted-foreground">Per page</span>
-                            <Select
-                                value={limit.toString()}
-                                onValueChange={(val) => {
-                                    setLimit(parseInt(val));
-                                    setPage(1);
-                                }}
+                        {isFiltered && (
+                            <Button
+                                variant="ghost"
+                                onClick={handleClearFilters}
+                                className="h-9 px-3 text-xs gap-1.5 hover:bg-muted/85 font-medium shrink-0"
                             >
-                                <SelectTrigger className="h-7 w-[70px] text-xs bg-background">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {PER_PAGE_OPTIONS.map((opt) => (
-                                        <SelectItem key={opt} value={opt.toString()} className="text-xs">
-                                            {opt}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
+                                Clear Filters
+                                <X className="h-3 w-3" />
+                            </Button>
+                        )}
                     </div>
 
-                    <div className="flex items-center space-x-2">
-                        <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => setPage(1)}
-                            disabled={page === 1 || isLoadingOrders}
-                        >
-                            <ChevronsLeft className="h-4 w-4" />
-                        </Button>
-                        <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => setPage((p) => Math.max(1, p - 1))}
-                            disabled={page === 1 || isLoadingOrders}
-                        >
-                            <ChevronLeft className="h-4 w-4" />
-                        </Button>
-                        <div className="flex items-center gap-1.5 px-3">
-                            <span className="text-sm font-medium">Page</span>
-                            <span className="flex h-7 w-12 items-center justify-center rounded-md border bg-background text-sm font-bold text-primary">
-                                {page}
-                            </span>
-                            <span className="text-sm font-medium text-muted-foreground">
-                                of {pagination.totalPages}
-                            </span>
-                        </div>
-                        <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => setPage((p) => Math.min(pagination.totalPages, p + 1))}
-                            disabled={page === pagination.totalPages || isLoadingOrders}
-                        >
-                            <ChevronRight className="h-4 w-4" />
-                        </Button>
-                        <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => setPage(pagination.totalPages)}
-                            disabled={page === pagination.totalPages || isLoadingOrders}
-                        >
-                            <ChevronsRight className="h-4 w-4" />
-                        </Button>
+                    {/* Table Container */}
+                    <div className="rounded-md border border-border/60 overflow-hidden">
+                        <OrderHistoryTable 
+                            orders={orders} 
+                            isLoading={isLoadingOrders} 
+                            currency={client.currency} 
+                        />
                     </div>
-                </div>
-            </div>
+
+                    {/* Pagination Footer */}
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-border/60">
+                        <div className="text-sm text-muted-foreground font-medium select-none">
+                            Showing <span className="font-semibold text-foreground">{orders.length}</span> of{" "}
+                            <span className="font-semibold text-foreground">{pagination.total}</span> orders
+                        </div>
+
+                        <div className="flex items-center gap-6">
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs text-muted-foreground whitespace-nowrap">Rows per page</span>
+                                <Select
+                                    value={limit.toString()}
+                                    onValueChange={(val) => {
+                                        setLimit(Number(val));
+                                        setPage(1);
+                                    }}
+                                >
+                                    <SelectTrigger className="h-8 w-[70px] text-xs font-semibold">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {PER_PAGE_OPTIONS.map((option) => (
+                                            <SelectItem key={option} value={option.toString()} className="text-xs">
+                                                {option}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            <div className="flex items-center gap-1">
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    onClick={() => setPage(1)}
+                                    disabled={page === 1 || isLoadingOrders}
+                                >
+                                    <ChevronsLeft className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                                    disabled={page === 1 || isLoadingOrders}
+                                >
+                                    <ChevronLeft className="h-4 w-4" />
+                                </Button>
+                                <span className="text-xs font-medium px-2 whitespace-nowrap select-none">
+                                    Page {pagination.page} of {pagination.totalPages}
+                                </span>
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    onClick={() => setPage((p) => Math.min(pagination.totalPages, p + 1))}
+                                    disabled={page >= pagination.totalPages || isLoadingOrders}
+                                >
+                                    <ChevronRight className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    onClick={() => setPage(pagination.totalPages)}
+                                    disabled={page >= pagination.totalPages || isLoadingOrders}
+                                >
+                                    <ChevronsRight className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
         </div>
     );
 }

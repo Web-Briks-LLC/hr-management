@@ -7,9 +7,9 @@ import StaffDashboard from './staff-dashboard/staff-dashboard';
 import AdminDashboard from './admin-dashboard/admin-dashboard';
 
 export default function RootDashboard() {
-    const { data: session, isPending, isRefetching } = useSession();
+    const { data: session, isPending } = useSession();
 
-    const isLoading = isPending || isRefetching;
+    const isLoading = isPending;
 
     if (isLoading) {
         return (

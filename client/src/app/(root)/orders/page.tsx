@@ -21,11 +21,10 @@ import type {
     OrderFilters,
     UpdateStatusInput,
 } from "@/types/order.type";
-import { ORDER_STATUS_LABELS, ORDER_PRIORITY_LABELS } from "@/lib/constants";
+import { ORDER_STATUS_LABELS, ORDER_PRIORITY_LABELS, PER_PAGE_OPTIONS } from "@/lib/constants";
 import {
     Card,
     CardContent,
-    CardDescription,
     CardHeader,
     CardTitle,
 } from "@/components/ui/card";
@@ -622,244 +621,282 @@ export default function OrdersPage() {
     };
 
     return (
-        <div className="space-y-6">
-            {/* Stats Cards - Row 1 */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {/* Total Orders Card */}
-                <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-slate-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-slate-500/5 hover:border-slate-500/30">
-                    <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-slate-500/10 blur-2xl transition-all duration-300 group-hover:bg-slate-500/20" />
-                    <div className="relative">
-                        <div className="flex items-center justify-between mb-3">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-500/10 text-slate-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-slate-500/20">
-                                <Package className="h-5 w-5" />
+        <div className="space-y-8 p-1">
+            {/* Header & Stats Overview (Matching Earnings Layout) */}
+            <div className="flex flex-col gap-6">
+                <div>
+                    <h2 className="text-3xl font-bold tracking-tight bg-linear-to-r from-foreground to-foreground/70 bg-clip-text">
+                        Orders Overview
+                    </h2>
+                    <p className="text-muted-foreground mt-1">
+                        Manage graphic design orders and track their status.
+                    </p>
+                </div>
+
+                {/* Stats Cards - Row 1 */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {/* Total Orders Card */}
+                    <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-slate-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-slate-500/5 hover:border-slate-500/30">
+                        <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-slate-500/10 blur-2xl transition-all duration-300 group-hover:bg-slate-500/20" />
+                        <div className="relative">
+                            <div className="flex items-center justify-between mb-3">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-500/10 text-slate-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-slate-500/20">
+                                    <Package className="h-5 w-5" />
+                                </div>
+                                <Badge variant="outline" className="text-[10px] font-medium opacity-70">
+                                    Total
+                                </Badge>
                             </div>
+                            <h3 className="text-3xl font-bold tracking-tight text-foreground">
+                                {stats?.total || 0}
+                            </h3>
+                            <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-slate-500/10 font-medium">
+                                Total Orders
+                            </p>
                         </div>
-                        <h3 className="text-3xl font-bold tracking-tight text-slate-600 dark:text-slate-300">
-                            {stats?.total || 0}
-                        </h3>
-                        <p className="text-xs text-muted-foreground mt-1">
-                            Total Orders
-                        </p>
+                    </div>
+
+                    {/* Pending Card */}
+                    <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-yellow-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-yellow-500/5 hover:border-yellow-500/30">
+                        <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-yellow-500/10 blur-2xl transition-all duration-300 group-hover:bg-yellow-500/20" />
+                        <div className="relative">
+                            <div className="flex items-center justify-between mb-3">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-yellow-500/10 text-yellow-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-yellow-500/20">
+                                    <Clock className="h-5 w-5" />
+                                </div>
+                                <Badge variant="outline" className="text-[10px] font-medium bg-yellow-500/5 text-yellow-500 border-yellow-500/20">
+                                    Pending
+                                </Badge>
+                            </div>
+                            <h3 className="text-3xl font-bold tracking-tight text-yellow-600 dark:text-yellow-400">
+                                {stats?.pending || 0}
+                            </h3>
+                            <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-yellow-500/10 font-medium">
+                                Pending Orders
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* In Progress Card */}
+                    <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-blue-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/5 hover:border-blue-500/30">
+                        <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-blue-500/10 blur-2xl transition-all duration-300 group-hover:bg-blue-500/20" />
+                        <div className="relative">
+                            <div className="flex items-center justify-between mb-3">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/10 text-blue-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-blue-500/20">
+                                    <Loader className="h-5 w-5" />
+                                </div>
+                                <Badge variant="outline" className="text-[10px] font-medium bg-blue-500/5 text-blue-500 border-blue-500/20">
+                                    Progress
+                                </Badge>
+                            </div>
+                            <h3 className="text-3xl font-bold tracking-tight text-blue-600 dark:text-blue-400">
+                                {stats?.inProgress || 0}
+                            </h3>
+                            <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-blue-500/10 font-medium">
+                                In Progress
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Quality Check Card */}
+                    <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-purple-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-purple-500/5 hover:border-purple-500/30">
+                        <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-purple-500/10 blur-2xl transition-all duration-300 group-hover:bg-purple-500/20" />
+                        <div className="relative">
+                            <div className="flex items-center justify-between mb-3">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-500/10 text-purple-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-purple-500/20">
+                                    <AlertCircle className="h-5 w-5" />
+                                </div>
+                                <Badge variant="outline" className="text-[10px] font-medium bg-purple-500/5 text-purple-500 border-purple-500/20">
+                                    QC
+                                </Badge>
+                            </div>
+                            <h3 className="text-3xl font-bold tracking-tight text-purple-600 dark:text-purple-400">
+                                {stats?.qualityCheck || 0}
+                            </h3>
+                            <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-purple-500/10 font-medium">
+                                Quality Check
+                            </p>
+                        </div>
                     </div>
                 </div>
 
-                {/* Pending Card */}
-                <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-yellow-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-yellow-500/5 hover:border-yellow-500/30">
-                    <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-yellow-500/10 blur-2xl transition-all duration-300 group-hover:bg-yellow-500/20" />
-                    <div className="relative">
-                        <div className="flex items-center justify-between mb-3">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-yellow-500/10 text-yellow-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-yellow-500/20">
-                                <Clock className="h-5 w-5" />
+                {/* Stats Cards - Row 2 */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {/* Revision Card */}
+                    <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-orange-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-orange-500/5 hover:border-orange-500/30">
+                        <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-orange-500/10 blur-2xl transition-all duration-300 group-hover:bg-orange-500/20" />
+                        <div className="relative">
+                            <div className="flex items-center justify-between mb-3">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-500/10 text-orange-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-orange-500/20">
+                                    <RotateCcw className="h-5 w-5" />
+                                </div>
+                                <Badge variant="outline" className="text-[10px] font-medium bg-orange-500/5 text-orange-500 border-orange-500/20">
+                                    Revision
+                                </Badge>
                             </div>
+                            <h3 className="text-3xl font-bold tracking-tight text-orange-600 dark:text-orange-400">
+                                {stats?.revision || 0}
+                            </h3>
+                            <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-orange-500/10 font-medium">
+                                In Revision
+                            </p>
                         </div>
-                        <h3 className="text-3xl font-bold tracking-tight text-yellow-600 dark:text-yellow-400">
-                            {stats?.pending || 0}
-                        </h3>
-                        <p className="text-xs text-muted-foreground mt-1">
-                            Pending
-                        </p>
                     </div>
-                </div>
 
-                {/* In Progress Card */}
-                <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-blue-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/5 hover:border-blue-500/30">
-                    <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-blue-500/10 blur-2xl transition-all duration-300 group-hover:bg-blue-500/20" />
-                    <div className="relative">
-                        <div className="flex items-center justify-between mb-3">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/10 text-blue-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-blue-500/20">
-                                <Loader className="h-5 w-5" />
+                    {/* Completed Card */}
+                    <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-green-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-green-500/5 hover:border-green-500/30">
+                        <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-green-500/10 blur-2xl transition-all duration-300 group-hover:bg-green-500/20" />
+                        <div className="relative">
+                            <div className="flex items-center justify-between mb-3">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-500/10 text-green-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-green-500/20">
+                                    <CheckCircle className="h-5 w-5" />
+                                </div>
+                                <Badge variant="outline" className="text-[10px] font-medium bg-green-500/5 text-green-500 border-green-500/20">
+                                    Completed
+                                </Badge>
                             </div>
+                            <h3 className="text-3xl font-bold tracking-tight text-green-600 dark:text-green-400">
+                                {stats?.completed || 0}
+                            </h3>
+                            <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-green-500/10 font-medium">
+                                Completed Orders
+                            </p>
                         </div>
-                        <h3 className="text-3xl font-bold tracking-tight text-blue-600 dark:text-blue-400">
-                            {stats?.inProgress || 0}
-                        </h3>
-                        <p className="text-xs text-muted-foreground mt-1">
-                            In Progress
-                        </p>
                     </div>
-                </div>
 
-                {/* Quality Check Card */}
-                <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-purple-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-purple-500/5 hover:border-purple-500/30">
-                    <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-purple-500/10 blur-2xl transition-all duration-300 group-hover:bg-purple-500/20" />
-                    <div className="relative">
-                        <div className="flex items-center justify-between mb-3">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-500/10 text-purple-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-purple-500/20">
-                                <AlertCircle className="h-5 w-5" />
+                    {/* Delivered Card */}
+                    <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-emerald-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-emerald-500/5 hover:border-emerald-500/30">
+                        <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-emerald-500/10 blur-2xl transition-all duration-300 group-hover:bg-emerald-500/20" />
+                        <div className="relative">
+                            <div className="flex items-center justify-between mb-3">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-emerald-500/20">
+                                    <CheckCircle className="h-5 w-5" />
+                                </div>
+                                <Badge variant="outline" className="text-[10px] font-medium bg-emerald-500/5 text-emerald-500 border-emerald-500/20">
+                                    Delivered
+                                </Badge>
                             </div>
+                            <h3 className="text-3xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400">
+                                {stats?.delivered || 0}
+                            </h3>
+                            <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-emerald-500/10 font-medium">
+                                Delivered Orders
+                            </p>
                         </div>
-                        <h3 className="text-3xl font-bold tracking-tight text-purple-600 dark:text-purple-400">
-                            {stats?.qualityCheck || 0}
-                        </h3>
-                        <p className="text-xs text-muted-foreground mt-1">
-                            Quality Check
-                        </p>
                     </div>
-                </div>
-            </div>
 
-            {/* Stats Cards - Row 2 */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {/* Revision Card */}
-                <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-orange-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-orange-500/5 hover:border-orange-500/30">
-                    <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-orange-500/10 blur-2xl transition-all duration-300 group-hover:bg-orange-500/20" />
-                    <div className="relative">
-                        <div className="flex items-center justify-between mb-3">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-500/10 text-orange-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-orange-500/20">
-                                <RotateCcw className="h-5 w-5" />
+                    {/* Overdue Card */}
+                    <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-red-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-red-500/5 hover:border-red-500/30">
+                        <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-red-500/10 blur-2xl transition-all duration-300 group-hover:bg-red-500/20" />
+                        <div className="relative">
+                            <div className="flex items-center justify-between mb-3">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-500/10 text-red-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-red-500/20">
+                                    <AlertTriangle className="h-5 w-5" />
+                                </div>
+                                <Badge variant="outline" className="text-[10px] font-medium bg-red-500/5 text-red-500 border-red-500/20">
+                                    Overdue
+                                </Badge>
                             </div>
+                            <h3 className="text-3xl font-bold tracking-tight text-red-600 dark:text-red-400">
+                                {stats?.overdue || 0}
+                            </h3>
+                            <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-red-500/10 font-medium">
+                                Overdue Orders
+                            </p>
                         </div>
-                        <h3 className="text-3xl font-bold tracking-tight text-orange-600 dark:text-orange-400">
-                            {stats?.revision || 0}
-                        </h3>
-                        <p className="text-xs text-muted-foreground mt-1">
-                            Revision
-                        </p>
-                    </div>
-                </div>
-
-                {/* Completed Card */}
-                <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-green-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-green-500/5 hover:border-green-500/30">
-                    <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-green-500/10 blur-2xl transition-all duration-300 group-hover:bg-green-500/20" />
-                    <div className="relative">
-                        <div className="flex items-center justify-between mb-3">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-500/10 text-green-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-green-500/20">
-                                <CheckCircle className="h-5 w-5" />
-                            </div>
-                        </div>
-                        <h3 className="text-3xl font-bold tracking-tight text-green-600 dark:text-green-400">
-                            {stats?.completed || 0}
-                        </h3>
-                        <p className="text-xs text-muted-foreground mt-1">
-                            Completed
-                        </p>
-                    </div>
-                </div>
-
-                {/* Delivered Card */}
-                <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-emerald-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-emerald-500/5 hover:border-emerald-500/30">
-                    <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-emerald-500/10 blur-2xl transition-all duration-300 group-hover:bg-emerald-500/20" />
-                    <div className="relative">
-                        <div className="flex items-center justify-between mb-3">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-emerald-500/20">
-                                <CheckCircle className="h-5 w-5" />
-                            </div>
-                        </div>
-                        <h3 className="text-3xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400">
-                            {stats?.delivered || 0}
-                        </h3>
-                        <p className="text-xs text-muted-foreground mt-1">
-                            Delivered
-                        </p>
-                    </div>
-                </div>
-
-                {/* Overdue Card */}
-                <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-red-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-red-500/5 hover:border-red-500/30">
-                    <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-red-500/10 blur-2xl transition-all duration-300 group-hover:bg-red-500/20" />
-                    <div className="relative">
-                        <div className="flex items-center justify-between mb-3">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-500/10 text-red-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-red-500/20">
-                                <AlertTriangle className="h-5 w-5" />
-                            </div>
-                        </div>
-                        <h3 className="text-3xl font-bold tracking-tight text-red-600 dark:text-red-400">
-                            {stats?.overdue || 0}
-                        </h3>
-                        <p className="text-xs text-muted-foreground mt-1">
-                            Overdue
-                        </p>
                     </div>
                 </div>
             </div>
 
             {/* Main Card */}
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                    <div>
-                        <CardTitle className="text-2xl">
-                            Order Management
+            <Card className="border-border/60 shadow-md">
+                <CardHeader className="pb-3">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <CardTitle className="flex items-center gap-2 text-xl">
+                            <Package className="h-5 w-5 text-primary" />
+                            Order Directory
                         </CardTitle>
-                        <CardDescription>
-                            Manage graphic design orders and track their status
-                        </CardDescription>
-                    </div>
-                    <div className="flex gap-3">
-                        {/* Select Mode Toggle Button (Hidden for telemarketers) */}
-                        {!isTelemarketer &&
-                            (!isSelectionMode ? (
-                                <Button
-                                    variant="outline"
-                                    onClick={() => setIsSelectionMode(true)}
-                                >
-                                    <CheckSquare className=" h-4 w-4" />
-                                    Select
-                                </Button>
-                            ) : (
-                                <Button
-                                    variant="outline"
-                                    onClick={clearSelection}
-                                >
-                                    <X className=" h-4 w-4" />
-                                    Cancel
-                                </Button>
-                            ))}
-                        <Button variant="outline" asChild>
-                            <Link href="/orders/invoice">
-                                <FileText className=" h-4 w-4" />
-                                Generate Invoice
-                            </Link>
-                        </Button>
-                        <Dialog
-                            open={isAddDialogOpen}
-                            onOpenChange={(open) => {
-                                setIsAddDialogOpen(open);
-                                if (!open) setServerErrors(undefined);
-                            }}
-                        >
-                            <DialogTrigger asChild>
-                                <Button>
-                                    <Plus />
-                                    Add Order
-                                </Button>
-                            </DialogTrigger>
-                            <DialogContent className="sm:max-w-[650px] p-0 gap-0 max-h-[85vh] overflow-hidden flex flex-col">
-                                <div className="px-6 pt-6 pb-4 shrink-0">
-                                    <DialogHeader>
-                                        <DialogTitle className="text-xl font-semibold">
-                                            Create New Order
-                                        </DialogTitle>
-                                        <DialogDescription>
-                                            Fill in the order details below.
-                                        </DialogDescription>
-                                    </DialogHeader>
-                                </div>
-                                <Separator className="shrink-0" />
-                                <OrderForm
-                                    onSubmit={handleCreateOrder}
-                                    isSubmitting={isCreating}
-                                    submitLabel="Create Order"
-                                    onCancel={() => setIsAddDialogOpen(false)}
-                                    serverErrors={serverErrors}
-                                />
-                            </DialogContent>
-                        </Dialog>
+                        <div className="flex flex-wrap items-center gap-3">
+                            {/* Select Mode Toggle Button (Hidden for telemarketers) */}
+                            {!isTelemarketer &&
+                                (!isSelectionMode ? (
+                                    <Button
+                                        variant="outline"
+                                        className="border-primary text-primary hover:bg-accent hover:text-accent-foreground shadow-xs"
+                                        onClick={() => setIsSelectionMode(true)}
+                                    >
+                                        <CheckSquare className="h-4 w-4" />
+                                        Select
+                                    </Button>
+                                ) : (
+                                    <Button
+                                        variant="outline"
+                                        className="border-destructive text-destructive hover:bg-destructive/10 shadow-xs"
+                                        onClick={clearSelection}
+                                    >
+                                        <X className="h-4 w-4" />
+                                        Cancel
+                                    </Button>
+                                ))}
+                            <Button variant="outline" className="border-primary text-primary hover:bg-accent hover:text-accent-foreground shadow-xs" asChild>
+                                <Link href="/orders/invoice">
+                                    <FileText className="h-4 w-4" />
+                                    Generate Invoice
+                                </Link>
+                            </Button>
+                            <Dialog
+                                open={isAddDialogOpen}
+                                onOpenChange={(open) => {
+                                    setIsAddDialogOpen(open);
+                                    if (!open) setServerErrors(undefined);
+                                }}
+                            >
+                                <DialogTrigger asChild>
+                                    <Button className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-xs">
+                                        <Plus className="h-4 w-4" />
+                                        Add Order
+                                    </Button>
+                                </DialogTrigger>
+                                <DialogContent className="sm:max-w-[650px] p-0 gap-0 max-h-[85vh] overflow-hidden flex flex-col">
+                                    <div className="px-6 pt-6 pb-4 shrink-0">
+                                        <DialogHeader>
+                                            <DialogTitle className="text-xl font-semibold">
+                                                Create New Order
+                                            </DialogTitle>
+                                            <DialogDescription>
+                                                Fill in the order details below.
+                                            </DialogDescription>
+                                        </DialogHeader>
+                                    </div>
+                                    <Separator className="shrink-0" />
+                                    <OrderForm
+                                        onSubmit={handleCreateOrder}
+                                        isSubmitting={isCreating}
+                                        submitLabel="Create Order"
+                                        onCancel={() => setIsAddDialogOpen(false)}
+                                        serverErrors={serverErrors}
+                                    />
+                                </DialogContent>
+                            </Dialog>
+                        </div>
                     </div>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                    {/* Filters */}
-                    <div className="rounded-xl border bg-muted/30 p-4">
-                        <div className="flex items-center gap-2 mb-4">
-                            <Filter className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-sm font-medium">Filters</span>
+                <CardContent className="space-y-6">
+                    {/* Filters Toolbar */}
+                    <div className="flex flex-wrap items-center gap-3 p-4 bg-muted/30 rounded-lg border border-border/50">
+                        <div className="flex items-center gap-2 shrink-0">
+                            <div className="bg-primary/10 p-2 rounded-full">
+                                <Filter className="h-4 w-4 text-primary" />
+                            </div>
+                            <span className="text-sm font-medium">Filters:</span>
                         </div>
                         <TooltipProvider>
-                            <div className="flex flex-wrap gap-4 items-center">
+                            <div className="flex flex-wrap gap-3 items-center flex-1">
                                 {/* Search */}
                                 <div className="relative flex-1 min-w-[200px]">
                                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                                     <Input
-                                        placeholder="Search..."
+                                        placeholder="Search orders..."
                                         value={filters.search || ""}
                                         onChange={(e) =>
                                             handleFilterChange(
@@ -867,8 +904,17 @@ export default function OrdersPage() {
                                                 e.target.value,
                                             )
                                         }
-                                        className="pl-9 bg-background"
+                                        className="pl-9 pr-8 h-9 bg-background/60 border-input text-sm"
                                     />
+                                    {filters.search && (
+                                        <button
+                                            onClick={() => handleFilterChange("search", "")}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/60 hover:text-foreground transition-colors"
+                                            type="button"
+                                        >
+                                            <X className="h-3.5 w-3.5" />
+                                        </button>
+                                    )}
                                 </div>
 
                                 {/* Month Filter */}
@@ -879,7 +925,7 @@ export default function OrdersPage() {
                                         setPage(1);
                                     }}
                                 >
-                                    <SelectTrigger className="bg-background w-[140px]">
+                                    <SelectTrigger className="w-[130px] h-9 bg-background/60 text-xs font-medium">
                                         <SelectValue placeholder="All Months" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -887,6 +933,7 @@ export default function OrdersPage() {
                                             <SelectItem
                                                 key={month.value}
                                                 value={month.value}
+                                                className="text-xs"
                                             >
                                                 {month.label}
                                             </SelectItem>
@@ -902,14 +949,16 @@ export default function OrdersPage() {
                                         setPage(1);
                                     }}
                                 >
-                                    <SelectTrigger className="bg-background w-[120px]">
+                                    <SelectTrigger className="w-[110px] h-9 bg-background/60 text-xs font-medium">
                                         <SelectValue placeholder="All Years" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {sortedYears.map((year) => (
+                                        <SelectItem value="all" className="text-xs">All Years</SelectItem>
+                                        {sortedYears.map((year: number) => (
                                             <SelectItem
                                                 key={year}
                                                 value={year.toString()}
+                                                className="text-xs"
                                             >
                                                 {year}
                                             </SelectItem>
@@ -919,51 +968,55 @@ export default function OrdersPage() {
 
                                 {/* Status Filter */}
                                 <Select
-                                    value={filters.status || ""}
+                                    value={filters.status || "all"}
                                     onValueChange={(value) =>
                                         handleFilterChange(
                                             "status",
-                                            value as OrderStatus,
+                                            value === "all" ? undefined : value,
                                         )
                                     }
                                 >
-                                    <SelectTrigger className="bg-background w-[140px]">
-                                        <SelectValue placeholder="All Statuses" />
+                                    <SelectTrigger className="w-[130px] h-9 bg-background/60 text-xs font-medium">
+                                        <SelectValue placeholder="All Status" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {Object.entries(
-                                            ORDER_STATUS_LABELS,
-                                        ).map(([value, label]) => (
-                                            <SelectItem
-                                                key={value}
-                                                value={value}
-                                            >
-                                                {label}
-                                            </SelectItem>
-                                        ))}
+                                        <SelectItem value="all" className="text-xs">All Status</SelectItem>
+                                        {Object.entries(ORDER_STATUS_LABELS).map(
+                                            ([value, label]) => (
+                                                <SelectItem
+                                                    key={value}
+                                                    value={value}
+                                                    className="text-xs"
+                                                >
+                                                    {label}
+                                                </SelectItem>
+                                            ),
+                                        )}
                                     </SelectContent>
                                 </Select>
 
                                 {/* Priority Filter */}
                                 <Select
-                                    value={filters.priority || ""}
+                                    value={filters.priority || "all"}
                                     onValueChange={(value) =>
                                         handleFilterChange(
                                             "priority",
-                                            value as OrderPriority,
+                                            value === "all" ? undefined : value,
                                         )
                                     }
                                 >
-                                    <SelectTrigger className="bg-background w-[140px]">
-                                        <SelectValue placeholder="All Priorities" />
+                                    <SelectTrigger className="w-[130px] h-9 bg-background/60 text-xs font-medium">
+                                        <SelectValue placeholder="All Priority" />
                                     </SelectTrigger>
                                     <SelectContent>
+                                        <SelectItem value="all" className="text-xs">All Priority</SelectItem>
                                         {Object.entries(
                                             ORDER_PRIORITY_LABELS,
                                         ).map(([value, label]) => (
                                             <SelectItem
                                                 key={value}
                                                 value={value}
+                                                className="text-xs"
                                             >
                                                 {label}
                                             </SelectItem>
@@ -973,19 +1026,24 @@ export default function OrdersPage() {
 
                                 {/* Client Filter */}
                                 <Select
-                                    value={filters.clientId || ""}
+                                    value={filters.clientId || "all"}
                                     onValueChange={(value) =>
-                                        handleFilterChange("clientId", value)
+                                        handleFilterChange(
+                                            "clientId",
+                                            value === "all" ? undefined : value,
+                                        )
                                     }
                                 >
-                                    <SelectTrigger className="bg-background w-[140px]">
+                                    <SelectTrigger className="w-[140px] h-9 bg-background/60 text-xs font-medium">
                                         <SelectValue placeholder="All Clients" />
                                     </SelectTrigger>
                                     <SelectContent>
+                                        <SelectItem value="all" className="text-xs">All Clients</SelectItem>
                                         {clients.map((client) => (
                                             <SelectItem
                                                 key={client._id}
                                                 value={client._id}
+                                                className="text-xs"
                                             >
                                                 {client.name}
                                             </SelectItem>
@@ -993,33 +1051,28 @@ export default function OrdersPage() {
                                     </SelectContent>
                                 </Select>
 
-                                {/* Clear Filters Button */}
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <Button
-                                            variant="outline"
-                                            size="icon"
-                                            onClick={() => {
-                                                setFilters({
-                                                    search: "",
-                                                    status: undefined,
-                                                    priority: undefined,
-                                                    clientId: undefined,
-                                                    limit: 10,
-                                                });
-                                                setSelectedMonth("");
-                                                setSelectedYear("");
-                                                setPage(1);
-                                            }}
-                                            className="bg-background"
-                                        >
-                                            <X className="h-4 w-4" />
-                                        </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                        <p>Clear Filters</p>
-                                    </TooltipContent>
-                                </Tooltip>
+                                 {/* Clear Filters Button */}
+                                {(filters.search || filters.status || filters.priority || filters.clientId || selectedMonth || selectedYear) && (
+                                    <Button
+                                        variant="ghost"
+                                        onClick={() => {
+                                            setFilters({
+                                                search: "",
+                                                status: undefined,
+                                                priority: undefined,
+                                                clientId: undefined,
+                                                limit: 10,
+                                            });
+                                            setSelectedMonth("");
+                                            setSelectedYear("");
+                                            setPage(1);
+                                        }}
+                                        className="h-9 px-3 text-xs hover:bg-muted/85 font-medium shrink-0"
+                                    >
+                                        Clear Filters
+                                        <X className="h-3 w-3" />
+                                    </Button>
+                                )}
                             </div>
                         </TooltipProvider>
                     </div>
@@ -1044,7 +1097,7 @@ export default function OrdersPage() {
                                         }
                                         className="h-7 text-xs"
                                     >
-                                        <X className="h-3 w-3 mr-1" />
+                                        <X className="h-3 w-3" />
                                         Clear Selection
                                     </Button>
                                 )}
@@ -1059,7 +1112,7 @@ export default function OrdersPage() {
                                         }
                                         disabled={selectedOrderIds.size === 0}
                                     >
-                                        <Trash2 className="h-4 w-4 mr-1" />
+                                        <Trash2 className="h-4 w-4" />
                                         Delete ({selectedOrderIds.size})
                                     </Button>
                                 )}
@@ -1085,7 +1138,7 @@ export default function OrdersPage() {
                                 >
                                     {isLoadingAll ? (
                                         <>
-                                            <Loader className=" h-3 w-3 animate-spin" />
+                                            <Loader className="h-3 w-3 animate-spin" />
                                             Selecting all {meta.total} orders...
                                         </>
                                     ) : (
@@ -1095,65 +1148,51 @@ export default function OrdersPage() {
                             </div>
                         )}
 
-                    {/* Table */}
-                    <div className="border">
+                    {/* Table Container */}
+                    <div className="rounded-md border border-border/60 overflow-hidden">
                         {isLoading ? (
                             <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead className="border-r">
-                                            Name
-                                        </TableHead>
-                                        <TableHead className="border-r">
-                                            Client
-                                        </TableHead>
-                                        <TableHead className="border-r">
-                                            Time Left
-                                        </TableHead>
-                                        <TableHead className="border-r">
-                                            Qty
-                                        </TableHead>
-                                        <TableHead className="border-r">
-                                            Total
-                                        </TableHead>
-                                        <TableHead className="border-r">
-                                            Status
-                                        </TableHead>
-                                        <TableHead className="border-r">
-                                            Priority
-                                        </TableHead>
-                                        <TableHead>Actions</TableHead>
+                                <TableHeader className="bg-muted/40">
+                                    <TableRow className="hover:bg-muted/40 border-b-border/60">
+                                        <TableHead className="font-semibold py-3 pl-4">Name</TableHead>
+                                        <TableHead className="font-semibold py-3">Client</TableHead>
+                                        <TableHead className="font-semibold py-3">Time Left</TableHead>
+                                        <TableHead className="font-semibold py-3 text-center">Qty</TableHead>
+                                        <TableHead className="font-semibold py-3">Total</TableHead>
+                                        <TableHead className="font-semibold py-3 text-center">Status</TableHead>
+                                        <TableHead className="font-semibold py-3">Priority</TableHead>
+                                        <TableHead className="font-semibold py-3 text-right pr-4">Actions</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {[...Array(5)].map((_, i) => (
-                                        <TableRow key={i}>
-                                            <TableCell className="border-r">
-                                                <Skeleton className="h-4 w-32" />
+                                        <TableRow key={i} className="border-b last:border-b-0">
+                                            <TableCell className="py-3 pl-4">
+                                                <Skeleton className="h-4 w-32 bg-muted animate-pulse rounded-md" />
                                             </TableCell>
-                                            <TableCell className="border-r">
-                                                <Skeleton className="h-4 w-24" />
+                                            <TableCell className="py-3">
+                                                <Skeleton className="h-4 w-24 bg-muted animate-pulse rounded-md" />
                                             </TableCell>
-                                            <TableCell className="border-r">
-                                                <Skeleton className="h-4 w-16" />
+                                            <TableCell className="py-3">
+                                                <Skeleton className="h-4 w-16 bg-muted animate-pulse rounded-md" />
                                             </TableCell>
-                                            <TableCell className="border-r">
-                                                <Skeleton className="h-4 w-10" />
+                                            <TableCell className="py-3">
+                                                <Skeleton className="h-4 w-10 mx-auto bg-muted animate-pulse rounded-md" />
                                             </TableCell>
-                                            <TableCell className="border-r">
-                                                <Skeleton className="h-4 w-16" />
+                                            <TableCell className="py-3">
+                                                <Skeleton className="h-4 w-16 bg-muted animate-pulse rounded-md" />
                                             </TableCell>
-                                            <TableCell className="border-r">
-                                                <Skeleton className="h-6 w-20" />
+                                            <TableCell className="py-3">
+                                                <Skeleton className="h-6 w-20 mx-auto rounded-full bg-muted animate-pulse" />
                                             </TableCell>
-                                            <TableCell className="border-r">
-                                                <Skeleton className="h-6 w-16" />
+                                            <TableCell className="py-3">
+                                                <Skeleton className="h-6 w-16 rounded-full bg-muted animate-pulse" />
                                             </TableCell>
-                                            <TableCell>
-                                                <div className="flex gap-1">
-                                                    <Skeleton className="h-8 w-8" />
-                                                    <Skeleton className="h-8 w-8" />
-                                                    <Skeleton className="h-8 w-8" />
+                                            <TableCell className="py-3 pr-4 text-right">
+                                                <div className="flex justify-end gap-1">
+                                                    <Skeleton className="h-8 w-8 bg-muted animate-pulse rounded-md" />
+                                                    <Skeleton className="h-8 w-8 bg-muted animate-pulse rounded-md" />
+                                                    <Skeleton className="h-8 w-8 bg-muted animate-pulse rounded-md" />
                                                 </div>
                                             </TableCell>
                                         </TableRow>
@@ -1162,10 +1201,10 @@ export default function OrdersPage() {
                             </Table>
                         ) : (
                             <Table>
-                                <TableHeader>
-                                    <TableRow>
+                                <TableHeader className="bg-muted/40">
+                                    <TableRow className="hover:bg-muted/40 border-b-border/60">
                                         {isSelectionMode && (
-                                            <TableHead className="border-r w-[50px]">
+                                            <TableHead className="w-[50px] py-3 pl-4">
                                                 <Checkbox
                                                     checked={allOrdersSelected}
                                                     onCheckedChange={(
@@ -1179,31 +1218,31 @@ export default function OrdersPage() {
                                                 />
                                             </TableHead>
                                         )}
-                                        <TableHead className="border-r">
+                                        <TableHead className={`font-semibold py-3 ${isSelectionMode ? '' : 'pl-4'}`}>
                                             Order Date
                                         </TableHead>
-                                        <TableHead className="border-r">
+                                        <TableHead className="font-semibold py-3">
                                             Client
                                         </TableHead>
-                                        <TableHead className="border-r">
+                                        <TableHead className="font-semibold py-3">
                                             Name
                                         </TableHead>
-                                        <TableHead className="border-r">
+                                        <TableHead className="font-semibold py-3">
                                             Time Left
                                         </TableHead>
-                                        <TableHead className="border-r text-center">
+                                        <TableHead className="font-semibold py-3 text-center">
                                             Qty
                                         </TableHead>
-                                        <TableHead className="border-r">
+                                        <TableHead className="font-semibold py-3">
                                             Total
                                         </TableHead>
-                                        <TableHead className="border-r text-center">
+                                        <TableHead className="font-semibold py-3 text-center">
                                             Status
                                         </TableHead>
-                                        <TableHead className="border-r">
+                                        <TableHead className="font-semibold py-3">
                                             Priority
                                         </TableHead>
-                                        <TableHead className="text-center">
+                                        <TableHead className="font-semibold py-3 text-right pr-4">
                                             Actions
                                         </TableHead>
                                     </TableRow>
@@ -1225,6 +1264,7 @@ export default function OrdersPage() {
                                             <TableRow
                                                 key={order._id}
                                                 className={cn(
+                                                    "hover:bg-muted/15 transition-colors border-b last:border-b-0",
                                                     isSelectionMode &&
                                                     selectedOrderIds.has(
                                                         order._id,
@@ -1233,7 +1273,7 @@ export default function OrdersPage() {
                                                 )}
                                             >
                                                 {isSelectionMode && (
-                                                    <TableCell className="border-r">
+                                                    <TableCell className="py-3 pl-4">
                                                         <Checkbox
                                                             checked={selectedOrderIds.has(
                                                                 order._id,
@@ -1247,23 +1287,23 @@ export default function OrdersPage() {
                                                         />
                                                     </TableCell>
                                                 )}
-                                                <TableCell className="border-r">
+                                                <TableCell className={`py-3 text-xs text-muted-foreground ${isSelectionMode ? '' : 'pl-4'}`}>
                                                     {format(
                                                         new Date(
                                                             order.orderDate,
                                                         ),
-                                                        "PPP",
+                                                        "MMM dd, yyyy",
                                                     )}
                                                 </TableCell>
-                                                <TableCell className="border-r">
+                                                <TableCell className="py-3">
                                                     <div className="flex flex-col">
-                                                        <span className="font-medium">
+                                                        <span className="font-semibold text-sm text-foreground">
                                                             {
                                                                 order.clientId
                                                                     ?.name
                                                             }
                                                         </span>
-                                                        <span className="text-xs text-muted-foreground">
+                                                        <span className="text-xs text-muted-foreground font-mono">
                                                             {
                                                                 order.clientId
                                                                     ?.clientId
@@ -1271,7 +1311,7 @@ export default function OrdersPage() {
                                                         </span>
                                                     </div>
                                                 </TableCell>
-                                                <TableCell className="border-r font-medium max-w-[200px] truncate">
+                                                <TableCell className="py-3 font-medium text-sm max-w-[200px] truncate">
                                                     {order.orderName}
                                                     {order.revisionCount >
                                                         0 && (
@@ -1286,7 +1326,7 @@ export default function OrdersPage() {
                                                             </Badge>
                                                         )}
                                                 </TableCell>
-                                                <TableCell className="border-r">
+                                                <TableCell className="py-3">
                                                     <DeadlineCountdown
                                                         deadline={
                                                             order.deadline
@@ -1294,16 +1334,16 @@ export default function OrdersPage() {
                                                         status={order.status}
                                                     />
                                                 </TableCell>
-                                                <TableCell className="border-r text-center">
+                                                <TableCell className="py-3 text-center text-sm font-bold">
                                                     {order.imageQuantity}
                                                 </TableCell>
-                                                <TableCell className="border-r">
+                                                <TableCell className="py-3 text-sm font-semibold">
                                                     $
                                                     {order.totalPrice.toFixed(
                                                         2,
                                                     )}
                                                 </TableCell>
-                                                <TableCell className='border-r flex items-center justify-center w-auto'>
+                                                <TableCell className='py-3 flex items-center justify-center w-auto'>
                                                     <Select
                                                         value={order.status}
                                                         onValueChange={(
@@ -1362,7 +1402,7 @@ export default function OrdersPage() {
                                                         </SelectContent>
                                                     </Select>
                                                 </TableCell>
-                                                <TableCell className="border-r">
+                                                <TableCell className="py-3">
                                                     <span
                                                         className={`px-2 py-1 rounded-full text-xs font-medium ${priorityColors[
                                                             order.priority
@@ -1539,37 +1579,40 @@ export default function OrdersPage() {
                         )}
                     </div>
 
-                    {/* Pagination */}
+                    {/* Pagination Footer */}
                     {meta && (
-                        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t">
-                            <div className="flex items-center gap-2">
-                                <p className="text-sm text-muted-foreground">
-                                    Showing {(page - 1) * (filters.limit || 10) + 1} to{" "}
-                                    {Math.min(page * (filters.limit || 10), meta.total)} of{" "}
-                                    {meta.total} entries
-                                </p>
-                                <Select
-                                    value={`${filters.limit || 10}`}
-                                    onValueChange={(value) => {
-                                        handleFilterChange("limit", Number(value));
-                                    }}
-                                >
-                                    <SelectTrigger className="h-8 w-[70px]">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {[10, 20, 50, 100].map((pageSize) => (
-                                            <SelectItem
-                                                key={pageSize}
-                                                value={`${pageSize}`}
-                                            >
-                                                {pageSize}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-border/60">
+                            <div className="text-sm text-muted-foreground font-medium select-none">
+                                Showing <span className="font-semibold text-foreground">{orders.length}</span> of{" "}
+                                <span className="font-semibold text-foreground">{meta.total}</span> orders
                             </div>
-                            {meta.totalPages > 1 && (
+
+                            <div className="flex items-center gap-6">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xs text-muted-foreground whitespace-nowrap">Rows per page</span>
+                                    <Select
+                                        value={`${filters.limit || 10}`}
+                                        onValueChange={(value) => {
+                                            handleFilterChange("limit", Number(value));
+                                        }}
+                                    >
+                                        <SelectTrigger className="h-8 w-[70px] text-xs font-semibold">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {PER_PAGE_OPTIONS.map((pageSize) => (
+                                                <SelectItem
+                                                    key={pageSize}
+                                                    value={`${pageSize}`}
+                                                    className="text-xs"
+                                                >
+                                                    {pageSize}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
                                 <div className="flex items-center gap-1">
                                     <Button
                                         variant="outline"
@@ -1589,37 +1632,9 @@ export default function OrdersPage() {
                                     >
                                         <ChevronLeft className="h-4 w-4" />
                                     </Button>
-                                    {(() => {
-                                        const totalPages = meta.totalPages;
-                                        const pageNumbers: (number | string)[] = [];
-                                        if (totalPages <= 7) {
-                                            for (let i = 1; i <= totalPages; i++) pageNumbers.push(i);
-                                        } else {
-                                            if (page <= 3) {
-                                                pageNumbers.push(1, 2, 3, 4, "...", totalPages);
-                                            } else if (page >= totalPages - 2) {
-                                                pageNumbers.push(1, "...", totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
-                                            } else {
-                                                pageNumbers.push(1, "...", page - 1, page, page + 1, "...", totalPages);
-                                            }
-                                        }
-                                        return pageNumbers.map((num, idx) =>
-                                            num === "..." ? (
-                                                <span key={`ellipsis-${idx}`} className="px-2 text-muted-foreground">...</span>
-                                            ) : (
-                                                <Button
-                                                    key={num}
-                                                    variant={page === num ? "default" : "outline"}
-                                                    size="icon"
-                                                    className="h-8 w-8"
-                                                    onClick={() => setPage(num as number)}
-                                                    disabled={isFetching}
-                                                >
-                                                    {num}
-                                                </Button>
-                                            ),
-                                        );
-                                    })()}
+                                    <span className="text-xs font-medium px-2 whitespace-nowrap select-none">
+                                        Page {meta.page} of {meta.totalPages}
+                                    </span>
                                     <Button
                                         variant="outline"
                                         size="icon"
@@ -1639,7 +1654,7 @@ export default function OrdersPage() {
                                         <ChevronsRight className="h-4 w-4" />
                                     </Button>
                                 </div>
-                            )}
+                            </div>
                         </div>
                     )}
                 </CardContent>

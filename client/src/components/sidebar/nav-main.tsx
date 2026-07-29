@@ -8,11 +8,13 @@ import { sidebarGroups } from "@/constants/sidebar";
 import { useSession } from "@/lib/auth-client";
 import { Role } from "@/constants/role";
 import { useGetMeQuery } from "@/redux/features/staff/staffApi";
-import { Skeleton } from "../ui/skeleton";
-import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Search } from "lucide-react";
 import {
     SidebarGroup,
+    SidebarGroupContent,
+    SidebarGroupLabel,
+    SidebarInput,
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
@@ -22,7 +24,6 @@ export function NavMain() {
     const {
         data: session,
         isPending: isSessionPending,
-        isRefetching,
     } = useSession();
     const { data: meData, isLoading: isMeLoading } = useGetMeQuery({});
     const pathname = usePathname();
@@ -41,7 +42,8 @@ export function NavMain() {
                 if (!item.access.includes(userRole)) return false;
 
                 if (
-                    (userRole === Role.STAFF || userRole === Role.TEAM_LEADER) &&
+                    (userRole === Role.STAFF ||
+                        userRole === Role.TEAM_LEADER) &&
                     item.requiredDesignation
                 ) {
                     if (
@@ -52,7 +54,7 @@ export function NavMain() {
                     }
                 }
                 return true;
-            })
+            }),
         );
     }, [userRole, staff]);
 
@@ -83,7 +85,8 @@ export function NavMain() {
 
                     // B. Restriction: STAFF and TEAM_LEADER must match requiredDesignation if specified
                     if (
-                        (userRole === Role.STAFF || userRole === Role.TEAM_LEADER) &&
+                        (userRole === Role.STAFF ||
+                            userRole === Role.TEAM_LEADER) &&
                         item.requiredDesignation
                     ) {
                         if (
@@ -109,85 +112,94 @@ export function NavMain() {
             .filter((group) => group.items.length > 0);
     }, [userRole, staff, search]);
 
-    const isLoading =
-        isSessionPending || isMeLoading || (isRefetching && !session);
+    const isLoading = isSessionPending || (isMeLoading && !meData);
 
     if (isLoading) {
         return (
-            <SidebarGroup className="px-4">
-                <SidebarMenu className="space-y-2">
-                    {[...Array(5)].map((_, i) => (
-                        <SidebarMenuItem key={i}>
-                            <Skeleton className="h-8 w-full bg-muted animate-pulse" />
-                        </SidebarMenuItem>
-                    ))}
-                </SidebarMenu>
-            </SidebarGroup>
+            <div className="space-y-4 px-2">
+                {[...Array(3)].map((_, groupIndex) => (
+                    <SidebarGroup key={groupIndex} className="py-1 px-0">
+                        <Skeleton className="h-3.5 w-20 mb-2 bg-sidebar-accent/50 rounded-md animate-pulse" />
+                        <SidebarGroupContent>
+                            <SidebarMenu className="space-y-1">
+                                {[...Array(3)].map((_, itemIndex) => (
+                                    <SidebarMenuItem key={itemIndex}>
+                                        <Skeleton className="h-8.5 w-full bg-sidebar-accent/30 rounded-lg animate-pulse" />
+                                    </SidebarMenuItem>
+                                ))}
+                            </SidebarMenu>
+                        </SidebarGroupContent>
+                    </SidebarGroup>
+                ))}
+            </div>
         );
     }
 
     return (
-        <SidebarGroup className="py-2 px-1">
+        <div className="space-y-4">
             {/* Real-time Search Input Bar */}
-            <div className="px-2 mb-4 relative group/search">
-                <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/50 transition-colors group-focus-within/search:text-primary" />
-                <Input
-                    placeholder="Search navigation..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="pl-8 bg-sidebar-accent/30 border-sidebar-border/40 focus-visible:bg-background h-8.5 rounded-lg text-xs font-semibold placeholder:text-muted-foreground/50 placeholder:font-medium transition-all duration-200"
-                />
-            </div>
+            <SidebarGroup className="py-0 px-3">
+                <div className="relative group/search">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-sidebar-foreground/40 transition-colors group-focus-within/search:text-sidebar-foreground/80" />
+                    <SidebarInput
+                        placeholder="Search navigation..."
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        className="pl-8 bg-sidebar-accent/40 border-sidebar-border/50 focus-visible:bg-sidebar-accent h-9 rounded-md text-xs font-medium placeholder:text-sidebar-foreground/45 transition-all duration-200"
+                    />
+                </div>
+            </SidebarGroup>
 
-            <div className="space-y-5">
+            <div className="space-y-1">
                 {filteredGroups.length === 0 ? (
-                    <div className="text-center text-xs font-medium text-muted-foreground py-8 italic bg-muted/10 rounded-lg border border-dashed border-border/40 mx-2">
+                    <div className="text-center text-xs font-medium text-muted-foreground py-8 italic bg-muted/15 rounded-lg border border-dashed border-border/40 mx-3">
                         No matches found.
                     </div>
                 ) : (
                     filteredGroups.map((group) => (
-                        <div key={group.groupLabel} className="space-y-1">
-                            <div className="px-2.5 text-[9px] font-bold text-muted-foreground/45 uppercase tracking-widest select-none">
+                        <SidebarGroup key={group.groupLabel} className="py-1">
+                            <SidebarGroupLabel className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-widest px-3 select-none">
                                 {group.groupLabel}
-                            </div>
-                            <SidebarMenu className="space-y-0.5">
-                                {group.items.map((item) => {
-                                    const isActive = item.url === activeItemUrl;
-                                    return (
-                                        <SidebarMenuItem key={item.title}>
-                                            <SidebarMenuButton
-                                                asChild
-                                                isActive={isActive}
-                                                className={cn(
-                                                    "w-full flex items-center gap-2.5 py-1.5 px-2.5 text-xs font-medium rounded-lg transition-all duration-200",
-                                                    isActive
-                                                        ? "bg-sidebar-accent text-sidebar-accent-foreground font-semibold shadow-xs"
-                                                        : "text-muted-foreground/80 hover:bg-sidebar-accent/50 hover:text-foreground"
-                                                )}
-                                            >
-                                                <Link href={item.url}>
-                                                    {item.icon && (
-                                                        <item.icon
-                                                            strokeWidth={2}
-                                                            className={cn(
-                                                                "size-4 shrink-0 transition-colors",
-                                                                isActive
-                                                                    ? "text-foreground"
-                                                                    : "text-muted-foreground/60 group-hover:text-foreground"
-                                                            )}
-                                                        />
+                            </SidebarGroupLabel>
+                            <SidebarGroupContent>
+                                <SidebarMenu className="space-y-0.5 px-1">
+                                    {group.items.map((item) => {
+                                        const isActive =
+                                            item.url === activeItemUrl;
+                                        return (
+                                            <SidebarMenuItem key={item.title}>
+                                                <SidebarMenuButton
+                                                    asChild
+                                                    isActive={isActive}
+                                                    tooltip={item.title}
+                                                    className={cn(
+                                                        "transition-all duration-200 relative group/btn",
+                                                        isActive
+                                                            ? "bg-sidebar-primary! text-sidebar-primary-foreground! font-semibold shadow-xs"
+                                                            : "hover:bg-sidebar-accent/50",
                                                     )}
-                                                    <span className="truncate">{item.title}</span>
-                                                </Link>
-                                            </SidebarMenuButton>
-                                        </SidebarMenuItem>
-                                    );
-                                })}
-                            </SidebarMenu>
-                        </div>
+                                                >
+                                                    <Link
+                                                        href={item.url}
+                                                        className="flex items-center gap-2 w-full"
+                                                    >
+                                                        {item.icon && (
+                                                            <item.icon />
+                                                        )}
+                                                        <span className="truncate">
+                                                            {item.title}
+                                                        </span>
+                                                    </Link>
+                                                </SidebarMenuButton>
+                                            </SidebarMenuItem>
+                                        );
+                                    })}
+                                </SidebarMenu>
+                            </SidebarGroupContent>
+                        </SidebarGroup>
                     ))
                 )}
             </div>
-        </SidebarGroup>
+        </div>
     );
 }

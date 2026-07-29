@@ -22,15 +22,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Plus,
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
-  Loader,
   FileDown,
-  RefreshCw,
+  RefreshCcw,
+  Users,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -122,8 +123,7 @@ export default function ClientsPage() {
       toast.success("Client created successfully");
       setIsAddDialogOpen(false);
     } catch (error: unknown) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const err = error as any;
+      const err = error as { data?: { errors?: Record<string, string[]>; message?: string }; errors?: Record<string, string[]> };
       setAddServerErrors(err?.data?.errors || err?.errors);
       toast.error(err?.data?.message || "Failed to create client");
     }
@@ -137,8 +137,7 @@ export default function ClientsPage() {
       toast.success("Client updated successfully");
       setIsEditDialogOpen(false);
     } catch (error: unknown) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const err = error as any;
+      const err = error as { data?: { errors?: Record<string, string[]>; message?: string }; errors?: Record<string, string[]> };
       setUpdateServerErrors(err?.data?.errors || err?.errors);
       toast.error(err?.data?.message || "Failed to update client");
     }
@@ -164,177 +163,162 @@ export default function ClientsPage() {
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
-      {/* Header section */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <div className="space-y-1">
-          <h1 className="text-3xl font-bold tracking-tight text-slate-800 dark:text-slate-100">
-            Clients
-          </h1>
-          <p className="text-muted-foreground flex items-center gap-2">
-            Manage your client database and team assignments
-            {isFetching && (
-              <Loader className="h-3 w-3 animate-spin text-primary" />
-            )}
+    <div className="space-y-8 p-1">
+      {/* Header & Stats Overview (Matching Earnings Layout Exactly) */}
+      <div className="flex flex-col gap-6">
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight bg-linear-to-r from-foreground to-foreground/70 bg-clip-text">
+            Clients Overview
+          </h2>
+          <p className="text-muted-foreground mt-1">
+            Manage your client database and team assignments.
           </p>
         </div>
-        {!isTelemarketer && (
-          <div className="flex items-center gap-3">
-            <Button
-              variant="outline"
-              className="bg-card shadow-sm hover:shadow-md transition-all duration-200"
-              onClick={() => toast.info("Export feature coming soon")}
-            >
-              <FileDown className="mr-2 h-4 w-4 text-slate-500" />
-              Export
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => refetch()}
-              disabled={isLoading || isFetching}
-              className="bg-card shadow-sm hover:shadow-md transition-all duration-200"
-            >
-              <RefreshCw
-                className={isFetching ? "animate-spin" : ""}
-                size={16}
-              />
-            </Button>
-            <Button
-              onClick={() => setIsAddDialogOpen(true)}
-              className="bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all duration-200"
-            >
-              <Plus className="mr-2 h-4 w-4" /> Add Client
-            </Button>
-          </div>
-        )}
-      </div>
 
-      {/* Stats section */}
-      <ClientStats
-        total={stats.total}
-        active={stats.active}
-        inactive={stats.inactive}
-        isLoading={isLoading}
-      />
-
-      {/* Filter section */}
-      <div className="bg-card p-4 rounded-xl border shadow-sm space-y-4">
-        <ClientFilters
-          search={search}
-          status={status}
-          limit={limit}
-          onFilterChange={handleFilterChange}
-          onClearFilters={handleClearFilters}
-        />
-      </div>
-
-      {/* Table section */}
-      <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
-        <ClientTable
-          clients={clients}
+        <ClientStats
+          total={stats.total}
+          active={stats.active}
+          inactive={stats.inactive}
           isLoading={isLoading}
-          isTelemarketer={isTelemarketer}
-          onEdit={openEditDialog}
         />
-
-        {/* Pagination */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-6 py-4 border-t bg-muted/20">
-          <div className="flex items-center gap-4 order-2 sm:order-1">
-            <div className="text-sm text-muted-foreground">
-              Showing{" "}
-              <span className="font-medium text-foreground">
-                {clients.length}
-              </span>{" "}
-              of{" "}
-              <span className="font-medium text-foreground">
-                {pagination.total}
-              </span>{" "}
-              clients
-            </div>
-            <div className="h-4 w-px bg-slate-300 hidden sm:block" />
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground whitespace-nowrap">
-                Per page
-              </span>
-              <Select
-                value={limit.toString()}
-                onValueChange={(val) =>
-                  handleFilterChange("limit", parseInt(val))
-                }
-              >
-                <SelectTrigger className="h-7 w-[70px] text-xs bg-background">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {PER_PAGE_OPTIONS.map((opt) => (
-                    <SelectItem
-                      key={opt}
-                      value={opt.toString()}
-                      className="text-xs"
-                    >
-                      {opt}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div className="flex items-center space-x-2 order-1 sm:order-2">
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => setPage(1)}
-              disabled={page === 1 || isLoading}
-            >
-              <ChevronsLeft className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page === 1 || isLoading}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <div className="flex items-center gap-1.5 px-3">
-              <span className="text-sm font-medium">Page</span>
-              <span className="flex h-7 w-12 items-center justify-center rounded-md border bg-background text-sm font-bold text-primary">
-                {page}
-              </span>
-              <span className="text-sm font-medium">
-                of {pagination.pages}
-              </span>
-            </div>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() =>
-                setPage((p) => Math.min(pagination.pages, p + 1))
-              }
-              disabled={page === pagination.pages || isLoading}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => setPage(pagination.pages)}
-              disabled={page === pagination.pages || isLoading}
-            >
-              <ChevronsRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
       </div>
+
+      {/* Main Content Area (Matching Recent Earnings Section Card) */}
+      <Card className="border-border/60 shadow-md">
+        <CardHeader className="pb-3">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <CardTitle className="flex items-center gap-2 text-xl">
+              <Users className="h-5 w-5 text-primary" />
+              Client Directory
+            </CardTitle>
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                className="border-primary text-primary hover:bg-accent hover:text-accent-foreground shadow-xs"
+                onClick={() => toast.info("Export feature coming soon")}
+              >
+                <FileDown className="h-4 w-4" />
+                Export
+              </Button>
+              <Button
+                variant="outline"
+                className="border-primary text-primary hover:bg-accent hover:text-accent-foreground shadow-xs"
+                onClick={() => refetch()}
+                disabled={isFetching}
+              >
+                <RefreshCcw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
+                Refresh
+              </Button>
+              {!isTelemarketer && (
+                <Button
+                  onClick={() => setIsAddDialogOpen(true)}
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-xs"
+                >
+                  <Plus className="h-4 w-4" /> Add Client
+                </Button>
+              )}
+            </div>
+          </div>
+        </CardHeader>
+
+        <CardContent className="space-y-6">
+          {/* Filters Section */}
+          <ClientFilters
+            search={search}
+            status={status}
+            onFilterChange={handleFilterChange}
+            onClearFilters={handleClearFilters}
+          />
+
+          {/* Table */}
+          <div className="rounded-md border border-border/60 overflow-hidden">
+            <ClientTable
+              clients={clients}
+              isLoading={isLoading}
+              isTelemarketer={isTelemarketer}
+              onEdit={openEditDialog}
+            />
+          </div>
+
+          {/* Pagination Footer */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-border/60">
+            <div className="text-sm text-muted-foreground font-medium select-none">
+              Showing <span className="font-semibold text-foreground">{clients.length}</span> of{" "}
+              <span className="font-semibold text-foreground">{pagination.total}</span> clients
+            </div>
+
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground whitespace-nowrap">Rows per page</span>
+                <Select
+                  value={limit.toString()}
+                  onValueChange={(val) => {
+                    setLimit(Number(val));
+                    setPage(1);
+                  }}
+                >
+                  <SelectTrigger className="h-8 w-[70px] text-xs font-semibold">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PER_PAGE_OPTIONS.map((option) => (
+                      <SelectItem key={option} value={option.toString()} className="text-xs">
+                        {option}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setPage(1)}
+                  disabled={page === 1}
+                >
+                  <ChevronsLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-xs font-medium px-2 whitespace-nowrap select-none">
+                  Page {pagination.page} of {pagination.pages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setPage((p) => Math.min(pagination.pages, p + 1))}
+                  disabled={page >= pagination.pages}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setPage(pagination.pages)}
+                  disabled={page >= pagination.pages}
+                >
+                  <ChevronsRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Add Client Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add New Client</DialogTitle>
             <DialogDescription>
@@ -344,7 +328,7 @@ export default function ClientsPage() {
           <ClientForm
             onSubmit={handleAddClient}
             isSubmitting={isCreating}
-            submitLabel="Create Client"
+            submitLabel="Add Client"
             onCancel={() => setIsAddDialogOpen(false)}
             serverErrors={addServerErrors}
           />
@@ -353,25 +337,22 @@ export default function ClientsPage() {
 
       {/* Edit Client Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Client</DialogTitle>
             <DialogDescription>
-              Update client profile and team information.
+              Update client information and settings.
             </DialogDescription>
           </DialogHeader>
-          {editDefaultValues && (
-            <ClientForm
-              key={selectedClient?._id}
-              defaultValues={editDefaultValues}
-              onSubmit={handleUpdateClient}
-              isSubmitting={isUpdating}
-              submitLabel="Save Changes"
-              onCancel={() => setIsEditDialogOpen(false)}
-              serverErrors={updateServerErrors}
-              isEditMode
-            />
-          )}
+          <ClientForm
+            onSubmit={handleUpdateClient}
+            isSubmitting={isUpdating}
+            submitLabel="Update Client"
+            onCancel={() => setIsEditDialogOpen(false)}
+            defaultValues={editDefaultValues}
+            isEditMode={true}
+            serverErrors={updateServerErrors}
+          />
         </DialogContent>
       </Dialog>
     </div>

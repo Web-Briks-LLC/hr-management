@@ -658,7 +658,7 @@ async function addRevision(
         .lean();
 }
 
-async function getOrderStatsFromDB(): Promise<{
+async function getOrderStatsFromDB(clientIds?: string[]): Promise<{
     total: number;
     pending: number;
     inProgress: number;
@@ -669,6 +669,11 @@ async function getOrderStatsFromDB(): Promise<{
     overdue: number;
 }> {
     const now = new Date();
+    const filter: Record<string, unknown> = {};
+    if (clientIds) {
+        filter.clientId = { $in: clientIds.map((id) => new mongoose.Types.ObjectId(id)) };
+    }
+
     const [
         total,
         pending,
@@ -679,14 +684,15 @@ async function getOrderStatsFromDB(): Promise<{
         delivered,
         overdue,
     ] = await Promise.all([
-        OrderModel.countDocuments(),
-        OrderModel.countDocuments({ status: 'pending' }),
-        OrderModel.countDocuments({ status: 'in_progress' }),
-        OrderModel.countDocuments({ status: 'quality_check' }),
-        OrderModel.countDocuments({ status: 'revision' }),
-        OrderModel.countDocuments({ status: 'completed' }),
-        OrderModel.countDocuments({ status: 'delivered' }),
+        OrderModel.countDocuments(filter),
+        OrderModel.countDocuments({ ...filter, status: 'pending' }),
+        OrderModel.countDocuments({ ...filter, status: 'in_progress' }),
+        OrderModel.countDocuments({ ...filter, status: 'quality_check' }),
+        OrderModel.countDocuments({ ...filter, status: 'revision' }),
+        OrderModel.countDocuments({ ...filter, status: 'completed' }),
+        OrderModel.countDocuments({ ...filter, status: 'delivered' }),
         OrderModel.countDocuments({
+            ...filter,
             deadline: { $lt: now },
             status: { $nin: ['completed', 'delivered', 'cancelled'] },
         }),

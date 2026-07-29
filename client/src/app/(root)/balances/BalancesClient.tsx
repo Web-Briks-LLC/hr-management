@@ -12,7 +12,6 @@ import {
 import {
     Card,
     CardContent,
-    CardDescription,
     CardHeader,
     CardTitle,
 } from "@/components/ui/card";
@@ -30,10 +29,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
     ChevronLeft,
     ChevronRight,
+    ChevronsLeft,
+    ChevronsRight,
     Wallet,
     ArrowDownCircle,
     TrendingUp,
     Filter,
+    Users,
+    History,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -55,6 +58,34 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+
+interface IWalletTx {
+    _id: string;
+    amount: number;
+    type: string;
+    description: string;
+    status: string;
+    createdAt: string;
+    staffId?: {
+        userId?: {
+            name?: string;
+        };
+    };
+    metadata?: {
+        clientName?: string;
+    };
+}
+
+interface IStaffWallet {
+    _id: string;
+    staffId: string;
+    phone?: string;
+    designation?: string;
+    balance?: number;
+    user?: {
+        name?: string;
+    };
+}
 
 export default function BalancesClient() {
     // Separate pagination states for each tab
@@ -83,7 +114,6 @@ export default function BalancesClient() {
     // Staff Balances (Admin only)
     const {
         data: adminStaffData,
-        isLoading: isAdminStaffLoading,
         isFetching: isAdminStaffFetching
     } = useGetStaffsQuery(
         { page: staffPage, limit, designation: "telemarketer", hasBalance: true },
@@ -93,7 +123,6 @@ export default function BalancesClient() {
     // All Transactions (Admin only)
     const {
         data: allTxData,
-        isLoading: isAllTxLoading,
         isFetching: isAllTxFetching
     } = useGetAllTransactionsQuery(
         { page: allTxPage, limit },
@@ -114,215 +143,370 @@ export default function BalancesClient() {
         try {
             await adminWithdraw({ staffDocId, amount, description }).unwrap();
             toast.success("Withdrawal processed successfully");
-        } catch (err: any) {
-            toast.error(err.data?.message || "Failed to process withdrawal");
+        } catch (err: unknown) {
+            const error = err as { data?: { message?: string } };
+            toast.error(error?.data?.message || "Failed to process withdrawal");
         }
     };
 
     if (isMeLoading || isTxLoading) {
         return (
-            <div className="flex-1 space-y-4 p-8 pt-6 text-foreground bg-background min-h-screen">
-                <div className="flex items-center justify-between space-y-2">
-                    <h2 className="text-3xl font-bold tracking-tight">Balances</h2>
+            <div className="space-y-8 p-1">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                        <Skeleton className="h-8 w-48 bg-muted animate-pulse rounded-md" />
+                        <Skeleton className="h-4 w-72 bg-muted animate-pulse rounded-md mt-2" />
+                    </div>
                 </div>
                 <div className="grid gap-4 md:grid-cols-3">
-                    <Skeleton className="h-[120px] w-full rounded-xl" />
-                    <Skeleton className="h-[120px] w-full rounded-xl" />
-                    <Skeleton className="h-[120px] w-full rounded-xl" />
+                    <Skeleton className="h-[120px] w-full rounded-xl bg-muted animate-pulse" />
+                    <Skeleton className="h-[120px] w-full rounded-xl bg-muted animate-pulse" />
+                    <Skeleton className="h-[120px] w-full rounded-xl bg-muted animate-pulse" />
                 </div>
-                <Skeleton className="h-[400px] w-full border mt-4" />
+                <Skeleton className="h-[400px] w-full rounded-xl bg-muted animate-pulse" />
             </div>
         );
     }
 
     return (
-        <div className="flex-1 space-y-4 p-8 pt-6">
-            <div className="flex items-center justify-between space-y-2">
-                <h2 className="text-3xl font-bold tracking-tight">Balances</h2>
+        <div className="space-y-8 p-1">
+            {/* Header Overview */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h2 className="text-3xl font-bold tracking-tight bg-linear-to-r from-foreground to-foreground/70 bg-clip-text">
+                        Balances Overview
+                    </h2>
+                    <p className="text-muted-foreground text-sm mt-1">
+                        Manage staff wallets, commissions, and payout withdrawals.
+                    </p>
+                </div>
             </div>
 
-            <Tabs defaultValue={isAdmin ? "staff-balances" : "my-balance"} className="w-full">
-                <TabsList className={isAdmin ? "" : "hidden"}>
-                    {!isAdmin && <TabsTrigger value="my-balance">My Balance</TabsTrigger>}
-                    <TabsTrigger value="staff-balances">Staff Balances</TabsTrigger>
-                    <TabsTrigger value="all-transactions">All Transactions</TabsTrigger>
-                </TabsList>
+            <Tabs defaultValue={isAdmin ? "staff-balances" : "my-balance"} className="w-full space-y-6">
+                {isAdmin && (
+                    <TabsList className="bg-muted/40 p-1 border border-border/50 rounded-xl h-auto flex flex-wrap gap-1 w-max">
+                        <TabsTrigger
+                            value="staff-balances"
+                            className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-xs px-4 py-2 text-sm font-medium rounded-lg transition-all"
+                        >
+                            <Users className="h-4 w-4 mr-2" />
+                            Staff Balances
+                        </TabsTrigger>
+                        <TabsTrigger
+                            value="all-transactions"
+                            className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-xs px-4 py-2 text-sm font-medium rounded-lg transition-all"
+                        >
+                            <History className="h-4 w-4 mr-2" />
+                            All Transactions
+                        </TabsTrigger>
+                        <TabsTrigger
+                            value="my-balance"
+                            className="data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-xs px-4 py-2 text-sm font-medium rounded-lg transition-all"
+                        >
+                            <Wallet className="h-4 w-4 mr-2" />
+                            My Wallet
+                        </TabsTrigger>
+                    </TabsList>
+                )}
 
-                {!isAdmin && (
-                    <TabsContent value="my-balance" className="space-y-4">
-                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                            <Card className="bg-gradient-to-br from-blue-500/10 to-indigo-500/10 border-blue-500/20 shadow-sm">
-                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                    <CardTitle className="text-sm font-medium">Available Balance</CardTitle>
-                                    <Wallet className="h-4 w-4 text-blue-500" />
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="text-2xl font-bold">৳{calculatedBalance.toLocaleString()}</div>
-                                    <p className="text-muted-foreground mt-1">Calculated from transaction logs</p>
-                                </CardContent>
-                            </Card>
-
-                            <Card className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 border-green-500/20 shadow-sm">
-                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                    <CardTitle className="text-sm font-medium">Total Earned</CardTitle>
-                                    <TrendingUp className="h-4 w-4 text-green-500" />
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="text-2xl font-bold text-green-600 dark:text-green-400">৳{totalEarned.toLocaleString()}</div>
-                                    <p className="text-muted-foreground mt-1">Sum of all earnings & rewards</p>
-                                </CardContent>
-                            </Card>
-
-                            <Card className="bg-gradient-to-br from-orange-500/10 to-red-500/10 border-orange-500/20 shadow-sm">
-                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                    <CardTitle className="text-sm font-medium">Total Withdrawn</CardTitle>
-                                    <ArrowDownCircle className="h-4 w-4 text-orange-500" />
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">৳{totalWithdrawn.toLocaleString()}</div>
-                                    <p className="text-muted-foreground mt-1">Sum of all payouts processed</p>
-                                </CardContent>
-                            </Card>
-                        </div>
-
-                        <Card>
-                            <CardHeader className="flex flex-row items-center justify-between space-y-0">
-                                <div>
-                                    <CardTitle>Transaction History</CardTitle>
-                                    <CardDescription>View your latest commissions and withdrawals.</CardDescription>
+                {/* My Balance Tab */}
+                <TabsContent value="my-balance" className="space-y-6">
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                        {/* Available Balance */}
+                        <Card className="relative overflow-hidden border-border/60 hover:border-border transition-all duration-200 group shadow-xs">
+                            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                                <div className="h-24 w-24 rounded-full bg-blue-500 blur-2xl" />
+                            </div>
+                            <CardHeader className="flex flex-row items-center justify-between pb-2">
+                                <span className="text-sm font-medium text-muted-foreground">
+                                    Available Balance
+                                </span>
+                                <Badge variant="secondary" className="bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-500/20 border-0 font-medium">
+                                    Wallet
+                                </Badge>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                                <div className="flex items-baseline justify-between">
+                                    <span className="text-3xl font-bold tracking-tight text-blue-600 dark:text-blue-400">
+                                        ৳{calculatedBalance.toLocaleString()}
+                                    </span>
+                                    <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 shrink-0">
+                                        <Wallet className="h-5 w-5" />
+                                    </div>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+                                <div className="pt-2 border-t border-border/50 text-xs text-muted-foreground font-medium">
+                                    Calculated from transaction logs
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        {/* Total Earned */}
+                        <Card className="relative overflow-hidden border-border/60 hover:border-border transition-all duration-200 group shadow-xs">
+                            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                                <div className="h-24 w-24 rounded-full bg-emerald-500 blur-2xl" />
+                            </div>
+                            <CardHeader className="flex flex-row items-center justify-between pb-2">
+                                <span className="text-sm font-medium text-muted-foreground">
+                                    Total Earned
+                                </span>
+                                <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 border-0 font-medium">
+                                    Gross Earnings
+                                </Badge>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                                <div className="flex items-baseline justify-between">
+                                    <span className="text-3xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400">
+                                        ৳{totalEarned.toLocaleString()}
+                                    </span>
+                                    <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 shrink-0">
+                                        <TrendingUp className="h-5 w-5" />
+                                    </div>
+                                </div>
+                                <div className="pt-2 border-t border-border/50 text-xs text-muted-foreground font-medium">
+                                    Sum of all commissions & rewards
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        {/* Total Withdrawn */}
+                        <Card className="relative overflow-hidden border-border/60 hover:border-border transition-all duration-200 group shadow-xs">
+                            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                                <div className="h-24 w-24 rounded-full bg-orange-500 blur-2xl" />
+                            </div>
+                            <CardHeader className="flex flex-row items-center justify-between pb-2">
+                                <span className="text-sm font-medium text-muted-foreground">
+                                    Total Withdrawn
+                                </span>
+                                <Badge variant="secondary" className="bg-orange-500/10 text-orange-600 dark:text-orange-400 hover:bg-orange-500/20 border-0 font-medium">
+                                    Payouts
+                                </Badge>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                                <div className="flex items-baseline justify-between">
+                                    <span className="text-3xl font-bold tracking-tight text-orange-600 dark:text-orange-400">
+                                        ৳{totalWithdrawn.toLocaleString()}
+                                    </span>
+                                    <div className="p-2.5 rounded-xl bg-orange-500/10 text-orange-600 dark:text-orange-400 shrink-0">
+                                        <ArrowDownCircle className="h-5 w-5" />
+                                    </div>
+                                </div>
+                                <div className="pt-2 border-t border-border/50 text-xs text-muted-foreground font-medium">
+                                    Sum of all payouts processed
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+
+                    {/* My Transactions Card */}
+                    <Card className="border-border/60 shadow-md">
+                        <CardHeader className="pb-3">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                <CardTitle className="flex items-center gap-2 text-xl">
+                                    <History className="h-5 w-5 text-primary" />
+                                    Transaction History
+                                </CardTitle>
+                                <div className="flex items-center gap-2 bg-muted/30 p-2 rounded-lg border border-border/50 shrink-0">
+                                    <Filter className="h-4 w-4 text-primary ml-1" />
+                                    <span className="text-xs font-medium">Filter:</span>
                                     <Select value={typeFilter} onValueChange={(val) => { setTypeFilter(val); setMyTxPage(1); }}>
-                                        <SelectTrigger className="w-[140px] h-8">
+                                        <SelectTrigger className="w-[140px] h-8 bg-background/60 text-xs font-medium">
                                             <SelectValue placeholder="Filter type" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="all">All Types</SelectItem>
-                                            <SelectItem value="commission">Commissions</SelectItem>
-                                            <SelectItem value="withdrawal">Withdrawals</SelectItem>
-                                            <SelectItem value="reward">Rewards</SelectItem>
-                                            <SelectItem value="adjustment">Adjustments</SelectItem>
+                                            <SelectItem value="all" className="text-xs">All Types</SelectItem>
+                                            <SelectItem value="commission" className="text-xs">Commissions</SelectItem>
+                                            <SelectItem value="withdrawal" className="text-xs">Withdrawals</SelectItem>
+                                            <SelectItem value="reward" className="text-xs">Rewards</SelectItem>
+                                            <SelectItem value="adjustment" className="text-xs">Adjustments</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="rounded-md border overflow-hidden">
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow className="bg-muted/50">
-                                                <TableHead className="w-[120px]">Date</TableHead>
-                                                <TableHead>Description</TableHead>
-                                                <TableHead className="w-[100px]">Type</TableHead>
-                                                <TableHead className="w-[100px]">Status</TableHead>
-                                                <TableHead className="text-right w-[150px]">Amount</TableHead>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            <div className="rounded-md border border-border/60 overflow-hidden">
+                                <Table>
+                                    <TableHeader className="bg-muted/40">
+                                        <TableRow className="hover:bg-muted/40 border-b-border/60">
+                                            <TableHead className="font-semibold py-3 pl-4 w-[140px]">Date</TableHead>
+                                            <TableHead className="font-semibold py-3">Description</TableHead>
+                                            <TableHead className="font-semibold py-3 w-[120px]">Type</TableHead>
+                                            <TableHead className="font-semibold py-3 w-[120px]">Status</TableHead>
+                                            <TableHead className="font-semibold py-3 text-right pr-4 w-[160px]">Amount</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {isTxFetching && transactions.length === 0 ? (
+                                            Array.from({ length: 5 }).map((_, i) => (
+                                                <TableRow key={i} className="border-b last:border-b-0">
+                                                    <TableCell className="py-3 pl-4">
+                                                        <Skeleton className="h-4 w-24 bg-muted animate-pulse rounded-md" />
+                                                    </TableCell>
+                                                    <TableCell className="py-3">
+                                                        <Skeleton className="h-4 w-48 bg-muted animate-pulse rounded-md" />
+                                                    </TableCell>
+                                                    <TableCell className="py-3">
+                                                        <Skeleton className="h-6 w-20 rounded-full bg-muted animate-pulse" />
+                                                    </TableCell>
+                                                    <TableCell className="py-3">
+                                                        <Skeleton className="h-6 w-16 rounded-full bg-muted animate-pulse" />
+                                                    </TableCell>
+                                                    <TableCell className="py-3 pr-4 text-right">
+                                                        <Skeleton className="h-4 w-20 ml-auto bg-muted animate-pulse rounded-md" />
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))
+                                        ) : transactions.length === 0 ? (
+                                            <TableRow>
+                                                <TableCell colSpan={5} className="py-8 text-center text-muted-foreground font-medium">
+                                                    No transactions found.
+                                                </TableCell>
                                             </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {isTxFetching && transactions.length === 0 ? (
-                                                <TableRow>
-                                                    <TableCell colSpan={5} className="h-24 text-center">
-                                                        <div className="flex items-center justify-center gap-2">
-                                                            <Skeleton className="h-4 w-4 rounded-full animate-pulse" />
-                                                            Loading...
+                                        ) : (
+                                            transactions.map((tx: IWalletTx) => (
+                                                <TableRow key={tx._id} className="hover:bg-muted/15 transition-colors border-b last:border-b-0">
+                                                    <TableCell className="py-3 pl-4 font-medium text-xs text-muted-foreground">
+                                                        {format(new Date(tx.createdAt), "PPP")}
+                                                    </TableCell>
+                                                    <TableCell className="py-3">
+                                                        <div className="flex flex-col">
+                                                            <span className="font-medium text-sm text-foreground">{tx.description}</span>
+                                                            {tx.metadata?.clientName && (
+                                                                <span className="text-xs text-muted-foreground uppercase font-mono">Client: {tx.metadata.clientName}</span>
+                                                            )}
                                                         </div>
                                                     </TableCell>
-                                                </TableRow>
-                                            ) : transactions.length === 0 ? (
-                                                <TableRow>
-                                                    <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
-                                                        No transactions found.
+                                                    <TableCell className="py-3">
+                                                        <Badge variant="outline" className="capitalize font-normal text-xs">
+                                                            {tx.type}
+                                                        </Badge>
+                                                    </TableCell>
+                                                    <TableCell className="py-3">
+                                                        <Badge
+                                                            variant={tx.status === "completed" ? "default" : "secondary"}
+                                                            className="px-2 py-0.5 text-xs font-medium"
+                                                        >
+                                                            {tx.status}
+                                                        </Badge>
+                                                    </TableCell>
+                                                    <TableCell className={`py-3 pr-4 text-right font-bold text-sm ${tx.type === 'withdrawal' ? 'text-red-500' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                                                        {tx.type === 'withdrawal' ? '-' : '+'}৳{tx.amount.toLocaleString()}
                                                     </TableCell>
                                                 </TableRow>
-                                            ) : (
-                                                transactions.map((tx: any) => (
-                                                    <TableRow key={tx._id} className="hover:bg-muted/30 transition-colors">
-                                                        <TableCell className="font-medium">
-                                                            {format(new Date(tx.createdAt), "dd MMM, yyyy")}
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            <div className="flex flex-col">
-                                                                <span className="font-medium">{tx.description}</span>
-                                                                {tx.metadata?.clientName && (
-                                                                    <span className="text-muted-foreground uppercase tracking-tight">Client: {tx.metadata.clientName}</span>
-                                                                )}
-                                                            </div>
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            <Badge variant="outline" className="capitalize font-normal">
-                                                                {tx.type}
-                                                            </Badge>
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            <Badge
-                                                                variant={tx.status === "completed" ? "default" : "secondary"}
-                                                                className="px-1.5 font-normal"
-                                                            >
-                                                                {tx.status}
-                                                            </Badge>
-                                                        </TableCell>
-                                                        <TableCell className={`text-right font-bold ${tx.type === 'withdrawal' ? 'text-red-500' : 'text-green-600 dark:text-green-400'}`}>
-                                                            {tx.type === 'withdrawal' ? '-' : '+'}৳{tx.amount.toLocaleString()}
-                                                        </TableCell>
-                                                    </TableRow>
-                                                ))
-                                            )}
-                                        </TableBody>
-                                    </Table>
-                                </div>
+                                            ))
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </div>
 
-                                {myTxMeta && myTxMeta.totalPages > 1 && (
-                                    <div className="flex items-center justify-end space-x-2 py-4">
-                                        <span className="text-muted-foreground mr-2">Page {myTxMeta.page} of {myTxMeta.totalPages}</span>
-                                        <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => setMyTxPage(p => Math.max(1, p - 1))} disabled={myTxPage === 1 || isTxFetching}>
+                            {/* Pagination Footer */}
+                            {myTxMeta && (
+                                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-border/60">
+                                    <div className="text-sm text-muted-foreground font-medium select-none">
+                                        Showing <span className="font-semibold text-foreground">{transactions.length}</span> of{" "}
+                                        <span className="font-semibold text-foreground">{myTxMeta.total}</span> transactions
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                        <Button
+                                            variant="outline"
+                                            size="icon"
+                                            className="h-8 w-8"
+                                            onClick={() => setMyTxPage(1)}
+                                            disabled={myTxPage === 1 || isTxFetching}
+                                        >
+                                            <ChevronsLeft className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            size="icon"
+                                            className="h-8 w-8"
+                                            onClick={() => setMyTxPage((p) => Math.max(1, p - 1))}
+                                            disabled={myTxPage === 1 || isTxFetching}
+                                        >
                                             <ChevronLeft className="h-4 w-4" />
                                         </Button>
-                                        <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => setMyTxPage(p => Math.min(myTxMeta.totalPages || p, p + 1))} disabled={myTxPage === myTxMeta.totalPages || isTxFetching}>
+                                        <span className="text-xs font-medium px-2 whitespace-nowrap select-none">
+                                            Page {myTxMeta.page} of {myTxMeta.totalPages}
+                                        </span>
+                                        <Button
+                                            variant="outline"
+                                            size="icon"
+                                            className="h-8 w-8"
+                                            onClick={() => setMyTxPage((p) => Math.min(myTxMeta.totalPages, p + 1))}
+                                            disabled={myTxPage >= myTxMeta.totalPages || isTxFetching}
+                                        >
                                             <ChevronRight className="h-4 w-4" />
                                         </Button>
+                                        <Button
+                                            variant="outline"
+                                            size="icon"
+                                            className="h-8 w-8"
+                                            onClick={() => setMyTxPage(myTxMeta.totalPages)}
+                                            disabled={myTxPage >= myTxMeta.totalPages || isTxFetching}
+                                        >
+                                            <ChevronsRight className="h-4 w-4" />
+                                        </Button>
                                     </div>
-                                )}
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
-                )}
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </TabsContent>
 
-                <TabsContent value="staff-balances" className="space-y-4">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Staff Wallet Management</CardTitle>
-                            <CardDescription>View all staff balances and process intentional payouts.</CardDescription>
+                {/* Staff Balances Tab */}
+                <TabsContent value="staff-balances" className="space-y-6">
+                    <Card className="border-border/60 shadow-md">
+                        <CardHeader className="pb-3">
+                            <CardTitle className="flex items-center gap-2 text-xl">
+                                <Users className="h-5 w-5 text-primary" />
+                                Staff Wallet Management
+                            </CardTitle>
                         </CardHeader>
-                        <CardContent>
-                            <div className="rounded-md border overflow-hidden">
+                        <CardContent className="space-y-6">
+                            <div className="rounded-md border border-border/60 overflow-hidden">
                                 <Table>
-                                    <TableHeader>
-                                        <TableRow className="bg-muted/50">
-                                            <TableHead>Staff Member</TableHead>
-                                            <TableHead>Staff ID</TableHead>
-                                            <TableHead>Designation</TableHead>
-                                            <TableHead className="text-right">Balance</TableHead>
-                                            <TableHead className="text-right">Action</TableHead>
+                                    <TableHeader className="bg-muted/40">
+                                        <TableRow className="hover:bg-muted/40 border-b-border/60">
+                                            <TableHead className="font-semibold py-3 pl-4">Staff Member</TableHead>
+                                            <TableHead className="font-semibold py-3">Staff ID</TableHead>
+                                            <TableHead className="font-semibold py-3">Designation</TableHead>
+                                            <TableHead className="font-semibold py-3 text-right">Balance</TableHead>
+                                            <TableHead className="font-semibold py-3 text-right pr-4">Action</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
                                         {isAdminStaffFetching && (!adminStaffData || staffPage > 1) ? (
-                                            <TableRow>
-                                                <TableCell colSpan={5} className="h-24 text-center">Loading...</TableCell>
-                                            </TableRow>
-                                        ) : adminStaffData?.staffs?.map((staff: any) => (
-                                            <TableRow key={staff._id}>
-                                                <TableCell>
+                                            Array.from({ length: 5 }).map((_, i) => (
+                                                <TableRow key={i} className="border-b last:border-b-0">
+                                                    <TableCell className="py-3 pl-4">
+                                                        <Skeleton className="h-4 w-32 bg-muted animate-pulse rounded-md" />
+                                                    </TableCell>
+                                                    <TableCell className="py-3">
+                                                        <Skeleton className="h-4 w-20 bg-muted animate-pulse rounded-md" />
+                                                    </TableCell>
+                                                    <TableCell className="py-3">
+                                                        <Skeleton className="h-4 w-24 bg-muted animate-pulse rounded-md" />
+                                                    </TableCell>
+                                                    <TableCell className="py-3 text-right">
+                                                        <Skeleton className="h-4 w-20 ml-auto bg-muted animate-pulse rounded-md" />
+                                                    </TableCell>
+                                                    <TableCell className="py-3 pr-4 text-right">
+                                                        <Skeleton className="h-8 w-28 ml-auto bg-muted animate-pulse rounded-md" />
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))
+                                        ) : adminStaffData?.staffs?.map((staff: IStaffWallet) => (
+                                            <TableRow key={staff._id} className="hover:bg-muted/15 transition-colors border-b last:border-b-0">
+                                                <TableCell className="py-3 pl-4">
                                                     <div className="flex flex-col">
-                                                        <span className="font-medium">{staff.user?.name}</span>
-                                                        <span className="text-muted-foreground">{staff.phone}</span>
+                                                        <span className="font-semibold text-sm text-foreground">{staff.user?.name}</span>
+                                                        <span className="text-xs text-muted-foreground font-mono">{staff.phone}</span>
                                                     </div>
                                                 </TableCell>
-                                                <TableCell>{staff.staffId}</TableCell>
-                                                <TableCell className="capitalize">{staff.designation}</TableCell>
-                                                <TableCell className="text-right font-bold text-blue-600">৳{staff.balance?.toLocaleString() || 0}</TableCell>
-                                                <TableCell className="text-right">
+                                                <TableCell className="py-3 font-mono text-xs">{staff.staffId}</TableCell>
+                                                <TableCell className="py-3 capitalize text-sm">{staff.designation}</TableCell>
+                                                <TableCell className="py-3 text-right font-bold text-sm text-blue-600 dark:text-blue-400">৳{staff.balance?.toLocaleString() || 0}</TableCell>
+                                                <TableCell className="py-3 pr-4 text-right">
                                                     <WithdrawDialog staff={staff} onWithdraw={handleWithdraw} />
                                                 </TableCell>
                                             </TableRow>
@@ -331,49 +515,115 @@ export default function BalancesClient() {
                                 </Table>
                             </div>
 
-                            {adminStaffData?.meta && adminStaffData.meta.totalPages > 1 && (
-                                <div className="flex items-center justify-end space-x-2 py-4">
-                                    <span className="text-muted-foreground mr-2">Page {adminStaffData.meta.page} of {adminStaffData.meta.totalPages}</span>
-                                    <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => setStaffPage(p => Math.max(1, p - 1))} disabled={staffPage === 1 || isAdminStaffFetching}>
-                                        <ChevronLeft className="h-4 w-4" />
-                                    </Button>
-                                    <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => setStaffPage(p => Math.min(adminStaffData.meta.totalPages || p, p + 1))} disabled={staffPage === adminStaffData.meta.totalPages || isAdminStaffFetching}>
-                                        <ChevronRight className="h-4 w-4" />
-                                    </Button>
+                            {/* Pagination Footer */}
+                            {adminStaffData?.meta && (
+                                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-border/60">
+                                    <div className="text-sm text-muted-foreground font-medium select-none">
+                                        Showing <span className="font-semibold text-foreground">{adminStaffData.staffs?.length || 0}</span> of{" "}
+                                        <span className="font-semibold text-foreground">{adminStaffData.meta.total}</span> staff members
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                        <Button
+                                            variant="outline"
+                                            size="icon"
+                                            className="h-8 w-8"
+                                            onClick={() => setStaffPage(1)}
+                                            disabled={staffPage === 1 || isAdminStaffFetching}
+                                        >
+                                            <ChevronsLeft className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            size="icon"
+                                            className="h-8 w-8"
+                                            onClick={() => setStaffPage((p) => Math.max(1, p - 1))}
+                                            disabled={staffPage === 1 || isAdminStaffFetching}
+                                        >
+                                            <ChevronLeft className="h-4 w-4" />
+                                        </Button>
+                                        <span className="text-xs font-medium px-2 whitespace-nowrap select-none">
+                                            Page {adminStaffData.meta.page} of {adminStaffData.meta.totalPages}
+                                        </span>
+                                        <Button
+                                            variant="outline"
+                                            size="icon"
+                                            className="h-8 w-8"
+                                            onClick={() => setStaffPage((p) => Math.min(adminStaffData.meta.totalPages, p + 1))}
+                                            disabled={staffPage >= adminStaffData.meta.totalPages || isAdminStaffFetching}
+                                        >
+                                            <ChevronRight className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            size="icon"
+                                            className="h-8 w-8"
+                                            onClick={() => setStaffPage(adminStaffData.meta.totalPages)}
+                                            disabled={staffPage >= adminStaffData.meta.totalPages || isAdminStaffFetching}
+                                        >
+                                            <ChevronsRight className="h-4 w-4" />
+                                        </Button>
+                                    </div>
                                 </div>
                             )}
                         </CardContent>
                     </Card>
                 </TabsContent>
 
-                <TabsContent value="all-transactions" className="space-y-4">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Global Audit Log</CardTitle>
-                            <CardDescription>Track every financial transaction across the entire system.</CardDescription>
+                {/* All Transactions Tab */}
+                <TabsContent value="all-transactions" className="space-y-6">
+                    <Card className="border-border/60 shadow-md">
+                        <CardHeader className="pb-3">
+                            <CardTitle className="flex items-center gap-2 text-xl">
+                                <History className="h-5 w-5 text-primary" />
+                                Global Audit Log
+                            </CardTitle>
                         </CardHeader>
-                        <CardContent>
-                            <div className="rounded-md border overflow-hidden">
+                        <CardContent className="space-y-6">
+                            <div className="rounded-md border border-border/60 overflow-hidden">
                                 <Table>
-                                    <TableHeader>
-                                        <TableRow className="bg-muted/50">
-                                            <TableHead>Date & Time</TableHead>
-                                            <TableHead>Staff Name</TableHead>
-                                            <TableHead>Activity</TableHead>
-                                            <TableHead>Type</TableHead>
-                                            <TableHead className="text-right">Amount</TableHead>
+                                    <TableHeader className="bg-muted/40">
+                                        <TableRow className="hover:bg-muted/40 border-b-border/60">
+                                            <TableHead className="font-semibold py-3 pl-4 w-[160px]">Date & Time</TableHead>
+                                            <TableHead className="font-semibold py-3">Staff Name</TableHead>
+                                            <TableHead className="font-semibold py-3">Activity</TableHead>
+                                            <TableHead className="font-semibold py-3 w-[120px]">Type</TableHead>
+                                            <TableHead className="font-semibold py-3 text-right pr-4 w-[160px]">Amount</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
                                         {isAllTxFetching && (!allTxData || allTxPage > 1) ? (
-                                            <TableRow><TableCell colSpan={5} className="text-center h-24">Loading audit log...</TableCell></TableRow>
-                                        ) : allTxData?.data?.map((tx: any) => (
-                                            <TableRow key={tx._id}>
-                                                <TableCell>{format(new Date(tx.createdAt), "dd MMM HH:mm")}</TableCell>
-                                                <TableCell className="font-medium">{tx.staffId?.userId?.name || 'Deleted Staff'}</TableCell>
-                                                <TableCell>{tx.description}</TableCell>
-                                                <TableCell><Badge variant="outline" className="uppercase py-0 leading-none h-4">{tx.type}</Badge></TableCell>
-                                                <TableCell className={`text-right font-bold ${tx.type === 'withdrawal' ? 'text-red-500' : 'text-green-600'}`}>
+                                            Array.from({ length: 5 }).map((_, i) => (
+                                                <TableRow key={i} className="border-b last:border-b-0">
+                                                    <TableCell className="py-3 pl-4">
+                                                        <Skeleton className="h-4 w-24 bg-muted animate-pulse rounded-md" />
+                                                    </TableCell>
+                                                    <TableCell className="py-3">
+                                                        <Skeleton className="h-4 w-32 bg-muted animate-pulse rounded-md" />
+                                                    </TableCell>
+                                                    <TableCell className="py-3">
+                                                        <Skeleton className="h-4 w-48 bg-muted animate-pulse rounded-md" />
+                                                    </TableCell>
+                                                    <TableCell className="py-3">
+                                                        <Skeleton className="h-6 w-20 rounded-full bg-muted animate-pulse" />
+                                                    </TableCell>
+                                                    <TableCell className="py-3 pr-4 text-right">
+                                                        <Skeleton className="h-4 w-20 ml-auto bg-muted animate-pulse rounded-md" />
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))
+                                        ) : allTxData?.data?.map((tx: IWalletTx) => (
+                                            <TableRow key={tx._id} className="hover:bg-muted/15 transition-colors border-b last:border-b-0">
+                                                <TableCell className="py-3 pl-4 font-medium text-xs text-muted-foreground">
+                                                    {format(new Date(tx.createdAt), "PPP p")}
+                                                </TableCell>
+                                                <TableCell className="py-3 font-semibold text-sm text-foreground">{tx.staffId?.userId?.name || 'Deleted Staff'}</TableCell>
+                                                <TableCell className="py-3 text-sm">{tx.description}</TableCell>
+                                                <TableCell className="py-3">
+                                                    <Badge variant="outline" className="uppercase py-0.5 text-xs font-medium">
+                                                        {tx.type}
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell className={`py-3 pr-4 text-right font-bold text-sm ${tx.type === 'withdrawal' ? 'text-red-500' : 'text-emerald-600 dark:text-emerald-400'}`}>
                                                     {tx.type === 'withdrawal' ? '-' : '+'}৳{tx.amount.toLocaleString()}
                                                 </TableCell>
                                             </TableRow>
@@ -382,15 +632,54 @@ export default function BalancesClient() {
                                 </Table>
                             </div>
 
-                            {allTxData?.meta && allTxData.meta.totalPages > 1 && (
-                                <div className="flex items-center justify-end space-x-2 py-4">
-                                    <span className="text-muted-foreground mr-2">Page {allTxData.meta.page} of {allTxData.meta.totalPages}</span>
-                                    <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => setAllTxPage(p => Math.max(1, p - 1))} disabled={allTxPage === 1 || isAllTxFetching}>
-                                        <ChevronLeft className="h-4 w-4" />
-                                    </Button>
-                                    <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => setAllTxPage(p => Math.min(allTxData.meta.totalPages || p, p + 1))} disabled={allTxPage === allTxData.meta.totalPages || isAllTxFetching}>
-                                        <ChevronRight className="h-4 w-4" />
-                                    </Button>
+                            {/* Pagination Footer */}
+                            {allTxData?.meta && (
+                                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-border/60">
+                                    <div className="text-sm text-muted-foreground font-medium select-none">
+                                        Showing <span className="font-semibold text-foreground">{allTxData.data?.length || 0}</span> of{" "}
+                                        <span className="font-semibold text-foreground">{allTxData.meta.total}</span> audit records
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                        <Button
+                                            variant="outline"
+                                            size="icon"
+                                            className="h-8 w-8"
+                                            onClick={() => setAllTxPage(1)}
+                                            disabled={allTxPage === 1 || isAllTxFetching}
+                                        >
+                                            <ChevronsLeft className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            size="icon"
+                                            className="h-8 w-8"
+                                            onClick={() => setAllTxPage((p) => Math.max(1, p - 1))}
+                                            disabled={allTxPage === 1 || isAllTxFetching}
+                                        >
+                                            <ChevronLeft className="h-4 w-4" />
+                                        </Button>
+                                        <span className="text-xs font-medium px-2 whitespace-nowrap select-none">
+                                            Page {allTxData.meta.page} of {allTxData.meta.totalPages}
+                                        </span>
+                                        <Button
+                                            variant="outline"
+                                            size="icon"
+                                            className="h-8 w-8"
+                                            onClick={() => setAllTxPage((p) => Math.min(allTxData.meta.totalPages, p + 1))}
+                                            disabled={allTxPage >= allTxData.meta.totalPages || isAllTxFetching}
+                                        >
+                                            <ChevronRight className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            size="icon"
+                                            className="h-8 w-8"
+                                            onClick={() => setAllTxPage(allTxData.meta.totalPages)}
+                                            disabled={allTxPage >= allTxData.meta.totalPages || isAllTxFetching}
+                                        >
+                                            <ChevronsRight className="h-4 w-4" />
+                                        </Button>
+                                    </div>
                                 </div>
                             )}
                         </CardContent>
@@ -401,7 +690,7 @@ export default function BalancesClient() {
     );
 }
 
-function WithdrawDialog({ staff, onWithdraw }: { staff: any, onWithdraw: any }) {
+function WithdrawDialog({ staff, onWithdraw }: { staff: IStaffWallet, onWithdraw: (staffDocId: string, amount: number, description: string) => Promise<void> }) {
     const [amount, setAmount] = useState("");
     const [description, setDescription] = useState("");
     const [open, setOpen] = useState(false);
@@ -418,7 +707,7 @@ function WithdrawDialog({ staff, onWithdraw }: { staff: any, onWithdraw: any }) 
             setOpen(false);
             setAmount("");
             setDescription("");
-        } catch (err) {
+        } catch {
             // Error handled in parent
         } finally {
             setIsSubmitting(false);
@@ -428,7 +717,7 @@ function WithdrawDialog({ staff, onWithdraw }: { staff: any, onWithdraw: any }) 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button variant="outline" disabled={staff.balance <= 0}>Process Payout</Button>
+                <Button variant="outline" className="border-primary text-primary hover:bg-accent shadow-xs" disabled={(staff.balance || 0) <= 0}>Process Payout</Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
@@ -440,20 +729,20 @@ function WithdrawDialog({ staff, onWithdraw }: { staff: any, onWithdraw: any }) 
                 <div className="grid gap-4 py-4">
                     <div className="grid grid-cols-4 items-center gap-4">
                         <Label className="text-right">Available</Label>
-                        <div className="col-span-3 font-bold text-blue-600">৳{staff.balance?.toLocaleString()}</div>
+                        <div className="col-span-3 font-bold text-blue-600 dark:text-blue-400">৳{staff.balance?.toLocaleString() || 0}</div>
                     </div>
                     <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="amount" className="text-right">Amount (৳)</Label>
-                        <Input id="amount" type="number" value={amount} onChange={(e) => setAmount(e.target.value)} className="col-span-3 h-8" placeholder="0.00" />
+                        <Input id="amount" type="number" value={amount} onChange={(e) => setAmount(e.target.value)} className="col-span-3 h-9" placeholder="0.00" />
                     </div>
                     <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="desc" className="text-right">Notes</Label>
-                        <Input id="desc" value={description} onChange={(e) => setDescription(e.target.value)} className="col-span-3 h-8" placeholder="Cash payment, bank transfer, etc." />
+                        <Input id="desc" value={description} onChange={(e) => setDescription(e.target.value)} className="col-span-3 h-9" placeholder="Cash payment, bank transfer, etc." />
                     </div>
                 </div>
                 <DialogFooter className="flex-row justify-end gap-2">
                     <Button variant="outline" size="sm" onClick={() => setOpen(false)} disabled={isSubmitting}>Cancel</Button>
-                    <Button size="sm" onClick={handleSubmit} disabled={!amount || parseFloat(amount) > staff.balance || isSubmitting}>
+                    <Button size="sm" onClick={handleSubmit} disabled={!amount || parseFloat(amount) > (staff.balance || 0) || isSubmitting}>
                         {isSubmitting ? "Processing..." : "Confirm Payout"}
                     </Button>
                 </DialogFooter>

@@ -33,16 +33,14 @@ import { StaffOvertimeTab } from "@/app/(root)/staffs/[id]/_components/overtime-
 import { PaymentHistoryTab } from "@/app/(root)/staffs/[id]/_components/payment-history-tab";
 
 export default function RootAccount() {
-    const { data, isPending, isRefetching } = useSession();
+    const { data, isPending } = useSession();
 
     const {
         data: staffData,
         isLoading: isStaffLoading,
-        isFetching: isStaffFetching,
     } = useGetMeQuery({}, { skip: !data?.user?.id });
 
-    const isLoading =
-        isPending || isRefetching || isStaffLoading || isStaffFetching;
+    const isLoading = isPending || isStaffLoading;
 
     const searchParams = useSearchParams();
     const pathname = usePathname();

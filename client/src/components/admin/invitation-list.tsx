@@ -1,473 +1,273 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
     useGetInvitationsQuery,
     useResendInvitationMutation,
     useCancelInvitationMutation,
 } from '@/redux/features/invitation/invitationApi';
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-    Tooltip,
-    TooltipContent,
-    TooltipProvider,
-    TooltipTrigger,
-} from '@/components/ui/tooltip';
-import {
-    Loader,
     Mail,
-    Trash2,
-    Clock,
-    CheckCircle2,
-    XCircle,
+    RefreshCcw,
     AlertTriangle,
-    RefreshCw,
-    Copy,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { format, formatDistanceToNow } from 'date-fns';
 import InviteEmployeeDialog from './invite-employee-dialog';
 
+// Import modular redesign components
+import { InvitationStats } from './invitations/invitation-stats';
+import { InvitationToolbar } from './invitations/invitation-toolbar';
+import { InvitationsTable } from './invitations/invitations-table';
+import { InvitationMobileList } from './invitations/invitation-mobile-card';
+import { InvitationPagination } from './invitations/invitation-pagination';
+import {
+    isInvitationExpired,
+    isInvitationPending,
+    StatusFilterType,
+} from './invitations/types';
+
 export default function InvitationList() {
-    const [filter, setFilter] = useState<
-        'all' | 'pending' | 'used' | 'expired'
-    >('all');
-    const { data, isLoading, isFetching, refetch } = useGetInvitationsQuery(
-        filter === 'all' ? undefined : { isUsed: filter === 'used' },
-    );
-    const [resendInvitation, { isLoading: isResending }] =
-        useResendInvitationMutation();
-    const [cancelInvitation, { isLoading: isCanceling }] =
-        useCancelInvitationMutation();
+    const { data, isLoading, isFetching, refetch } = useGetInvitationsQuery(undefined);
+    const [resendInvitation, { isLoading: isResending }] = useResendInvitationMutation();
+    const [cancelInvitation, { isLoading: isCanceling }] = useCancelInvitationMutation();
+
+    // Filter and search states
+    const [searchQuery, setSearchQuery] = useState('');
+    const [statusFilter, setStatusFilter] = useState<StatusFilterType>('all');
+
+    // Pagination states
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
 
     const handleResend = async (id: string) => {
         try {
             await resendInvitation(id).unwrap();
             toast.success('Invitation resent successfully!');
             refetch();
-        } catch (err: any) {
-            toast.error(err?.data?.message || 'Failed to resend invitation');
+        } catch (err) {
+            const error = err as { data?: { message?: string } };
+            toast.error(error?.data?.message || 'Failed to resend invitation');
         }
     };
 
     const handleCancel = async (id: string) => {
-        if (!confirm('Are you sure you want to cancel this invitation?'))
-            return;
-
         try {
             await cancelInvitation(id).unwrap();
             toast.success('Invitation cancelled successfully!');
             refetch();
-        } catch (err: any) {
-            toast.error(err?.data?.message || 'Failed to cancel invitation');
+        } catch (err) {
+            const error = err as { data?: { message?: string } };
+            toast.error(error?.data?.message || 'Failed to cancel invitation');
         }
     };
 
-    const invitations = data?.data || [];
-    const pendingInvitations = invitations.filter(
-        (inv) => !inv.isUsed && new Date(inv.expiresAt) > new Date(),
-    );
-    const usedInvitations = invitations.filter((inv) => inv.isUsed);
-    const expiredInvitations = invitations.filter(
-        (inv) => !inv.isUsed && new Date(inv.expiresAt) <= new Date(),
-    );
+    const invitations = useMemo(() => data?.data || [], [data]);
 
-    const getFilteredInvitations = () => {
-        switch (filter) {
-            case 'pending':
-                return pendingInvitations;
-            case 'used':
-                return usedInvitations;
-            case 'expired':
-                return expiredInvitations;
-            default:
-                return invitations;
+    // Calculate overall stats based on all invitations
+    const stats = useMemo(() => {
+        const total = invitations.length;
+        const pending = invitations.filter(isInvitationPending).length;
+        const accepted = invitations.filter((inv) => inv.isUsed).length;
+        const expired = invitations.filter(isInvitationExpired).length;
+        return { total, pending, accepted, expired };
+    }, [invitations]);
+
+    // Filter invitations based on search query and status filter
+    const filteredInvitations = useMemo(() => {
+        let result = invitations;
+
+        // Apply status filter
+        if (statusFilter === 'pending') {
+            result = result.filter(isInvitationPending);
+        } else if (statusFilter === 'accepted') {
+            result = result.filter((inv) => inv.isUsed);
+        } else if (statusFilter === 'expired') {
+            result = result.filter(isInvitationExpired);
         }
-    };
 
-    const getStatusBadge = (invitation: any) => {
-        if (invitation.isUsed) {
-            return (
-                <Badge
-                    variant="default"
-                    className="gap-1 bg-emerald-500 hover:bg-emerald-600"
-                >
-                    <CheckCircle2 className="h-3 w-3" />
-                    Accepted
-                </Badge>
+        // Apply search query (by email, designation, department, or role)
+        if (searchQuery.trim() !== '') {
+            const query = searchQuery.toLowerCase();
+            result = result.filter(
+                (inv) =>
+                    inv.email.toLowerCase().includes(query) ||
+                    (inv.designation && inv.designation.toLowerCase().includes(query)) ||
+                    (inv.department && inv.department.toLowerCase().includes(query)) ||
+                    inv.role.toLowerCase().includes(query)
             );
         }
-        if (new Date(invitation.expiresAt) <= new Date()) {
-            return (
-                <Badge variant="destructive" className="gap-1">
-                    <XCircle className="h-3 w-3" />
-                    Expired
-                </Badge>
-            );
-        }
-        return (
-            <Badge
-                variant="secondary"
-                className="gap-1 bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-500"
-            >
-                <Clock className="h-3 w-3" />
-                Pending
-            </Badge>
-        );
+
+        return result;
+    }, [invitations, statusFilter, searchQuery]);
+
+    // Reset filters handler
+    const isFiltered = searchQuery !== '' || statusFilter !== 'all';
+    const handleResetFilters = () => {
+        setSearchQuery('');
+        setStatusFilter('all');
+        setCurrentPage(1);
     };
 
-    const getRoleBadge = (role: string) => {
-        const roleColors: Record<string, string> = {
-            super_admin:
-                'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
-            admin: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
-            hr_manager:
-                'bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-400',
-            team_leader:
-                'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-400',
-            staff: 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300',
-        };
-
-        return (
-            <Badge
-                variant="outline"
-                className={`font-medium ${roleColors[role] || ''}`}
-            >
-                {role.replace('_', ' ')}
-            </Badge>
-        );
+    const handleSearchChange = (val: string) => {
+        setSearchQuery(val);
+        setCurrentPage(1);
     };
 
-    const renderTable = (invitations: any[]) => (
-        <div className="rounded-lg border">
-            <Table>
-                <TableHeader>
-                    <TableRow className="bg-muted/50">
-                        <TableHead className="font-semibold">
-                            Employee Details
-                        </TableHead>
-                        <TableHead className="font-semibold">
-                            Role & Salary
-                        </TableHead>
-                        <TableHead className="font-semibold">Status</TableHead>
-                        <TableHead className="font-semibold">Expires</TableHead>
-                        <TableHead className="text-right font-semibold">
-                            Actions
-                        </TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {invitations.length === 0 ? (
-                        <TableRow>
-                            <TableCell colSpan={5} className="h-32 text-center">
-                                <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                                    <Mail className="h-8 w-8 opacity-50" />
-                                    <p>No invitations found</p>
-                                    <p className="text-sm">
-                                        Click &quot;Invite Employee&quot; to
-                                        send a new invitation
-                                    </p>
-                                </div>
-                            </TableCell>
-                        </TableRow>
-                    ) : (
-                        invitations.map((invitation) => (
-                            <TableRow
-                                key={invitation._id}
-                                className="hover:bg-muted/30"
-                            >
-                                <TableCell>
-                                    <div className="flex flex-col gap-0.5">
-                                        <span className="font-medium">
-                                            {invitation.email}
-                                        </span>
-                                        <span className="text-sm text-muted-foreground">
-                                            {invitation.designation}
-                                            {invitation.department &&
-                                                ` • ${invitation.department}`}
-                                        </span>
-                                    </div>
-                                </TableCell>
-                                <TableCell>
-                                    <div className="flex flex-col gap-1.5">
-                                        {getRoleBadge(invitation.role)}
-                                        <span className="text-sm font-medium">
-                                            ৳
-                                            {invitation.salary.toLocaleString()}
-                                        </span>
-                                    </div>
-                                </TableCell>
-                                <TableCell>
-                                    {getStatusBadge(invitation)}
-                                </TableCell>
-                                <TableCell>
-                                    <TooltipProvider>
-                                        <Tooltip>
-                                            <TooltipTrigger asChild>
-                                                <span className="text-sm cursor-help">
-                                                    {new Date(
-                                                        invitation.expiresAt,
-                                                    ) > new Date()
-                                                        ? formatDistanceToNow(
-                                                              new Date(
-                                                                  invitation.expiresAt,
-                                                              ),
-                                                              {
-                                                                  addSuffix: true,
-                                                              },
-                                                          )
-                                                        : 'Expired'}
-                                                </span>
-                                            </TooltipTrigger>
-                                            <TooltipContent>
-                                                {format(
-                                                    new Date(
-                                                        invitation.expiresAt,
-                                                    ),
-                                                    'PPpp',
-                                                )}
-                                            </TooltipContent>
-                                        </Tooltip>
-                                    </TooltipProvider>
-                                </TableCell>
-                                <TableCell className="text-right">
-                                    <div className="flex justify-end gap-1">
-                                        {!invitation.isUsed && (
-                                            <>
-                                                <TooltipProvider>
-                                                    <Tooltip>
-                                                        <TooltipTrigger asChild>
-                                                            <Button
-                                                                size="icon"
-                                                                variant="ghost"
-                                                                onClick={() => {
-                                                                    const url = `${window.location.origin}/sign-up/${invitation.token}`;
-                                                                    navigator.clipboard.writeText(
-                                                                        url,
-                                                                    );
-                                                                    toast.success(
-                                                                        'Link copied to clipboard',
-                                                                    );
-                                                                }}
-                                                                className="h-8 w-8"
-                                                            >
-                                                                <Copy className="h-4 w-4" />
-                                                            </Button>
-                                                        </TooltipTrigger>
-                                                        <TooltipContent>
-                                                            Copy link
-                                                        </TooltipContent>
-                                                    </Tooltip>
-                                                </TooltipProvider>
-                                                <TooltipProvider>
-                                                    <Tooltip>
-                                                        <TooltipTrigger asChild>
-                                                            <Button
-                                                                size="icon"
-                                                                variant="ghost"
-                                                                onClick={() =>
-                                                                    handleResend(
-                                                                        invitation._id,
-                                                                    )
-                                                                }
-                                                                disabled={
-                                                                    isResending
-                                                                }
-                                                                className="h-8 w-8"
-                                                            >
-                                                                <RefreshCw
-                                                                    className={`h-4 w-4 ${isResending ? 'animate-spin' : ''}`}
-                                                                />
-                                                            </Button>
-                                                        </TooltipTrigger>
-                                                        <TooltipContent>
-                                                            Resend invitation
-                                                        </TooltipContent>
-                                                    </Tooltip>
-                                                </TooltipProvider>
-                                                <TooltipProvider>
-                                                    <Tooltip>
-                                                        <TooltipTrigger asChild>
-                                                            <Button
-                                                                size="icon"
-                                                                variant="ghost"
-                                                                onClick={() =>
-                                                                    handleCancel(
-                                                                        invitation._id,
-                                                                    )
-                                                                }
-                                                                disabled={
-                                                                    isCanceling
-                                                                }
-                                                                className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                                                            >
-                                                                <Trash2 className="h-4 w-4" />
-                                                            </Button>
-                                                        </TooltipTrigger>
-                                                        <TooltipContent>
-                                                            Cancel invitation
-                                                        </TooltipContent>
-                                                    </Tooltip>
-                                                </TooltipProvider>
-                                            </>
-                                        )}
-                                    </div>
-                                </TableCell>
-                            </TableRow>
-                        ))
-                    )}
-                </TableBody>
-            </Table>
-        </div>
-    );
+    const handleStatusFilterChange = (val: StatusFilterType) => {
+        setStatusFilter(val);
+        setCurrentPage(1);
+    };
 
-    if (isLoading) {
-        return (
-            <Card>
-                <CardContent className="flex items-center justify-center py-16">
-                    <div className="flex flex-col items-center gap-2">
-                        <Loader className="h-8 w-8 animate-spin text-primary" />
-                        <p className="text-sm text-muted-foreground">
-                            Loading invitations...
-                        </p>
-                    </div>
-                </CardContent>
-            </Card>
-        );
-    }
+    const handlePageSizeChange = (size: number) => {
+        setPageSize(size);
+        setCurrentPage(1);
+    };
+
+    // Pagination calculations
+    const totalPages = Math.max(1, Math.ceil(filteredInvitations.length / pageSize));
+    const startIndex = (currentPage - 1) * pageSize;
+    const paginatedInvitations = useMemo(() => {
+        return filteredInvitations.slice(startIndex, startIndex + pageSize);
+    }, [filteredInvitations, startIndex, pageSize]);
 
     return (
-        <Card>
-            <CardHeader className="pb-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div>
-                        <CardTitle>Manage Invitations</CardTitle>
-                        <CardDescription className="mt-1">
-                            Send invitations and track their status
-                        </CardDescription>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <Button
-                            variant="outline"
-                            size="icon"
-                            onClick={() => refetch()}
-                            disabled={isFetching}
-                            className="h-9 w-9"
-                        >
-                            <RefreshCw
-                                className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`}
-                            />
-                        </Button>
-                        <InviteEmployeeDialog />
-                    </div>
-                </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-                {/* Stats Overview */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <div className="rounded-lg border p-3 bg-muted/30">
-                        <p className="text-2xl font-bold">
-                            {invitations.length}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                            Total Invitations
-                        </p>
-                    </div>
-                    <div className="rounded-lg border p-3 bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800">
-                        <p className="text-2xl font-bold text-amber-700 dark:text-amber-400">
-                            {pendingInvitations.length}
-                        </p>
-                        <p className="text-xs text-amber-600 dark:text-amber-500">
-                            Pending
-                        </p>
-                    </div>
-                    <div className="rounded-lg border p-3 bg-emerald-50 dark:bg-emerald-900/10 border-emerald-200 dark:border-emerald-800">
-                        <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">
-                            {usedInvitations.length}
-                        </p>
-                        <p className="text-xs text-emerald-600 dark:text-emerald-500">
-                            Accepted
-                        </p>
-                    </div>
-                    <div className="rounded-lg border p-3 bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800">
-                        <p className="text-2xl font-bold text-red-700 dark:text-red-400">
-                            {expiredInvitations.length}
-                        </p>
-                        <p className="text-xs text-red-600 dark:text-red-500">
-                            Expired
-                        </p>
-                    </div>
+        <div className="space-y-8 p-1">
+            {/* Header & Stats Overview (Matching Earnings Layout Exactly) */}
+            <div className="flex flex-col gap-6">
+                <div>
+                    <h2 className="text-3xl font-bold tracking-tight bg-linear-to-r from-foreground to-foreground/70 bg-clip-text">
+                        Invitations Overview
+                    </h2>
+                    <p className="text-muted-foreground mt-1">
+                        Invite team members and manage existing invitations.
+                    </p>
                 </div>
 
-                {/* Filter Tabs */}
-                <Tabs
-                    defaultValue="all"
-                    value={filter}
-                    onValueChange={(v: string) => setFilter(v as any)}
-                >
-                    <TabsList className="w-full sm:w-auto grid grid-cols-4 sm:inline-flex">
-                        <TabsTrigger value="all" className="text-xs sm:text-sm">
-                            All
-                        </TabsTrigger>
-                        <TabsTrigger
-                            value="pending"
-                            className="text-xs sm:text-sm"
-                        >
-                            Pending
-                        </TabsTrigger>
-                        <TabsTrigger
-                            value="used"
-                            className="text-xs sm:text-sm"
-                        >
-                            Accepted
-                        </TabsTrigger>
-                        <TabsTrigger
-                            value="expired"
-                            className="text-xs sm:text-sm"
-                        >
-                            Expired
-                        </TabsTrigger>
-                    </TabsList>
+                <InvitationStats stats={stats} isLoading={isLoading} />
+            </div>
 
-                    <div className="mt-4">
-                        {renderTable(getFilteredInvitations())}
-                    </div>
-                </Tabs>
-
-                {/* Expired Warning */}
-                {expiredInvitations.length > 0 && filter !== 'expired' && (
-                    <div className="flex items-start gap-3 p-4 bg-amber-50 dark:bg-amber-900/10 rounded-lg border border-amber-200 dark:border-amber-800">
-                        <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
-                        <div>
-                            <p className="font-medium text-amber-800 dark:text-amber-300">
-                                {expiredInvitations.length} expired invitation
-                                {expiredInvitations.length > 1 ? 's' : ''}
-                            </p>
-                            <p className="text-sm text-amber-700 dark:text-amber-400">
-                                These invitations need to be resent or
-                                cancelled.
-                            </p>
+            {/* Main Content Area (Matching Recent Earnings Section Card) */}
+            <Card className="border-border/60 shadow-md">
+                <CardHeader className="pb-3">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <CardTitle className="flex items-center gap-2 text-xl">
+                            <Mail className="h-5 w-5 text-primary" />
+                            Invitation Management
+                        </CardTitle>
+                        <div className="flex items-center gap-3">
+                            <Button
+                                variant="outline"
+                                className="border-primary text-primary hover:bg-accent hover:text-accent-foreground shadow-xs"
+                                onClick={() => refetch()}
+                                disabled={isFetching}
+                            >
+                                <RefreshCcw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+                                Refresh
+                            </Button>
+                            <InviteEmployeeDialog />
                         </div>
                     </div>
-                )}
-            </CardContent>
-        </Card>
+                </CardHeader>
+
+                <CardContent className="space-y-6">
+                    {/* Filters Toolbar */}
+                    <InvitationToolbar
+                        searchQuery={searchQuery}
+                        onSearchChange={handleSearchChange}
+                        statusFilter={statusFilter}
+                        onStatusFilterChange={handleStatusFilterChange}
+                        onReset={handleResetFilters}
+                        isFiltered={isFiltered}
+                    />
+
+                    {/* Table / Mobile Cards / Empty State */}
+                    {isLoading ? (
+                        <div className="space-y-3">
+                            {[...Array(4)].map((_, i) => (
+                                <Skeleton key={i} className="h-12 w-full bg-muted animate-pulse rounded-md" />
+                            ))}
+                        </div>
+                    ) : filteredInvitations.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center p-12 text-center bg-card rounded-md border border-border/60">
+                            <div className="p-3 bg-muted/50 text-muted-foreground/60 rounded-full mb-3">
+                                <Mail className="h-7 w-7 opacity-75" />
+                            </div>
+                            {isFiltered ? (
+                                <>
+                                    <h3 className="font-semibold text-foreground text-base">No matches found</h3>
+                                    <p className="text-sm text-muted-foreground mt-1 max-w-xs">
+                                        No invitations match your current search query or status filter.
+                                    </p>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={handleResetFilters}
+                                        className="mt-4 text-xs font-semibold"
+                                    >
+                                        Reset Filters
+                                    </Button>
+                                </>
+                            ) : (
+                                <>
+                                    <h3 className="font-semibold text-foreground text-base">No invitations yet</h3>
+                                    <p className="text-sm text-muted-foreground mt-1 max-w-xs">
+                                        Invite your first team member to get started with your workspace.
+                                    </p>
+                                    <div className="mt-4">
+                                        <InviteEmployeeDialog />
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    ) : (
+                        <>
+                            <InvitationsTable
+                                invitations={paginatedInvitations}
+                                isResending={isResending}
+                                isCanceling={isCanceling}
+                                onResend={handleResend}
+                                onCancel={handleCancel}
+                            />
+                            <InvitationMobileList
+                                invitations={paginatedInvitations}
+                                isResending={isResending}
+                                isCanceling={isCanceling}
+                                onResend={handleResend}
+                                onCancel={handleCancel}
+                            />
+                        </>
+                    )}
+
+                    {/* Pagination Footer */}
+                    <InvitationPagination
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        pageSize={pageSize}
+                        onPageChange={setCurrentPage}
+                        onPageSizeChange={handlePageSizeChange}
+                        startIndex={startIndex}
+                        totalItems={filteredInvitations.length}
+                    />
+                </CardContent>
+            </Card>
+
+            {/* Expired warning banner */}
+            {stats.expired > 0 && statusFilter !== 'expired' && (
+                <div className="flex items-start gap-3 p-4 bg-orange-500/10 rounded-xl border border-orange-500/20">
+                    <AlertTriangle className="h-5 w-5 text-orange-500 shrink-0 mt-0.5" />
+                    <div>
+                        <h4 className="font-semibold text-orange-800 dark:text-orange-400 text-sm">
+                            {stats.expired} expired invitation{stats.expired > 1 ? 's' : ''}
+                        </h4>
+                        <p className="text-xs text-orange-700 dark:text-orange-500 mt-0.5">
+                            These invitation links are past their expiration deadline. You can resend them or revoke them to clear up pending records.
+                        </p>
+                    </div>
+                </div>
+            )}
+        </div>
     );
 }

@@ -46,12 +46,12 @@ const DAY_MAP: Record<number, string> = {
 };
 
 export default function ShiftCard({ shift }: ShiftCardProps) {
-    const { data: session, isPending, isRefetching } = useSession();
+    const { data: session, isPending } = useSession();
     const [openEdit, setOpenEdit] = useState(false);
     const [updateShift, { isLoading: isUpdating }] = useUpdateShiftMutation();
 
     const { data: offDatesData } = useGetShiftOffDatesQuery(shift._id);
-    const isLoading = isPending || isRefetching;
+    const isLoading = isPending;
 
     const offDates = offDatesData?.data?.dates || [];
     const upcomingOffDates = offDates
