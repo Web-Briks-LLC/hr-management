@@ -5,6 +5,7 @@ import {
   useGetClientsQuery,
   useCreateClientMutation,
   useUpdateClientMutation,
+  useMigrateClientIdsMutation,
 } from "@/redux/features/client/clientApi";
 import { useGetMeQuery } from "@/redux/features/staff/staffApi";
 import {
@@ -23,6 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Plus,
   ChevronLeft,
@@ -77,6 +79,18 @@ export default function ClientsPage() {
 
   const [createClient, { isLoading: isCreating }] = useCreateClientMutation();
   const [updateClient, { isLoading: isUpdating }] = useUpdateClientMutation();
+  const [migrateClientIds, { isLoading: isMigrating }] = useMigrateClientIdsMutation();
+
+  const handleMigrateIds = async () => {
+    try {
+      const res = await migrateClientIds().unwrap();
+      toast.success(res.message || "All clients updated to WB-10001 format successfully!");
+      refetch();
+    } catch (error: unknown) {
+      const err = error as { data?: { message?: string } };
+      toast.error(err?.data?.message || "Failed to migrate client IDs");
+    }
+  };
 
   const [addServerErrors, setAddServerErrors] = useState<
     Record<string, string[]> | undefined
@@ -210,6 +224,18 @@ export default function ClientsPage() {
                 <RefreshCcw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
                 Refresh
               </Button>
+              {!isTelemarketer && (
+                <Button
+                  variant="outline"
+                  className="border-amber-600 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40 shadow-xs"
+                  onClick={handleMigrateIds}
+                  disabled={isMigrating}
+                  title="Migrate all existing client IDs to WB-10001, WB-10002... format"
+                >
+                  <RefreshCcw className={`h-4 w-4 ${isMigrating ? "animate-spin" : ""}`} />
+                  Migrate IDs (WB-10001)
+                </Button>
+              )}
               <Button
                 onClick={() => setIsAddDialogOpen(true)}
                 className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-xs"
@@ -317,8 +343,8 @@ export default function ClientsPage() {
 
       {/* Add Client Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
+        <DialogContent className="max-w-2xl h-[90vh] max-h-[90vh] flex flex-col p-0 overflow-hidden gap-0">
+          <DialogHeader className="p-6 pb-4 border-b border-border/60 shrink-0">
             <DialogTitle>Add New Client</DialogTitle>
             <DialogDescription>
               Create a new client profile with contact and team details.
@@ -336,8 +362,8 @@ export default function ClientsPage() {
 
       {/* Edit Client Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
+        <DialogContent className="max-w-2xl h-[90vh] max-h-[90vh] flex flex-col p-0 overflow-hidden gap-0">
+          <DialogHeader className="p-6 pb-4 border-b border-border/60 shrink-0">
             <DialogTitle>Edit Client</DialogTitle>
             <DialogDescription>
               Update client information and settings.

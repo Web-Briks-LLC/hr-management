@@ -124,6 +124,21 @@ export const clientApi = apiSlice.injectEndpoints({
             transformResponse: (response: { data: ClientEmail[] }) => response.data,
             providesTags: ['Client'],
         }),
+        getNextClientId: builder.query<{ nextClientId: string }, void>({
+            query: () => ({
+                url: '/clients/next-id',
+                method: 'GET',
+            }),
+            transformResponse: (response: { data: { nextClientId: string } }) => response.data,
+            providesTags: ['Client'],
+        }),
+        migrateClientIds: builder.mutation<{ message?: string; updatedCount: number; mappings: any[] }, void>({
+            query: () => ({
+                url: '/clients/migrate-ids',
+                method: 'POST',
+            }),
+            invalidatesTags: ['Client'],
+        }),
     }),
 });
 
@@ -138,4 +153,6 @@ export const {
     useGetClientStatsQuery,
     useGetAssignedServicesQuery,
     useGetClientEmailsQuery,
+    useGetNextClientIdQuery,
+    useMigrateClientIdsMutation,
 } = clientApi;

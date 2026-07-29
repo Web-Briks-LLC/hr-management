@@ -108,6 +108,61 @@ const checkClientIdExists = async (
     return !!existing;
 };
 
+// Get next auto-incremented WB-10001 series client ID
+const getNextClientIdFromDB = async (): Promise<string> => {
+    const clients = await ClientModel.find({}, { clientId: 1 }).lean();
+    let maxNum = 10000;
+
+    for (const client of clients) {
+        if (!client.clientId) continue;
+        const match = client.clientId.match(/^WB-(\d+)$/i) || client.clientId.match(/(\d+)/);
+        if (match && match[1]) {
+            const num = parseInt(match[1], 10);
+            if (num > maxNum) {
+                maxNum = num;
+            }
+        }
+    }
+
+    let nextNum = maxNum + 1;
+    let candidate = `WB-${nextNum}`;
+
+    while (await checkClientIdExists(candidate)) {
+        nextNum++;
+        candidate = `WB-${nextNum}`;
+    }
+
+    return candidate;
+};
+
+// Migrate all existing clients to WB-10001, WB-10002... format ordered by creation date
+const migrateClientIdsInDB = async (): Promise<{ updatedCount: number; mappings: { id: string; name: string; oldClientId: string; newClientId: string }[] }> => {
+    const clients = await ClientModel.find().sort({ createdAt: 1 });
+    let currentNum = 10001;
+    const mappings: { id: string; name: string; oldClientId: string; newClientId: string }[] = [];
+
+    for (const client of clients) {
+        const newClientId = `WB-${currentNum}`;
+        const oldClientId = client.clientId || 'unassigned';
+
+        await ClientModel.updateOne(
+            { _id: client._id },
+            { $set: { clientId: newClientId } }
+        );
+
+        mappings.push({
+            id: client._id.toString(),
+            name: client.name,
+            oldClientId,
+            newClientId,
+        });
+
+        currentNum++;
+    }
+
+    return { updatedCount: mappings.length, mappings };
+};
+
 // Check client ID availability and return suggestions if taken
 const checkClientIdAvailability = async (
     clientId: string,
@@ -259,14 +314,19 @@ class ClientIdExistsError extends Error {
 const createClientInDB = async (
     payload: CreateClientInput & { createdBy: string; assignedTelemarketer?: string | null | undefined },
 ) => {
-    // Check if client ID already exists
-    const clientIdExists = await checkClientIdExists(payload.clientId);
-    if (clientIdExists) {
-        const suggestions = await generateSuggestedIds(payload.clientId);
-        throw new ClientIdExistsError(
-            `Client ID "${payload.clientId}" already exists`,
-            suggestions,
-        );
+    // If no client ID provided, generate auto WB-XXXXX client ID
+    let finalClientId = payload.clientId;
+    if (!finalClientId || !finalClientId.trim()) {
+        finalClientId = await getNextClientIdFromDB();
+    } else {
+        const clientIdExists = await checkClientIdExists(finalClientId);
+        if (clientIdExists) {
+            const suggestions = await generateSuggestedIds(finalClientId);
+            throw new ClientIdExistsError(
+                `Client ID "${finalClientId}" already exists`,
+                suggestions,
+            );
+        }
     }
 
     // Check if any of the emails already exist
@@ -282,7 +342,7 @@ const createClientInDB = async (
 
     // Prepare data for creation
     const clientData = {
-        clientId: payload.clientId,
+        clientId: finalClientId,
         name: payload.name,
         emails: payload.emails.map((e) => e.toLowerCase()),
         status: payload.status,
@@ -510,6 +570,8 @@ export default {
     checkClientIdAvailability,
     getClientStatsFromDB,
     getAllClientsWithoutPaginationFromDB,
+    getNextClientIdFromDB,
+    migrateClientIdsInDB,
 };
 
 export { ClientIdExistsError };

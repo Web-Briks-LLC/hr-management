@@ -22,13 +22,14 @@ import {
     Users,
     Briefcase
 } from 'lucide-react';
-import { useLazyCheckClientIdQuery } from '@/redux/features/client/clientApi';
+import { useLazyCheckClientIdQuery, useGetNextClientIdQuery } from '@/redux/features/client/clientApi';
 import { useGetServicesQuery } from '@/redux/features/service/serviceApi';
 import { useGetStaffsQuery } from '@/redux/features/staff/staffApi';
 import { cn } from '@/lib/utils';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { Card, CardContent } from '@/components/ui/card';
 import { Combobox } from '@/components/ui/combobox';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 // Zod schema for client form validation
 // Team member schema needs _id to correctly handle existing records from the API
@@ -128,6 +129,7 @@ export function ClientForm({
 }: ClientFormProps) {
     const [checkClientId, { isFetching: isCheckingId, data: checkResult, originalArgs: lastCheckedClientId }] =
         useLazyCheckClientIdQuery();
+    const { data: nextIdData } = useGetNextClientIdQuery(undefined, { skip: isEditMode });
     const { data: servicesData } = useGetServicesQuery({ isActive: true });
     const { data: staffsData } = useGetStaffsQuery({ limit: 100 });
     const staffs = staffsData?.staffs || staffsData?.data || [];
@@ -234,6 +236,12 @@ export function ClientForm({
         };
     }, [clientIdValue, isEditMode, checkClientId]);
 
+    useEffect(() => {
+        if (!isEditMode && nextIdData?.nextClientId && !form.getValues('clientId')) {
+            form.setValue('clientId', nextIdData.nextClientId);
+        }
+    }, [isEditMode, nextIdData, form]);
+
     const handleFormSubmit = async (data: FormValues) => {
         if (clientIdError && !isEditMode) {
             return;
@@ -251,6 +259,7 @@ export function ClientForm({
             status: data.status,
             teamMembers: data.teamMembers,
             assignedServices: data.assignedServices,
+            assignedTelemarketer: data.assignedTelemarketer,
         };
         await onSubmit(formattedData);
     };
@@ -306,8 +315,9 @@ export function ClientForm({
     })) || [];
 
     return (
-        <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
-            <div className="space-y-4">
+        <form onSubmit={handleSubmit(handleFormSubmit)} className="flex flex-col flex-1 h-full min-h-0 overflow-hidden">
+            <ScrollArea className="flex-1 min-h-0 p-6">
+                <div className="space-y-6">
                 <div className="flex items-center gap-2 pb-2 border-b border-muted">
                     <Users className="h-5 w-5 text-primary" />
                     <h3 className="font-semibold">Basic Information</h3>
@@ -595,9 +605,10 @@ export function ClientForm({
                         className="min-h-[100px]"
                     />
                 </div>
-            </div>
+                </div>
+            </ScrollArea>
 
-            <div className="flex justify-end gap-2 pt-6 border-t font-semibold">
+            <div className="p-4 px-6 border-t border-border/60 bg-muted/20 shrink-0 flex items-center justify-end gap-3 font-semibold">
                 <Button type="button" variant="outline" onClick={onCancel}>
                     Cancel
                 </Button>

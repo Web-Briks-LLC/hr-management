@@ -14,6 +14,20 @@ router.get(
     ClientController.getAllClientsWithoutPagination,
 );
 
+// Get next auto-incremented WB-10001 client ID (must be before :id route)
+router.get(
+    '/next-id',
+    authorizeTelemarketer,
+    ClientController.getNextClientId,
+);
+
+// Migrate existing client IDs to WB-10001 format
+router.post(
+    '/migrate-ids',
+    authorizeTelemarketer,
+    ClientController.migrateClientIds,
+);
+
 // Check client ID availability (must be before :id route)
 router.get(
     '/check-id/:clientId',

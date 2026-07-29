@@ -459,6 +459,39 @@ const getAllClientsWithoutPagination = async (req: Request, res: Response) => {
     }
 };
 
+const getNextClientId = async (_req: Request, res: Response) => {
+    try {
+        const nextClientId = await ClientServices.getNextClientIdFromDB();
+        res.status(200).json({
+            success: true,
+            data: { nextClientId },
+        });
+    } catch (error: unknown) {
+        const err = error as Error;
+        res.status(500).json({
+            success: false,
+            message: err.message || 'Failed to get next client ID',
+        });
+    }
+};
+
+const migrateClientIds = async (_req: Request, res: Response) => {
+    try {
+        const result = await ClientServices.migrateClientIdsInDB();
+        res.status(200).json({
+            success: true,
+            message: `Successfully migrated ${result.updatedCount} clients to new WB-10001 format`,
+            data: result,
+        });
+    } catch (error: unknown) {
+        const err = error as Error;
+        res.status(500).json({
+            success: false,
+            message: err.message || 'Failed to migrate client IDs',
+        });
+    }
+};
+
 export default {
     getAllClients,
     getClientById,
@@ -469,4 +502,6 @@ export default {
     getAssignedServices,
     getClientEmails,
     getAllClientsWithoutPagination,
+    getNextClientId,
+    migrateClientIds,
 };
