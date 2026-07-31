@@ -275,18 +275,13 @@ async function approveLeave(input: ApproveLeaveInput) {
         throw new Error('Leave application not found');
     }
 
-    if (application.status !== 'pending') {
+    if (application.status !== 'pending' && application.status !== 'expired') {
         throw new Error(
             `Cannot approve: Application is already ${application.status}`,
         );
     }
 
-    // Check if expired
-    if (new Date() > application.expiresAt) {
-        application.status = 'expired';
-        await application.save();
-        throw new Error('Application has expired and cannot be approved');
-    }
+    // Removed expiry check as per requirements: Admin can approve or reject before Salary Processing even if expired.
 
     const requestedDateStrings = application.requestedDates.map(
         (d) => d.toISOString().split('T')[0],
@@ -419,7 +414,7 @@ async function rejectLeave(
         throw new Error('Leave application not found');
     }
 
-    if (application.status !== 'pending') {
+    if (application.status !== 'pending' && application.status !== 'expired') {
         throw new Error(
             `Cannot reject: Application is already ${application.status}`,
         );

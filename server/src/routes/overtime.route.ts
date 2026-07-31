@@ -75,6 +75,12 @@ OvertimeRoutes.get(
 );
 
 OvertimeRoutes.get(
+    "/logs",
+    authorize(...adminRoles),
+    OvertimeController.getOvertimeLogs,
+);
+
+OvertimeRoutes.get(
     "/:id",
     authorize(...adminRoles),
     OvertimeController.getOvertimeById,

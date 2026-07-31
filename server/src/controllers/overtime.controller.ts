@@ -113,9 +113,11 @@ const getOvertimeById = async (req: Request, res: Response) => {
 const updateOvertime = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
+        const userId = req.user?.id;
         if (!id) throw new Error("ID is required");
+        if (!userId) throw new Error("Unauthorized");
 
-        const result = await OvertimeServices.updateOvertimeInDB(id, req.body);
+        const result = await OvertimeServices.updateOvertimeInDB(id, req.body, userId);
         res.status(200).json({
             success: true,
             message: "Overtime updated successfully",
@@ -132,9 +134,11 @@ const updateOvertime = async (req: Request, res: Response) => {
 const deleteOvertime = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
+        const userId = req.user?.id;
         if (!id) throw new Error("ID is required");
+        if (!userId) throw new Error("Unauthorized");
 
-        await OvertimeServices.deleteOvertimeFromDB(id);
+        await OvertimeServices.deleteOvertimeFromDB(id, userId);
         res.status(200).json({
             success: true,
             message: "Overtime deleted successfully",
@@ -208,13 +212,15 @@ const extendStaffOvertime = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
         const { additionalMinutes } = req.body;
+        const userId = req.user?.id;
         
         if (!id) throw new Error("Overtime ID is required");
+        if (!userId) throw new Error("Unauthorized");
         if (!additionalMinutes || isNaN(additionalMinutes)) {
             throw new Error("Valid additionalMinutes is required");
         }
 
-        const result = await OvertimeServices.extendOvertimeInDB(id, Number(additionalMinutes));
+        const result = await OvertimeServices.extendOvertimeInDB(id, Number(additionalMinutes), userId);
         res.status(200).json({
             success: true,
             message: `Overtime extended by ${additionalMinutes} minutes`,
@@ -224,6 +230,45 @@ const extendStaffOvertime = async (req: Request, res: Response) => {
         res.status(500).json({
             success: false,
             message: error.message || "Failed to extend overtime",
+        });
+    }
+};
+
+const getOvertimeLogs = async (_req: Request, res: Response) => {
+    try {
+        const { default: AuditService } = await import("../services/audit.service.js");
+        const logs = await AuditService.getLogs({
+            entity: "OVERTIME",
+        });
+
+        // We need to populate the userId to show who made the changes
+        const { default: AuditLogModel } = await import("../models/audit-log.model.js");
+        const populatedLogs = await AuditLogModel.populate(logs, {
+            path: "userId",
+            select: "name image role",
+        });
+        
+        // Also populate entityId if it's an overtime record, we might want staff details.
+        const populatedWithEntity = await AuditLogModel.populate(populatedLogs, {
+            path: "entityId",
+            model: "Overtime",
+            populate: {
+                path: "staffId",
+                populate: {
+                    path: "userId",
+                    select: "name"
+                }
+            }
+        });
+
+        res.status(200).json({
+            success: true,
+            data: populatedWithEntity,
+        });
+    } catch (error: any) {
+        res.status(500).json({
+            success: false,
+            message: error.message || "Failed to fetch overtime logs",
         });
     }
 };
@@ -239,4 +284,5 @@ export default {
     stopStaffOvertime,
     extendStaffOvertime,
     getScheduledOvertimeToday,
+    getOvertimeLogs,
 };

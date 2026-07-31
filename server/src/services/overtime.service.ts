@@ -4,6 +4,7 @@ import OvertimeModel from "../models/overtime.model.js";
 import type { IOvertime } from "../types/overtime.type.js";
 import StaffModel from "../models/staff.model.js";
 import { escapeRegex } from "../lib/sanitize.js";
+import AuditService from "./audit.service.js";
 
 const getOvertimeAggregationPipeline = (
     matchStage: any,
@@ -89,6 +90,20 @@ const createOvertimeInDB = async (
                 status: "approved",
                 approvedBy: payload.createdBy,
             });
+            
+            // Audit Log
+            await AuditService.createLog({
+                userId: payload.createdBy,
+                action: "OVERTIME_CREATE",
+                entity: "OVERTIME",
+                entityId: result._id as any,
+                details: {
+                    type: result.type,
+                    durationMinutes: result.durationMinutes,
+                    status: result.status,
+                }
+            });
+            
             results.push(result);
         } catch (error: any) {
             // Check if it's a duplicate key error (code 11000)
@@ -229,13 +244,38 @@ const getOvertimeByIdFromDB = async (id: string) => {
     return result[0] || null;
 };
 
-const updateOvertimeInDB = async (id: string, payload: Partial<IOvertime>) => {
+const updateOvertimeInDB = async (id: string, payload: Partial<IOvertime>, userId: string) => {
     // Get the overtime record before update
     const overtime = await OvertimeModel.findById(id).populate("staffId");
 
     const result = await OvertimeModel.findByIdAndUpdate(id, payload, {
         new: true,
     });
+
+    if (overtime && result) {
+        // Log changes
+        let action = "OVERTIME_UPDATE";
+        let changes: any = {};
+        
+        if (payload.status && payload.status !== overtime.status) {
+            action = "OVERTIME_STATUS_CHANGE";
+            changes.status = { old: overtime.status, new: payload.status };
+        }
+        
+        if (payload.durationMinutes !== undefined && payload.durationMinutes !== overtime.durationMinutes) {
+            changes.durationMinutes = { old: overtime.durationMinutes, new: payload.durationMinutes };
+        }
+
+        if (Object.keys(changes).length > 0) {
+            await AuditService.createLog({
+                userId,
+                action,
+                entity: "OVERTIME",
+                entityId: result._id as any,
+                details: changes,
+            });
+        }
+    }
 
     // Send notification if status changed to approved or rejected
     if (
@@ -266,8 +306,19 @@ const updateOvertimeInDB = async (id: string, payload: Partial<IOvertime>) => {
     return result;
 };
 
-const deleteOvertimeFromDB = async (id: string) => {
+const deleteOvertimeFromDB = async (id: string, userId: string) => {
     const result = await OvertimeModel.findByIdAndDelete(id);
+    if (result) {
+        await AuditService.createLog({
+            userId,
+            action: "OVERTIME_DELETE",
+            entity: "OVERTIME",
+            entityId: result._id as any,
+            details: {
+                deletedRecord: result,
+            }
+        });
+    }
     return result;
 };
 
@@ -383,7 +434,7 @@ const stopOvertimeInDB = async (userId: string) => {
     return activeOvertime;
 };
 
-const extendOvertimeInDB = async (overtimeId: string, additionalMinutes: number) => {
+const extendOvertimeInDB = async (overtimeId: string, additionalMinutes: number, userId: string) => {
     const overtime = await OvertimeModel.findById(overtimeId).populate("staffId");
     if (!overtime) throw new Error("Overtime record not found");
 
@@ -395,10 +446,22 @@ const extendOvertimeInDB = async (overtimeId: string, additionalMinutes: number)
         throw new Error("Cannot extend an overtime that has not started yet");
     }
 
+    const oldDuration = overtime.durationMinutes;
     overtime.durationMinutes += additionalMinutes;
     overtime.reason = (overtime.reason ? overtime.reason + ' | ' : '') + `Extended by ${additionalMinutes} mins`;
     
     await overtime.save();
+
+    await AuditService.createLog({
+        userId,
+        action: "OVERTIME_EXTEND",
+        entity: "OVERTIME",
+        entityId: overtime._id as any,
+        details: {
+            durationMinutes: { old: oldDuration, new: overtime.durationMinutes },
+            additionalMinutes,
+        }
+    });
 
     // Send notification to staff about the extension
     const staff = overtime.staffId as any;

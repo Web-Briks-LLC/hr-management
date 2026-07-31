@@ -29,7 +29,8 @@ const auditLogSchema = new Schema<IAuditLog>(
                 'PROFILE_UPDATE', 'PASSWORD_CHANGE',
                 'ATTENDANCE_UPDATE', 'GRACE_ATTENDANCE',
                 'PAYMENT_PROCESS', 'BULK_PAYMENT_PROCESS', 'PAYMENT_UNDO',
-                'PAYROLL_LOCK', 'PAYROLL_UNLOCK'
+                'PAYROLL_LOCK', 'PAYROLL_UNLOCK',
+                'OVERTIME_CREATE', 'OVERTIME_UPDATE', 'OVERTIME_DELETE', 'OVERTIME_STATUS_CHANGE', 'OVERTIME_EXTEND'
             ],
         },
         entity: {

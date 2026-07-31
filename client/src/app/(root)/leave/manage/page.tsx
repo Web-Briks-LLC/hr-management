@@ -14,6 +14,8 @@ import {
     Calendar as CalendarIcon,
     ChevronLeft,
     ChevronRight,
+    ChevronsLeft,
+    ChevronsRight,
     FilterX,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -66,7 +68,9 @@ import {
     Tooltip,
     TooltipContent,
     TooltipTrigger,
+    TooltipProvider,
 } from '@/components/ui/tooltip';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
     useGetLeaveApplicationsQuery,
     useGetPendingLeavesQuery,
@@ -482,297 +486,345 @@ export default function LeaveManagePage() {
                 </CardContent>
             </Card>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>Leave Applications</CardTitle>
-                    <CardDescription>
-                        {statusFilter === 'all'
-                            ? 'All leave applications'
-                            : `${LEAVE_STATUS_LABELS[statusFilter]} applications`}
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    {isLoading ? (
-                        <div className="space-y-2">
-                            <Skeleton className="h-12 w-full" />
-                            <Skeleton className="h-12 w-full" />
-                            <Skeleton className="h-12 w-full" />
-                        </div>
-                    ) : applications.length === 0 ? (
-                        <p className="text-center text-muted-foreground py-8">
-                            No applications found
-                        </p>
-                    ) : (
-                        <div className="space-y-4">
-                            <div className="overflow-hidden rounded-xl border bg-card">
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow className="hover:bg-transparent border-b">
-                                            <TableHead className="font-semibold border-r">
-                                                Employee
-                                            </TableHead>
-                                            <TableHead className="font-semibold border-r">
-                                                Type
-                                            </TableHead>
-                                            <TableHead className="font-semibold border-r">
-                                                Dates
-                                            </TableHead>
-                                            <TableHead className="font-semibold border-r">
-                                                Days
-                                            </TableHead>
-                                            <TableHead className="font-semibold border-r">
-                                                Reason
-                                            </TableHead>
-                                            <TableHead className="font-semibold border-r">
-                                                Status
-                                            </TableHead>
-                                            <TableHead className="font-semibold border-r">
-                                                Applied
-                                            </TableHead>
-                                            <TableHead className="font-semibold text-right">
-                                                Actions
-                                            </TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {applications.map((app: ILeaveApplication) => (
-                                            <TableRow key={app._id} className="group border-b">
-                                                <TableCell className="font-medium border-r">
-                                                    {app.staffId?.userId?.name || 'N/A'}
-                                                </TableCell>
-                                                <TableCell className="border-r">
-                                                    <div className="flex items-center gap-2">
-                                                        {
-                                                            LEAVE_TYPE_LABELS[
-                                                                app.leaveType
-                                                            ]
-                                                        }
-                                                        {app.leaveType === 'sick' &&
-                                                            app.medicalDocuments &&
-                                                            app.medicalDocuments.length > 0 && (
-                                                                <Badge
-                                                                    variant="outline"
-                                                                    className="text-xs"
-                                                                >
-                                                                    <FileText className="mr-1 h-3 w-3" />
-                                                                    {
-                                                                        app
-                                                                            .medicalDocuments
-                                                                            .length
-                                                                    }
-                                                                </Badge>
-                                                            )}
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell className="border-r text-muted-foreground">
-                                                    {format(
-                                                        new Date(app.startDate),
-                                                        'MMM dd',
-                                                    )}{' '}
-                                                    -{' '}
-                                                    {format(
-                                                        new Date(app.endDate),
-                                                        'MMM dd, yyyy',
-                                                    )}
-                                                </TableCell>
-                                                <TableCell className="border-r">
-                                                    {app.requestedDates.length}
-                                                </TableCell>
-                                                <TableCell
-                                                    className="max-w-[220px] truncate border-r text-muted-foreground"
-                                                    title={app.reason}
-                                                >
-                                                    {app.reason}
-                                                </TableCell>
-                                                <TableCell className="border-r">
+            <div className="rounded-md border border-border/60 overflow-hidden">
+                <Table>
+                    <TableHeader className="bg-muted/40">
+                        <TableRow className="hover:bg-muted/40 border-b-border/60">
+                            <TableHead className="font-semibold">
+                                Employee
+                            </TableHead>
+                            <TableHead className="font-semibold">
+                                Type
+                            </TableHead>
+                            <TableHead className="font-semibold">
+                                Dates
+                            </TableHead>
+                            <TableHead className="font-semibold">
+                                Days
+                            </TableHead>
+                            <TableHead className="font-semibold">
+                                Reason
+                            </TableHead>
+                            <TableHead className="font-semibold">
+                                Status
+                            </TableHead>
+                            <TableHead className="font-semibold">
+                                Applied
+                            </TableHead>
+                            <TableHead className="font-semibold text-right">
+                                Actions
+                            </TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {isLoading ? (
+                            [...Array(5)].map((_, i) => (
+                                <TableRow key={i}>
+                                    <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                                    <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                                    <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                                    <TableCell><Skeleton className="h-4 w-8" /></TableCell>
+                                    <TableCell><Skeleton className="h-4 w-40" /></TableCell>
+                                    <TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell>
+                                    <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                                    <TableCell><Skeleton className="h-8 w-20 ml-auto" /></TableCell>
+                                </TableRow>
+                            ))
+                        ) : applications.length === 0 ? (
+                            <TableRow>
+                                <TableCell colSpan={8} className="h-48 text-center">
+                                    <div className="flex flex-col items-center justify-center text-muted-foreground gap-2">
+                                        <div className="bg-muted/50 p-3 rounded-full">
+                                            <FileText className="h-6 w-6 opacity-30" />
+                                        </div>
+                                        <p className="text-lg font-medium">
+                                            No applications found
+                                        </p>
+                                        <p className="text-sm">
+                                            Try adjusting your filters or wait for new applications.
+                                        </p>
+                                    </div>
+                                </TableCell>
+                            </TableRow>
+                        ) : (
+                            applications.map((app: ILeaveApplication) => (
+                                <TableRow key={app._id} className="hover:bg-muted/20 transition-colors">
+                                    <TableCell className="font-medium">
+                                        {app.staffId?.userId?.name || 'N/A'}
+                                    </TableCell>
+                                    <TableCell>
+                                        <div className="flex items-center gap-2">
+                                            {LEAVE_TYPE_LABELS[app.leaveType]}
+                                            {app.leaveType === 'sick' &&
+                                                app.medicalDocuments &&
+                                                app.medicalDocuments.length > 0 && (
                                                     <Badge
-                                                        variant={getStatusBadgeVariant(
-                                                            app.status,
-                                                        )}
+                                                        variant="outline"
+                                                        className="text-xs"
                                                     >
-                                                        {
-                                                            LEAVE_STATUS_LABELS[
-                                                                app.status
-                                                            ]
-                                                        }
+                                                        <FileText className="mr-1 h-3 w-3" />
+                                                        {app.medicalDocuments.length}
                                                     </Badge>
-                                                </TableCell>
-                                                <TableCell className="border-r text-muted-foreground">
-                                                    {format(
-                                                        new Date(app.createdAt),
-                                                        'PPP',
-                                                    )}
-                                                </TableCell>
-                                                <TableCell className="text-right">
+                                                )}
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="text-muted-foreground">
+                                        {format(new Date(app.startDate), 'MMM dd')} -{' '}
+                                        {format(new Date(app.endDate), 'MMM dd, yyyy')}
+                                    </TableCell>
+                                    <TableCell>
+                                        {app.requestedDates.length}
+                                    </TableCell>
+                                    <TableCell
+                                        className="max-w-[220px] truncate text-muted-foreground"
+                                        title={app.reason}
+                                    >
+                                        {app.reason}
+                                    </TableCell>
+                                    <TableCell>
+                                        <Badge variant={getStatusBadgeVariant(app.status)}>
+                                            {LEAVE_STATUS_LABELS[app.status]}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-muted-foreground">
+                                        {format(new Date(app.createdAt), 'PPP')}
+                                    </TableCell>
+                                    <TableCell className="text-right">
                                                     <div className="flex items-center justify-end gap-1">
-                                                        <Tooltip>
-                                                            <TooltipTrigger asChild>
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="icon"
-                                                                    onClick={() =>
-                                                                        openDetailsDialog(
-                                                                            app,
-                                                                        )
-                                                                    }
-                                                                >
-                                                                    <Eye className="h-4 w-4" />
-                                                                </Button>
-                                                            </TooltipTrigger>
-                                                            <TooltipContent>
-                                                                View details
-                                                            </TooltipContent>
-                                                        </Tooltip>
-                                                        {app.status === 'pending' && (
-                                                            <>
-                                                                <Tooltip>
-                                                                    <TooltipTrigger asChild>
-                                                                        <Button
-                                                                            variant="ghost"
-                                                                            size="icon"
-                                                                            onClick={() =>
-                                                                                openApproveDialog(
-                                                                                    app,
-                                                                                )
-                                                                            }
-                                                                            className="text-green-600 hover:text-green-700"
-                                                                        >
-                                                                            <Check className="h-4 w-4" />
-                                                                        </Button>
-                                                                    </TooltipTrigger>
-                                                                    <TooltipContent>
-                                                                        Approve leave
-                                                                    </TooltipContent>
-                                                                </Tooltip>
-                                                                <Tooltip>
-                                                                    <TooltipTrigger asChild>
-                                                                        <Button
-                                                                            variant="ghost"
-                                                                            size="icon"
-                                                                            onClick={() =>
-                                                                                openRejectDialog(
-                                                                                    app,
-                                                                                )
-                                                                            }
-                                                                            className="text-red-600 hover:text-red-700"
-                                                                        >
-                                                                            <X className="h-4 w-4" />
-                                                                        </Button>
-                                                                    </TooltipTrigger>
-                                                                    <TooltipContent>
-                                                                        Reject leave
-                                                                    </TooltipContent>
-                                                                </Tooltip>
-                                                            </>
-                                                        )}
-                                                        {(app.status === 'approved' ||
-                                                            app.status ===
-                                                                'partially_approved') && (
+                                                        <TooltipProvider>
                                                             <Tooltip>
                                                                 <TooltipTrigger asChild>
                                                                     <Button
                                                                         variant="ghost"
                                                                         size="icon"
-                                                                        onClick={() =>
-                                                                            openRevokeDialog(
-                                                                                app,
-                                                                            )
-                                                                        }
-                                                                        className="text-orange-600 hover:text-orange-700"
+                                                                        className="h-8 w-8 text-foreground/70"
+                                                                        onClick={() => openDetailsDialog(app)}
                                                                     >
-                                                                        <RotateCcw className="h-4 w-4" />
+                                                                        <Eye className="h-4 w-4" />
                                                                     </Button>
                                                                 </TooltipTrigger>
-                                                                <TooltipContent>
-                                                                    Revoke leave
-                                                                </TooltipContent>
+                                                                <TooltipContent>View details</TooltipContent>
                                                             </Tooltip>
+                                                        </TooltipProvider>
+                                                        {(app.status === 'pending' || app.status === 'expired') && (
+                                                            <>
+                                                                <TooltipProvider>
+                                                                    <Tooltip>
+                                                                        <TooltipTrigger asChild>
+                                                                            <Button
+                                                                                variant="ghost"
+                                                                                size="icon"
+                                                                                onClick={() => openApproveDialog(app)}
+                                                                                className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-100 dark:hover:bg-green-900/30"
+                                                                            >
+                                                                                <Check className="h-4 w-4" />
+                                                                            </Button>
+                                                                        </TooltipTrigger>
+                                                                        <TooltipContent>Approve leave</TooltipContent>
+                                                                    </Tooltip>
+                                                                </TooltipProvider>
+                                                                <TooltipProvider>
+                                                                    <Tooltip>
+                                                                        <TooltipTrigger asChild>
+                                                                            <Button
+                                                                                variant="ghost"
+                                                                                size="icon"
+                                                                                onClick={() => openRejectDialog(app)}
+                                                                                className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-100 dark:hover:bg-red-900/30"
+                                                                            >
+                                                                                <X className="h-4 w-4" />
+                                                                            </Button>
+                                                                        </TooltipTrigger>
+                                                                        <TooltipContent>Reject leave</TooltipContent>
+                                                                    </Tooltip>
+                                                                </TooltipProvider>
+                                                            </>
+                                                        )}
+                                                        {(app.status === 'approved' || app.status === 'partially_approved') && (
+                                                            <TooltipProvider>
+                                                                <Tooltip>
+                                                                    <TooltipTrigger asChild>
+                                                                        <Button
+                                                                            variant="ghost"
+                                                                            size="icon"
+                                                                            onClick={() => openRevokeDialog(app)}
+                                                                            className="h-8 w-8 text-orange-600 hover:text-orange-700 hover:bg-orange-100 dark:hover:bg-orange-900/30"
+                                                                        >
+                                                                            <RotateCcw className="h-4 w-4" />
+                                                                        </Button>
+                                                                    </TooltipTrigger>
+                                                                    <TooltipContent>Revoke leave</TooltipContent>
+                                                                </Tooltip>
+                                                            </TooltipProvider>
                                                         )}
                                                     </div>
                                                 </TableCell>
                                             </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            </div>
+                                        ))
+                                    )}
+                    </TableBody>
+                </Table>
+            </div>
 
+                            {/* Pagination */}
                             {meta && (
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-6">
-                                        <div className="text-sm text-muted-foreground">
-                                            Page {meta.page} of{' '}
-                                            {Math.max(1, meta.totalPages)} (
-                                            {meta.total} total)
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <p className="text-sm font-medium">
-                                                Rows per page
-                                            </p>
-                                            <Select
-                                                value={`${limit}`}
-                                                onValueChange={(value) => {
-                                                    setLimit(Number(value));
-                                                    setPage(1);
-                                                }}
+                                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t">
+                                    <div className="flex items-center gap-2">
+                                        <p className="text-sm text-muted-foreground">
+                                            Showing {(page - 1) * limit + 1} to{' '}
+                                            {Math.min(page * limit, meta.total)} of{' '}
+                                            {meta.total} entries
+                                        </p>
+                                        <Select
+                                            value={limit.toString()}
+                                            onValueChange={(value) => {
+                                                setLimit(parseInt(value));
+                                                setPage(1);
+                                            }}
+                                        >
+                                            <SelectTrigger className="h-8 w-[70px]">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {[10, 20, 30, 40, 50].map((option) => (
+                                                    <SelectItem
+                                                        key={option}
+                                                        value={option.toString()}
+                                                    >
+                                                        {option}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    {meta.totalPages > 1 && (
+                                        <div className="flex items-center gap-1">
+                                            <Button
+                                                variant="outline"
+                                                size="icon"
+                                                className="h-8 w-8"
+                                                onClick={() => setPage(1)}
+                                                disabled={page === 1 || isFetching}
                                             >
-                                                <SelectTrigger className="h-8 w-[70px]">
-                                                    <SelectValue placeholder={limit} />
-                                                </SelectTrigger>
-                                                <SelectContent side="top">
-                                                    {[10, 20, 30, 40, 50].map(
-                                                        (pageSize) => (
-                                                            <SelectItem
-                                                                key={pageSize}
-                                                                value={`${pageSize}`}
-                                                            >
-                                                                {pageSize}
-                                                            </SelectItem>
-                                                        ),
-                                                    )}
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() =>
-                                                setPage((currentPage) =>
-                                                    Math.max(1, currentPage - 1),
-                                                )
-                                            }
-                                            disabled={page === 1 || isFetching}
-                                        >
-                                            <ChevronLeft className="h-4 w-4" />
-                                            Previous
-                                        </Button>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() =>
-                                                setPage((currentPage) =>
-                                                    Math.min(
-                                                        meta.totalPages,
-                                                        currentPage + 1,
+                                                <ChevronsLeft className="h-4 w-4" />
+                                            </Button>
+                                            <Button
+                                                variant="outline"
+                                                size="icon"
+                                                className="h-8 w-8"
+                                                onClick={() =>
+                                                    setPage((p) => Math.max(1, p - 1))
+                                                }
+                                                disabled={page === 1 || isFetching}
+                                            >
+                                                <ChevronLeft className="h-4 w-4" />
+                                            </Button>
+                                            {(() => {
+                                                const totalPages = meta.totalPages;
+                                                const pageNumbers: (number | string)[] =
+                                                    [];
+                                                if (totalPages <= 7) {
+                                                    for (
+                                                        let i = 1;
+                                                        i <= totalPages;
+                                                        i++
+                                                    ) {
+                                                        pageNumbers.push(i);
+                                                    }
+                                                } else {
+                                                    if (page <= 3) {
+                                                        pageNumbers.push(
+                                                            1,
+                                                            2,
+                                                            3,
+                                                            4,
+                                                            '...',
+                                                            totalPages,
+                                                        );
+                                                    } else if (page >= totalPages - 2) {
+                                                        pageNumbers.push(
+                                                            1,
+                                                            '...',
+                                                            totalPages - 3,
+                                                            totalPages - 2,
+                                                            totalPages - 1,
+                                                            totalPages,
+                                                        );
+                                                    } else {
+                                                        pageNumbers.push(
+                                                            1,
+                                                            '...',
+                                                            page - 1,
+                                                            page,
+                                                            page + 1,
+                                                            '...',
+                                                            totalPages,
+                                                        );
+                                                    }
+                                                }
+                                                return pageNumbers.map((num, idx) =>
+                                                    num === '...' ? (
+                                                        <span
+                                                            key={`ellipsis-${idx}`}
+                                                            className="px-2 text-muted-foreground"
+                                                        >
+                                                            ...
+                                                        </span>
+                                                    ) : (
+                                                        <Button
+                                                            key={num}
+                                                            variant={
+                                                                page === num
+                                                                    ? 'default'
+                                                                    : 'outline'
+                                                            }
+                                                            size="icon"
+                                                            className="h-8 w-8"
+                                                            onClick={() =>
+                                                                setPage(num as number)
+                                                            }
+                                                            disabled={isFetching}
+                                                        >
+                                                            {num}
+                                                        </Button>
                                                     ),
-                                                )
-                                            }
-                                            disabled={
-                                                page >= meta.totalPages ||
-                                                isFetching
-                                            }
-                                        >
-                                            Next
-                                            <ChevronRight className="ml-2 h-4 w-4" />
-                                        </Button>
-                                    </div>
+                                                );
+                                            })()}
+                                            <Button
+                                                variant="outline"
+                                                size="icon"
+                                                className="h-8 w-8"
+                                                onClick={() =>
+                                                    setPage((p) =>
+                                                        Math.min(
+                                                            meta.totalPages,
+                                                            p + 1,
+                                                        ),
+                                                    )
+                                                }
+                                                disabled={
+                                                    page === meta.totalPages ||
+                                                    isFetching
+                                                }
+                                            >
+                                                <ChevronRight className="h-4 w-4" />
+                                            </Button>
+                                            <Button
+                                                variant="outline"
+                                                size="icon"
+                                                className="h-8 w-8"
+                                                onClick={() => setPage(meta.totalPages)}
+                                                disabled={
+                                                    page === meta.totalPages ||
+                                                    isFetching
+                                                }
+                                            >
+                                                <ChevronsRight className="h-4 w-4" />
+                                            </Button>
+                                        </div>
+                                    )}
                                 </div>
                             )}
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
 
             {/* Enhanced Approve Dialog */}
             <Dialog
@@ -872,60 +924,54 @@ export default function LeaveManagePage() {
                             <Label className="text-base font-semibold">
                                 How would you like to approve?
                             </Label>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div
-                                    onClick={() => setApprovalMode('full')}
-                                    className={`p-5 rounded-xl border-2 cursor-pointer transition-all ${
-                                        approvalMode === 'full'
-                                            ? 'border-green-500 bg-green-50 dark:bg-green-900/20 shadow-md'
-                                            : 'border-muted hover:border-green-300 hover:bg-muted/50'
-                                    }`}
-                                >
-                                    <div className="flex items-start gap-3">
-                                        <div
-                                            className={`mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center ${approvalMode === 'full' ? 'border-green-500 bg-green-500' : 'border-muted-foreground'}`}
-                                        >
-                                            {approvalMode === 'full' && (
-                                                <Check className="w-3 h-3 text-white" />
-                                            )}
+                            <RadioGroup
+                                value={approvalMode}
+                                onValueChange={(value: 'full' | 'partial') => setApprovalMode(value)}
+                                className="grid grid-cols-2 gap-4"
+                            >
+                                <div>
+                                    <RadioGroupItem
+                                        value="full"
+                                        id="mode-full"
+                                        className="peer sr-only"
+                                    />
+                                    <Label
+                                        htmlFor="mode-full"
+                                        className="flex flex-col items-start gap-1 p-5 rounded-xl border-2 cursor-pointer transition-all peer-data-[state=checked]:border-green-500 peer-data-[state=checked]:bg-green-50 dark:peer-data-[state=checked]:bg-green-900/20 peer-data-[state=checked]:shadow-md hover:border-green-300 hover:bg-muted/50"
+                                    >
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <div className="w-4 h-4 rounded-full border-2 border-primary flex items-center justify-center">
+                                                {approvalMode === 'full' && <div className="w-2 h-2 rounded-full bg-primary" />}
+                                            </div>
+                                            <span className="font-semibold text-base">Approve All Dates</span>
                                         </div>
-                                        <div>
-                                            <p className="font-semibold text-base">
-                                                Approve All Dates
-                                            </p>
-                                            <p className="text-sm text-muted-foreground mt-1">
-                                                Approve the entire leave request
-                                            </p>
-                                        </div>
-                                    </div>
+                                        <span className="text-sm text-muted-foreground font-normal">
+                                            Approve the entire leave request
+                                        </span>
+                                    </Label>
                                 </div>
-                                <div
-                                    onClick={() => setApprovalMode('partial')}
-                                    className={`p-5 rounded-xl border-2 cursor-pointer transition-all ${
-                                        approvalMode === 'partial'
-                                            ? 'border-green-500 bg-green-50 dark:bg-green-900/20 shadow-md'
-                                            : 'border-muted hover:border-green-300 hover:bg-muted/50'
-                                    }`}
-                                >
-                                    <div className="flex items-start gap-3">
-                                        <div
-                                            className={`mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center ${approvalMode === 'partial' ? 'border-green-500 bg-green-500' : 'border-muted-foreground'}`}
-                                        >
-                                            {approvalMode === 'partial' && (
-                                                <Check className="w-3 h-3 text-white" />
-                                            )}
+                                <div>
+                                    <RadioGroupItem
+                                        value="partial"
+                                        id="mode-partial"
+                                        className="peer sr-only"
+                                    />
+                                    <Label
+                                        htmlFor="mode-partial"
+                                        className="flex flex-col items-start gap-1 p-5 rounded-xl border-2 cursor-pointer transition-all peer-data-[state=checked]:border-green-500 peer-data-[state=checked]:bg-green-50 dark:peer-data-[state=checked]:bg-green-900/20 peer-data-[state=checked]:shadow-md hover:border-green-300 hover:bg-muted/50"
+                                    >
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <div className="w-4 h-4 rounded-full border-2 border-primary flex items-center justify-center">
+                                                {approvalMode === 'partial' && <div className="w-2 h-2 rounded-full bg-primary" />}
+                                            </div>
+                                            <span className="font-semibold text-base">Partial Approval</span>
                                         </div>
-                                        <div>
-                                            <p className="font-semibold text-base">
-                                                Partial Approval
-                                            </p>
-                                            <p className="text-sm text-muted-foreground mt-1">
-                                                Approve selected dates only
-                                            </p>
-                                        </div>
-                                    </div>
+                                        <span className="text-sm text-muted-foreground font-normal">
+                                            Approve selected dates only
+                                        </span>
+                                    </Label>
                                 </div>
-                            </div>
+                            </RadioGroup>
                         </div>
 
                         {/* Partial Approval Date Selection */}
@@ -975,75 +1021,39 @@ export default function LeaveManagePage() {
                                                             </p>
                                                         </div>
                                                     </div>
-                                                    <div className="flex items-center gap-2">
-                                                        <Button
-                                                            type="button"
-                                                            variant={
-                                                                ds.decision ===
-                                                                'approve'
-                                                                    ? 'default'
-                                                                    : 'outline'
-                                                            }
-                                                            size="sm"
-                                                            className={
-                                                                ds.decision ===
-                                                                'approve'
-                                                                    ? 'bg-green-600 hover:bg-green-700'
-                                                                    : ''
-                                                            }
-                                                            onClick={() =>
-                                                                handleDateDecisionChange(
-                                                                    ds.date,
-                                                                    'approve',
-                                                                )
-                                                            }
+                                                    <div className="w-[140px]">
+                                                        <Select
+                                                            value={ds.decision}
+                                                            onValueChange={(value: 'approve' | 'paid' | 'reject') => handleDateDecisionChange(ds.date, value)}
                                                         >
-                                                            <Check className="h-4 w-4 mr-1" />
-                                                            Approve
-                                                        </Button>
-                                                        <Button
-                                                            type="button"
-                                                            variant={
-                                                                ds.decision ===
-                                                                'paid'
-                                                                    ? 'default'
-                                                                    : 'outline'
-                                                            }
-                                                            size="sm"
-                                                            className={
-                                                                ds.decision ===
-                                                                'paid'
-                                                                    ? 'bg-blue-600 hover:bg-blue-700'
-                                                                    : ''
-                                                            }
-                                                            onClick={() =>
-                                                                handleDateDecisionChange(
-                                                                    ds.date,
-                                                                    'paid',
-                                                                )
-                                                            }
-                                                        >
-                                                            💰 Paid
-                                                        </Button>
-                                                        <Button
-                                                            type="button"
-                                                            variant={
-                                                                ds.decision ===
-                                                                'reject'
-                                                                    ? 'destructive'
-                                                                    : 'outline'
-                                                            }
-                                                            size="sm"
-                                                            onClick={() =>
-                                                                handleDateDecisionChange(
-                                                                    ds.date,
-                                                                    'reject',
-                                                                )
-                                                            }
-                                                        >
-                                                            <X className="h-4 w-4 mr-1" />
-                                                            Reject
-                                                        </Button>
+                                                            <SelectTrigger className={
+                                                                ds.decision === 'approve' ? 'border-green-500 text-green-700 bg-green-50 dark:bg-green-900/20' :
+                                                                ds.decision === 'paid' ? 'border-blue-500 text-blue-700 bg-blue-50 dark:bg-blue-900/20' :
+                                                                ds.decision === 'reject' ? 'border-red-500 text-red-700 bg-red-50 dark:bg-red-900/20' : ''
+                                                            }>
+                                                                <SelectValue placeholder="Select decision" />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                <SelectItem value="approve">
+                                                                    <div className="flex items-center gap-2 text-green-600">
+                                                                        <Check className="h-4 w-4" />
+                                                                        <span>Approve</span>
+                                                                    </div>
+                                                                </SelectItem>
+                                                                <SelectItem value="paid">
+                                                                    <div className="flex items-center gap-2 text-blue-600">
+                                                                        <span>💰</span>
+                                                                        <span>Paid</span>
+                                                                    </div>
+                                                                </SelectItem>
+                                                                <SelectItem value="reject">
+                                                                    <div className="flex items-center gap-2 text-red-600">
+                                                                        <X className="h-4 w-4" />
+                                                                        <span>Reject</span>
+                                                                    </div>
+                                                                </SelectItem>
+                                                            </SelectContent>
+                                                        </Select>
                                                     </div>
                                                 </div>
                                             ))}

@@ -79,6 +79,14 @@ export const overtimeApi = apiSlice.injectEndpoints({
             transformResponse: (response: { data: any }) => response.data,
             providesTags: ['Overtime'],
         }),
+        getOvertimeLogs: builder.query({
+            query: () => ({
+                url: '/overtime/logs',
+                method: 'GET',
+            }),
+            transformResponse: (response: { data: any }) => response.data,
+            providesTags: ['Overtime'],
+        }),
     }),
 });
 
@@ -93,4 +101,5 @@ export const {
     useStopOvertimeMutation,
     useExtendOvertimeMutation,
     useGetScheduledOvertimeTodayQuery,
+    useGetOvertimeLogsQuery,
 } = overtimeApi;
