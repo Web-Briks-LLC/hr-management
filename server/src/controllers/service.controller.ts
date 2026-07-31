@@ -55,6 +55,9 @@ async function getAllServices(req: Request, res: Response) {
             data: result.services,
             meta: {
                 total: result.total,
+                activeCount: result.activeCount,
+                totalUsage: result.totalUsage,
+                unusedCount: result.unusedCount,
             },
         });
     } catch (error) {

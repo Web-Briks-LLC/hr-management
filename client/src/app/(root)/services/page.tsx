@@ -161,7 +161,7 @@ export default function ServicesPage() {
   };
 
   const services = useMemo(() => servicesData?.data || [], [servicesData]);
-  const meta = servicesData?.meta || { total: 0 };
+  const meta = servicesData?.meta || { total: 0, activeCount: 0, totalUsage: 0, unusedCount: 0 };
   const totalPages = Math.ceil(meta.total / limit);
 
   const confirmDelete = async () => {
@@ -248,7 +248,7 @@ export default function ServicesPage() {
               ) : (
                 <div>
                   <h3 className="text-3xl font-bold tracking-tight text-green-600 dark:text-green-400">
-                    {services.filter((s) => s.isActive).length}
+                    {meta.activeCount}
                   </h3>
                   <p className="text-xs font-medium text-muted-foreground mt-1">Active Services</p>
                 </div>
@@ -270,7 +270,7 @@ export default function ServicesPage() {
               ) : (
                 <div>
                   <h3 className="text-3xl font-bold tracking-tight text-blue-600 dark:text-blue-400">
-                    {services.reduce((acc, curr) => acc + (curr.usageCount || 0), 0)}
+                    {meta.totalUsage}
                   </h3>
                   <p className="text-xs font-medium text-muted-foreground mt-1">Total Usage</p>
                 </div>
@@ -292,7 +292,7 @@ export default function ServicesPage() {
               ) : (
                 <div>
                   <h3 className="text-3xl font-bold tracking-tight text-amber-600 dark:text-amber-400">
-                    {services.filter((s) => s.usageCount === 0).length}
+                    {meta.unusedCount}
                   </h3>
                   <p className="text-xs font-medium text-muted-foreground mt-1">Unused Services</p>
                 </div>

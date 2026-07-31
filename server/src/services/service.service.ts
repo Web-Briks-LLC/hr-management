@@ -17,7 +17,13 @@ async function getAllServicesFromDB(options: {
     page?: number;
     limit?: number;
     search?: string;
-}): Promise<{ services: (IService & { usageCount: number })[]; total: number }> {
+}): Promise<{ 
+    services: (IService & { usageCount: number })[]; 
+    total: number;
+    activeCount: number;
+    totalUsage: number;
+    unusedCount: number;
+}> {
     const { isActive, page = 1, limit = 50, search } = options;
 
     const query: Record<string, unknown> = {};
@@ -51,12 +57,50 @@ async function getAllServicesFromDB(options: {
         { $limit: limit },
     ];
 
-    const [services, total] = await Promise.all([
+    const statsPipeline: any[] = [
+        { $match: query },
+        {
+            $lookup: {
+                from: "orders",
+                localField: "_id",
+                foreignField: "services",
+                as: "orderUsages",
+            },
+        },
+        {
+            $addFields: {
+                usageCount: { $size: "$orderUsages" },
+            },
+        },
+        {
+            $group: {
+                _id: null,
+                total: { $sum: 1 },
+                activeCount: {
+                    $sum: { $cond: [{ $eq: ["$isActive", true] }, 1, 0] }
+                },
+                totalUsage: { $sum: "$usageCount" },
+                unusedCount: {
+                    $sum: { $cond: [{ $eq: ["$usageCount", 0] }, 1, 0] }
+                }
+            }
+        }
+    ];
+
+    const [services, statsResult] = await Promise.all([
         ServiceModel.aggregate(pipeline),
-        ServiceModel.countDocuments(query),
+        ServiceModel.aggregate(statsPipeline),
     ]);
 
-    return { services: services as (IService & { usageCount: number })[], total };
+    const stats = statsResult[0] || { total: 0, activeCount: 0, totalUsage: 0, unusedCount: 0 };
+
+    return { 
+        services: services as (IService & { usageCount: number })[], 
+        total: stats.total,
+        activeCount: stats.activeCount,
+        totalUsage: stats.totalUsage,
+        unusedCount: stats.unusedCount,
+    };
 }
 
 async function getServiceByIdFromDB(id: string): Promise<IService | null> {

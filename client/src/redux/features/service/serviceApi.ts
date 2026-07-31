@@ -10,6 +10,9 @@ interface ServicesResponse {
     data: (IService & { usageCount: number })[];
     meta: {
         total: number;
+        activeCount: number;
+        totalUsage: number;
+        unusedCount: number;
     };
 }
 
