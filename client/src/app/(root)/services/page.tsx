@@ -31,19 +31,34 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   Plus,
   Search,
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
+  Settings2,
+  CheckCircle2,
+  TrendingUp,
+  Info,
+  Filter,
+  Edit,
+  Trash2,
 } from "lucide-react";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import {
   useGetServicesQuery,
   useCreateServiceMutation,
@@ -53,8 +68,9 @@ import {
 } from "@/redux/features/service/serviceApi";
 import { toast } from "sonner";
 import { IService } from "@/types/order.type";
-import { DataTable } from "@/components/ui/data-table";
-import { getColumns } from "./columns";
+import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
+import { Combobox } from "@/components/ui/combobox";
 
 export default function ServicesPage() {
   const [page, setPage] = useState(1);
@@ -148,11 +164,6 @@ export default function ServicesPage() {
   const meta = servicesData?.meta || { total: 0 };
   const totalPages = Math.ceil(meta.total / limit);
 
-  const columns = useMemo(() => getColumns({
-    onEdit: handleOpenEdit,
-    onDelete: handleDeleteClick,
-  }), [handleOpenEdit, handleDeleteClick]);
-
   const confirmDelete = async () => {
     if (!selectedService) return;
     try {
@@ -183,145 +194,344 @@ export default function ServicesPage() {
   };
 
   return (
-    <div className="container mx-auto py-10 space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Services</h1>
-          <p className="text-muted-foreground">
-            Manage your order services and track usage.
-          </p>
+    <div className="space-y-8 p-1">
+      {/* Header & Stats Overview */}
+      <div className="flex flex-col gap-6">
+        <div className="flex justify-between items-start">
+          <div>
+            <h2 className="text-3xl font-bold tracking-tight bg-linear-to-r from-foreground to-foreground/70 bg-clip-text">
+              Services Overview
+            </h2>
+            <p className="text-muted-foreground mt-1">
+              Manage your order services and track usage.
+            </p>
+          </div>
+          <Button onClick={handleOpenAdd} className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm">
+            <Plus className="mr-2 h-4 w-4" /> Add Service
+          </Button>
         </div>
-        <Button onClick={handleOpenAdd}>
-          <Plus className="mr-2 h-4 w-4" /> Add Service
-        </Button>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Total Services Card */}
+          <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-slate-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-slate-500/5 hover:border-slate-500/30">
+            <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-slate-500/10 blur-2xl transition-all duration-300 group-hover:bg-slate-500/20" />
+            <div className="relative">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-500/10 text-slate-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-slate-500/20">
+                  <Settings2 className="h-5 w-5" />
+                </div>
+              </div>
+              {isLoading ? (
+                <Skeleton className="h-8 w-20" />
+              ) : (
+                <div>
+                  <h3 className="text-3xl font-bold tracking-tight text-slate-600 dark:text-slate-300">
+                    {meta.total}
+                  </h3>
+                  <p className="text-xs font-medium text-muted-foreground mt-1">Total Services</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Active Card */}
+          <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-green-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-green-500/5 hover:border-green-500/30">
+            <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-green-500/10 blur-2xl transition-all duration-300 group-hover:bg-green-500/20" />
+            <div className="relative">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-500/10 text-green-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-green-500/20">
+                  <CheckCircle2 className="h-5 w-5" />
+                </div>
+              </div>
+              {isLoading ? (
+                <Skeleton className="h-8 w-20" />
+              ) : (
+                <div>
+                  <h3 className="text-3xl font-bold tracking-tight text-green-600 dark:text-green-400">
+                    {services.filter((s) => s.isActive).length}
+                  </h3>
+                  <p className="text-xs font-medium text-muted-foreground mt-1">Active Services</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Total Usage Card */}
+          <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-blue-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/5 hover:border-blue-500/30">
+            <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-blue-500/10 blur-2xl transition-all duration-300 group-hover:bg-blue-500/20" />
+            <div className="relative">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/10 text-blue-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-blue-500/20">
+                  <TrendingUp className="h-5 w-5" />
+                </div>
+              </div>
+              {isLoading ? (
+                <Skeleton className="h-8 w-20" />
+              ) : (
+                <div>
+                  <h3 className="text-3xl font-bold tracking-tight text-blue-600 dark:text-blue-400">
+                    {services.reduce((acc, curr) => acc + (curr.usageCount || 0), 0)}
+                  </h3>
+                  <p className="text-xs font-medium text-muted-foreground mt-1">Total Usage</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Unused Card */}
+          <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-amber-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-amber-500/5 hover:border-amber-500/30">
+            <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-amber-500/10 blur-2xl transition-all duration-300 group-hover:bg-amber-500/20" />
+            <div className="relative">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/10 text-amber-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-amber-500/20">
+                  <Info className="h-5 w-5" />
+                </div>
+              </div>
+              {isLoading ? (
+                <Skeleton className="h-8 w-20" />
+              ) : (
+                <div>
+                  <h3 className="text-3xl font-bold tracking-tight text-amber-600 dark:text-amber-400">
+                    {services.filter((s) => s.usageCount === 0).length}
+                  </h3>
+                  <p className="text-xs font-medium text-muted-foreground mt-1">Unused Services</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Services</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{meta.total}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">
-              {services.filter((s) => s.isActive).length}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Usage</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {services.reduce((acc, curr) => acc + (curr.usageCount || 0), 0)}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Unused</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-amber-600">
-              {services.filter((s) => s.usageCount === 0).length}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Filters Toolbar */}
+      <div className="flex flex-wrap items-center gap-3 p-4 bg-muted/30 rounded-lg border border-border/50">
+        <div className="flex items-center gap-2">
+          <div className="bg-primary/10 p-2 rounded-full">
+            <Filter className="h-4 w-4 text-primary" />
+          </div>
+          <span className="text-sm font-medium">Filters:</span>
+        </div>
 
-      <div className="flex items-center gap-2">
-        <div className="relative w-full max-w-sm">
+        <div className="relative w-full max-w-sm ml-auto">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Filter services..."
+            placeholder="Search services..."
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
               setPage(1);
             }}
-            className="pl-9"
+            className="pl-9 h-9 bg-background/60"
           />
         </div>
       </div>
 
-      <DataTable
-        columns={columns}
-        data={services}
-        isLoading={isLoading}
-      />
+      {/* Table */}
+      <div className="rounded-md border border-border/60 overflow-hidden bg-background">
+        <Table>
+          <TableHeader className="bg-muted/40">
+            <TableRow className="hover:bg-muted/40 border-b-border/60">
+              <TableHead className="font-semibold">Name</TableHead>
+              <TableHead className="font-semibold">Description</TableHead>
+              <TableHead className="font-semibold text-center">Status</TableHead>
+              <TableHead className="font-semibold text-center">Usage</TableHead>
+              <TableHead className="font-semibold text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading ? (
+              [...Array(limit)].map((_, i) => (
+                <TableRow key={i}>
+                  <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-48" /></TableCell>
+                  <TableCell><Skeleton className="h-6 w-16 mx-auto rounded-full" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-12 mx-auto" /></TableCell>
+                  <TableCell><Skeleton className="h-8 w-20 ml-auto" /></TableCell>
+                </TableRow>
+              ))
+            ) : services.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5} className="h-48 text-center">
+                  <div className="flex flex-col items-center justify-center text-muted-foreground gap-2">
+                    <div className="bg-muted/50 p-3 rounded-full">
+                      <Settings2 className="h-6 w-6 opacity-30" />
+                    </div>
+                    <p className="text-lg font-medium">No services found</p>
+                    <p className="text-sm">Try adjusting your search or create a new service.</p>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ) : (
+              services.map((service) => (
+                <TableRow key={service._id} className="hover:bg-muted/20 transition-colors">
+                  <TableCell className="font-medium text-foreground">
+                    {service.name}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground max-w-[300px] truncate">
+                    {service.description || '-'}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <span className={cn(
+                      "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold",
+                      service.isActive
+                        ? "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400"
+                        : "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400"
+                    )}>
+                      {service.isActive ? "Active" : "Inactive"}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-center font-mono font-medium text-muted-foreground">
+                    {service.usageCount || 0}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center justify-end gap-1">
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                              onClick={() => handleOpenEdit(service)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Edit Service</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
 
-      {!isLoading && services.length > 0 && (
-        <div className="flex items-center justify-between py-4">
-          <div className="text-sm text-muted-foreground">
-            Page {page} of {totalPages || 1}
-          </div>
-          <div className="flex items-center gap-6 lg:gap-8">
-            <div className="flex items-center space-x-2">
-              <p className="text-sm font-medium">Rows per page</p>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                              onClick={() => handleDeleteClick(service)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Delete Service</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+
+        {/* Pagination */}
+        {meta && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t px-4 pb-4 bg-muted/5">
+            <div className="flex items-center gap-2">
+              <p className="text-sm text-muted-foreground">
+                Showing {(page - 1) * limit + 1} to{" "}
+                {Math.min(page * limit, meta.total)} of{" "}
+                {meta.total} entries
+              </p>
               <Select
                 value={limit.toString()}
-                onValueChange={(v) => {
-                  setLimit(parseInt(v));
+                onValueChange={(value) => {
+                  setLimit(parseInt(value));
                   setPage(1);
                 }}
               >
-                <SelectTrigger className="h-8 w-[70px]">
-                  <SelectValue placeholder={limit} />
+                <SelectTrigger className="h-8 w-[70px] bg-background">
+                  <SelectValue />
                 </SelectTrigger>
-                <SelectContent align="end">
-                  {[10, 20, 30, 40, 50].map((pageSize) => (
-                    <SelectItem key={pageSize} value={`${pageSize}`}>
-                      {pageSize}
+                <SelectContent>
+                  {[10, 20, 30, 40, 50].map((option) => (
+                    <SelectItem key={option} value={option.toString()}>
+                      {option}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex items-center space-x-2">
-              <Button
-                variant="outline"
-                className="h-8 w-8 p-0"
-                onClick={() => setPage(1)}
-                disabled={page === 1 || isFetching}
-              >
-                <ChevronsLeft className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                className="h-8 w-8 p-0"
-                onClick={() => setPage((p) => p - 1)}
-                disabled={page === 1 || isFetching}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                className="h-8 w-8 p-0"
-                onClick={() => setPage((p) => p + 1)}
-                disabled={page === totalPages || totalPages === 0 || isFetching}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                className="h-8 w-8 p-0"
-                onClick={() => setPage(totalPages)}
-                disabled={page === totalPages || totalPages === 0 || isFetching}
-              >
-                <ChevronsRight className="h-4 w-4" />
-              </Button>
-            </div>
+            {totalPages > 1 && (
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8 bg-background"
+                  onClick={() => setPage(1)}
+                  disabled={page === 1 || isFetching}
+                >
+                  <ChevronsLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8 bg-background"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page === 1 || isFetching}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                {(() => {
+                  const pageNumbers: (number | string)[] = [];
+                  if (totalPages <= 7) {
+                    for (let i = 1; i <= totalPages; i++) {
+                      pageNumbers.push(i);
+                    }
+                  } else {
+                    if (page <= 3) {
+                      pageNumbers.push(1, 2, 3, 4, "...", totalPages);
+                    } else if (page >= totalPages - 2) {
+                      pageNumbers.push(1, "...", totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
+                    } else {
+                      pageNumbers.push(1, "...", page - 1, page, page + 1, "...", totalPages);
+                    }
+                  }
+                  return pageNumbers.map((num, idx) =>
+                    num === "..." ? (
+                      <span key={`ellipsis-${idx}`} className="px-2 text-muted-foreground">
+                        ...
+                      </span>
+                    ) : (
+                      <Button
+                        key={num}
+                        variant={page === num ? "default" : "outline"}
+                        size="icon"
+                        className={cn("h-8 w-8", page !== num && "bg-background")}
+                        onClick={() => setPage(num as number)}
+                        disabled={isFetching}
+                      >
+                        {num}
+                      </Button>
+                    )
+                  );
+                })()}
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8 bg-background"
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages || isFetching}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8 bg-background"
+                  onClick={() => setPage(totalPages)}
+                  disabled={page === totalPages || isFetching}
+                >
+                  <ChevronsRight className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Dialogs */}
       <Dialog open={isAddEditOpen} onOpenChange={setIsAddEditOpen}>
@@ -356,6 +566,7 @@ export default function ServicesPage() {
                 id="isActive"
                 checked={formData.isActive}
                 onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
+                className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
               />
               <Label htmlFor="isActive">Active</Label>
             </div>
@@ -399,20 +610,21 @@ export default function ServicesPage() {
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label>Target Service</Label>
-              <Select value={migrationTargetId} onValueChange={setMigrationTargetId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select target service..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {servicesData?.data
+              <Combobox
+                options={
+                  servicesData?.data
                     .filter((s) => s._id !== selectedService?._id)
-                    .map((s) => (
-                      <SelectItem key={s._id} value={s._id}>
-                        {s.name}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
+                    .map((s) => ({
+                      value: s._id,
+                      label: s.name,
+                    })) || []
+                }
+                value={migrationTargetId}
+                onChange={setMigrationTargetId}
+                placeholder="Select target service..."
+                searchPlaceholder="Search service..."
+                emptyText="No service found."
+              />
             </div>
           </div>
           <DialogFooter>
