@@ -72,5 +72,8 @@ expenseSchema.index({ date: -1, branchId: 1 });
 // Prevent duplicate payroll payments for same staff + category + month
 expenseSchema.index({ staffId: 1, categoryId: 1, date: 1 }, { sparse: true });
 
+// Optimize getPayrollPreview strict matching
+expenseSchema.index({ categoryId: 1, staffId: 1, billingMonth: 1, billingYear: 1 });
+
 const ExpenseModel = model<IExpense>("Expense", expenseSchema);
 export default ExpenseModel;

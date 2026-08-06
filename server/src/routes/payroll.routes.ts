@@ -11,6 +11,7 @@ import {
     absentDatesSchema,
     undoPaymentSchema,
     lockMonthSchema,
+    setAttendanceSchema,
 } from "../validators/payroll.validator.js";
 
 const router: Router = Router();
@@ -88,6 +89,7 @@ router.post(
 router.post(
     "/set-attendance",
     writeAccess,
+    validate(setAttendanceSchema),
     payrollController.setAttendance,
 );
 
