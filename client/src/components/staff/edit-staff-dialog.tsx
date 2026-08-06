@@ -40,6 +40,7 @@ const formSchema = z.object({
     status: z.enum(["active", "inactive", "terminated"]),
     salary: z.number().min(0, "Salary must be positive"),
     salaryVisibleToEmployee: z.boolean(),
+    joinDate: z.string().optional(),
     // Bank Account Fields
     bank: z.object({
         bankName: z.string().optional(),
@@ -72,6 +73,7 @@ export function EditStaffDialog({ staff }: EditStaffDialogProps) {
             role: staff.user?.role || Role.STAFF,
             status: staff.status || "active",
             salary: staff.salary || 0,
+            joinDate: staff.joinDate ? new Date(staff.joinDate).toISOString().split('T')[0] : "",
             salaryVisibleToEmployee: staff.salaryVisibleToEmployee !== false,
             bank: {
                 bankName: staff.bank?.bankName || "",
@@ -92,6 +94,7 @@ export function EditStaffDialog({ staff }: EditStaffDialogProps) {
                 role: staff.user?.role || Role.STAFF,
                 status: staff.status || "active",
                 salary: staff.salary || 0,
+                joinDate: staff.joinDate ? new Date(staff.joinDate).toISOString().split('T')[0] : "",
                 salaryVisibleToEmployee:
                     staff.salaryVisibleToEmployee !== false,
                 bank: {
@@ -280,6 +283,20 @@ export function EditStaffDialog({ staff }: EditStaffDialogProps) {
                                         </SelectContent>
                                     </Select>
                                 )}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="border-t pt-4">
+                        <h4 className="text-sm font-medium mb-4">
+                            Employment Dates
+                        </h4>
+                        <div className="space-y-2">
+                            <Label htmlFor="joinDate">Join Date</Label>
+                            <Input
+                                id="joinDate"
+                                type="date"
+                                {...form.register("joinDate")}
                             />
                         </div>
                     </div>
