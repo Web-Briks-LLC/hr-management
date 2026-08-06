@@ -26,7 +26,15 @@ import { useUpdateStaffMutation } from "@/redux/features/staff/staffApi";
 import IStaff from "@/types/staff.type";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { DESIGNATIONS, DEPARTMENTS } from "@/constants/metadata";
-import { Edit, Loader2 } from "lucide-react";
+import { CalendarIcon, Edit, Loader2 } from "lucide-react";
+import { format } from "date-fns";
+import { Calendar } from "@/components/ui/calendar";
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -291,12 +299,44 @@ export function EditStaffDialog({ staff }: EditStaffDialogProps) {
                         <h4 className="text-sm font-medium mb-4">
                             Employment Dates
                         </h4>
-                        <div className="space-y-2">
+                        <div className="space-y-2 flex flex-col">
                             <Label htmlFor="joinDate">Join Date</Label>
-                            <Input
-                                id="joinDate"
-                                type="date"
-                                {...form.register("joinDate")}
+                            <Controller
+                                control={form.control}
+                                name="joinDate"
+                                render={({ field }) => (
+                                    <Popover>
+                                        <PopoverTrigger asChild>
+                                            <Button
+                                                variant={"outline"}
+                                                className={cn(
+                                                    "w-full pl-3 text-left font-normal",
+                                                    !field.value && "text-muted-foreground"
+                                                )}
+                                            >
+                                                {field.value ? (
+                                                    format(new Date(field.value), "PPP")
+                                                ) : (
+                                                    <span>Pick a date</span>
+                                                )}
+                                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                            </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-auto p-0" align="start">
+                                            <Calendar
+                                                mode="single"
+                                                selected={field.value ? new Date(field.value) : undefined}
+                                                onSelect={(date) => 
+                                                    field.onChange(date ? format(date, "yyyy-MM-dd") : "")
+                                                }
+                                                disabled={(date) =>
+                                                    date > new Date() || date < new Date("1900-01-01")
+                                                }
+                                                initialFocus
+                                            />
+                                        </PopoverContent>
+                                    </Popover>
+                                )}
                             />
                         </div>
                     </div>
