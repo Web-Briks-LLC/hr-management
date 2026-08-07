@@ -6,7 +6,7 @@ import { authorizeOrderAccess } from '../middlewares/authorizeOrderAccess.js';
 const router: Router = Router();
 
 // Get all clients
-router.get('/', authorizeOrderAccess, ClientController.getAllClients);
+router.get('/', authorizeTelemarketer, ClientController.getAllClients);
 
 // Get all clients without pagination (for selector dropdowns)
 router.get(
@@ -55,7 +55,7 @@ router.patch('/:id', authorizeTelemarketer, ClientController.updateClient);
 // Get assigned services for a client
 router.get(
     '/:id/assigned-services',
-    authorizeTelemarketer,
+    authorizeOrderAccess,
     ClientController.getAssignedServices,
 );
 
