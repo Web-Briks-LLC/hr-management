@@ -24,7 +24,7 @@ export interface Client {
     currency?: string;
     status: 'active' | 'inactive';
     teamMembers?: TeamMember[];
-    assignedServices?: string[];
+    assignedServices?: (string | { service: string; price?: number | null })[];
     assignedServicesDetails?: {
         _id: string;
         name: string;

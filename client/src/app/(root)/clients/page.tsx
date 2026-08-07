@@ -185,7 +185,10 @@ export default function ClientsPage() {
             currency: client.currency || "",
             status: client.status,
             teamMembers: client.teamMembers || [],
-            assignedServices: client.assignedServices || [],
+            assignedServices: (client.assignedServicesDetails || client.assignedServices || []).map((s: any) => {
+                if (typeof s === 'string') return { service: s, price: null };
+                return { service: s._id || s.service, price: s.price || null };
+            }),
             assignedTelemarketer:
                 typeof client.assignedTelemarketer === "object"
                     ? client.assignedTelemarketer?._id

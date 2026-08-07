@@ -177,10 +177,7 @@ export function ClientForm({
             currency: defaultValues?.currency || '',
             status: defaultValues?.status || 'active',
             teamMembers: defaultValues?.teamMembers || [],
-            assignedServices: defaultValues?.assignedServicesDetails?.map(d => ({
-                service: d._id,
-                price: d.price
-            })) || (defaultValues?.assignedServices?.map(id => ({ service: typeof id === 'string' ? id : (id as any)._id, price: null })) || []),
+            assignedServices: defaultValues?.assignedServices || [],
             assignedTelemarketer: defaultValues?.assignedTelemarketer || '',
         },
     });
