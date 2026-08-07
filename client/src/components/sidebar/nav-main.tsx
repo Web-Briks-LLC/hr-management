@@ -83,12 +83,8 @@ export function NavMain() {
                     if (!userRole) return false;
                     if (!item.access.includes(userRole)) return false;
 
-                    // B. Restriction: STAFF and TEAM_LEADER must match requiredDesignation if specified
-                    if (
-                        (userRole === Role.STAFF ||
-                            userRole === Role.TEAM_LEADER) &&
-                        item.requiredDesignation
-                    ) {
+                    // B. Restriction: STAFF must match requiredDesignation if specified
+                    if (userRole === Role.STAFF && item.requiredDesignation) {
                         if (
                             staff?.designation?.toLowerCase() !==
                             item.requiredDesignation.toLowerCase()
