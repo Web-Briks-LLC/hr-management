@@ -285,12 +285,24 @@ export function OrderForm({
     const handleServiceToggle = (serviceId: string) => {
         const isRemoving = selectedServices.includes(serviceId);
         
-        if (!isRemoving && selectedClient?.assignedServicesDetails) {
-            const assignedServiceDetails = selectedClient.assignedServicesDetails.find(
-                (s: any) => s._id === serviceId
-            );
-            if (assignedServiceDetails && assignedServiceDetails.price !== undefined && assignedServiceDetails.price !== null) {
-                handlePerImagePriceChange(assignedServiceDetails.price);
+        if (!isRemoving) {
+            let priceToSet = null;
+            if (selectedClient?.assignedServicesDetails) {
+                const assignedServiceDetails = selectedClient.assignedServicesDetails.find(
+                    (s: any) => s._id === serviceId
+                );
+                if (assignedServiceDetails && assignedServiceDetails.price !== undefined && assignedServiceDetails.price !== null) {
+                    priceToSet = assignedServiceDetails.price;
+                }
+            }
+            if (priceToSet === null) {
+                const defaultService = allServices.find((s: any) => s._id === serviceId);
+                if (defaultService && defaultService.price !== undefined && defaultService.price !== null) {
+                    priceToSet = defaultService.price;
+                }
+            }
+            if (priceToSet !== null) {
+                handlePerImagePriceChange(priceToSet);
             }
         }
 

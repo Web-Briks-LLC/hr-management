@@ -6,6 +6,7 @@ import { escapeRegex } from "../lib/sanitize.js";
 async function createServiceInDB(data: {
     name: string;
     description?: string;
+    price?: number;
     createdBy: string;
 }): Promise<IService> {
     const service = await ServiceModel.create(data);
@@ -112,6 +113,7 @@ async function updateServiceInDB(
     data: {
         name?: string;
         description?: string;
+        price?: number;
         isActive?: boolean;
     },
 ): Promise<IService | null> {

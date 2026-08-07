@@ -13,6 +13,10 @@ const serviceSchema = new Schema<IService>(
             type: String,
             trim: true,
         },
+        price: {
+            type: Number,
+            default: 0,
+        },
         isActive: {
             type: Boolean,
             default: true,
