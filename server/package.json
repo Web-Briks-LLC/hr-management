@@ -49,5 +49,10 @@
         "socket.io": "^4.8.3",
         "stripe": "^20.3.1",
         "zod": "^4.3.6"
+    },
+    "allowScripts": {
+        "bcrypt@6.0.0": true,
+        "esbuild@0.27.1": true,
+        "puppeteer@25.0.4": true
     }
 }

@@ -1,16 +1,17 @@
 import { Router } from 'express';
 import ClientController from '../controllers/client.controller.js';
 import { authorizeTelemarketer } from '../middlewares/authorizeTelemarketer.js';
+import { authorizeOrderAccess } from '../middlewares/authorizeOrderAccess.js';
 
 const router: Router = Router();
 
 // Get all clients
-router.get('/', authorizeTelemarketer, ClientController.getAllClients);
+router.get('/', authorizeOrderAccess, ClientController.getAllClients);
 
 // Get all clients without pagination (for selector dropdowns)
 router.get(
     '/all',
-    authorizeTelemarketer,
+    authorizeOrderAccess,
     ClientController.getAllClientsWithoutPagination,
 );
 
@@ -43,7 +44,7 @@ router.get(
 );
 
 // Get client by ID
-router.get('/:id', authorizeTelemarketer, ClientController.getClientById);
+router.get('/:id', authorizeOrderAccess, ClientController.getClientById);
 
 // Create client
 router.post('/', authorizeTelemarketer, ClientController.createClient);

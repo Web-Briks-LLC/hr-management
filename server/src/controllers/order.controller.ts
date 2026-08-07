@@ -6,6 +6,7 @@ import type { OrderStatus, OrderPriority } from '../types/order.type.js';
 import { Role } from '../constants/role.js';
 import mongoose from 'mongoose';
 import ClientModel from '../models/client.model.js';
+import { maskClientData } from '../utils/clientMask.util.js';
 
 async function createOrder(req: Request, res: Response) {
     try {
@@ -153,6 +154,18 @@ async function getAllOrders(req: Request, res: Response) {
 
         const result = await orderService.getAllOrdersFromDB(filters);
 
+        // Data masking for non-TM Team Leaders
+        if (userId && req.user && req.user.role === Role.TEAM_LEADER) {
+            const isTM = await isTelemarketer(userId);
+            if (!isTM) {
+                result.orders.forEach((order) => {
+                    if (order.clientId && typeof order.clientId === 'object') {
+                        order.clientId = maskClientData(order.clientId) as any;
+                    }
+                });
+            }
+        }
+
         return res.status(200).json({
             message: 'Orders retrieved successfully',
             data: result.orders,
@@ -200,6 +213,14 @@ async function getOrderById(req: Request, res: Response) {
                             'Forbidden: You do not have permission to view this order',
                     });
                 }
+            }
+        }
+
+        // Data masking for non-TM Team Leaders
+        if (userId && req.user && req.user.role === Role.TEAM_LEADER) {
+            const isTM = await isTelemarketer(userId);
+            if (!isTM && order.clientId && typeof order.clientId === 'object') {
+                order.clientId = maskClientData(order.clientId) as any;
             }
         }
 
