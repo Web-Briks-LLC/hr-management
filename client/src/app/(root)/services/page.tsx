@@ -364,6 +364,7 @@ export default function ServicesPage() {
                 </TableRow>
               ))
             ) : services.length === 0 ? (
+              <TableRow>
                 <TableCell colSpan={6} className="h-48 text-center">
                   <div className="flex flex-col items-center justify-center text-muted-foreground gap-2">
                     <div className="bg-muted/50 p-3 rounded-full">
