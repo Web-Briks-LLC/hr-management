@@ -66,7 +66,10 @@ export const clientFormSchema = z.object({
     currency: z.string().optional(),
     status: z.enum(['active', 'inactive']),
     teamMembers: z.array(teamMemberSchema),
-    assignedServices: z.array(z.string()),
+    assignedServices: z.array(z.object({
+        service: z.string(),
+        price: z.any().transform(v => v === '' || v === null || Number.isNaN(Number(v)) ? null : Number(v)).optional().nullable()
+    })),
     assignedTelemarketer: z.string().optional(),
 });
 
@@ -91,7 +94,10 @@ export interface ClientFormData {
         phone?: string;
         designation?: string;
     }[];
-    assignedServices: string[];
+    assignedServices: {
+        service: string;
+        price?: number | null;
+    }[];
     assignedTelemarketer?: string;
 }
 
@@ -171,7 +177,10 @@ export function ClientForm({
             currency: defaultValues?.currency || '',
             status: defaultValues?.status || 'active',
             teamMembers: defaultValues?.teamMembers || [],
-            assignedServices: defaultValues?.assignedServices || [],
+            assignedServices: defaultValues?.assignedServicesDetails?.map(d => ({
+                service: d._id,
+                price: d.price
+            })) || (defaultValues?.assignedServices?.map(id => ({ service: typeof id === 'string' ? id : (id as any)._id, price: null })) || []),
             assignedTelemarketer: defaultValues?.assignedTelemarketer || '',
         },
     });
@@ -535,11 +544,44 @@ export function ClientForm({
                     <Label>Select Services for this Client</Label>
                     <MultiSelect
                         options={serviceOptions}
-                        selected={assignedServices}
-                        onChange={(selected) => setValue('assignedServices', selected)}
+                        selected={assignedServices.map(s => s.service)}
+                        onChange={(selected) => {
+                            const newAssigned = selected.map(id => {
+                                const existing = assignedServices.find(s => s.service === id);
+                                return existing ? existing : { service: id, price: null };
+                            });
+                            setValue('assignedServices', newAssigned, { shouldValidate: true });
+                        }}
                         placeholder="Pick services..."
                     />
-                    <p className="text-[10px] text-muted-foreground italic">
+                    {assignedServices.length > 0 && (
+                        <div className="mt-4 space-y-3 pt-2">
+                            <Label className="text-sm text-muted-foreground">Set custom prices for assigned services (Optional)</Label>
+                            {assignedServices.map((asItem, index) => {
+                                const serviceName = serviceOptions.find(o => o.value === asItem.service)?.label || 'Unknown Service';
+                                return (
+                                    <div key={asItem.service} className="flex items-center gap-3 bg-slate-50 dark:bg-slate-900 p-2 rounded-md border">
+                                        <div className="flex-1 text-sm font-medium pl-2">{serviceName}</div>
+                                        <div className="w-40 relative">
+                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                                            <Input
+                                                type="number"
+                                                step="0.01"
+                                                placeholder="Price"
+                                                className="pl-7"
+                                                {...register(`assignedServices.${index}.price`)}
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    setValue(`assignedServices.${index}.price`, val === '' ? null : Number(val));
+                                                }}
+                                            />
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                    <p className="text-[10px] text-muted-foreground italic mt-2">
                         If no services are assigned, all active services will be available during order creation.
                     </p>
                 </div>

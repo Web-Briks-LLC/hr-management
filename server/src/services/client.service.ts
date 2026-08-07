@@ -222,6 +222,17 @@ const getAllClientsFromDB = async (params: ClientQueryParams) => {
             },
         },
         {
+            $addFields: {
+                assignedServices: {
+                    $map: {
+                        input: { $ifNull: ['$assignedServices', []] },
+                        as: 'item',
+                        in: '$$item.service'
+                    }
+                }
+            }
+        },
+        {
             $project: {
                 'createdBy.password': 0,
                 'createdBy.passwordHistory': 0,
@@ -282,10 +293,55 @@ const getClientByIdFromDB = async (id: string) => {
         {
             $lookup: {
                 from: 'services',
-                localField: 'assignedServices',
+                localField: 'assignedServices.service',
                 foreignField: '_id',
-                as: 'assignedServicesDetails',
+                as: 'services_lookup',
             },
+        },
+        {
+            $addFields: {
+                assignedServicesDetails: {
+                    $map: {
+                        input: '$assignedServices',
+                        as: 'asItem',
+                        in: {
+                            $let: {
+                                vars: {
+                                    matchedService: {
+                                        $arrayElemAt: [
+                                            {
+                                                $filter: {
+                                                    input: '$services_lookup',
+                                                    as: 'srv',
+                                                    cond: { $eq: ['$$srv._id', '$$asItem.service'] }
+                                                }
+                                            },
+                                            0
+                                        ]
+                                    }
+                                },
+                                in: {
+                                    _id: '$$matchedService._id',
+                                    name: '$$matchedService.name',
+                                    price: '$$asItem.price'
+                                }
+                            }
+                        }
+                    }
+                },
+                assignedServices: {
+                    $map: {
+                        input: { $ifNull: ['$assignedServices', []] },
+                        as: 'item',
+                        in: '$$item.service'
+                    }
+                }
+            }
+        },
+        {
+            $project: {
+                services_lookup: 0
+            }
         },
         {
             $project: {
@@ -354,7 +410,10 @@ const createClientInDB = async (
         ...(payload.teamMembers && { teamMembers: payload.teamMembers }),
         ...(payload.assignedServices && {
             assignedServices: payload.assignedServices.map(
-                (id) => new Types.ObjectId(id),
+                (item) => ({
+                    service: new Types.ObjectId(item.service),
+                    price: item.price !== undefined ? item.price : null,
+                })
             ),
         }),
         ...(payload.assignedTelemarketer !== undefined && {
@@ -399,7 +458,10 @@ const updateClientInDB = async (id: string, payload: UpdateClientInput) => {
     const updateData: Record<string, unknown> = { ...payload };
     if (payload.assignedServices) {
         updateData.assignedServices = payload.assignedServices.map(
-            (id) => new Types.ObjectId(id),
+            (item) => ({
+                service: new Types.ObjectId(item.service),
+                price: item.price !== undefined ? item.price : null,
+            })
         );
     }
 
@@ -555,10 +617,20 @@ const getAllClientsWithoutPaginationFromDB = async (params: { createdBy?: string
         query.status = params.status;
     }
 
-    return ClientModel.find(query)
-        .populate('assignedServices')
+    const clients = await ClientModel.find(query)
+        .populate('assignedServices.service')
         .sort({ name: 1 })
         .lean();
+
+    return clients.map((client: any) => ({
+        ...client,
+        assignedServicesDetails: client.assignedServices?.map((asItem: any) => ({
+            _id: asItem.service?._id,
+            name: asItem.service?.name,
+            price: asItem.price
+        })),
+        assignedServices: client.assignedServices?.map((asItem: any) => asItem.service?._id)
+    }));
 };
 
 export default {

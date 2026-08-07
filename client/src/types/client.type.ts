@@ -25,7 +25,11 @@ export interface Client {
     status: 'active' | 'inactive';
     teamMembers?: TeamMember[];
     assignedServices?: string[];
-    assignedServicesDetails?: { _id: string; name: string }[];
+    assignedServicesDetails?: {
+        _id: string;
+        name: string;
+        price?: number;
+    }[];
     createdBy?: { _id: string; name: string };
     assignedTelemarketer?: { _id: string; name: string; email?: string } | string;
     createdAt: string;

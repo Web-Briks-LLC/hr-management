@@ -275,8 +275,19 @@ export function OrderForm({
     }, [services, debouncedServiceSearch]);
 
     const handleServiceToggle = (serviceId: string) => {
+        const isRemoving = selectedServices.includes(serviceId);
+        
+        if (!isRemoving && selectedClient?.assignedServicesDetails) {
+            const assignedServiceDetails = selectedClient.assignedServicesDetails.find(
+                (s: any) => s._id === serviceId
+            );
+            if (assignedServiceDetails && assignedServiceDetails.price !== undefined && assignedServiceDetails.price !== null) {
+                handlePerImagePriceChange(assignedServiceDetails.price);
+            }
+        }
+
         setSelectedServices((prev) => {
-            return prev.includes(serviceId)
+            return isRemoving
                 ? prev.filter((id) => id !== serviceId)
                 : [...prev, serviceId];
         });
