@@ -88,6 +88,7 @@ interface OrderFormProps {
     submitLabel: string;
     onCancel: () => void;
     serverErrors?: Record<string, string[]>;
+    isTelemarketer?: boolean;
 }
 
 export function OrderForm({
@@ -97,6 +98,7 @@ export function OrderForm({
     submitLabel,
     onCancel,
     serverErrors,
+    isTelemarketer,
 }: OrderFormProps) {
     // Form fields local state
     const [orderName, setOrderName] = useState(defaultValues?.orderName || '');
@@ -243,6 +245,12 @@ export function OrderForm({
     const allServices = useMemo(() => servicesData?.data || [], [servicesData]);
     const formats = useMemo(() => formatsData?.data || [], [formatsData]);
     const clients = useMemo(() => clientsData || [], [clientsData]);
+
+    const showPrices = useMemo(() => {
+        if (isTelemarketer) return true;
+        const selectedClient = clients.find((c: any) => c._id === clientId);
+        return selectedClient?.clientId === 'WB_1003_50';
+    }, [isTelemarketer, clients, clientId]);
 
     const services = useMemo(() => {
         if (!clientId || showAllServices) return allServices;
@@ -621,45 +629,49 @@ export function OrderForm({
                             )}
                         </div>
 
-                        <div className="space-y-2">
-                            <Label className="text-sm font-medium flex items-center gap-2">
-                                <DollarSign className="h-3.5 w-3.5 text-muted-foreground" />
-                                Per Image ($)
-                            </Label>
-                            <Input
-                                type="number"
-                                step="any"
-                                min="0"
-                                className="h-10"
-                                value={perImagePrice || ''}
-                                onChange={(e) => handlePerImagePriceChange(Number(e.target.value) || 0)}
-                            />
-                            {errors.perImagePrice && (
-                                <p className="text-xs text-destructive">
-                                    {errors.perImagePrice}
-                                </p>
-                            )}
-                        </div>
+                        {showPrices && (
+                            <>
+                                <div className="space-y-2">
+                                    <Label className="text-sm font-medium flex items-center gap-2">
+                                        <DollarSign className="h-3.5 w-3.5 text-muted-foreground" />
+                                        Per Image ($)
+                                    </Label>
+                                    <Input
+                                        type="number"
+                                        step="any"
+                                        min="0"
+                                        className="h-10"
+                                        value={perImagePrice || ''}
+                                        onChange={(e) => handlePerImagePriceChange(Number(e.target.value) || 0)}
+                                    />
+                                    {errors.perImagePrice && (
+                                        <p className="text-xs text-destructive">
+                                            {errors.perImagePrice}
+                                        </p>
+                                    )}
+                                </div>
 
-                        <div className="space-y-2">
-                            <Label className="text-sm font-medium flex items-center gap-2">
-                                <DollarSign className="h-3.5 w-3.5 text-muted-foreground" />
-                                Total ($)
-                            </Label>
-                            <Input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                className="h-10"
-                                value={totalPrice || ''}
-                                onChange={(e) => handleTotalPriceChange(Number(e.target.value) || 0)}
-                            />
-                            {errors.totalPrice && (
-                                <p className="text-xs text-destructive">
-                                    {errors.totalPrice}
-                                </p>
-                            )}
-                        </div>
+                                <div className="space-y-2">
+                                    <Label className="text-sm font-medium flex items-center gap-2">
+                                        <DollarSign className="h-3.5 w-3.5 text-muted-foreground" />
+                                        Total ($)
+                                    </Label>
+                                    <Input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        className="h-10"
+                                        value={totalPrice || ''}
+                                        onChange={(e) => handleTotalPriceChange(Number(e.target.value) || 0)}
+                                    />
+                                    {errors.totalPrice && (
+                                        <p className="text-xs text-destructive">
+                                            {errors.totalPrice}
+                                        </p>
+                                    )}
+                                </div>
+                            </>
+                        )}
                     </div>
 
                     <Separator />

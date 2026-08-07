@@ -878,6 +878,7 @@ export default function OrdersPage() {
                                         submitLabel="Create Order"
                                         onCancel={() => setIsAddDialogOpen(false)}
                                         serverErrors={serverErrors}
+                                        isTelemarketer={isTelemarketer}
                                     />
                                 </DialogContent>
                             </Dialog>
@@ -1341,9 +1342,10 @@ export default function OrdersPage() {
                                                     {order.imageQuantity}
                                                 </TableCell>
                                                 <TableCell className="py-3 text-sm font-semibold">
-                                                    $
-                                                    {order.totalPrice.toFixed(
-                                                        2,
+                                                    {!isTelemarketer && order.clientId?.clientId !== 'WB_1003_50' ? (
+                                                        <span className="text-muted-foreground">N/A</span>
+                                                    ) : (
+                                                        `$${order.totalPrice.toFixed(2)}`
                                                     )}
                                                 </TableCell>
                                                 <TableCell className='py-3 flex items-center justify-center w-auto'>
@@ -1692,6 +1694,7 @@ export default function OrdersPage() {
                             submitLabel="Update Order"
                             onCancel={() => setIsEditDialogOpen(false)}
                             serverErrors={serverErrors}
+                            isTelemarketer={isTelemarketer}
                         />
                     )}
                 </DialogContent>
