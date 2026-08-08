@@ -168,6 +168,13 @@ export default function OrdersPage() {
             meData?.staff?.designation?.toLowerCase() === "telemarketer"
         );
     }, [session, meData]);
+    const isAdmin = useMemo(() => {
+        return (
+            session?.user?.role === Role.SUPER_ADMIN ||
+            session?.user?.role === Role.ADMIN ||
+            session?.user?.role === Role.HR_MANAGER
+        );
+    }, [session]);
     const [page, setPage] = useState(1);
     const [filters, setFilters] = useState<OrderFilters>({
         search: "",
@@ -879,6 +886,7 @@ export default function OrdersPage() {
                                         onCancel={() => setIsAddDialogOpen(false)}
                                         serverErrors={serverErrors}
                                         isTelemarketer={isTelemarketer}
+                                        isAdmin={isAdmin}
                                     />
                                 </DialogContent>
                             </Dialog>
@@ -1695,6 +1703,7 @@ export default function OrdersPage() {
                             onCancel={() => setIsEditDialogOpen(false)}
                             serverErrors={serverErrors}
                             isTelemarketer={isTelemarketer}
+                            isAdmin={isAdmin}
                         />
                     )}
                 </DialogContent>

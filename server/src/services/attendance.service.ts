@@ -818,7 +818,7 @@ async function bulkUpdateAttendanceStatusInDB({
       }
 
       if (!shiftDataToUse) {
-        const shiftAssignment = await ShiftAssignmentModel.findOne({
+        let shiftAssignment = await ShiftAssignmentModel.findOne({
           staffId,
           startDate: { $lte: dayStart },
           $or: [{ endDate: null }, { endDate: { $gte: dayStart } }],
@@ -826,6 +826,18 @@ async function bulkUpdateAttendanceStatusInDB({
         })
           .populate("shiftId")
           .lean();
+
+        // Fallback: If no shift assignment covers this date (e.g. join date moved backwards),
+        // use the earliest active shift assignment.
+        if (!shiftAssignment) {
+          shiftAssignment = await ShiftAssignmentModel.findOne({
+            staffId,
+            isActive: true,
+          })
+            .sort({ startDate: 1 })
+            .populate("shiftId")
+            .lean();
+        }
 
         if (shiftAssignment && shiftAssignment.shiftId) {
             shiftDataToUse = shiftAssignment.shiftId;

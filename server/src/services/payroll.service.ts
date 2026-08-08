@@ -1497,7 +1497,7 @@ async function setAttendance(payload: {
 }) {
     const { staffId, date, status, context } = payload;
     // 1. Find shift assignment for this staff on this date
-    const assignment = await ShiftAssignmentModel.findOne({
+    let assignment = await ShiftAssignmentModel.findOne({
         staffId: new Types.ObjectId(staffId),
         startDate: { $lte: new Date(date + 'T23:59:59+06:00') },
         $or: [
@@ -1505,6 +1505,17 @@ async function setAttendance(payload: {
             { endDate: { $gte: new Date(date + 'T00:00:00+06:00') } },
         ],
     }).populate('shiftId');
+
+    if (!assignment) {
+        // Fallback: If no shift assignment covers this date (e.g. join date moved backwards),
+        // use the earliest active shift assignment.
+        assignment = await ShiftAssignmentModel.findOne({
+            staffId: new Types.ObjectId(staffId),
+            isActive: true,
+        })
+            .sort({ startDate: 1 })
+            .populate('shiftId');
+    }
 
     if (!assignment) {
         throw new Error('This staff is not assigned to any shift');

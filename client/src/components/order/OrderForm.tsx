@@ -89,6 +89,7 @@ interface OrderFormProps {
     onCancel: () => void;
     serverErrors?: Record<string, string[]>;
     isTelemarketer?: boolean;
+    isAdmin?: boolean;
 }
 
 export function OrderForm({
@@ -99,6 +100,7 @@ export function OrderForm({
     onCancel,
     serverErrors,
     isTelemarketer,
+    isAdmin,
 }: OrderFormProps) {
     // Form fields local state
     const [orderName, setOrderName] = useState(defaultValues?.orderName || '');
@@ -247,10 +249,10 @@ export function OrderForm({
     const clients = useMemo(() => clientsData || [], [clientsData]);
 
     const showPrices = useMemo(() => {
-        if (isTelemarketer) return true;
+        if (isAdmin || isTelemarketer) return true;
         const selectedClient = clients.find((c: any) => c._id === clientId);
         return selectedClient?.clientId === 'WB_1003_50';
-    }, [isTelemarketer, clients, clientId]);
+    }, [isAdmin, isTelemarketer, clients, clientId]);
 
     const services = useMemo(() => {
         if (!clientId || showAllServices) return allServices;
