@@ -24,8 +24,21 @@ export interface Client {
     currency?: string;
     status: 'active' | 'inactive';
     teamMembers?: TeamMember[];
-    assignedServices?: string[];
-    assignedServicesDetails?: { _id: string; name: string }[];
+    assignedServices?: {
+        service: string;
+        price: number;
+        assignedDate?: string;
+        assignedBy?: string;
+    }[];
+    assignedServicesDetails?: {
+        _id: string;
+        service: string;
+        price: number;
+        assignedDate: string;
+        assignedBy: string;
+        serviceDetails?: { _id: string; name: string; description?: string };
+        assignedByDetails?: { _id: string; name: string };
+    }[];
     createdBy?: { _id: string; name: string };
     assignedTelemarketer?: { _id: string; name: string; email?: string } | string;
     createdAt: string;

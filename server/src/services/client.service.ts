@@ -281,11 +281,68 @@ const getClientByIdFromDB = async (id: string) => {
         },
         {
             $lookup: {
-                from: 'services',
-                localField: 'assignedServices',
+                from: 'user',
+                localField: 'assignedServices.assignedBy',
                 foreignField: '_id',
-                as: 'assignedServicesDetails',
+                as: 'assignedByData',
             },
+        },
+        {
+            $lookup: {
+                from: 'services',
+                localField: 'assignedServices.service',
+                foreignField: '_id',
+                as: 'servicesData',
+            },
+        },
+        {
+            $addFields: {
+                assignedServicesDetails: {
+                    $map: {
+                        input: '$assignedServices',
+                        as: 'assigned',
+                        in: {
+                            $mergeObjects: [
+                                '$$assigned',
+                                {
+                                    serviceDetails: {
+                                        $arrayElemAt: [
+                                            {
+                                                $filter: {
+                                                    input: '$servicesData',
+                                                    as: 'sd',
+                                                    cond: { $eq: ['$$sd._id', '$$assigned.service'] }
+                                                }
+                                            },
+                                            0
+                                        ]
+                                    },
+                                    assignedByDetails: {
+                                        $arrayElemAt: [
+                                            {
+                                                $filter: {
+                                                    input: '$assignedByData',
+                                                    as: 'ad',
+                                                    cond: { $eq: ['$$ad._id', '$$assigned.assignedBy'] }
+                                                }
+                                            },
+                                            0
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        {
+            $project: {
+                servicesData: 0,
+                assignedByData: 0,
+                'assignedServicesDetails.assignedByDetails.password': 0,
+                'assignedServicesDetails.assignedByDetails.passwordHistory': 0
+            }
         },
         {
             $project: {
@@ -354,7 +411,12 @@ const createClientInDB = async (
         ...(payload.teamMembers && { teamMembers: payload.teamMembers }),
         ...(payload.assignedServices && {
             assignedServices: payload.assignedServices.map(
-                (id) => new Types.ObjectId(id),
+                (assignment) => ({
+                    service: new Types.ObjectId(assignment.service),
+                    price: assignment.price,
+                    assignedBy: new Types.ObjectId(payload.createdBy),
+                    assignedDate: new Date(),
+                })
             ),
         }),
         ...(payload.assignedTelemarketer !== undefined && {
@@ -399,7 +461,12 @@ const updateClientInDB = async (id: string, payload: UpdateClientInput) => {
     const updateData: Record<string, unknown> = { ...payload };
     if (payload.assignedServices) {
         updateData.assignedServices = payload.assignedServices.map(
-            (id) => new Types.ObjectId(id),
+            (assignment) => ({
+                service: new Types.ObjectId(assignment.service),
+                price: assignment.price,
+                // Existing assignments won't be modified by default unless we pass them.
+                // We'll let the controller handle setting assignedBy if it's a new assignment.
+            })
         );
     }
 
@@ -549,7 +616,11 @@ const getClientStatsFromDB = async (
 const getAllClientsWithoutPaginationFromDB = async (params: { createdBy?: string; status?: string }) => {
     const query: Record<string, any> = {};
     if (params.createdBy) {
-        query.createdBy = new Types.ObjectId(params.createdBy);
+        const userId = new Types.ObjectId(params.createdBy);
+        query.$or = [
+            { createdBy: userId },
+            { assignedTelemarketer: userId },
+        ];
     }
     if (params.status) {
         query.status = params.status;

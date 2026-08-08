@@ -17,9 +17,10 @@ interface ClientOrderStatsProps {
 
 export function ClientOrderStats({ stats, isLoading, currency = "USD" }: ClientOrderStatsProps) {
     const formatCurrency = (amount: number) => {
+        const safeCurrency = currency || 'USD';
         return new Intl.NumberFormat('en-US', {
             style: 'currency',
-            currency: currency,
+            currency: safeCurrency,
         }).format(amount);
     };
 

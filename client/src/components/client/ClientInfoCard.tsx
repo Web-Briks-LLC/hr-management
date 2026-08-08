@@ -45,11 +45,15 @@ export function ClientInfoCard({ client }: ClientInfoCardProps) {
                         </div>
                         <div className="overflow-hidden">
                             <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider leading-none mb-1">Email(s)</p>
-                            {client.emails.map((email, idx) => (
-                                <p key={idx} className="text-sm font-medium text-slate-700 dark:text-slate-200 truncate" title={email}>
-                                    {email}
-                                </p>
-                            ))}
+                            {client.emails && client.emails.length > 0 ? (
+                                client.emails.map((email, idx) => (
+                                    <p key={idx} className="text-sm font-medium text-slate-700 dark:text-slate-200 truncate" title={email}>
+                                        {email}
+                                    </p>
+                                ))
+                            ) : (
+                                <p className="text-sm font-medium text-slate-500 italic">No email provided</p>
+                            )}
                         </div>
                     </div>
                     {client.phone && (
@@ -109,7 +113,7 @@ export function ClientInfoCard({ client }: ClientInfoCardProps) {
                         <div>
                             <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider leading-none mb-1">Created At</p>
                             <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                                {format(new Date(client.createdAt), "MMMM dd, yyyy")}
+                                {client.createdAt ? format(new Date(client.createdAt), "MMMM dd, yyyy") : 'N/A'}
                             </p>
                         </div>
                     </div>
@@ -140,7 +144,7 @@ export function ClientInfoCard({ client }: ClientInfoCardProps) {
                             <div className="flex flex-wrap gap-2">
                                 {client.assignedServicesDetails.map((service, idx) => (
                                     <Badge key={idx} variant="outline" className="bg-teal-50 text-teal-700 border-teal-200 shadow-sm">
-                                        {service.name}
+                                        {service.serviceDetails?.name || 'Unknown Service'}
                                     </Badge>
                                 ))}
                             </div>

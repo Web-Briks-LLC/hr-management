@@ -269,9 +269,10 @@ export function OrderForm({
     const filteredServices = useMemo(() => {
         if (!debouncedServiceSearch.trim()) return services;
         const searchLower = debouncedServiceSearch.toLowerCase();
-        return services.filter((service: { name: string }) =>
-            service.name.toLowerCase().includes(searchLower),
-        );
+        return services.filter((service: any) => {
+            const name = service.serviceDetails?.name || service.name || '';
+            return name.toLowerCase().includes(searchLower);
+        });
     }, [services, debouncedServiceSearch]);
 
     const handleServiceToggle = (serviceId: string) => {
@@ -759,46 +760,49 @@ export function OrderForm({
                                         No services found
                                     </p>
                                 ) : (
-                                    filteredServices.map((service) => (
+                                    filteredServices.map((service: any) => {
+                                        const serviceId = service.service || service._id;
+                                        const serviceName = service.serviceDetails?.name || service.name || 'Unknown Service';
+                                        return (
                                         <div
-                                            key={service._id}
+                                            key={serviceId}
                                             role="button"
                                             tabIndex={0}
                                             className={cn(
                                                 'flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer transition-colors outline-none focus-visible:bg-accent',
                                                 selectedServices.includes(
-                                                    service._id,
+                                                    serviceId,
                                                 )
                                                     ? 'bg-primary/5'
                                                     : 'hover:bg-accent',
                                             )}
                                             onClick={() =>
-                                                handleServiceToggle(service._id)
+                                                handleServiceToggle(serviceId)
                                             }
                                             onKeyDown={(e) => {
                                                 if (e.key === 'Enter' || e.key === ' ') {
                                                     e.preventDefault();
-                                                    handleServiceToggle(service._id);
+                                                    handleServiceToggle(serviceId);
                                                 }
                                             }}
                                         >
                                             <div
                                                 className={cn(
                                                     'h-4 w-4 shrink-0 rounded-[4px] border flex items-center justify-center transition-colors',
-                                                    selectedServices.includes(service._id)
+                                                    selectedServices.includes(serviceId)
                                                         ? 'bg-primary border-primary text-primary-foreground'
                                                         : 'border-input bg-background',
                                                 )}
                                             >
-                                                {selectedServices.includes(service._id) && (
+                                                {selectedServices.includes(serviceId) && (
                                                     <Check className="h-3 w-3 stroke-[3]" />
                                                 )}
                                             </div>
                                             <span className="text-sm truncate">
-                                                {service.name}
+                                                {serviceName}
                                             </span>
                                         </div>
-                                    ))
+                                    )})
                                 )}
                             </div>
                         )}

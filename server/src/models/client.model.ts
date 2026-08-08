@@ -81,12 +81,31 @@ const ClientSchema = new Schema<IClient>(
             type: [teamMemberSchema],
             default: [],
         },
-        assignedServices: [
-            {
-                type: Schema.Types.ObjectId,
-                ref: 'Service',
-            },
-        ],
+        assignedServices: {
+            type: [
+                {
+                    service: {
+                        type: Schema.Types.ObjectId,
+                        ref: 'Service',
+                        required: true,
+                    },
+                    price: {
+                        type: Number,
+                        required: true,
+                    },
+                    assignedDate: {
+                        type: Date,
+                        default: Date.now,
+                    },
+                    assignedBy: {
+                        type: Schema.Types.ObjectId,
+                        ref: 'User',
+                        required: true,
+                    },
+                }
+            ],
+            default: [],
+        },
         assignedTelemarketer: {
             type: Schema.Types.ObjectId,
             ref: 'User',

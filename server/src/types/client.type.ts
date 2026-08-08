@@ -18,7 +18,13 @@ export interface IClient extends Document {
     currency?: string; // USD, EUR, GBP, etc.
     status: 'active' | 'inactive';
     teamMembers: ITeamMember[];
-    assignedServices: Types.ObjectId[];
+    assignedServices: {
+        _id?: Types.ObjectId;
+        service: Types.ObjectId;
+        price: number;
+        assignedDate: Date;
+        assignedBy: Types.ObjectId;
+    }[];
     assignedTelemarketer?: Types.ObjectId;
     createdBy: Types.ObjectId;
     createdAt: Date;

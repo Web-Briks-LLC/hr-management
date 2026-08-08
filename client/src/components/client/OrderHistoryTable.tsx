@@ -23,9 +23,10 @@ interface OrderHistoryTableProps {
 
 export function OrderHistoryTable({ orders, isLoading, currency = "USD" }: OrderHistoryTableProps) {
     const formatCurrency = (amount: number) => {
+        const safeCurrency = currency || 'USD';
         return new Intl.NumberFormat('en-US', {
             style: 'currency',
-            currency: currency,
+            currency: safeCurrency,
         }).format(amount);
     };
 
@@ -115,7 +116,7 @@ export function OrderHistoryTable({ orders, isLoading, currency = "USD" }: Order
                                 </div>
                             </TableCell>
                             <TableCell className="py-3 text-center text-xs text-muted-foreground">
-                                {format(new Date(order.orderDate), "MMM dd, yyyy")}
+                                {order.orderDate ? format(new Date(order.orderDate), "MMM dd, yyyy") : "N/A"}
                             </TableCell>
                             <TableCell className="py-3 text-center text-sm font-bold">
                                 {order.imageQuantity}

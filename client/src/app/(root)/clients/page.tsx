@@ -141,7 +141,14 @@ export default function ClientsPage() {
     const handleAddClient = async (data: ClientFormData) => {
         try {
             setAddServerErrors(undefined);
-            await createClient(data).unwrap();
+            const submitData = {
+                ...data,
+                assignedServices: data.assignedServices.map(serviceId => ({
+                    service: serviceId,
+                    price: 0
+                }))
+            };
+            await createClient(submitData as any).unwrap();
             toast.success("Client created successfully");
             setIsAddDialogOpen(false);
         } catch (error: unknown) {
@@ -158,7 +165,18 @@ export default function ClientsPage() {
         if (!selectedClient) return;
         try {
             setUpdateServerErrors(undefined);
-            await updateClient({ id: selectedClient._id, ...data }).unwrap();
+            const updatedAssignedServices = data.assignedServices.map(serviceId => {
+                const existing = selectedClient.assignedServices?.find(a => a.service === serviceId);
+                return {
+                    service: serviceId,
+                    price: existing ? existing.price : 0
+                };
+            });
+            const submitData = {
+                ...data,
+                assignedServices: updatedAssignedServices
+            };
+            await updateClient({ id: selectedClient._id, ...submitData } as any).unwrap();
             toast.success("Client updated successfully");
             setIsEditDialogOpen(false);
         } catch (error: unknown) {
@@ -185,7 +203,7 @@ export default function ClientsPage() {
             currency: client.currency || "",
             status: client.status,
             teamMembers: client.teamMembers || [],
-            assignedServices: client.assignedServices || [],
+            assignedServices: client.assignedServices?.map(a => typeof a === 'string' ? a : a.service) || [],
             assignedTelemarketer:
                 typeof client.assignedTelemarketer === "object"
                     ? client.assignedTelemarketer?._id

@@ -108,12 +108,35 @@ export const clientApi = apiSlice.injectEndpoints({
             }) => response.data,
             providesTags: ['Client'],
         }),
-        getAssignedServices: builder.query<{ _id: string; name: string }[], string>({
+        getAssignedServices: builder.query<
+            {
+                _id: string;
+                service: string;
+                price: number;
+                assignedDate: string;
+                assignedBy: string;
+                serviceDetails?: { _id: string; name: string; description?: string };
+                assignedByDetails?: { _id: string; name: string };
+            }[],
+            string
+        >({
             query: (id) => ({
                 url: `/clients/${id}/assigned-services`,
                 method: 'GET',
             }),
-            transformResponse: (response: { data: { _id: string; name: string }[] }) => response.data,
+            transformResponse: (
+                response: {
+                    data: {
+                        _id: string;
+                        service: string;
+                        price: number;
+                        assignedDate: string;
+                        assignedBy: string;
+                        serviceDetails?: { _id: string; name: string; description?: string };
+                        assignedByDetails?: { _id: string; name: string };
+                    }[];
+                }
+            ) => response.data,
             providesTags: ['Client'],
         }),
         getClientEmails: builder.query<ClientEmail[], string>({

@@ -36,6 +36,8 @@ import { MONTH_OPTIONS, PER_PAGE_OPTIONS, ORDER_STATUS_LABELS, ORDER_PRIORITY_LA
 import { ClientInfoCard } from '@/components/client/ClientInfoCard';
 import { ClientOrderStats } from '@/components/client/ClientOrderStats';
 import { OrderHistoryTable } from '@/components/client/OrderHistoryTable';
+import { AssignedServicesTab } from '@/components/client/AssignedServicesTab';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export default function ClientDetailsPage() {
     const params = useParams();
@@ -174,207 +176,223 @@ export default function ClientDetailsPage() {
                 />
             </div>
 
-            {/* Orders Section Card */}
-            <Card className="border-border/60 shadow-md">
-                <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center gap-2 text-xl">
-                        <ShoppingBag className="h-5 w-5 text-primary" />
-                        Order History
-                        <span className="text-xs font-normal text-muted-foreground">
-                            ({pagination.total} total orders)
-                        </span>
-                    </CardTitle>
-                </CardHeader>
+            {/* Tabs Section */}
+            <Tabs defaultValue="orders" className="w-full">
+                <TabsList className="mb-4">
+                    <TabsTrigger value="orders">Order History</TabsTrigger>
+                    <TabsTrigger value="services">Assigned Services</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="orders" className="mt-0">
+                    {/* Orders Section Card */}
+                    <Card className="border-border/60 shadow-md">
+                        <CardHeader className="pb-3">
+                            <CardTitle className="flex items-center gap-2 text-xl">
+                                <ShoppingBag className="h-5 w-5 text-primary" />
+                                Order History
+                                <span className="text-xs font-normal text-muted-foreground">
+                                    ({pagination.total} total orders)
+                                </span>
+                            </CardTitle>
+                        </CardHeader>
 
-                <CardContent className="space-y-6">
-                    {/* Filters Toolbar */}
-                    <div className="flex flex-wrap items-center gap-3 p-4 bg-muted/30 rounded-lg border border-border/50">
-                        <div className="flex items-center gap-2 shrink-0">
-                            <div className="bg-primary/10 p-2 rounded-full">
-                                <Filter className="h-4 w-4 text-primary" />
-                            </div>
-                            <span className="text-sm font-medium">Filters:</span>
-                        </div>
+                        <CardContent className="space-y-6">
+                            {/* Filters Toolbar */}
+                            <div className="flex flex-wrap items-center gap-3 p-4 bg-muted/30 rounded-lg border border-border/50">
+                                <div className="flex items-center gap-2 shrink-0">
+                                    <div className="bg-primary/10 p-2 rounded-full">
+                                        <Filter className="h-4 w-4 text-primary" />
+                                    </div>
+                                    <span className="text-sm font-medium">Filters:</span>
+                                </div>
 
-                        {/* Search Input */}
-                        <div className="relative flex-1 min-w-[200px]">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input
-                                placeholder="Search orders..."
-                                value={search}
-                                onChange={(e) => {
-                                    setSearch(e.target.value);
-                                    setPage(1);
-                                }}
-                                className="pl-9 pr-8 h-9 bg-background/60 border-input text-sm"
-                            />
-                            {search && (
-                                <button
-                                    onClick={() => setSearch('')}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/60 hover:text-foreground transition-colors"
-                                    type="button"
-                                >
-                                    <X className="h-3.5 w-3.5" />
-                                </button>
-                            )}
-                        </div>
+                                {/* Search Input */}
+                                <div className="relative flex-1 min-w-[200px]">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                    <Input
+                                        placeholder="Search orders..."
+                                        value={search}
+                                        onChange={(e) => {
+                                            setSearch(e.target.value);
+                                            setPage(1);
+                                        }}
+                                        className="pl-9 pr-8 h-9 bg-background/60 border-input text-sm"
+                                    />
+                                    {search && (
+                                        <button
+                                            onClick={() => setSearch('')}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/60 hover:text-foreground transition-colors"
+                                            type="button"
+                                        >
+                                            <X className="h-3.5 w-3.5" />
+                                        </button>
+                                    )}
+                                </div>
 
-                        {/* Month Filter */}
-                        <Select
-                            value={selectedMonth}
-                            onValueChange={(val) => {
-                                setSelectedMonth(val);
-                                setPage(1);
-                            }}
-                        >
-                            <SelectTrigger className="w-[130px] h-9 bg-background/60 text-xs font-medium">
-                                <SelectValue placeholder="Month" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {MONTH_OPTIONS.map((m) => (
-                                    <SelectItem key={m.value} value={m.value} className="text-xs">
-                                        {m.label}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-
-                        {/* Status Filter */}
-                        <Select
-                            value={selectedStatus}
-                            onValueChange={(val) => {
-                                setSelectedStatus(val as OrderStatus);
-                                setPage(1);
-                            }}
-                        >
-                            <SelectTrigger className="w-[130px] h-9 bg-background/60 text-xs font-medium">
-                                <SelectValue placeholder="Status" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {Object.entries(ORDER_STATUS_LABELS).map(([value, label]) => (
-                                    <SelectItem key={value} value={value} className="text-xs">
-                                        {label}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-
-                        {/* Priority Filter */}
-                        <Select
-                            value={selectedPriority}
-                            onValueChange={(val) => {
-                                setSelectedPriority(val as OrderPriority);
-                                setPage(1);
-                            }}
-                        >
-                            <SelectTrigger className="w-[130px] h-9 bg-background/60 text-xs font-medium">
-                                <SelectValue placeholder="Priority" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {Object.entries(ORDER_PRIORITY_LABELS).map(([value, label]) => (
-                                    <SelectItem key={value} value={value} className="text-xs">
-                                        {label}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-
-                        {isFiltered && (
-                            <Button
-                                variant="ghost"
-                                onClick={handleClearFilters}
-                                className="h-9 px-3 text-xs gap-1.5 hover:bg-muted/85 font-medium shrink-0"
-                            >
-                                Clear Filters
-                                <X className="h-3 w-3" />
-                            </Button>
-                        )}
-                    </div>
-
-                    {/* Table Container */}
-                    <div className="rounded-md border border-border/60 overflow-hidden">
-                        <OrderHistoryTable 
-                            orders={orders} 
-                            isLoading={isLoadingOrders} 
-                            currency={client.currency} 
-                        />
-                    </div>
-
-                    {/* Pagination Footer */}
-                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-border/60">
-                        <div className="text-sm text-muted-foreground font-medium select-none">
-                            Showing <span className="font-semibold text-foreground">{orders.length}</span> of{" "}
-                            <span className="font-semibold text-foreground">{pagination.total}</span> orders
-                        </div>
-
-                        <div className="flex items-center gap-6">
-                            <div className="flex items-center gap-2">
-                                <span className="text-xs text-muted-foreground whitespace-nowrap">Rows per page</span>
+                                {/* Month Filter */}
                                 <Select
-                                    value={limit.toString()}
+                                    value={selectedMonth}
                                     onValueChange={(val) => {
-                                        setLimit(Number(val));
+                                        setSelectedMonth(val);
                                         setPage(1);
                                     }}
                                 >
-                                    <SelectTrigger className="h-8 w-[70px] text-xs font-semibold">
-                                        <SelectValue />
+                                    <SelectTrigger className="w-[130px] h-9 bg-background/60 text-xs font-medium">
+                                        <SelectValue placeholder="Month" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {PER_PAGE_OPTIONS.map((option) => (
-                                            <SelectItem key={option} value={option.toString()} className="text-xs">
-                                                {option}
+                                        {MONTH_OPTIONS.map((m) => (
+                                            <SelectItem key={m.value} value={m.value} className="text-xs">
+                                                {m.label}
                                             </SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
+
+                                {/* Status Filter */}
+                                <Select
+                                    value={selectedStatus}
+                                    onValueChange={(val) => {
+                                        setSelectedStatus(val as OrderStatus);
+                                        setPage(1);
+                                    }}
+                                >
+                                    <SelectTrigger className="w-[130px] h-9 bg-background/60 text-xs font-medium">
+                                        <SelectValue placeholder="Status" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {Object.entries(ORDER_STATUS_LABELS).map(([value, label]) => (
+                                            <SelectItem key={value} value={value} className="text-xs">
+                                                {label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+
+                                {/* Priority Filter */}
+                                <Select
+                                    value={selectedPriority}
+                                    onValueChange={(val) => {
+                                        setSelectedPriority(val as OrderPriority);
+                                        setPage(1);
+                                    }}
+                                >
+                                    <SelectTrigger className="w-[130px] h-9 bg-background/60 text-xs font-medium">
+                                        <SelectValue placeholder="Priority" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {Object.entries(ORDER_PRIORITY_LABELS).map(([value, label]) => (
+                                            <SelectItem key={value} value={value} className="text-xs">
+                                                {label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+
+                                {isFiltered && (
+                                    <Button
+                                        variant="ghost"
+                                        onClick={handleClearFilters}
+                                        className="h-9 px-3 text-xs gap-1.5 hover:bg-muted/85 font-medium shrink-0"
+                                    >
+                                        Clear Filters
+                                        <X className="h-3 w-3" />
+                                    </Button>
+                                )}
                             </div>
 
-                            <div className="flex items-center gap-1">
-                                <Button
-                                    variant="outline"
-                                    size="icon"
-                                    className="h-8 w-8"
-                                    onClick={() => setPage(1)}
-                                    disabled={page === 1 || isLoadingOrders}
-                                >
-                                    <ChevronsLeft className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    size="icon"
-                                    className="h-8 w-8"
-                                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                                    disabled={page === 1 || isLoadingOrders}
-                                >
-                                    <ChevronLeft className="h-4 w-4" />
-                                </Button>
-                                <span className="text-xs font-medium px-2 whitespace-nowrap select-none">
-                                    Page {pagination.page} of {pagination.totalPages}
-                                </span>
-                                <Button
-                                    variant="outline"
-                                    size="icon"
-                                    className="h-8 w-8"
-                                    onClick={() => setPage((p) => Math.min(pagination.totalPages, p + 1))}
-                                    disabled={page >= pagination.totalPages || isLoadingOrders}
-                                >
-                                    <ChevronRight className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    size="icon"
-                                    className="h-8 w-8"
-                                    onClick={() => setPage(pagination.totalPages)}
-                                    disabled={page >= pagination.totalPages || isLoadingOrders}
-                                >
-                                    <ChevronsRight className="h-4 w-4" />
-                                </Button>
+                            {/* Table Container */}
+                            <div className="rounded-md border border-border/60 overflow-hidden">
+                                <OrderHistoryTable 
+                                    orders={orders} 
+                                    isLoading={isLoadingOrders} 
+                                    currency={client.currency} 
+                                />
                             </div>
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
+
+                            {/* Pagination Footer */}
+                            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-border/60">
+                                <div className="text-sm text-muted-foreground font-medium select-none">
+                                    Showing <span className="font-semibold text-foreground">{orders.length}</span> of{" "}
+                                    <span className="font-semibold text-foreground">{pagination.total}</span> orders
+                                </div>
+
+                                <div className="flex items-center gap-6">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xs text-muted-foreground whitespace-nowrap">Rows per page</span>
+                                        <Select
+                                            value={limit.toString()}
+                                            onValueChange={(val) => {
+                                                setLimit(Number(val));
+                                                setPage(1);
+                                            }}
+                                        >
+                                            <SelectTrigger className="h-8 w-[70px] text-xs font-semibold">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {PER_PAGE_OPTIONS.map((option) => (
+                                                    <SelectItem key={option} value={option.toString()} className="text-xs">
+                                                        {option}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+
+                                    <div className="flex items-center gap-1">
+                                        <Button
+                                            variant="outline"
+                                            size="icon"
+                                            className="h-8 w-8"
+                                            onClick={() => setPage(1)}
+                                            disabled={page === 1 || isLoadingOrders}
+                                        >
+                                            <ChevronsLeft className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            size="icon"
+                                            className="h-8 w-8"
+                                            onClick={() => setPage((p) => Math.max(1, p - 1))}
+                                            disabled={page === 1 || isLoadingOrders}
+                                        >
+                                            <ChevronLeft className="h-4 w-4" />
+                                        </Button>
+                                        <span className="text-xs font-medium px-2 whitespace-nowrap select-none">
+                                            Page {pagination.page} of {pagination.totalPages}
+                                        </span>
+                                        <Button
+                                            variant="outline"
+                                            size="icon"
+                                            className="h-8 w-8"
+                                            onClick={() => setPage((p) => Math.min(pagination.totalPages, p + 1))}
+                                            disabled={page >= pagination.totalPages || isLoadingOrders}
+                                        >
+                                            <ChevronRight className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            size="icon"
+                                            className="h-8 w-8"
+                                            onClick={() => setPage(pagination.totalPages)}
+                                            disabled={page >= pagination.totalPages || isLoadingOrders}
+                                        >
+                                            <ChevronsRight className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+                
+                <TabsContent value="services" className="mt-0">
+                    <Card className="border-border/60 shadow-md p-6">
+                        <AssignedServicesTab client={client} />
+                    </Card>
+                </TabsContent>
+            </Tabs>
         </div>
     );
 }
