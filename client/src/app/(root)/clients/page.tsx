@@ -143,9 +143,9 @@ export default function ClientsPage() {
             setAddServerErrors(undefined);
             const submitData = {
                 ...data,
-                assignedServices: data.assignedServices.map(serviceId => ({
-                    service: serviceId,
-                    price: 0
+                assignedServices: data.assignedServices.map(serviceObj => ({
+                    service: serviceObj.service,
+                    price: serviceObj.price || 0
                 }))
             };
             await createClient(submitData as any).unwrap();
@@ -165,14 +165,14 @@ export default function ClientsPage() {
         if (!selectedClient) return;
         try {
             setUpdateServerErrors(undefined);
-            const updatedAssignedServices = data.assignedServices.map(serviceId => {
+            const updatedAssignedServices = data.assignedServices.map(serviceObj => {
                 const existing = selectedClient.assignedServices?.find(a => {
                     const id = typeof a === 'string' ? a : a.service;
-                    return id === serviceId;
+                    return id === serviceObj.service;
                 });
                 return {
-                    service: serviceId,
-                    price: existing ? (typeof existing === 'string' ? 0 : existing.price || 0) : 0
+                    service: serviceObj.service,
+                    price: serviceObj.price ?? (existing ? (typeof existing === 'string' ? 0 : existing.price || 0) : 0)
                 };
             });
             const submitData = {
@@ -206,7 +206,10 @@ export default function ClientsPage() {
             currency: client.currency || "",
             status: client.status,
             teamMembers: client.teamMembers || [],
-            assignedServices: client.assignedServices?.map(a => typeof a === 'string' ? a : a.service) || [],
+            assignedServices: (client.assignedServicesDetails || client.assignedServices || []).map((s: any) => {
+                if (typeof s === 'string') return { service: s, price: null };
+                return { service: s.service || s._id, price: s.price || null };
+            }),
             assignedTelemarketer:
                 typeof client.assignedTelemarketer === "object"
                     ? client.assignedTelemarketer?._id
