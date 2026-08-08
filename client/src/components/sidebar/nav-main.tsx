@@ -85,11 +85,12 @@ export function NavMain() {
 
                     // B. Restriction: STAFF and TEAM_LEADER must match requiredDesignation if specified
                     if (
-                        (userRole === Role.STAFF ||
-                            userRole === Role.TEAM_LEADER) &&
+                        (userRole === Role.STAFF || userRole === Role.TEAM_LEADER) &&
                         item.requiredDesignation
                     ) {
-                        if (
+                        if (userRole === Role.TEAM_LEADER && item.url === "/orders") {
+                            // Team Leaders can always see Orders
+                        } else if (
                             staff?.designation?.toLowerCase() !==
                             item.requiredDesignation.toLowerCase()
                         ) {

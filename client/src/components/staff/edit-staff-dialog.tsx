@@ -26,7 +26,15 @@ import { useUpdateStaffMutation } from "@/redux/features/staff/staffApi";
 import IStaff from "@/types/staff.type";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { DESIGNATIONS, DEPARTMENTS } from "@/constants/metadata";
-import { Edit, Loader2 } from "lucide-react";
+import { CalendarIcon, Edit, Loader2 } from "lucide-react";
+import { format } from "date-fns";
+import { Calendar } from "@/components/ui/calendar";
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -40,6 +48,7 @@ const formSchema = z.object({
     status: z.enum(["active", "inactive", "terminated"]),
     salary: z.number().min(0, "Salary must be positive"),
     salaryVisibleToEmployee: z.boolean(),
+    joinDate: z.string().optional(),
     // Bank Account Fields
     bank: z.object({
         bankName: z.string().optional(),
@@ -72,6 +81,7 @@ export function EditStaffDialog({ staff }: EditStaffDialogProps) {
             role: staff.user?.role || Role.STAFF,
             status: staff.status || "active",
             salary: staff.salary || 0,
+            joinDate: staff.joinDate ? new Date(staff.joinDate).toISOString().split('T')[0] : "",
             salaryVisibleToEmployee: staff.salaryVisibleToEmployee !== false,
             bank: {
                 bankName: staff.bank?.bankName || "",
@@ -92,6 +102,7 @@ export function EditStaffDialog({ staff }: EditStaffDialogProps) {
                 role: staff.user?.role || Role.STAFF,
                 status: staff.status || "active",
                 salary: staff.salary || 0,
+                joinDate: staff.joinDate ? new Date(staff.joinDate).toISOString().split('T')[0] : "",
                 salaryVisibleToEmployee:
                     staff.salaryVisibleToEmployee !== false,
                 bank: {
@@ -279,6 +290,52 @@ export function EditStaffDialog({ staff }: EditStaffDialogProps) {
                                             </SelectItem>
                                         </SelectContent>
                                     </Select>
+                                )}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="border-t pt-4">
+                        <h4 className="text-sm font-medium mb-4">
+                            Employment Dates
+                        </h4>
+                        <div className="space-y-2 flex flex-col">
+                            <Label htmlFor="joinDate">Join Date</Label>
+                            <Controller
+                                control={form.control}
+                                name="joinDate"
+                                render={({ field }) => (
+                                    <Popover>
+                                        <PopoverTrigger asChild>
+                                            <Button
+                                                variant={"outline"}
+                                                className={cn(
+                                                    "w-full pl-3 text-left font-normal",
+                                                    !field.value && "text-muted-foreground"
+                                                )}
+                                            >
+                                                {field.value ? (
+                                                    format(new Date(field.value), "PPP")
+                                                ) : (
+                                                    <span>Pick a date</span>
+                                                )}
+                                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                            </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-auto p-0" align="start">
+                                            <Calendar
+                                                mode="single"
+                                                selected={field.value ? new Date(field.value) : undefined}
+                                                onSelect={(date) => 
+                                                    field.onChange(date ? format(date, "yyyy-MM-dd") : "")
+                                                }
+                                                disabled={(date) =>
+                                                    date > new Date() || date < new Date("1900-01-01")
+                                                }
+                                                initialFocus
+                                            />
+                                        </PopoverContent>
+                                    </Popover>
                                 )}
                             />
                         </div>

@@ -13,6 +13,7 @@ export interface IService {
     _id: string;
     name: string;
     description?: string;
+    price?: number;
     isActive: boolean;
     createdBy: string;
     createdAt: string;
@@ -149,11 +150,13 @@ export interface AddRevisionInput {
 export interface CreateServiceInput {
     name: string;
     description?: string;
+    price?: number;
 }
 
 export interface UpdateServiceInput {
     name?: string;
     description?: string;
+    price?: number;
     isActive?: boolean;
 }
 

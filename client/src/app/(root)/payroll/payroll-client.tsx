@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import PayrollTable from "../../../components/payroll/payroll-table";
 import OvertimeTable from "../../../components/payroll/overtime-table";
@@ -304,108 +305,223 @@ export default function PayrollPage() {
     const completionRate = displayTotal > 0 ? (displayPaid / displayTotal) * 100 : 0;
 
     return (
-        <div className="space-y-6 animate-in fade-in duration-500">
+        <div className="space-y-8 p-1 animate-in fade-in duration-500">
             {/* Header & Stats Overview */}
-
-            <div className="flex flex-col gap-8">
-                <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-                    <div className="flex flex-col gap-1">
-                        <h1 className="text-3xl font-bold tracking-tight">Payroll Operations</h1>
-                        <p className="text-sm text-muted-foreground font-medium">Manage and audit institutional disbursements</p>
+            <div className="flex flex-col gap-6">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                        <h2 className="text-3xl font-bold tracking-tight bg-linear-to-r from-foreground to-foreground/70 bg-clip-text">
+                            Payroll Operations
+                        </h2>
+                        <p className="text-muted-foreground mt-1">
+                            Manage monthly salaries, attendance audits, and institutional disbursements.
+                        </p>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                        <div className="px-4 py-2 bg-card border rounded-xl shadow-sm flex items-center gap-3">
-                            <div className="flex flex-col items-end">
-                                <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Payroll Status</span>
-                                <span className={cn(
-                                    "text-sm font-bold",
-                                    isLocked ? "text-amber-500" : "text-green-500"
-                                )}>
-                                    {isLocked ? "Locked" : "Editable"}
-                                </span>
+                    <div className="flex items-center gap-3">
+                        <Badge
+                            variant="outline"
+                            className={cn(
+                                "px-3 py-1.5 text-xs font-semibold rounded-xl flex items-center gap-2 shadow-xs",
+                                isLocked
+                                    ? "bg-amber-500/10 text-amber-600 border-amber-500/30 dark:text-amber-400"
+                                    : "bg-green-500/10 text-green-600 border-green-500/30 dark:text-green-400"
+                            )}
+                        >
+                            {isLocked ? <Lock className="h-3.5 w-3.5" /> : <ShieldCheck className="h-3.5 w-3.5" />}
+                            <span>{isLocked ? "Payroll Locked" : "Editable Preview"}</span>
+                        </Badge>
+
+                        {canWrite && (
+                            <Button
+                                size="sm"
+                                variant={isLocked ? "outline" : "secondary"}
+                                className={cn(
+                                    "h-9 gap-2 shadow-xs transition-all",
+                                    isLocked
+                                        ? "border-amber-500/30 text-amber-600 hover:bg-amber-500/10"
+                                        : "bg-muted hover:bg-muted/80"
+                                )}
+                                onClick={handleToggleLock}
+                                disabled={isLocking || isUnlocking}
+                            >
+                                {isLocked ? (
+                                    <>
+                                        <Unlock className="h-4 w-4" />
+                                        Unlock Payroll
+                                    </>
+                                ) : (
+                                    <>
+                                        <Lock className="h-4 w-4 text-amber-500" />
+                                        Lock Payroll
+                                    </>
+                                )}
+                            </Button>
+                        )}
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {/* Gross Liability Card */}
+                    <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-slate-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-slate-500/5 hover:border-slate-500/30">
+                        <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-slate-500/10 blur-2xl transition-all duration-300 group-hover:bg-slate-500/20" />
+                        <div className="relative">
+                            <div className="flex items-center justify-between mb-3">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-500/10 text-slate-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-slate-500/20">
+                                    <DollarSign className="h-5 w-5" />
+                                </div>
+                                {!isLoading && (
+                                    <Badge
+                                        variant="outline"
+                                        className="text-[10px] font-medium opacity-70 group-hover:opacity-100"
+                                    >
+                                        {isOvertimeTab ? "Overtime Total" : "Gross Liability"}
+                                    </Badge>
+                                )}
                             </div>
-                            <div className={cn(
-                                "h-10 w-10 flex items-center justify-center rounded-lg",
-                                isLocked ? "bg-amber-500/10 text-amber-500" : "bg-green-500/10 text-green-500"
-                            )}>
-                                {isLocked ? <Lock className="h-5 w-5" /> : <ShieldCheck className="h-5 w-5" />}
+                            {isLoading ? (
+                                <Skeleton className="h-8 w-28" />
+                            ) : (
+                                <div>
+                                    <h3 className="text-3xl font-bold tracking-tight text-slate-700 dark:text-slate-200">
+                                        {formatCurrency(displayTotal)}
+                                    </h3>
+                                    <p className="text-xs text-muted-foreground mt-2 font-medium">
+                                        {displayTotalStaff} active personnel evaluated
+                                    </p>
+                                </div>
+                            )}
+                            <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-slate-500/10 font-medium">
+                                Total Payroll Budget
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Pending Settlement Card */}
+                    <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-orange-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-orange-500/5 hover:border-orange-500/30">
+                        <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-orange-500/10 blur-2xl transition-all duration-300 group-hover:bg-orange-500/20" />
+                        <div className="relative">
+                            <div className="flex items-center justify-between mb-3">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-500/10 text-orange-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-orange-500/20">
+                                    <Clock className="h-5 w-5" />
+                                </div>
+                                {!isLoading && (
+                                    <Badge
+                                        variant="outline"
+                                        className="text-[10px] font-medium bg-orange-500/5 text-orange-500 border-orange-500/20 px-1.5 py-0 h-5"
+                                    >
+                                        Pending
+                                    </Badge>
+                                )}
                             </div>
+                            {isLoading ? (
+                                <Skeleton className="h-8 w-28" />
+                            ) : (
+                                <div>
+                                    <h3 className="text-3xl font-bold tracking-tight text-orange-600 dark:text-orange-400">
+                                        {formatCurrency(displayPending)}
+                                    </h3>
+                                    <p className="text-xs text-orange-600/80 dark:text-orange-400/80 mt-2 font-medium">
+                                        {isOvertimeTab ? overtimePendingCount : salaryPendingCount} staff awaiting payment
+                                    </p>
+                                </div>
+                            )}
+                            <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-orange-500/10 font-medium">
+                                Outstanding Liability
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Disbursed Volume Card */}
+                    <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-green-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-green-500/5 hover:border-green-500/30">
+                        <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-green-500/10 blur-2xl transition-all duration-300 group-hover:bg-green-500/20" />
+                        <div className="relative">
+                            <div className="flex items-center justify-between mb-3">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-500/10 text-green-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-green-500/20">
+                                    <CheckCircle2 className="h-5 w-5" />
+                                </div>
+                                {!isLoading && (
+                                    <Badge
+                                        variant="outline"
+                                        className="text-[10px] font-medium bg-green-500/5 text-green-500 border-green-500/20 px-1.5 py-0 h-5"
+                                    >
+                                        Disbursed
+                                    </Badge>
+                                )}
+                            </div>
+                            {isLoading ? (
+                                <Skeleton className="h-8 w-28" />
+                            ) : (
+                                <div>
+                                    <h3 className="text-3xl font-bold tracking-tight text-green-600 dark:text-green-400">
+                                        {formatCurrency(displayPaid)}
+                                    </h3>
+                                    <div className="mt-2 space-y-1">
+                                        <div className="flex justify-between text-[11px] font-medium text-muted-foreground">
+                                            <span>Paid ({isOvertimeTab ? overtimePaidCount : salaryPaidCount})</span>
+                                            <span className="font-semibold text-green-600 dark:text-green-400">{Math.round(completionRate)}%</span>
+                                        </div>
+                                        <Progress value={completionRate} className="h-1.5 bg-green-500/10" />
+                                    </div>
+                                </div>
+                            )}
+                            <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-green-500/10 font-medium">
+                                Successfully Paid Volume
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Personnel Engagement Card */}
+                    <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-blue-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/5 hover:border-blue-500/30">
+                        <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-blue-500/10 blur-2xl transition-all duration-300 group-hover:bg-blue-500/20" />
+                        <div className="relative">
+                            <div className="flex items-center justify-between mb-3">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/10 text-blue-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-blue-500/20">
+                                    <Users className="h-5 w-5" />
+                                </div>
+                                {!isLoading && (
+                                    <Badge
+                                        variant="outline"
+                                        className="text-[10px] font-medium bg-blue-500/5 text-blue-500 border-blue-500/20 px-1.5 py-0 h-5"
+                                    >
+                                        Staff
+                                    </Badge>
+                                )}
+                            </div>
+                            {isLoading ? (
+                                <Skeleton className="h-8 w-20" />
+                            ) : (
+                                <div>
+                                    <h3 className="text-3xl font-bold tracking-tight text-blue-600 dark:text-blue-400">
+                                        {displayTotalStaff}
+                                    </h3>
+                                    <p className="text-xs text-muted-foreground mt-2 font-medium">
+                                        {branchId === "all" ? "Across all branches" : "Filtered by selected branch"}
+                                    </p>
+                                </div>
+                            )}
+                            <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-blue-500/10 font-medium">
+                                Active Personnel Count
+                            </p>
                         </div>
                     </div>
                 </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                    {/* Gross Liability Card */}
-                    <Card className="shadow-sm">
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">Gross Liability</CardTitle>
-                            <DollarSign className="h-4 w-4 text-muted-foreground" />
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold">৳{displayTotal.toLocaleString()}</div>
-                            <p className="text-xs text-muted-foreground mt-1">Total payroll cost for this month</p>
-                        </CardContent>
-                    </Card>
-
-                    {/* Disbursement Card */}
-                    <Card className="shadow-sm">
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">Disbursed Volume</CardTitle>
-                            <Wallet className="h-4 w-4 text-muted-foreground" />
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold text-green-600">৳{displayPaid.toLocaleString()}</div>
-                            <div className="mt-4 flex flex-col gap-2">
-                                <div className="flex justify-between text-[10px] font-bold">
-                                    <span>Allocation Progress</span>
-                                    <span>{Math.round(completionRate)}%</span>
-                                </div>
-                                <Progress value={completionRate} className="h-1.5" />
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* Pending Settlement Card */}
-                    <Card className="shadow-sm">
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">Pending Settlement</CardTitle>
-                            <Clock className="h-4 w-4 text-muted-foreground" />
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold text-amber-600">৳{displayPending.toLocaleString()}</div>
-                            <p className="text-xs text-muted-foreground mt-1">Outstanding liability</p>
-                        </CardContent>
-                    </Card>
-
-                    {/* Personnel Engagement Card */}
-                    <Card className="shadow-sm">
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">Personnel Engagement</CardTitle>
-                            <Users className="h-4 w-4 text-muted-foreground" />
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold">{displayTotalStaff} Members</div>
-                            <p className="text-xs text-muted-foreground mt-1">Active staff in current preview</p>
-                        </CardContent>
-                    </Card>
-                </div>
             </div>
 
-            {/* Main Content Area Simplified */}
-            <Card className="shadow-sm border-none bg-card">
+            {/* Main Content Area */}
+            <Card className="border-border/60 shadow-md">
                 {isLocked && (
-                    <div className="flex items-center gap-3 px-6 py-3 bg-amber-50 text-amber-800 border-b border-amber-100">
+                    <div className="flex items-center gap-3 px-6 py-3 bg-amber-500/10 text-amber-700 dark:text-amber-400 border-b border-amber-500/20">
                         <Lock className="h-4 w-4" />
                         <div className="flex-1">
-                            <p className="text-sm font-semibold">Payroll Archived</p>
-                            <p className="text-xs opacity-80">This billing period is locked for data integrity.</p>
+                            <p className="text-sm font-semibold">Payroll Period Locked</p>
+                            <p className="text-xs opacity-80">This billing period is archived for data integrity and accounting auditing.</p>
                         </div>
                         {canWrite && (
                             <Button
                                 size="sm"
                                 variant="outline"
-                                className="h-8 border-amber-200 hover:bg-amber-100"
+                                className="h-8 border-amber-500/30 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300"
                                 onClick={handleToggleLock}
                                 disabled={isUnlocking}
                             >
@@ -416,67 +532,87 @@ export default function PayrollPage() {
                     </div>
                 )}
 
-                <div className="p-6">
+                <CardHeader className="pb-3">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <CardTitle className="flex items-center gap-2 text-xl font-bold">
+                            <DollarSign className="h-5 w-5 text-primary" />
+                            Payroll Preview & Management
+                        </CardTitle>
+                        <div className="flex items-center gap-3">
+                            {activeTab === "salary" && canWrite && (
+                                <Button
+                                    variant={isSelectMode ? "default" : "outline"}
+                                    className="gap-2 shadow-xs"
+                                    onClick={() => setIsSelectMode(!isSelectMode)}
+                                >
+                                    <CheckCircle2 className="h-4 w-4" />
+                                    {isSelectMode ? "Cancel Bulk Mode" : "Bulk Pay Mode"}
+                                </Button>
+                            )}
+
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button
+                                        variant="outline"
+                                        className="border-primary text-primary hover:bg-primary/10 shadow-xs gap-2"
+                                    >
+                                        <Download className="h-4 w-4" />
+                                        Export Reports
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-48">
+                                    <DropdownMenuItem onClick={handleExportExcel} className="cursor-pointer gap-2">
+                                        <FileSpreadsheet className="h-4 w-4 text-green-600" />
+                                        Export to Excel
+                                    </DropdownMenuItem>
+                                    {!isOvertimeTab && (
+                                        <DropdownMenuItem onClick={handleExportPDF} className="cursor-pointer gap-2">
+                                            <FileText className="h-4 w-4 text-red-600" />
+                                            Export to PDF
+                                        </DropdownMenuItem>
+                                    )}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        </div>
+                    </div>
+                </CardHeader>
+
+                <CardContent className="space-y-6">
                     <Tabs
                         value={activeTab}
                         onValueChange={(val) => updateUrl("tab", val)}
                         className="w-full"
                     >
-                        <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4 border-b pb-4">
-                            <TabsList className="bg-muted/50 p-1 rounded-lg">
-                                <TabsTrigger value="salary" className="font-semibold px-6">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4">
+                            <TabsList className="bg-muted/60 p-1 rounded-xl">
+                                <TabsTrigger value="salary" className="font-semibold px-6 rounded-lg">
                                     Salary Preview
                                 </TabsTrigger>
-                                <TabsTrigger value="overtime" className="font-semibold px-6">
+                                <TabsTrigger value="overtime" className="font-semibold px-6 rounded-lg">
                                     Overtime Balance
                                 </TabsTrigger>
                             </TabsList>
 
-                            <div className="flex items-center gap-3">
-                                {activeTab === "salary" && (
-                                    <Button
-                                        variant={isSelectMode ? "default" : "outline"}
-                                        size="sm"
-                                        onClick={() => setIsSelectMode(!isSelectMode)}
-                                        className="gap-2 h-9"
-                                    >
-                                        <CheckCircle2 className="h-4 w-4" />
-                                        {isSelectMode ? "Cancel Selection" : "Bulk Pay"}
-                                    </Button>
-                                )}
-
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button
-                                            size="sm"
-                                            className="h-9 gap-2"
-                                            variant="secondary"
-                                        >
-                                            <Download className="h-4 w-4" />
-                                            Export
-                                        </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
-                                        <DropdownMenuItem onClick={handleExportExcel} className="cursor-pointer gap-2">
-                                            <FileSpreadsheet className="h-4 w-4" />
-                                            Export to Excel
-                                        </DropdownMenuItem>
-                                        {!isOvertimeTab && (
-                                            <DropdownMenuItem onClick={handleExportPDF} className="cursor-pointer gap-2">
-                                                <FileText className="h-4 w-4" />
-                                                Export to PDF
-                                            </DropdownMenuItem>
-                                        )}
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-                            </div>
+                            {!isLocked && suggestLock && canWrite && (
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={handleToggleLock}
+                                    className="gap-2 border-amber-500/40 text-amber-600 hover:bg-amber-500/10"
+                                >
+                                    <Lock className="h-3.5 w-3.5" />
+                                    Lock Billing Period
+                                </Button>
+                            )}
                         </div>
 
-                        {/* Filter Toolbar Simplified */}
-                        <div className="flex flex-wrap items-center gap-4 mb-6 p-4 bg-muted/20 border rounded-lg">
+                        {/* Filter Toolbar */}
+                        <div className="flex flex-wrap items-center gap-4 my-6 p-4 bg-muted/20 border border-border/60 rounded-xl">
                             <div className="flex items-center gap-2">
                                 <Filter className="h-4 w-4 text-muted-foreground" />
-                                <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Filters</span>
+                                <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                                    Filter Period
+                                </span>
                             </div>
 
                             <div className="flex gap-2">
@@ -489,7 +625,9 @@ export default function PayrollPage() {
                                     </SelectTrigger>
                                     <SelectContent>
                                         {MONTHS.map((m) => (
-                                            <SelectItem key={m.value} value={m.value.toString()}>{m.label}</SelectItem>
+                                            <SelectItem key={m.value} value={m.value.toString()}>
+                                                {m.label}
+                                            </SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
@@ -503,13 +641,15 @@ export default function PayrollPage() {
                                     </SelectTrigger>
                                     <SelectContent>
                                         {YEARS.map((y) => (
-                                            <SelectItem key={y} value={y.toString()}>{y}</SelectItem>
+                                            <SelectItem key={y} value={y.toString()}>
+                                                {y}
+                                            </SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
                             </div>
 
-                            <div className="flex-1">
+                            <div className="flex-1 min-w-[200px]">
                                 <Select
                                     value={branchId}
                                     onValueChange={(v) => updateUrl("branch", v)}
@@ -521,58 +661,44 @@ export default function PayrollPage() {
                                         </div>
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="all">Everywhere (All)</SelectItem>
+                                        <SelectItem value="all">All Branches</SelectItem>
                                         {branches.map((branch) => (
-                                            <SelectItem key={branch._id} value={branch._id}>{branch.name}</SelectItem>
+                                            <SelectItem key={branch._id} value={branch._id}>
+                                                {branch.name}
+                                            </SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
                             </div>
-
-                            {!isLocked && suggestLock && (
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={handleToggleLock}
-                                    className="gap-2 border-primary text-primary hover:bg-primary/10"
-                                >
-                                    <Lock className="h-3.5 w-3.5" />
-                                    Archive Month
-                                </Button>
-                            )}
                         </div>
 
-                        <TabsContent value="salary" className="mt-0">
-                            <div className="border rounded-lg overflow-hidden bg-background">
-                                {isLoading ? (
-                                    <TableSkeleton />
-                                ) : (
-                                    <PayrollTable
-                                        data={payrollData}
-                                        month={formattedMonth}
-                                        isSelectMode={isSelectMode}
-                                        isLocked={isLocked}
-                                        branchId={branchId}
-                                    />
-                                )}
-                            </div>
+                        <TabsContent value="salary" className="mt-0 space-y-4">
+                            {isLoading ? (
+                                <TableSkeleton />
+                            ) : (
+                                <PayrollTable
+                                    data={payrollData}
+                                    month={formattedMonth}
+                                    isSelectMode={isSelectMode}
+                                    isLocked={isLocked}
+                                    branchId={branchId}
+                                />
+                            )}
                         </TabsContent>
 
-                        <TabsContent value="overtime" className="mt-0">
-                            <div className="border rounded-lg overflow-hidden bg-background">
-                                {isLoading ? (
-                                    <TableSkeleton />
-                                ) : (
-                                    <OvertimeTable
-                                        data={payrollData}
-                                        month={formattedMonth}
-                                        isLocked={isLocked}
-                                    />
-                                )}
-                            </div>
+                        <TabsContent value="overtime" className="mt-0 space-y-4">
+                            {isLoading ? (
+                                <TableSkeleton />
+                            ) : (
+                                <OvertimeTable
+                                    data={payrollData}
+                                    month={formattedMonth}
+                                    isLocked={isLocked}
+                                />
+                            )}
                         </TabsContent>
                     </Tabs>
-                </div>
+                </CardContent>
             </Card>
 
             <ExportPdfDialog

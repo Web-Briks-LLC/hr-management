@@ -72,6 +72,21 @@ export const lockMonthSchema = z.object({
     month: monthFormat,
 });
 
+export const setAttendanceSchema = z.object({
+    staffId: objectId,
+    date: z.string().date("Date must be YYYY-MM-DD format"),
+    status: z.enum([
+        "present",
+        "absent",
+        "on_leave",
+        "weekend",
+        "holiday",
+        "half_day",
+        "late",
+        "early_exit",
+    ]),
+});
+
 // ── Validation Middleware Factory ───────────────────────────────────────
 
 type Source = "body" | "query";

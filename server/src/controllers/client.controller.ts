@@ -9,6 +9,7 @@ import {
 } from '../validators/client.validation.js';
 import { isTelemarketer } from '../utils/telemarketer.util.js';
 import { Role } from '../constants/role.js';
+import { maskClientData } from '../utils/clientMask.util.js';
 
 const getAllClients = async (req: Request, res: Response) => {
     try {
@@ -35,6 +36,15 @@ const getAllClients = async (req: Request, res: Response) => {
         }
 
         const result = await ClientServices.getAllClientsFromDB(params);
+
+        // Data masking for non-TM Team Leaders
+        if (userId && req.user && req.user.role === Role.TEAM_LEADER) {
+            const isTM = await isTelemarketer(userId);
+            if (!isTM && result.clients) {
+                result.clients = result.clients.map(maskClientData);
+            }
+        }
+
         res.status(200).json({
             success: true,
             data: result,
@@ -84,9 +94,17 @@ const getClientById = async (req: Request, res: Response) => {
             }
         }
 
+        let finalResult = result;
+        if (userId && req.user && req.user.role === Role.TEAM_LEADER) {
+            const isTM = await isTelemarketer(userId);
+            if (!isTM) {
+                finalResult = maskClientData(result);
+            }
+        }
+
         res.status(200).json({
             success: true,
-            data: result,
+            data: finalResult,
         });
     } catch (error: unknown) {
         const err = error as Error;
@@ -446,9 +464,18 @@ const getAllClientsWithoutPagination = async (req: Request, res: Response) => {
         }
 
         const result = await ClientServices.getAllClientsWithoutPaginationFromDB(params);
+
+        let finalResult = result;
+        if (userId && req.user && req.user.role === Role.TEAM_LEADER) {
+            const isTM = await isTelemarketer(userId);
+            if (!isTM && result) {
+                finalResult = result.map(maskClientData);
+            }
+        }
+
         res.status(200).json({
             success: true,
-            data: result,
+            data: finalResult,
         });
     } catch (error: unknown) {
         const err = error as Error;

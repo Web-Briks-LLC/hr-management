@@ -16,8 +16,8 @@ export default function Main({ children }: { children: ReactNode }) {
     const theme = (data?.user?.theme as ToasterProps['theme']) || 'system';
 
     return (
-        <AuthGuard>
-            <ReduxProvider>
+        <ReduxProvider>
+            <AuthGuard>
                 <ThemeProvider
                     attribute="class"
                     defaultTheme={theme}
@@ -30,7 +30,7 @@ export default function Main({ children }: { children: ReactNode }) {
                     </SocketProvider>
                     <Toaster theme={theme} />
                 </ThemeProvider>
-            </ReduxProvider>
-        </AuthGuard>
+            </AuthGuard>
+        </ReduxProvider>
     );
 }

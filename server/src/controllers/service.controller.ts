@@ -3,7 +3,7 @@ import serviceService from '../services/service.service.js';
 
 async function createService(req: Request, res: Response) {
     try {
-        const { name, description } = req.body;
+        const { name, description, price } = req.body;
         const userId = req.user?.id;
 
         if (!userId) {
@@ -21,6 +21,7 @@ async function createService(req: Request, res: Response) {
         const service = await serviceService.createServiceInDB({
             name,
             description,
+            price,
             createdBy: userId,
         });
 
@@ -93,7 +94,7 @@ async function getServiceById(req: Request, res: Response) {
 async function updateService(req: Request, res: Response) {
     try {
         const id = req.params.id;
-        const { name, description, isActive } = req.body;
+        const { name, description, price, isActive } = req.body;
 
         if (!id) {
             return res.status(400).json({ message: 'Service ID is required' });
@@ -115,6 +116,7 @@ async function updateService(req: Request, res: Response) {
         const service = await serviceService.updateServiceInDB(id, {
             name,
             description,
+            price,
             isActive,
         });
 

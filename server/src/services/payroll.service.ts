@@ -173,240 +173,113 @@ const getPayrollPreview = async ({
         });
     }
 
-    const daysInMonth = eachDayOfInterval({ start: startDate, end: endDate });
+    // Precompute days and BD date strings to avoid Intl.DateTimeFormat in loops
+    const todayBDStr = getBDDateString(getBDNow());
+    const daysInMonthData = eachDayOfInterval({ start: startDate, end: endDate }).map(day => {
+        return {
+            day,
+            dayStr: getBDDateString(day),
+            weekDay: getBDWeekDay(day)
+        };
+    });
+
+    // Pre-parse bulk expenses to maps
+    const bulkSalaryMap = new Map<string, number>();
+    const bulkOtMap = new Map<string, number>();
+
+    const processBulkMap = (expenses: any[], map: Map<string, number>) => {
+        expenses.forEach(e => {
+            const note = e.note || '';
+            const match = note.match(/Bulk:\s*([0-9a-fA-F:,]+)/);
+            if (match && match[1]) {
+                const pairs = match[1].split(',');
+                pairs.forEach((p: string) => {
+                    const [id, amount] = p.split(':');
+                    if (id && amount) {
+                        map.set(id, parseFloat(amount));
+                    }
+                });
+            }
+        });
+    };
+
+    if (salaryCategory) {
+        processBulkMap(bulkExpenses.filter(e => e.categoryId.toString() === salaryCategory._id.toString()), bulkSalaryMap);
+    }
+    if (overtimeCategory) {
+        processBulkMap(bulkExpenses.filter(e => e.categoryId.toString() === overtimeCategory._id.toString()), bulkOtMap);
+    }
 
     // 3. Calculate stats for each staff
     const stats = staffs.map((staff) => {
+        const staffIdStr = staff._id.toString();
+
         const staffShiftAssignments = shiftAssignments.filter(
-            (sa) => sa.staffId.toString() === staff._id.toString(),
+            (sa) => sa.staffId.toString() === staffIdStr,
         );
 
-        // B. Attendance breakdown
+        // Precompute staff assignments lookup
+        const assignmentsData = staffShiftAssignments.map(sa => ({
+            shiftId: sa.shiftId,
+            startStr: getBDDateString(sa.startDate),
+            endStr: sa.endDate ? getBDDateString(sa.endDate) : '9999-12-31'
+        }));
+
+        // B. Attendance breakdown (O(1) Map)
         const staffAttendance = allAttendance.filter(
-            (a) => a.staffId.toString() === staff._id.toString(),
+            (a) => a.staffId.toString() === staffIdStr,
         );
+        const attendanceMap = new Map();
+        
+        let presentDays = 0;
+        let literalAbsentDays = 0;
+        let leaveDays = 0;
+        let holidays = 0;
+        let lateDays = 0;
+        let halfDayDays = 0;
 
-        const presentDays = staffAttendance.filter((a) =>
-            ['present', 'late', 'half_day', 'early_exit'].includes(a.status),
-        ).length;
+        staffAttendance.forEach(a => {
+            const aStr = getBDDateString(new Date(a.date));
+            attendanceMap.set(aStr, a);
+            
+            if (['present', 'late', 'half_day', 'early_exit'].includes(a.status)) presentDays++;
+            if (a.status === 'absent') literalAbsentDays++;
+            if (a.status === 'on_leave') leaveDays++;
+            if (a.status === 'holiday') holidays++;
+            if (a.status === 'late') lateDays++;
+            if (a.status === 'half_day') halfDayDays++;
+        });
 
-        const literalAbsentDays = staffAttendance.filter(
-            (a) => a.status === 'absent',
-        ).length;
-
-        const leaveDays = staffAttendance.filter(
-            (a) => a.status === 'on_leave',
-        ).length;
-
-        const holidays = staffAttendance.filter(
-            (a) => a.status === 'holiday',
-        ).length;
-
-        const lateDays = staffAttendance.filter(
-            (a) => a.status === 'late',
-        ).length;
-
-        const halfDayDays = staffAttendance.filter(
-            (a) => a.status === 'half_day',
-        ).length;
-        // Calculate Work Days, Missing Punches, and Unemployed Days by Day-by-Day Timeline
-        let expectedWorkDates: Date[] = [];
+        // Calculate Work Days, Missing Punches, and Unemployed Days
         let workDaysCount = 0;
         let missingPunches = 0;
         let unemployedDays = 0;
 
-        const todayBDStr = getBDDateString(getBDNow());
-
         const joinStr = staff.joinDate ? getBDDateString(staff.joinDate) : null;
         const exitStr = staff.exitDate ? getBDDateString(staff.exitDate) : null;
 
-        const staffShiftOffDates = (shiftOffDates as any[])
-            .filter((sod) =>
-                staffShiftAssignments.some(
-                    (sa) =>
-                        sa.shiftId._id.toString() === sod.shiftId.toString(),
-                ),
-            )
-            .flatMap((sod) => sod.dates.map((d: Date) => getBDDateString(d)));
+        const staffShiftIdsSet = new Set(staffShiftAssignments.map(sa => sa.shiftId._id.toString()));
+        const staffShiftOffDatesSet = new Set(
+            (shiftOffDates as any[])
+                .filter(sod => staffShiftIdsSet.has(sod.shiftId.toString()))
+                .flatMap(sod => sod.dates.map((d: Date) => getBDDateString(d)))
+        );
 
-        daysInMonth.forEach((day: Date) => {
-            const dayStr = getBDDateString(day);
-
-            // 1. Check if unemployed (strictly before join or after exit)
+        const calendar = daysInMonthData.map(({ dayStr, weekDay }) => {
+            // 1. Check if unemployed
             const isBeforeJoin = joinStr && dayStr < joinStr;
             const isAfterExit = exitStr && dayStr > exitStr;
-            if (isBeforeJoin || isAfterExit) {
-                unemployedDays++;
-                return; // Not a work day if unemployed
-            }
-
-            // 2. Resolve shift for this specific day
-            const dayAssignment = (staffShiftAssignments as any[]).find(
-                (sa) => {
-                    const s = getBDDateString(sa.startDate);
-                    const e = sa.endDate
-                        ? getBDDateString(sa.endDate)
-                        : '9999-12-31';
-                    return dayStr >= s && dayStr <= e!;
-                },
-            );
-
-            const shift: any = dayAssignment?.shiftId;
-            if (!shift) return;
-
-            // 3. Skip if it's a specific "Off Date" for this shift
-            if (staffShiftOffDates.includes(dayStr)) {
-                return;
-            }
-
-            // 4. Check if it's a work day
-            if (shift.workDays.includes(getBDWeekDay(day))) {
-                workDaysCount++;
-                expectedWorkDates.push(day);
-
-                // 5. Check for missing punch
-                if (dayStr < todayBDStr) {
-                    const hasRecord = staffAttendance.some((a: any) => {
-                        const aStr = getBDDateString(new Date(a.date));
-                        return aStr === dayStr;
-                    });
-                    if (!hasRecord) {
-                        missingPunches++;
-                    }
-                }
-            }
-        });
-
-        // Fallback: If NO shift assignments found for the entire month, use 22-day heuristic
-        if (staffShiftAssignments.length === 0) {
-            workDaysCount = 22;
-        }
-
-        const absentDays = literalAbsentDays + missingPunches;
-
-        // C. Salary calculation (fixed /30 policy)
-        const staffSalary = staff.salary || 0;
-        const perDaySalary = staffSalary / 30;
-
-        // Deduction formula: Absent days + Unemployed days only
-        // Half-day and late count as present with full payment
-        // LOGIC REFINEMENT: totalDeductionUnits capped at 30 to prevent >100% deduction in 31-day months.
-        const totalDeductionUnits = Math.min(30, absentDays + unemployedDays);
-        const deduction = totalDeductionUnits * perDaySalary;
-        const payableSalary = Math.max(0, staffSalary - deduction);
-
-        // D. Overtime from approved records only
-        const staffApprovedOvertime = approvedOvertime.filter(
-            (ot) => ot.staffId.toString() === staff._id.toString(),
-        );
-        const otMinutes = staffApprovedOvertime.reduce(
-            (sum, ot) => sum + (ot.durationMinutes || 0),
-            0,
-        );
-        const hourlyRate = staffSalary / 30 / 8;
-        const otPayable = otMinutes > 0 ? (otMinutes / 60) * hourlyRate : 0;
-
-        // E. Payment status — strict match by staffId + categoryId
-        let salaryExpense = paidExpenses.find(
-            (e) =>
-                e.staffId?.toString() === staff._id.toString() &&
-                salaryCategory &&
-                e.categoryId.toString() === salaryCategory._id.toString(),
-        );
-
-        if (!salaryExpense && salaryCategory) {
-            const bulkSalary = bulkExpenses.find((e) => {
-                const note = e.note || '';
-                const match = note.match(/Bulk:\s*([0-9a-fA-F:,]+)/);
-                if (match && match[1]) {
-                    const pairs = match[1].split(',');
-                    return pairs.some((p: string) =>
-                        p.startsWith(staff._id.toString()),
-                    );
-                }
-                return false;
-            });
-
-            if (bulkSalary) {
-                const note = bulkSalary.note || '';
-                const match = note.match(/Bulk:\s*([0-9a-fA-F:,]+)/);
-                const pairs = match![1].split(',');
-                const targetPair = pairs.find((p: string) =>
-                    p.startsWith(staff._id.toString()),
-                );
-                const individualAmount = targetPair
-                    ? parseFloat(targetPair.split(':')[1] || '0')
-                    : 0;
-
-                salaryExpense = {
-                    _id: bulkSalary._id,
-                    amount: individualAmount,
-                    categoryId: bulkSalary.categoryId,
-                } as any;
-            }
-        }
-
-        let otExpense = paidExpenses.find(
-            (e) =>
-                e.staffId?.toString() === staff._id.toString() &&
-                overtimeCategory &&
-                e.categoryId.toString() === overtimeCategory._id.toString(),
-        );
-
-        if (!otExpense && overtimeCategory) {
-            const bulkOt = bulkExpenses.find((e) => {
-                const note = e.note || '';
-                const match = note.match(/Bulk:\s*([0-9a-fA-F:,]+)/);
-                if (match && match[1]) {
-                    const pairs = match[1].split(',');
-                    return pairs.some((p: string) =>
-                        p.startsWith(staff._id.toString()),
-                    );
-                }
-                return false;
-            });
-
-            if (bulkOt) {
-                const note = bulkOt.note || '';
-                const match = note.match(/Bulk:\s*([0-9a-fA-F:,]+)/);
-                const pairs = match![1].split(',');
-                const targetPair = pairs.find((p: string) =>
-                    p.startsWith(staff._id.toString()),
-                );
-                const individualAmount = targetPair
-                    ? parseFloat(targetPair.split(':')[1] || '0')
-                    : 0;
-
-                otExpense = {
-                    _id: bulkOt._id,
-                    amount: individualAmount,
-                    categoryId: bulkOt.categoryId,
-                } as any;
-            }
-        }
-
-        // F. Build daily attendance calendar with shift & check-in/out info
-        const calendar = daysInMonth.map((day: Date) => {
-            const dayStr = getBDDateString(day);
-
+            
             // Resolve shift for this day
-            const dayAssignment = (staffShiftAssignments as any[]).find(
-                (sa) => {
-                    const s = getBDDateString(sa.startDate);
-                    const e = sa.endDate
-                        ? getBDDateString(sa.endDate)
-                        : '9999-12-31';
-                    return dayStr >= s && dayStr <= e!;
-                },
+            const dayAssignment = assignmentsData.find(
+                (sa) => dayStr >= sa.startStr && dayStr <= sa.endStr,
             );
             const shift: any = dayAssignment?.shiftId;
             const shiftStart = shift?.startTime || null;
             const shiftEnd = shift?.endTime || null;
 
-            // Unemployed
-            const isBeforeJoin = joinStr && dayStr < joinStr;
-            const isAfterExit = exitStr && dayStr > exitStr;
             if (isBeforeJoin || isAfterExit) {
+                unemployedDays++;
                 return {
                     date: dayStr,
                     status: 'unemployed',
@@ -429,33 +302,38 @@ const getPayrollPreview = async ({
                 };
             }
 
-            // Check attendance record
-            const record = staffAttendance.find((a: any) => {
-                const aStr = getBDDateString(new Date(a.date));
-                return aStr === dayStr;
-            });
-
+            // Record found
+            const record = attendanceMap.get(dayStr);
             if (record) {
+                if (shift && !staffShiftOffDatesSet.has(dayStr) && shift.workDays.includes(weekDay)) {
+                    workDaysCount++;
+                }
                 return {
                     date: dayStr,
                     status: record.status,
                     shiftStart,
                     shiftEnd,
-                    checkInAt: (record as any).checkInAt || null,
-                    checkOutAt: (record as any).checkOutAt || null,
+                    checkInAt: record.checkInAt || null,
+                    checkOutAt: record.checkOutAt || null,
                 };
             }
 
-            // No record — work day = absent, else off_day
-            if (shift && shift.workDays.includes(getBDWeekDay(day))) {
-                return {
-                    date: dayStr,
-                    status: 'absent',
-                    shiftStart,
-                    shiftEnd,
-                    checkInAt: null,
-                    checkOutAt: null,
-                };
+            // No record
+            if (shift && !staffShiftOffDatesSet.has(dayStr)) {
+                if (shift.workDays.includes(weekDay)) {
+                    workDaysCount++;
+                    if (dayStr < todayBDStr) {
+                        missingPunches++;
+                    }
+                    return {
+                        date: dayStr,
+                        status: 'absent',
+                        shiftStart,
+                        shiftEnd,
+                        checkInAt: null,
+                        checkOutAt: null,
+                    };
+                }
             }
 
             return {
@@ -467,6 +345,84 @@ const getPayrollPreview = async ({
                 checkOutAt: null,
             };
         });
+
+        // Fallback: If NO shift assignments found for the entire month, use 22-day heuristic
+        if (staffShiftAssignments.length === 0) {
+            workDaysCount = 22;
+        }
+
+        const absentDays = literalAbsentDays + missingPunches;
+
+        // C. Salary calculation (fixed /30 policy)
+        const staffSalary = staff.salary || 0;
+        const perDaySalary = staffSalary / 30;
+
+        const totalDeductionUnits = Math.min(30, absentDays + unemployedDays);
+        const deduction = totalDeductionUnits * perDaySalary;
+        const payableSalary = Math.max(0, staffSalary - deduction);
+
+        // D. Overtime from approved records only
+        const staffApprovedOvertime = approvedOvertime.filter(
+            (ot) => ot.staffId.toString() === staffIdStr,
+        );
+        const otMinutes = staffApprovedOvertime.reduce(
+            (sum, ot) => sum + (ot.durationMinutes || 0),
+            0,
+        );
+        const hourlyRate = staffSalary / 30 / 8;
+        const otPayable = otMinutes > 0 ? (otMinutes / 60) * hourlyRate : 0;
+
+        // E. Payment status — strict match by staffId + categoryId
+        let salaryExpense = paidExpenses.find(
+            (e) =>
+                e.staffId?.toString() === staffIdStr &&
+                salaryCategory &&
+                e.categoryId.toString() === salaryCategory._id.toString(),
+        );
+
+        if (!salaryExpense && salaryCategory) {
+            const bulkAmount = bulkSalaryMap.get(staffIdStr);
+            if (bulkAmount !== undefined) {
+                // Find the original bulk document ID for reference
+                const bulkDoc = bulkExpenses.find(e => 
+                    e.categoryId.toString() === salaryCategory._id.toString() &&
+                    (e.note || '').includes(`Bulk:`) && 
+                    (e.note || '').includes(`${staffIdStr}:`)
+                );
+                if (bulkDoc) {
+                    salaryExpense = {
+                        _id: bulkDoc._id,
+                        amount: bulkAmount,
+                        categoryId: bulkDoc.categoryId,
+                    } as any;
+                }
+            }
+        }
+
+        let otExpense = paidExpenses.find(
+            (e) =>
+                e.staffId?.toString() === staffIdStr &&
+                overtimeCategory &&
+                e.categoryId.toString() === overtimeCategory._id.toString(),
+        );
+
+        if (!otExpense && overtimeCategory) {
+            const bulkAmount = bulkOtMap.get(staffIdStr);
+            if (bulkAmount !== undefined) {
+                const bulkDoc = bulkExpenses.find(e => 
+                    e.categoryId.toString() === overtimeCategory._id.toString() &&
+                    (e.note || '').includes(`Bulk:`) && 
+                    (e.note || '').includes(`${staffIdStr}:`)
+                );
+                if (bulkDoc) {
+                    otExpense = {
+                        _id: bulkDoc._id,
+                        amount: bulkAmount,
+                        categoryId: bulkDoc.categoryId,
+                    } as any;
+                }
+            }
+        }
 
         return {
             staffId: staff._id,
@@ -697,6 +653,33 @@ const processPayroll = async ({
                 } else {
                     deduction -= difference;
                 }
+            }
+        } else if (paymentType === 'overtime') {
+            const staffApprovedOvertime = await OvertimeModel.find({
+                staffId: new Types.ObjectId(staffId),
+                status: 'approved',
+                date: { $gte: startDate, $lte: endDate },
+            }).session(session);
+
+            const otMinutes = staffApprovedOvertime.reduce(
+                (sum, ot) => sum + (ot.durationMinutes || 0),
+                0,
+            );
+
+            const staffSalary = staff.salary || 0;
+            const hourlyRate = staffSalary / 30 / 8;
+            const expectedOtPayable = Math.round(otMinutes > 0 ? (otMinutes / 60) * hourlyRate : 0);
+
+            const expectedAmount = Math.round(expectedOtPayable + bonus - deduction);
+            const receivedAmount = Math.round(amount);
+            const difference = receivedAmount - expectedAmount;
+
+            if (Math.abs(difference) > 2) {
+                 if (difference > 0) {
+                     bonus += difference;
+                 } else {
+                     deduction -= difference;
+                 }
             }
         }
 
@@ -1514,7 +1497,7 @@ async function setAttendance(payload: {
 }) {
     const { staffId, date, status, context } = payload;
     // 1. Find shift assignment for this staff on this date
-    const assignment = await ShiftAssignmentModel.findOne({
+    let assignment = await ShiftAssignmentModel.findOne({
         staffId: new Types.ObjectId(staffId),
         startDate: { $lte: new Date(date + 'T23:59:59+06:00') },
         $or: [
@@ -1522,6 +1505,17 @@ async function setAttendance(payload: {
             { endDate: { $gte: new Date(date + 'T00:00:00+06:00') } },
         ],
     }).populate('shiftId');
+
+    if (!assignment) {
+        // Fallback: If no shift assignment covers this date (e.g. join date moved backwards),
+        // use the earliest active shift assignment.
+        assignment = await ShiftAssignmentModel.findOne({
+            staffId: new Types.ObjectId(staffId),
+            isActive: true,
+        })
+            .sort({ startDate: 1 })
+            .populate('shiftId');
+    }
 
     if (!assignment) {
         throw new Error('This staff is not assigned to any shift');

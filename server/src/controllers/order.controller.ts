@@ -6,6 +6,7 @@ import type { OrderStatus, OrderPriority } from '../types/order.type.js';
 import { Role } from '../constants/role.js';
 import mongoose from 'mongoose';
 import ClientModel from '../models/client.model.js';
+import { maskClientData } from '../utils/clientMask.util.js';
 
 async function createOrder(req: Request, res: Response) {
     try {
@@ -30,6 +31,9 @@ async function createOrder(req: Request, res: Response) {
             return res.status(401).json({ message: 'Unauthorized' });
         }
 
+        let finalPerImagePrice = perImagePrice;
+        let finalTotalPrice = totalPrice;
+
         // Ownership enforcement for telemarketers: can only create orders for their own clients
         if (
             req.user &&
@@ -48,6 +52,12 @@ async function createOrder(req: Request, res: Response) {
                             'Forbidden: You can only create orders for your own or assigned clients',
                     });
                 }
+            } else if (req.user.role === Role.TEAM_LEADER) {
+                const client = await ClientModel.findById(clientId).lean();
+                if (client && client.clientId !== 'WB_1003_50') {
+                    finalPerImagePrice = 0;
+                    finalTotalPrice = 0;
+                }
             }
         }
 
@@ -58,8 +68,8 @@ async function createOrder(req: Request, res: Response) {
             orderDate: new Date(orderDate),
             deadline: new Date(deadline),
             imageQuantity,
-            perImagePrice,
-            totalPrice,
+            perImagePrice: finalPerImagePrice,
+            totalPrice: finalTotalPrice,
             services,
             returnFileFormat,
             createdBy: userId,
@@ -153,6 +163,24 @@ async function getAllOrders(req: Request, res: Response) {
 
         const result = await orderService.getAllOrdersFromDB(filters);
 
+        // Data masking for non-TM Team Leaders
+        if (userId && req.user && req.user.role === Role.TEAM_LEADER) {
+            const isTM = await isTelemarketer(userId);
+            if (!isTM) {
+                result.orders.forEach((order) => {
+                    const clientObj = order.clientId as any;
+                    const isExempted = clientObj && clientObj.clientId === 'WB_1003_50';
+                    if (clientObj) {
+                        order.clientId = maskClientData(clientObj) as any;
+                    }
+                    if (!isExempted) {
+                        order.perImagePrice = 0;
+                        order.totalPrice = 0;
+                    }
+                });
+            }
+        }
+
         return res.status(200).json({
             message: 'Orders retrieved successfully',
             data: result.orders,
@@ -203,6 +231,21 @@ async function getOrderById(req: Request, res: Response) {
             }
         }
 
+        // Data masking for non-TM Team Leaders
+        if (userId && req.user && req.user.role === Role.TEAM_LEADER) {
+            const isTM = await isTelemarketer(userId);
+            if (!isTM && order.clientId && typeof order.clientId === 'object') {
+                const clientObj = order.clientId as any;
+                const isExempted = clientObj.clientId === 'WB_1003_50';
+                order.clientId = maskClientData(clientObj) as any;
+                
+                if (!isExempted) {
+                    order.perImagePrice = 0;
+                    order.totalPrice = 0;
+                }
+            }
+        }
+
         return res.status(200).json({
             message: 'Order retrieved successfully',
             data: order,
@@ -242,6 +285,9 @@ async function updateOrder(req: Request, res: Response) {
             return res.status(404).json({ message: 'Order not found' });
         }
 
+        let finalPerImagePrice = perImagePrice;
+        let finalTotalPrice = totalPrice;
+
         // Ownership enforcement for telemarketers
         const userId = req.user?.id;
         if (
@@ -260,6 +306,13 @@ async function updateOrder(req: Request, res: Response) {
                             'Forbidden: You do not have permission to update this order',
                     });
                 }
+            } else if (req.user.role === Role.TEAM_LEADER) {
+                const clientIdToUse = clientId || (existingOrder.clientId as any)?._id;
+                const client = await ClientModel.findById(clientIdToUse).lean();
+                if (client && client.clientId !== 'WB_1003_50') {
+                    finalPerImagePrice = 0;
+                    finalTotalPrice = 0;
+                }
             }
         }
 
@@ -271,9 +324,9 @@ async function updateOrder(req: Request, res: Response) {
         if (deadline !== undefined) updateData.deadline = new Date(deadline);
         if (imageQuantity !== undefined)
             updateData.imageQuantity = imageQuantity;
-        if (perImagePrice !== undefined)
-            updateData.perImagePrice = perImagePrice;
-        if (totalPrice !== undefined) updateData.totalPrice = totalPrice;
+        if (finalPerImagePrice !== undefined)
+            updateData.perImagePrice = finalPerImagePrice;
+        if (finalTotalPrice !== undefined) updateData.totalPrice = finalTotalPrice;
         if (services !== undefined) updateData.services = services;
         if (returnFileFormat !== undefined)
             updateData.returnFileFormat = returnFileFormat;

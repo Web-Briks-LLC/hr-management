@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useMemo } from 'react';
 import { canAccess } from '@/utils/canAccess';
 import { Role } from '@/constants/role';
+import { useGetMeQuery } from '@/redux/features/staff/staffApi';
 
 const publicRoutes = new Set([
     '/sign-in',
@@ -20,9 +21,15 @@ const LoadingSpinner = () => (
 );
 
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
-    const { data: session, isPending } = useSession();
+    const { data: session, isPending: isSessionPending } = useSession();
+    const { data: meData, isLoading: isMeLoading } = useGetMeQuery(
+        {},
+        { skip: !session }
+    );
     const pathname = usePathname();
     const router = useRouter();
+
+    const isPending = isSessionPending || (!!session && isMeLoading);
 
     // Memoize route checks to avoid unnecessary recalculations
     const isStaticRoute = useMemo(() => {
@@ -58,11 +65,12 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
 
         // 🔐 Role based access
         const role = session.user?.role as Role | undefined;
-        if (role && !canAccess(role, pathname)) {
+        const designation = meData?.staff?.designation as string | undefined;
+        if (role && !canAccess(role, pathname, designation)) {
             router.replace('/dashboard');
             return;
         }
-    }, [session, isPending, pathname, router, isPublicRoute, isStaticRoute]);
+    }, [session, isPending, pathname, router, isPublicRoute, isStaticRoute, meData]);
 
     // Allow static routes immediately
     if (isStaticRoute) {

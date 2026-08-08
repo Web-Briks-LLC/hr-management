@@ -103,15 +103,21 @@ export default function ServicesPage() {
   const [migrationTargetId, setMigrationTargetId] = useState("");
 
   // Form States
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    name: string;
+    description: string;
+    price?: number | '';
+    isActive: boolean;
+  }>({
     name: "",
     description: "",
+    price: "",
     isActive: true,
   });
 
   const handleOpenAdd = useCallback(() => {
     setSelectedService(null);
-    setFormData({ name: "", description: "", isActive: true });
+    setFormData({ name: "", description: "", price: "", isActive: true });
     setIsAddEditOpen(true);
   }, []);
 
@@ -120,6 +126,7 @@ export default function ServicesPage() {
     setFormData({
       name: service.name,
       description: service.description || "",
+      price: service.price || "",
       isActive: service.isActive,
     });
     setIsAddEditOpen(true);
@@ -147,11 +154,17 @@ export default function ServicesPage() {
       if (selectedService) {
         await updateService({
           id: selectedService._id,
-          data: formData,
+          data: {
+            ...formData,
+            price: formData.price === "" ? 0 : Number(formData.price),
+          },
         }).unwrap();
         toast.success("Service updated successfully");
       } else {
-        await createService(formData).unwrap();
+        await createService({
+          ...formData,
+          price: formData.price === "" ? 0 : Number(formData.price),
+        }).unwrap();
         toast.success("Service created successfully");
       }
       setIsAddEditOpen(false);
@@ -332,6 +345,7 @@ export default function ServicesPage() {
             <TableRow className="hover:bg-muted/40 border-b-border/60">
               <TableHead className="font-semibold">Name</TableHead>
               <TableHead className="font-semibold">Description</TableHead>
+              <TableHead className="font-semibold text-center">Price</TableHead>
               <TableHead className="font-semibold text-center">Status</TableHead>
               <TableHead className="font-semibold text-center">Usage</TableHead>
               <TableHead className="font-semibold text-right">Actions</TableHead>
@@ -343,6 +357,7 @@ export default function ServicesPage() {
                 <TableRow key={i}>
                   <TableCell><Skeleton className="h-4 w-32" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-48" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-12 mx-auto" /></TableCell>
                   <TableCell><Skeleton className="h-6 w-16 mx-auto rounded-full" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-12 mx-auto" /></TableCell>
                   <TableCell><Skeleton className="h-8 w-20 ml-auto" /></TableCell>
@@ -350,7 +365,7 @@ export default function ServicesPage() {
               ))
             ) : services.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="h-48 text-center">
+                <TableCell colSpan={6} className="h-48 text-center">
                   <div className="flex flex-col items-center justify-center text-muted-foreground gap-2">
                     <div className="bg-muted/50 p-3 rounded-full">
                       <Settings2 className="h-6 w-6 opacity-30" />
@@ -368,6 +383,9 @@ export default function ServicesPage() {
                   </TableCell>
                   <TableCell className="text-muted-foreground max-w-[300px] truncate">
                     {service.description || '-'}
+                  </TableCell>
+                  <TableCell className="text-center font-medium text-muted-foreground">
+                    ${service.price?.toFixed(2) || '0.00'}
                   </TableCell>
                   <TableCell className="text-center">
                     <span className={cn(
@@ -558,6 +576,17 @@ export default function ServicesPage() {
                 id="description"
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="price">Price ($)</Label>
+              <Input
+                id="price"
+                type="number"
+                step="any"
+                min="0"
+                value={formData.price}
+                onChange={(e) => setFormData({ ...formData, price: e.target.value ? Number(e.target.value) : "" })}
               />
             </div>
             <div className="flex items-center space-x-2">

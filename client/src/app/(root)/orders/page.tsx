@@ -168,6 +168,13 @@ export default function OrdersPage() {
             meData?.staff?.designation?.toLowerCase() === "telemarketer"
         );
     }, [session, meData]);
+    const isAdmin = useMemo(() => {
+        return (
+            session?.user?.role === Role.SUPER_ADMIN ||
+            session?.user?.role === Role.ADMIN ||
+            session?.user?.role === Role.HR_MANAGER
+        );
+    }, [session]);
     const [page, setPage] = useState(1);
     const [filters, setFilters] = useState<OrderFilters>({
         search: "",
@@ -878,6 +885,8 @@ export default function OrdersPage() {
                                         submitLabel="Create Order"
                                         onCancel={() => setIsAddDialogOpen(false)}
                                         serverErrors={serverErrors}
+                                        isTelemarketer={isTelemarketer}
+                                        isAdmin={isAdmin}
                                     />
                                 </DialogContent>
                             </Dialog>
@@ -1341,9 +1350,10 @@ export default function OrdersPage() {
                                                     {order.imageQuantity}
                                                 </TableCell>
                                                 <TableCell className="py-3 text-sm font-semibold">
-                                                    $
-                                                    {order.totalPrice.toFixed(
-                                                        2,
+                                                    {!isTelemarketer && order.clientId?.clientId !== 'WB_1003_50' ? (
+                                                        <span className="text-muted-foreground">N/A</span>
+                                                    ) : (
+                                                        `$${order.totalPrice.toFixed(2)}`
                                                     )}
                                                 </TableCell>
                                                 <TableCell className='py-3 flex items-center justify-center w-auto'>
@@ -1692,6 +1702,8 @@ export default function OrdersPage() {
                             submitLabel="Update Order"
                             onCancel={() => setIsEditDialogOpen(false)}
                             serverErrors={serverErrors}
+                            isTelemarketer={isTelemarketer}
+                            isAdmin={isAdmin}
                         />
                     )}
                 </DialogContent>
