@@ -166,10 +166,13 @@ export default function ClientsPage() {
         try {
             setUpdateServerErrors(undefined);
             const updatedAssignedServices = data.assignedServices.map(serviceId => {
-                const existing = selectedClient.assignedServices?.find(a => a.service === serviceId);
+                const existing = selectedClient.assignedServices?.find(a => {
+                    const id = typeof a === 'string' ? a : a.service;
+                    return id === serviceId;
+                });
                 return {
                     service: serviceId,
-                    price: existing ? existing.price : 0
+                    price: existing ? (typeof existing === 'string' ? 0 : existing.price || 0) : 0
                 };
             });
             const submitData = {
