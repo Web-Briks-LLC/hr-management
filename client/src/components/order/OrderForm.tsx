@@ -288,32 +288,35 @@ export function OrderForm({
     const handleServiceToggle = (serviceId: string) => {
         const isRemoving = selectedServices.includes(serviceId);
         
-        if (!isRemoving) {
-            let priceToSet = null;
+        const newSelectedServices = isRemoving
+            ? selectedServices.filter((id) => id !== serviceId)
+            : [...selectedServices, serviceId];
+
+        let totalPerImagePrice = 0;
+        newSelectedServices.forEach((id) => {
+            let priceToAdd = 0;
             if (selectedClient?.assignedServicesDetails) {
                 const assignedServiceDetails = selectedClient.assignedServicesDetails.find(
-                    (s: any) => s._id === serviceId
+                    (s: any) => s._id === id
                 );
                 if (assignedServiceDetails && assignedServiceDetails.price !== undefined && assignedServiceDetails.price !== null) {
-                    priceToSet = assignedServiceDetails.price;
+                    priceToAdd = assignedServiceDetails.price;
                 }
             }
-            if (priceToSet === null) {
-                const defaultService = allServices.find((s: any) => s._id === serviceId);
+            if (priceToAdd === 0) {
+                const defaultService = allServices.find((s: any) => s._id === id);
                 if (defaultService && defaultService.price !== undefined && defaultService.price !== null) {
-                    priceToSet = defaultService.price;
+                    priceToAdd = defaultService.price;
                 }
             }
-            if (priceToSet !== null) {
-                handlePerImagePriceChange(priceToSet);
-            }
+            totalPerImagePrice += priceToAdd;
+        });
+
+        if (showPrices) {
+            handlePerImagePriceChange(totalPerImagePrice);
         }
 
-        setSelectedServices((prev) => {
-            return isRemoving
-                ? prev.filter((id) => id !== serviceId)
-                : [...prev, serviceId];
-        });
+        setSelectedServices(newSelectedServices);
         clearError('services');
     };
 

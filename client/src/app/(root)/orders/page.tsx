@@ -503,7 +503,10 @@ export default function OrdersPage() {
         }
 
         // Feature: send emails on specific status changes
-        if (["cancelled", "completed", "delivered"].includes(newStatus)) {
+        if (
+            ["cancelled", "completed", "delivered"].includes(newStatus) &&
+            session?.user?.role !== Role.TEAM_LEADER
+        ) {
             const orderObj = orderData?.data.find((o) => o._id === orderId);
             if (orderObj) {
                 setEmailPendingStatus(newStatus);

@@ -303,7 +303,13 @@ const getClientByIdFromDB = async (id: string) => {
                         as: 'assigned',
                         in: {
                             $mergeObjects: [
-                                '$$assigned',
+                                {
+                                    $cond: {
+                                        if: { $eq: [{ $type: '$$assigned' }, 'object'] },
+                                        then: '$$assigned',
+                                        else: { service: '$$assigned' }
+                                    }
+                                },
                                 {
                                     serviceDetails: {
                                         $arrayElemAt: [
