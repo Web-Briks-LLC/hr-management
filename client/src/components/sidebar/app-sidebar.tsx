@@ -12,17 +12,17 @@ import Image from 'next/image';
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     return (
         <Sidebar {...props}>
-            <SidebarHeader className="flex items-center justify-center py-5 px-4">
-                <Link href="/" className="flex items-center justify-center w-full focus:outline-hidden">
-                    <figure className="flex items-center justify-center w-full">
+            <SidebarHeader className="flex items-center justify-start py-4 px-3">
+                <Link href="/" className="flex items-center justify-start focus:outline-hidden">
+                    <figure className="flex items-center justify-start">
                         <Image
-                            src="https://res.cloudinary.com/dny7zfbg9/image/upload/v1755954483/mqontecf1xao7znsh6cx.png"
+                            src="https://res.cloudinary.com/dny7zfbg9/image/upload/v1777996436/q83auvamwih8u8ftw5zu.png"
                             alt="Company logo"
-                            width={180}
-                            height={55}
+                            width={170}
+                            height={50}
                             priority
-                            className="transition-transform duration-300 hover:scale-105 mx-auto object-contain"
-                            style={{ width: 'auto', height: 'auto', maxHeight: '52px', maxWidth: '175px' }}
+                            className="object-contain"
+                            style={{ width: 'auto', height: 'auto', maxHeight: '48px', maxWidth: '170px' }}
                         />
                     </figure>
                 </Link>

@@ -33,7 +33,7 @@ export default function RootLayout({
                 <header className="w-full p-4 md:p-6">
                     <div className="mx-auto flex h-16 max-w-7xl items-center">
                         <Image
-                            src="https://res.cloudinary.com/dny7zfbg9/image/upload/v1755954483/mqontecf1xao7znsh6cx.png"
+                            src="https://res.cloudinary.com/dny7zfbg9/image/upload/v1777996436/q83auvamwih8u8ftw5zu.png"
                             alt="Web Briks Logo"
                             width={150}
                             height={32}

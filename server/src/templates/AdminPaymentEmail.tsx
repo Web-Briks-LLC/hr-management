@@ -30,7 +30,7 @@ export const AdminPaymentEmail = ({
 }: AdminPaymentEmailProps) => {
     const previewText = `Action Required: Payment Received from ${clientName}`;
     const logoUrl =
-        'https://res.cloudinary.com/dny7zfbg9/image/upload/v1755954483/mqontecf1xao7znsh6cx.png';
+        'https://res.cloudinary.com/dny7zfbg9/image/upload/v1777996436/q83auvamwih8u8ftw5zu.png';
 
     return (
         <Html>

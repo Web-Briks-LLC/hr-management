@@ -33,7 +33,7 @@ export const InvitationEmail = ({
         ? `Reminder: Complete your registration for ${designation}`
         : `You're invited to join Web Briks as ${designation}`;
     const logoUrl =
-        'https://res.cloudinary.com/dny7zfbg9/image/upload/v1755954483/mqontecf1xao7znsh6cx.png';
+        'https://res.cloudinary.com/dny7zfbg9/image/upload/v1777996436/q83auvamwih8u8ftw5zu.png';
 
     return (
         <Html>

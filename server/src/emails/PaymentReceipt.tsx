@@ -54,7 +54,7 @@ export default function PaymentReceiptEmail({
                 <Container style={container}>
                     <Section style={header}>
                         <Img
-                            src="https://res.cloudinary.com/dny7zfbg9/image/upload/v1755954483/mqontecf1xao7znsh6cx.png"
+                            src="https://res.cloudinary.com/dny7zfbg9/image/upload/v1777996436/q83auvamwih8u8ftw5zu.png"
                             width="130"
                             alt="Web Briks"
                             style={logo}
