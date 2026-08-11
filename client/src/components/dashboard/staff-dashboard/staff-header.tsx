@@ -20,7 +20,7 @@ import StaffHeaderSkeleton from './staff-header-skeleton';
 import { useGetMyShiftQuery } from '@/redux/features/shift/shiftApi';
 
 export default function StaffHeader() {
-    const { data: session, isPending, isRefetching } = useSession();
+    const { data: session, isPending } = useSession();
     const {
         data: staffData,
         isLoading: isStaffLoading,
@@ -36,7 +36,6 @@ export default function StaffHeader() {
 
     const isLoading =
         isPending ||
-        isRefetching ||
         isStaffLoading ||
         isFetching ||
         isMyShiftLoading ||

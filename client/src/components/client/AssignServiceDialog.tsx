@@ -81,8 +81,19 @@ export function AssignServiceDialog({
         }
 
         try {
-            // Get current assigned services
-            const currentAssignments = client.assignedServices || [];
+            // Get current assigned services and normalize them to clean string IDs
+            const rawAssignments = client.assignedServices || [];
+            const currentAssignments = rawAssignments.map((a: any) => {
+                const sId =
+                    typeof a.service === "object"
+                        ? a.service?._id
+                        : a.service || a._id;
+                return {
+                    service: String(sId),
+                    price: Number(a.price || 0),
+                };
+            });
+
             let newAssignments = [...currentAssignments];
 
             if (editingService) {
@@ -107,7 +118,6 @@ export function AssignServiceDialog({
                 newAssignments.push({
                     service: selectedService,
                     price: numericPrice,
-                    // assignedDate and assignedBy are handled by the backend
                 });
             }
 

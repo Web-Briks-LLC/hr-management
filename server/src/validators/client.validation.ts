@@ -36,6 +36,8 @@ export const createClientSchema = z.object({
         z.object({
             service: z.string(),
             price: z.number().min(0, 'Price must be greater than or equal to 0'),
+            assignedDate: z.string().or(z.date()).optional(),
+            assignedBy: z.string().optional(),
         })
     ).optional(),
     assignedTelemarketer: z.string().nullable().optional(),
@@ -71,6 +73,8 @@ export const updateClientSchema = z.object({
         z.object({
             service: z.string(),
             price: z.number().min(0, 'Price must be greater than or equal to 0'),
+            assignedDate: z.string().or(z.date()).optional(),
+            assignedBy: z.string().optional(),
         })
     ).optional(),
     assignedTelemarketer: z.string().nullable().optional(),

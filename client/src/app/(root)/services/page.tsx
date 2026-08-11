@@ -71,6 +71,8 @@ import { IService } from "@/types/order.type";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { Combobox } from "@/components/ui/combobox";
+import { AssignServiceToClientDialog } from "@/components/service/AssignServiceToClientDialog";
+import { UserPlus } from "lucide-react";
 
 export default function ServicesPage() {
   const [page, setPage] = useState(1);
@@ -97,6 +99,8 @@ export default function ServicesPage() {
   const [isAddEditOpen, setIsAddEditOpen] = useState(false);
   const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
   const [isMigrationDialogOpen, setIsMigrationDialogOpen] = useState(false);
+  const [isAssignToClientOpen, setIsAssignToClientOpen] = useState(false);
+  const [assigningService, setAssigningService] = useState<IService | null>(null);
   const [selectedService, setSelectedService] = useState<
     (IService & { usageCount: number }) | null
   >(null);
@@ -219,9 +223,21 @@ export default function ServicesPage() {
               Manage your order services and track usage.
             </p>
           </div>
-          <Button onClick={handleOpenAdd} className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm">
-            <Plus className="mr-2 h-4 w-4" /> Add Service
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setAssigningService(null);
+                setIsAssignToClientOpen(true);
+              }}
+              className="shadow-xs"
+            >
+              <UserPlus className="mr-2 h-4 w-4" /> Assign to Client
+            </Button>
+            <Button onClick={handleOpenAdd} className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-xs">
+              <Plus className="mr-2 h-4 w-4" /> Add Service
+            </Button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -402,6 +418,27 @@ export default function ServicesPage() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center justify-end gap-1">
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                              onClick={() => {
+                                setAssigningService(service);
+                                setIsAssignToClientOpen(true);
+                              }}
+                            >
+                              <UserPlus className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Assign to Client</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -669,6 +706,14 @@ export default function ServicesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <AssignServiceToClientDialog
+        isOpen={isAssignToClientOpen}
+        onClose={() => {
+          setIsAssignToClientOpen(false);
+          setAssigningService(null);
+        }}
+        service={assigningService}
+      />
     </div>
   );
 }

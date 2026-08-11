@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import {
     useGetClientByIdQuery,
     useGetClientStatsQuery,
+    useGetAssignedServicesQuery,
 } from '@/redux/features/client/clientApi';
 import { useGetOrdersQuery } from '@/redux/features/order/orderApi';
 import { Button } from '@/components/ui/button';
@@ -17,6 +18,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import {
     ArrowLeft,
     Search,
@@ -29,10 +31,16 @@ import {
     RefreshCcw,
     Plus,
     ShoppingBag,
+    Layers,
 } from 'lucide-react';
 import Link from 'next/link';
 import type { OrderStatus, OrderPriority } from '@/types/order.type';
-import { MONTH_OPTIONS, PER_PAGE_OPTIONS, ORDER_STATUS_LABELS, ORDER_PRIORITY_LABELS } from '@/lib/constants';
+import {
+    MONTH_OPTIONS,
+    PER_PAGE_OPTIONS,
+    ORDER_STATUS_LABELS,
+    ORDER_PRIORITY_LABELS,
+} from '@/lib/constants';
 import { ClientInfoCard } from '@/components/client/ClientInfoCard';
 import { ClientOrderStats } from '@/components/client/ClientOrderStats';
 import { OrderHistoryTable } from '@/components/client/OrderHistoryTable';
@@ -58,7 +66,12 @@ export default function ClientDetailsPage() {
     // Queries
     const { data: client, isLoading: isLoadingClient } =
         useGetClientByIdQuery(clientId);
-    const { data: stats, isLoading: isLoadingStats, refetch: refetchStats } = useGetClientStatsQuery({
+    const { data: assignedServices } = useGetAssignedServicesQuery(clientId);
+    const {
+        data: stats,
+        isLoading: isLoadingStats,
+        refetch: refetchStats,
+    } = useGetClientStatsQuery({
         clientId,
         month: selectedMonth ? parseInt(selectedMonth) : undefined,
         year: selectedYear ? parseInt(selectedYear) : undefined,
@@ -110,118 +123,144 @@ export default function ClientDetailsPage() {
 
     if (!client) {
         return (
-            <div className="p-6 text-center space-y-4">
-                <h2 className="text-xl font-bold">Client not found</h2>
+            <div className="p-8 text-center space-y-4">
+                <h2 className="text-xl font-bold text-foreground">Client not found</h2>
                 <Button variant="outline" onClick={() => router.push('/clients')}>
-                    <ArrowLeft className="h-4 w-4" /> Back to Clients
+                    <ArrowLeft className="h-4 w-4 mr-1.5" /> Back to Clients
                 </Button>
             </div>
         );
     }
 
-    const isFiltered = search !== '' || selectedMonth !== '' || selectedStatus !== '' || selectedPriority !== '';
+    const isFiltered =
+        search !== '' ||
+        selectedMonth !== '' ||
+        selectedYear !== '' ||
+        selectedStatus !== '' ||
+        selectedPriority !== '';
 
     return (
-        <div className="space-y-8 p-1">
-            {/* Header & Stats Overview (Matching Clients/Earnings Layout) */}
-            <div className="flex flex-col gap-6">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                        <Button
-                            variant="outline"
-                            size="icon"
-                            onClick={() => router.back()}
-                            className="h-9 w-9 rounded-full border-border/60 hover:bg-accent"
-                        >
-                            <ArrowLeft className="h-4 w-4" />
-                        </Button>
-                        <div>
-                            <h2 className="text-3xl font-bold tracking-tight bg-linear-to-r from-foreground to-foreground/70 bg-clip-text flex items-center gap-2">
+        <div className="space-y-6 pb-8">
+            {/* Top Navigation & Action Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                    <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => router.back()}
+                        className="h-9 w-9 rounded-lg border-border/60 hover:bg-muted"
+                        title="Go back"
+                    >
+                        <ArrowLeft className="h-4 w-4" />
+                    </Button>
+                    <div>
+                        <div className="flex items-center gap-2">
+                            <h1 className="text-2xl font-bold tracking-tight text-foreground">
                                 {client.name}
-                                <span className="text-xs font-mono text-muted-foreground bg-muted px-2 py-0.5 rounded-md uppercase font-normal">
-                                    {client.clientId}
-                                </span>
-                            </h2>
-                            <p className="text-muted-foreground text-sm mt-0.5">
-                                Client profile details and complete order history.
-                            </p>
+                            </h1>
+                            <Badge variant="secondary" className="font-mono text-xs">
+                                {client.clientId}
+                            </Badge>
                         </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <Button
-                            variant="outline"
-                            className="border-primary text-primary hover:bg-accent hover:text-accent-foreground shadow-xs"
-                            onClick={handleRefresh}
-                            disabled={isFetchingOrders || isLoadingStats}
-                        >
-                            <RefreshCcw className={`h-4 w-4 ${isFetchingOrders ? 'animate-spin' : ''}`} />
-                            Refresh Data
-                        </Button>
-                        <Button className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-xs" asChild>
-                            <Link href={`/orders?clientId=${client._id}`}>
-                                <Plus className="h-4 w-4" /> New Order
-                            </Link>
-                        </Button>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                            Client profile overview, revenue analytics, and order history
+                        </p>
                     </div>
                 </div>
 
-                {/* Client Info Overview Card */}
-                <ClientInfoCard client={client} />
-
-                {/* Order Stats Row */}
-                <ClientOrderStats 
-                    stats={stats} 
-                    isLoading={isLoadingStats} 
-                    currency={client.currency} 
-                />
+                <div className="flex items-center gap-2 self-end sm:self-auto">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-9 text-xs font-medium"
+                        onClick={handleRefresh}
+                        disabled={isFetchingOrders || isLoadingStats}
+                    >
+                        <RefreshCcw
+                            className={`h-3.5 w-3.5 mr-1.5 ${
+                                isFetchingOrders || isLoadingStats ? 'animate-spin' : ''
+                            }`}
+                        />
+                        Refresh
+                    </Button>
+                    <Button size="sm" className="h-9 text-xs font-medium" asChild>
+                        <Link href={`/orders?clientId=${client._id}`}>
+                            <Plus className="h-3.5 w-3.5 mr-1.5" /> New Order
+                        </Link>
+                    </Button>
+                </div>
             </div>
 
+            {/* Client Info Overview Card */}
+            <ClientInfoCard client={client} />
+
+            {/* Order Stats Row */}
+            <ClientOrderStats
+                stats={stats}
+                isLoading={isLoadingStats}
+                currency={client.currency}
+            />
+
             {/* Tabs Section */}
-            <Tabs defaultValue="orders" className="w-full">
-                <TabsList className="mb-4">
-                    <TabsTrigger value="orders">Order History</TabsTrigger>
-                    <TabsTrigger value="services">Assigned Services</TabsTrigger>
+            <Tabs defaultValue="orders" className="w-full space-y-4">
+                <TabsList className="grid w-full sm:w-[360px] grid-cols-2">
+                    <TabsTrigger value="orders" className="flex items-center gap-2 text-xs font-semibold">
+                        <ShoppingBag className="h-3.5 w-3.5" />
+                        Order History
+                        <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-[10px] font-bold">
+                            {pagination.total}
+                        </Badge>
+                    </TabsTrigger>
+                    <TabsTrigger value="services" className="flex items-center gap-2 text-xs font-semibold">
+                        <Layers className="h-3.5 w-3.5" />
+                        Assigned Services
+                        <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-[10px] font-bold">
+                            {assignedServices?.length || 0}
+                        </Badge>
+                    </TabsTrigger>
                 </TabsList>
-                
+
                 <TabsContent value="orders" className="mt-0">
-                    {/* Orders Section Card */}
-                    <Card className="border-border/60 shadow-md">
-                        <CardHeader className="pb-3">
-                            <CardTitle className="flex items-center gap-2 text-xl">
-                                <ShoppingBag className="h-5 w-5 text-primary" />
-                                Order History
-                                <span className="text-xs font-normal text-muted-foreground">
-                                    ({pagination.total} total orders)
+                    <Card className="border-border/60 shadow-xs">
+                        <CardHeader className="pb-4">
+                            <div className="flex items-center justify-between">
+                                <CardTitle className="text-base font-semibold flex items-center gap-2">
+                                    <ShoppingBag className="h-4 w-4 text-primary" />
+                                    Client Orders
+                                </CardTitle>
+                                <span className="text-xs text-muted-foreground">
+                                    Total {pagination.total} orders found
                                 </span>
-                            </CardTitle>
+                            </div>
                         </CardHeader>
 
-                        <CardContent className="space-y-6">
+                        <CardContent className="space-y-4">
                             {/* Filters Toolbar */}
-                            <div className="flex flex-wrap items-center gap-3 p-4 bg-muted/30 rounded-lg border border-border/50">
-                                <div className="flex items-center gap-2 shrink-0">
-                                    <div className="bg-primary/10 p-2 rounded-full">
-                                        <Filter className="h-4 w-4 text-primary" />
-                                    </div>
-                                    <span className="text-sm font-medium">Filters:</span>
+                            <div className="flex flex-wrap items-center gap-2.5 p-3 bg-muted/40 rounded-lg border border-border/50">
+                                <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground mr-1">
+                                    <Filter className="h-3.5 w-3.5 text-primary" />
+                                    <span>Filter:</span>
                                 </div>
 
                                 {/* Search Input */}
                                 <div className="relative flex-1 min-w-[200px]">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                                     <Input
-                                        placeholder="Search orders..."
+                                        placeholder="Search order name..."
                                         value={search}
                                         onChange={(e) => {
                                             setSearch(e.target.value);
                                             setPage(1);
                                         }}
-                                        className="pl-9 pr-8 h-9 bg-background/60 border-input text-sm"
+                                        className="pl-8 pr-8 h-8 bg-background text-xs"
                                     />
                                     {search && (
                                         <button
-                                            onClick={() => setSearch('')}
-                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/60 hover:text-foreground transition-colors"
+                                            onClick={() => {
+                                                setSearch('');
+                                                setPage(1);
+                                            }}
+                                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                                             type="button"
                                         >
                                             <X className="h-3.5 w-3.5" />
@@ -237,7 +276,7 @@ export default function ClientDetailsPage() {
                                         setPage(1);
                                     }}
                                 >
-                                    <SelectTrigger className="w-[130px] h-9 bg-background/60 text-xs font-medium">
+                                    <SelectTrigger className="w-[120px] h-8 bg-background text-xs font-medium">
                                         <SelectValue placeholder="Month" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -257,7 +296,7 @@ export default function ClientDetailsPage() {
                                         setPage(1);
                                     }}
                                 >
-                                    <SelectTrigger className="w-[130px] h-9 bg-background/60 text-xs font-medium">
+                                    <SelectTrigger className="w-[125px] h-8 bg-background text-xs font-medium">
                                         <SelectValue placeholder="Status" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -277,7 +316,7 @@ export default function ClientDetailsPage() {
                                         setPage(1);
                                     }}
                                 >
-                                    <SelectTrigger className="w-[130px] h-9 bg-background/60 text-xs font-medium">
+                                    <SelectTrigger className="w-[125px] h-8 bg-background text-xs font-medium">
                                         <SelectValue placeholder="Priority" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -292,34 +331,35 @@ export default function ClientDetailsPage() {
                                 {isFiltered && (
                                     <Button
                                         variant="ghost"
+                                        size="sm"
                                         onClick={handleClearFilters}
-                                        className="h-9 px-3 text-xs gap-1.5 hover:bg-muted/85 font-medium shrink-0"
+                                        className="h-8 px-2.5 text-xs text-muted-foreground hover:text-foreground"
                                     >
-                                        Clear Filters
-                                        <X className="h-3 w-3" />
+                                        <X className="h-3.5 w-3.5 mr-1" />
+                                        Clear
                                     </Button>
                                 )}
                             </div>
 
                             {/* Table Container */}
-                            <div className="rounded-md border border-border/60 overflow-hidden">
-                                <OrderHistoryTable 
-                                    orders={orders} 
-                                    isLoading={isLoadingOrders} 
-                                    currency={client.currency} 
+                            <div className="rounded-md border border-border/60 overflow-hidden bg-card">
+                                <OrderHistoryTable
+                                    orders={orders}
+                                    isLoading={isLoadingOrders}
+                                    currency={client.currency}
                                 />
                             </div>
 
                             {/* Pagination Footer */}
-                            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-border/60">
-                                <div className="text-sm text-muted-foreground font-medium select-none">
+                            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
+                                <div className="text-xs text-muted-foreground font-medium">
                                     Showing <span className="font-semibold text-foreground">{orders.length}</span> of{" "}
                                     <span className="font-semibold text-foreground">{pagination.total}</span> orders
                                 </div>
 
-                                <div className="flex items-center gap-6">
+                                <div className="flex items-center gap-4">
                                     <div className="flex items-center gap-2">
-                                        <span className="text-xs text-muted-foreground whitespace-nowrap">Rows per page</span>
+                                        <span className="text-xs text-muted-foreground whitespace-nowrap">Rows:</span>
                                         <Select
                                             value={limit.toString()}
                                             onValueChange={(val) => {
@@ -327,7 +367,7 @@ export default function ClientDetailsPage() {
                                                 setPage(1);
                                             }}
                                         >
-                                            <SelectTrigger className="h-8 w-[70px] text-xs font-semibold">
+                                            <SelectTrigger className="h-8 w-[68px] text-xs font-medium bg-background">
                                                 <SelectValue />
                                             </SelectTrigger>
                                             <SelectContent>
@@ -348,7 +388,7 @@ export default function ClientDetailsPage() {
                                             onClick={() => setPage(1)}
                                             disabled={page === 1 || isLoadingOrders}
                                         >
-                                            <ChevronsLeft className="h-4 w-4" />
+                                            <ChevronsLeft className="h-3.5 w-3.5" />
                                         </Button>
                                         <Button
                                             variant="outline"
@@ -357,7 +397,7 @@ export default function ClientDetailsPage() {
                                             onClick={() => setPage((p) => Math.max(1, p - 1))}
                                             disabled={page === 1 || isLoadingOrders}
                                         >
-                                            <ChevronLeft className="h-4 w-4" />
+                                            <ChevronLeft className="h-3.5 w-3.5" />
                                         </Button>
                                         <span className="text-xs font-medium px-2 whitespace-nowrap select-none">
                                             Page {pagination.page} of {pagination.totalPages}
@@ -369,7 +409,7 @@ export default function ClientDetailsPage() {
                                             onClick={() => setPage((p) => Math.min(pagination.totalPages, p + 1))}
                                             disabled={page >= pagination.totalPages || isLoadingOrders}
                                         >
-                                            <ChevronRight className="h-4 w-4" />
+                                            <ChevronRight className="h-3.5 w-3.5" />
                                         </Button>
                                         <Button
                                             variant="outline"
@@ -378,7 +418,7 @@ export default function ClientDetailsPage() {
                                             onClick={() => setPage(pagination.totalPages)}
                                             disabled={page >= pagination.totalPages || isLoadingOrders}
                                         >
-                                            <ChevronsRight className="h-4 w-4" />
+                                            <ChevronsRight className="h-3.5 w-3.5" />
                                         </Button>
                                     </div>
                                 </div>
@@ -386,9 +426,9 @@ export default function ClientDetailsPage() {
                         </CardContent>
                     </Card>
                 </TabsContent>
-                
+
                 <TabsContent value="services" className="mt-0">
-                    <Card className="border-border/60 shadow-md p-6">
+                    <Card className="border-border/60 shadow-xs p-6 bg-card">
                         <AssignedServicesTab client={client} />
                     </Card>
                 </TabsContent>

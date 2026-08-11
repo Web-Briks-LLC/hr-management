@@ -50,7 +50,7 @@ export default function AssignedStaffDialog({
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button variant="outline" size="sm" className="gap-2">
+                <Button variant="outline" size="sm">
                     <Users className="h-4 w-4 text-muted-foreground" />
                     <span>Assigned Staff</span>
                 </Button>

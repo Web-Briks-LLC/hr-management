@@ -35,7 +35,7 @@ import {
 import { cn } from "@/lib/utils";
 
 export default function EditProfile() {
-    const { data: session, isPending, isRefetching } = useSession();
+    const { data: session, isPending } = useSession();
     const {
         data,
         isLoading: isStaffLoading,
@@ -136,12 +136,11 @@ export default function EditProfile() {
         if (data.staff.joinDate) {
             form.setValue("joinDate", new Date(data.staff.joinDate));
         }
-    }, [session, form, isPending, isRefetching, data]);
+    }, [session, form, isPending, data]);
 
     const isLoading =
         form.formState.isSubmitting ||
         isPending ||
-        isRefetching ||
         isStaffLoading ||
         isStaffFetching;
 

@@ -79,7 +79,7 @@ export function InvitationToolbar({
                 <Button
                     variant="ghost"
                     onClick={onReset}
-                    className="h-9 px-3 text-xs gap-1.5 hover:bg-muted/85 font-medium shrink-0"
+                    className="h-9 px-3 text-xs hover:bg-muted/85 font-medium shrink-0"
                 >
                     Reset Filters
                     <X className="h-3 w-3" />

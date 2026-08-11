@@ -217,6 +217,7 @@ const updateClient = async (req: Request, res: Response) => {
         const result = await ClientServices.updateClientInDB(
             id,
             validationResult.data,
+            userId,
         );
 
         res.status(200).json({
@@ -352,28 +353,9 @@ const getAssignedServices = async (req: Request, res: Response) => {
             return;
         }
 
-        // If client has assigned services, return those (already populated via lookup)
-        if (
-            client.assignedServicesDetails &&
-            client.assignedServicesDetails.length > 0
-        ) {
-            res.status(200).json({
-                success: true,
-                data: client.assignedServicesDetails,
-            });
-            return;
-        }
-
-        // Fallback: return all active services
-        const { default: ServiceModel } = await import(
-            '../models/service.model.js'
-        );
-        const allServices = await ServiceModel.find({ isActive: true })
-            .select('name description')
-            .lean();
         res.status(200).json({
             success: true,
-            data: allServices,
+            data: client.assignedServicesDetails || [],
         });
     } catch (error: unknown) {
         const err = error as Error;

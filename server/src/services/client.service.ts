@@ -437,7 +437,11 @@ const createClientInDB = async (
 };
 
 // Update client
-const updateClientInDB = async (id: string, payload: UpdateClientInput) => {
+const updateClientInDB = async (
+    id: string,
+    payload: UpdateClientInput,
+    userId?: string,
+) => {
     // If updating client ID, check if it's unique
     if (payload.clientId) {
         const clientIdExists = await checkClientIdExists(payload.clientId, id);
@@ -463,16 +467,37 @@ const updateClientInDB = async (id: string, payload: UpdateClientInput) => {
             );
         }
     }
-    // Convert assignedServices string IDs to ObjectIds if provided
+
     const updateData: Record<string, unknown> = { ...payload };
-    if (payload.assignedServices) {
+
+    if (payload.assignedServices !== undefined) {
+        const existing = await ClientModel.findById(id).select('assignedServices createdBy');
+        const existingAssignments = existing?.assignedServices || [];
+
         updateData.assignedServices = payload.assignedServices.map(
-            (assignment) => ({
-                service: new Types.ObjectId(assignment.service),
-                price: assignment.price,
-                // Existing assignments won't be modified by default unless we pass them.
-                // We'll let the controller handle setting assignedBy if it's a new assignment.
-            })
+            (assignment) => {
+                const serviceIdStr = assignment.service.toString();
+                const matched = existingAssignments.find(
+                    (ea) => ea.service.toString() === serviceIdStr
+                );
+
+                return {
+                    service: new Types.ObjectId(assignment.service),
+                    price: assignment.price,
+                    assignedDate:
+                        matched?.assignedDate ||
+                        (assignment.assignedDate
+                            ? new Date(assignment.assignedDate)
+                            : new Date()),
+                    assignedBy:
+                        matched?.assignedBy ||
+                        (assignment.assignedBy
+                            ? new Types.ObjectId(assignment.assignedBy)
+                            : userId
+                            ? new Types.ObjectId(userId)
+                            : existing?.createdBy),
+                };
+            }
         );
     }
 

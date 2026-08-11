@@ -154,7 +154,7 @@ export default function DistributeProfitDialog({
         <Dialog open={open} onOpenChange={setOpen}>
             <div onClick={!canDistribute ? handleDisabledClick : undefined}>
                 <DialogTrigger asChild>
-                    <Button disabled={!canDistribute} className="gap-2">
+                    <Button disabled={!canDistribute}>
                         <DollarSign className="h-4 w-4" />
                         Distribute Profit
                     </Button>

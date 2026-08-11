@@ -175,7 +175,7 @@ export default function AddShareholderDialog({
         <Dialog open={open} onOpenChange={handleOpenChange}>
             {!isEditing && (
                 <DialogTrigger asChild>
-                    <Button className="gap-2">
+                    <Button>
                         <UserPlus className="h-4 w-4" />
                         Add Shareholder
                     </Button>

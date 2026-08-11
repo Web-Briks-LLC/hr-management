@@ -100,7 +100,7 @@ const ClientSchema = new Schema<IClient>(
                     assignedBy: {
                         type: Schema.Types.ObjectId,
                         ref: 'User',
-                        required: true,
+                        required: false,
                     },
                 }
             ],

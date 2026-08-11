@@ -143,7 +143,7 @@ export default function ShareProfitDialog() {
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button className="gap-2" variant="default">
+                <Button variant="default">
                     <Share2 className="h-4 w-4" />
                     Share Profit
                 </Button>

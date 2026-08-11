@@ -135,7 +135,7 @@ export default function InviteEmployeeDialog() {
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button className="gap-2">
+                <Button>
                     <UserPlus className="h-4 w-4" />
                     Invite Team Member
                 </Button>

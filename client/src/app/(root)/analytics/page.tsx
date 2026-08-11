@@ -265,7 +265,7 @@ export default function FinanceAnalyticsPage() {
                     {filterMode === 'single-date' && (
                         <Popover>
                             <PopoverTrigger asChild>
-                                <Button variant="outline" className="flex gap-2">
+                                <Button variant="outline">
                                     <CalendarIcon className="h-4 w-4" />
                                     {selectedDate ? format(selectedDate, 'PPP') : 'Pick a date'}
                                 </Button>
@@ -284,7 +284,7 @@ export default function FinanceAnalyticsPage() {
                     {filterMode === 'custom-range' && (
                         <Popover>
                             <PopoverTrigger asChild>
-                                <Button variant="outline" className="flex gap-2">
+                                <Button variant="outline">
                                     <CalendarIcon className="h-4 w-4" />
                                     {dateRange.from ? (
                                         dateRange.to ? (
@@ -325,7 +325,7 @@ export default function FinanceAnalyticsPage() {
                     {/* Download dropdown */}
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="outline" className="flex gap-2">
+                            <Button variant="outline">
                                 <Download className="h-4 w-4" />
                                 Download Report
                             </Button>
