@@ -16,10 +16,12 @@ import { Badge } from "@/components/ui/badge";
 import { Combobox } from "@/components/ui/combobox";
 import { useGetAllClientsQuery, useUpdateClientMutation } from "@/redux/features/client/clientApi";
 import { useGetServicesQuery } from "@/redux/features/service/serviceApi";
+import { useSession } from "@/lib/auth-client";
+import { Role } from "@/constants/role";
 import type { IService } from "@/types/order.type";
 import type { Client } from "@/types/client.type";
 import { toast } from "sonner";
-import { Loader2, UserPlus, Info, CheckCircle2 } from "lucide-react";
+import { Loader2, UserPlus, Info } from "lucide-react";
 
 interface AssignServiceToClientDialogProps {
     isOpen: boolean;
@@ -32,6 +34,9 @@ export function AssignServiceToClientDialog({
     onClose,
     service,
 }: AssignServiceToClientDialogProps) {
+    const { data: session } = useSession();
+    const isHRManager = session?.user?.role === Role.HR_MANAGER;
+
     const { data: clientsData, isLoading: isLoadingClients } = useGetAllClientsQuery({
         status: "active",
     });
@@ -97,10 +102,10 @@ export function AssignServiceToClientDialog({
         () =>
             clients.map((c) => ({
                 value: c._id,
-                label: `${c.name} (${c.clientId})`,
-                description: c.emails?.[0] || c.phone || "No email",
+                label: isHRManager ? c.clientId : `${c.name} (${c.clientId})`,
+                description: isHRManager ? undefined : (c.emails?.[0] || c.phone || "No email"),
             })),
-        [clients]
+        [clients, isHRManager]
     );
 
     const serviceOptions = useMemo(
@@ -176,10 +181,11 @@ export function AssignServiceToClientDialog({
                 assignedServices: newAssignments as any,
             }).unwrap();
 
+            const displayName = isHRManager ? selectedClient.clientId : selectedClient.name;
             toast.success(
                 existingAssignment
-                    ? `Updated pricing for ${selectedClient.name}`
-                    : `Assigned service to ${selectedClient.name} successfully`
+                    ? `Updated pricing for ${displayName}`
+                    : `Assigned service to ${displayName} successfully`
             );
             onClose();
         } catch (err: any) {
@@ -234,13 +240,19 @@ export function AssignServiceToClientDialog({
 
                         {/* Client Selection */}
                         <div className="space-y-1.5">
-                            <Label className="text-xs font-semibold">Client</Label>
+                            <Label className="text-xs font-semibold">
+                                Client {isHRManager ? "(Client ID)" : ""}
+                            </Label>
                             <Combobox
                                 options={clientOptions}
                                 value={selectedClientId}
                                 onChange={(val) => setSelectedClientId(val)}
                                 placeholder="Select a client..."
-                                searchPlaceholder="Search client by name or ID..."
+                                searchPlaceholder={
+                                    isHRManager
+                                        ? "Search client ID..."
+                                        : "Search client by name or ID..."
+                                }
                                 emptyText="No active client found."
                                 isLoading={isLoadingClients}
                             />
