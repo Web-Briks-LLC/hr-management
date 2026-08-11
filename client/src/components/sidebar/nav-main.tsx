@@ -172,7 +172,6 @@ export function NavMain() {
                                                 <SidebarMenuButton
                                                     asChild
                                                     isActive={isActive}
-                                                    tooltip={item.title}
                                                     className={cn(
                                                         "transition-all duration-200 relative group/btn",
                                                         isActive
