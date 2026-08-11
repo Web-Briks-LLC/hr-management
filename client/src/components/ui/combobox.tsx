@@ -73,13 +73,15 @@ export function Combobox({
         </Button>
       </PopoverTrigger>
       <PopoverContent
-        className="p-0"
+        className="p-0 z-[100]"
         align="start"
         style={{ width: "var(--radix-popover-trigger-width)" }}
+        onWheel={(e) => e.stopPropagation()}
+        onTouchMove={(e) => e.stopPropagation()}
       >
         <Command>
           <CommandInput placeholder={searchPlaceholder} />
-          <CommandList>
+          <CommandList className="max-h-[260px] overflow-y-auto overscroll-contain">
             <CommandEmpty>{emptyText}</CommandEmpty>
             <CommandGroup>
               {options.map((option) => (
