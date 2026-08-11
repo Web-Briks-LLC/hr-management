@@ -1353,7 +1353,7 @@ export default function OrdersPage() {
                                                     {order.imageQuantity}
                                                 </TableCell>
                                                 <TableCell className="py-3 text-sm font-semibold">
-                                                    {!isTelemarketer && order.clientId?.clientId !== 'WB_1003_50' ? (
+                                                    {!isAdmin && !isTelemarketer && order.clientId?.clientId !== 'WB_1003_50' ? (
                                                         <span className="text-muted-foreground">N/A</span>
                                                     ) : (
                                                         `$${order.totalPrice.toFixed(2)}`
