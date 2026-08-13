@@ -182,7 +182,14 @@ export default function InvoicePage() {
         return { totalImages, totalAmount };
     }, [selectedOrdersList]);
 
+    const resetGeneratedInvoice = () => {
+        setInvoiceNumber("");
+        setPaymentToken("");
+        setShowPDF(false);
+    };
+
     const handleSelectAll = (checked: boolean) => {
+        resetGeneratedInvoice();
         if (checked) {
             setSelectedOrders(new Set(orders.map((o: IOrder) => o._id)));
         } else {
@@ -191,6 +198,7 @@ export default function InvoicePage() {
     };
 
     const handleSelectOrder = (orderId: string, checked: boolean) => {
+        resetGeneratedInvoice();
         const newSelected = new Set(selectedOrders);
         if (checked) {
             newSelected.add(orderId);
@@ -386,7 +394,7 @@ export default function InvoicePage() {
                         <div className="space-y-2">
                             <label className="text-sm font-medium">Year</label>
                             {isLoadingYears ? <Skeleton className="h-10 w-full" /> : (
-                                <Select value={selectedYear} onValueChange={(val) => { setSelectedYear(val); setSelectedClientId(""); setSelectedOrders(new Set()); setShowPDF(false); }}>
+                                <Select value={selectedYear} onValueChange={(val) => { setSelectedYear(val); setSelectedClientId(""); setSelectedOrders(new Set()); resetGeneratedInvoice(); }}>
                                     <SelectTrigger><SelectValue placeholder="Select year" /></SelectTrigger>
                                     <SelectContent>{years.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}</SelectContent>
                                 </Select>
@@ -395,7 +403,7 @@ export default function InvoicePage() {
 
                         <div className="space-y-2">
                             <label className="text-sm font-medium">Month</label>
-                            <Select value={selectedMonth} onValueChange={(val) => { setSelectedMonth(val); setSelectedClientId(""); setSelectedOrders(new Set()); setShowPDF(false); }}>
+                            <Select value={selectedMonth} onValueChange={(val) => { setSelectedMonth(val); setSelectedClientId(""); setSelectedOrders(new Set()); resetGeneratedInvoice(); }}>
                                 <SelectTrigger><SelectValue /></SelectTrigger>
                                 <SelectContent>{months.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent>
                             </Select>
@@ -404,7 +412,7 @@ export default function InvoicePage() {
                         <div className="space-y-2">
                             <label className="text-sm font-medium">Client</label>
                             {isLoadingAllOrders ? <Skeleton className="h-10 w-full" /> : (
-                                <Select value={selectedClientId} onValueChange={(val) => { setSelectedClientId(val); setSelectedOrders(new Set()); setShowPDF(false); }}>
+                                <Select value={selectedClientId} onValueChange={(val) => { setSelectedClientId(val); setSelectedOrders(new Set()); resetGeneratedInvoice(); }}>
                                     <SelectTrigger><SelectValue placeholder={availableClients.length === 0 ? "No clients found" : "Select a client"} /></SelectTrigger>
                                     <SelectContent>{availableClients.map(c => <SelectItem key={c._id} value={c._id}>{c.name} ({c.clientId})</SelectItem>)}</SelectContent>
                                 </Select>

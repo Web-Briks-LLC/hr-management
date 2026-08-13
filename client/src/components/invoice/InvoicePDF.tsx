@@ -579,6 +579,13 @@ export default function InvoicePDF(props: InvoicePDFProps) {
         }
 
         try {
+            // Calculate order dates
+            const orderDates = props.orders.map((o) =>
+                new Date(o.orderDate).getTime(),
+            );
+            const minDate = orderDates.length > 0 ? new Date(Math.min(...orderDates)).toISOString() : undefined;
+            const maxDate = orderDates.length > 0 ? new Date(Math.max(...orderDates)).toISOString() : undefined;
+
             // Record the invoice in the database first to get the paymentToken
             const recordResult = await recordInvoice({
                 invoiceNumber: props.invoiceNumber,
@@ -586,6 +593,7 @@ export default function InvoicePDF(props: InvoicePDFProps) {
                 clientId: props.client.clientId,
                 clientAddress:
                     props.client.address || props.client.officeAddress || "N/A",
+                companyName: props.client.officeAddress || "N/A",
                 totalAmount: props.totals.totalAmount,
                 currency: props.client.currency || "USD",
                 dueDate: new Date(
@@ -593,12 +601,17 @@ export default function InvoicePDF(props: InvoicePDFProps) {
                 ).toISOString(),
                 month: Number(props.month),
                 year: Number(props.year),
+                totalImages: props.totals.totalImages,
+                dateFrom: minDate,
+                dateTo: maxDate,
+                totalOrders: props.orders.length,
                 clientEmail: email,
                 items: props.orders.map((order) => ({
                     name: order.orderName,
                     price: order.perImagePrice * order.imageQuantity,
                     quantity: order.imageQuantity,
                 })),
+                orderIds: props.orders.map((order) => order._id),
             }).unwrap();
 
             const paymentToken = (

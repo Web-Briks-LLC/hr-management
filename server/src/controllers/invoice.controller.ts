@@ -161,26 +161,19 @@ export const recordInvoice = async (req: Request, res: Response) => {
                 .json({ message: "Missing required invoice fields" });
         }
 
-        const existingInvoice = await InvoiceRecord.findOne({
+        const payloadInfo = {
             invoiceNumber: String(invoiceNumber),
-        });
-
-        let paymentToken = existingInvoice?.paymentToken;
-        if (!paymentToken) {
-            const payloadInfo = {
-                invoiceNumber,
-                totalPrice: totalAmount,
-                currency: currency || "USD",
-                totalImages,
-                dateFrom,
-                dateTo,
-                totalOrders,
-                clientName,
-                address: clientAddress || "N/A",
-                companyName: companyName || "N/A",
-            };
-            paymentToken = encryptPayload(payloadInfo);
-        }
+            totalPrice: totalAmount,
+            currency: currency || "USD",
+            totalImages: totalImages ? Number(totalImages) : undefined,
+            dateFrom,
+            dateTo,
+            totalOrders: totalOrders ? Number(totalOrders) : undefined,
+            clientName,
+            address: clientAddress || "N/A",
+            companyName: companyName || "N/A",
+        };
+        const paymentToken = encryptPayload(payloadInfo);
 
         const invoice = await InvoiceRecord.findOneAndUpdate(
             { invoiceNumber: String(invoiceNumber) },
