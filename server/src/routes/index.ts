@@ -30,6 +30,7 @@ import payrollBankSettingsRoute from "./payroll-bank-settings.route.js";
 import paymentRoute from "./payment.route.js";
 import { policyRoute } from "./policy.route.js";
 import { transactionRoute } from "./transaction.route.js";
+import { assetRoute } from "./asset.route.js";
 
 const router: Router = Router();
 
@@ -157,6 +158,10 @@ const moduleRoutes = [
     {
         path: "/transactions",
         route: transactionRoute,
+    },
+    {
+        path: "/assets",
+        route: assetRoute,
     },
 ];
 

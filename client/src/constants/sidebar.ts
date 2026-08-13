@@ -19,6 +19,7 @@ import {
     IconWallet,
     IconShieldLock,
     IconUserShare,
+    IconArchive,
 } from "@tabler/icons-react";
 
 export interface SidebarItem {
@@ -218,6 +219,12 @@ export const sidebarGroups: SidebarGroup[] = [
                 title: "Expense",
                 url: "/expense",
                 icon: IconReceipt,
+                access: [Role.SUPER_ADMIN, Role.ADMIN, Role.HR_MANAGER],
+            },
+            {
+                title: "Assets",
+                url: "/assets",
+                icon: IconArchive,
                 access: [Role.SUPER_ADMIN, Role.ADMIN, Role.HR_MANAGER],
             },
             {

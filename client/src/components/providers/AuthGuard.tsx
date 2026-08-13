@@ -37,8 +37,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
             pathname.startsWith('/_next') ||
             pathname.startsWith('/api') ||
             pathname === '/favicon.ico' ||
-            pathname === '/robots.txt' ||
-            pathname.startsWith('/assets')
+            pathname === '/robots.txt'
         );
     }, [pathname]);
 
