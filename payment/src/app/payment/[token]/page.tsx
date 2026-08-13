@@ -2,18 +2,23 @@ import { redirect } from "next/navigation";
 import PaymentUI from "@/components/PaymentUI";
 
 export default async function PaymentPage({
+    params,
     searchParams,
 }: {
+    params: Promise<{ token?: string }>;
     searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-    // const resolvedParams = await params;
+    const resolvedParams = await params;
     const resolvedSearchParams = await searchParams;
 
     let invoice = null;
     const token =
-        typeof resolvedSearchParams.token === "string"
+        (typeof resolvedSearchParams.token === "string" && resolvedSearchParams.token
             ? resolvedSearchParams.token
-            : null;
+            : null) ||
+        (typeof resolvedParams.token === "string" && resolvedParams.token
+            ? resolvedParams.token
+            : null);
 
     if (token) {
         try {
