@@ -377,7 +377,7 @@ async function toggleEarningStatus(
         const updated = await EarningModel.findByIdAndUpdate(earningId, updateQuery, { new: true, session: session || null })
             .populate('clientId', 'clientId name email currency');
 
-        if (updated?.orderIds?.length > 0) {
+        if (updated && updated.orderIds && updated.orderIds.length > 0) {
             const OrderModel = (await import('../models/order.model.js')).default;
             await (OrderModel as any).updateMany({ _id: { $in: updated.orderIds } }, { $set: { isPaid: true } }, { session });
         }

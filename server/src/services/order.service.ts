@@ -151,7 +151,7 @@ async function getAllOrdersFromDB(filters: GetOrdersFilters): Promise<{
                 },
             });
         }
-        if (ownershipClauses.length === 1) {
+        if (ownershipClauses.length === 1 && ownershipClauses[0]) {
             andConditions.push(ownershipClauses[0]);
         } else if (ownershipClauses.length > 1) {
             andConditions.push({ $or: ownershipClauses });

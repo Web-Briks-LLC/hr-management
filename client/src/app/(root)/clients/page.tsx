@@ -47,8 +47,10 @@ import { PER_PAGE_OPTIONS } from "@/lib/constants";
 import { Client } from "@/types/client.type";
 
 export default function ClientsPage() {
-    const { data: user } = useGetMeQuery({});
-    const isTelemarketer = user?.role === "telemarketer";
+    const { data: userData } = useGetMeQuery({});
+    const isTelemarketer =
+        userData?.staff?.designation?.toLowerCase() === "telemarketer" ||
+        userData?.user?.role === "telemarketer";
 
     // Filter states
     const [page, setPage] = useState(1);
