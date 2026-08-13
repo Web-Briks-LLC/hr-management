@@ -126,6 +126,13 @@ export const staffApi = apiSlice.injectEndpoints({
             }),
             invalidatesTags: ["Staff", "WalletTransaction"],
         }),
+        syncCommissions: builder.mutation({
+            query: () => ({
+                url: "/staffs/wallet-transactions/sync",
+                method: "POST",
+            }),
+            invalidatesTags: ["Staff", "WalletTransaction"],
+        }),
     }),
 });
 
@@ -136,6 +143,7 @@ export const {
     useGetMyWalletTransactionsQuery,
     useGetAllTransactionsQuery,
     useAdminWithdrawMutation,
+    useSyncCommissionsMutation,
     useCreateStaffMutation,
     useCompleteProfileMutation,
     useUpdateProfileMutation,

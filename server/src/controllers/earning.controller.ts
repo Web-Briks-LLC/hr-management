@@ -36,9 +36,12 @@ async function getAllEarnings(req: Request, res: Response) {
         ) {
             const isTM = await isTelemarketer(req.user.id);
             if (isTM) {
-                // Find all clients created by this telemarketer
+                // Find all clients created by or assigned to this telemarketer
                 const clients = await ClientModel.find({
-                    createdBy: req.user.id,
+                    $or: [
+                        { createdBy: req.user.id },
+                        { assignedTelemarketer: req.user.id },
+                    ],
                 })
                     .select("_id")
                     .lean();
@@ -77,6 +80,32 @@ async function getEarningById(req: Request, res: Response) {
             return res.status(404).json({ message: "Earning not found" });
         }
 
+        // Security: Telemarketer ownership enforcement
+        if (
+            req.user &&
+            [Role.STAFF, Role.TEAM_LEADER].includes(req.user.role as Role)
+        ) {
+            const isTM = await isTelemarketer(req.user.id);
+            if (isTM) {
+                const clientObj = earning.clientId as any;
+                const clientOwnerId =
+                    clientObj?.createdBy?._id?.toString() ||
+                    clientObj?.createdBy?.toString();
+                const assignedTMId =
+                    clientObj?.assignedTelemarketer?._id?.toString() ||
+                    clientObj?.assignedTelemarketer?.toString();
+                if (
+                    clientOwnerId !== req.user.id &&
+                    assignedTMId !== req.user.id
+                ) {
+                    return res.status(403).json({
+                        message:
+                            "Forbidden: You do not have permission to view this earning",
+                    });
+                }
+            }
+        }
+
         return res.status(200).json({
             message: "Earning fetched successfully",
             data: earning,
@@ -110,7 +139,10 @@ async function getEarningStats(req: Request, res: Response) {
             const isTM = await isTelemarketer(req.user.id);
             if (isTM) {
                 const clients = await ClientModel.find({
-                    createdBy: req.user.id,
+                    $or: [
+                        { createdBy: req.user.id },
+                        { assignedTelemarketer: req.user.id },
+                    ],
                 })
                     .select("_id")
                     .lean();

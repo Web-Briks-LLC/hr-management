@@ -510,6 +510,18 @@ const updateClientInDB = async (
     const result = await ClientModel.findByIdAndUpdate(id, updateData, {
         new: true,
     });
+
+    if (payload.assignedTelemarketer !== undefined) {
+        // Asynchronously sync commissions for telemarketers
+        import('./commission.service.js')
+            .then(({ default: commissionService }) => {
+                commissionService.syncAllCommissionsAndBalances().catch((err) => {
+                    console.error('[Commission Sync] Auto-sync on client update failed:', err);
+                });
+            })
+            .catch((err) => console.error('[Commission Sync] Failed to load commission service:', err));
+    }
+
     return result;
 };
 

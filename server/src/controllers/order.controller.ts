@@ -8,6 +8,25 @@ import mongoose from 'mongoose';
 import ClientModel from '../models/client.model.js';
 import { maskClientData } from '../utils/clientMask.util.js';
 
+function isTelemarketerOrderOwner(order: any, userId: string): boolean {
+    if (!order) return false;
+    const clientObj = order.clientId as any;
+    const clientOwnerId =
+        clientObj?.createdBy?._id?.toString() ||
+        clientObj?.createdBy?.toString();
+    const assignedTMId =
+        clientObj?.assignedTelemarketer?._id?.toString() ||
+        clientObj?.assignedTelemarketer?.toString();
+    const orderCreatorId =
+        order.createdBy?._id?.toString() || order.createdBy?.toString();
+
+    return (
+        clientOwnerId === userId ||
+        assignedTMId === userId ||
+        orderCreatorId === userId
+    );
+}
+
 async function createOrder(req: Request, res: Response) {
     try {
         const {
@@ -219,10 +238,7 @@ async function getOrderById(req: Request, res: Response) {
         ) {
             const isTM = await isTelemarketer(userId);
             if (isTM) {
-                const clientOwnerId = (
-                    order.clientId as any
-                )?.createdBy?.toString();
-                if (clientOwnerId !== userId) {
+                if (!isTelemarketerOrderOwner(order, userId)) {
                     return res.status(403).json({
                         message:
                             'Forbidden: You do not have permission to view this order',
@@ -297,10 +313,7 @@ async function updateOrder(req: Request, res: Response) {
         ) {
             const isTM = await isTelemarketer(userId);
             if (isTM) {
-                const clientOwnerId = (
-                    existingOrder.clientId as any
-                )?.createdBy?.toString();
-                if (clientOwnerId !== userId) {
+                if (!isTelemarketerOrderOwner(existingOrder, userId)) {
                     return res.status(403).json({
                         message:
                             'Forbidden: You do not have permission to update this order',
@@ -422,10 +435,7 @@ async function updateOrderStatus(req: Request, res: Response) {
         ) {
             const isTM = await isTelemarketer(userId);
             if (isTM) {
-                const clientOwnerId = (
-                    existingOrder.clientId as any
-                )?.createdBy?.toString();
-                if (clientOwnerId !== userId) {
+                if (!isTelemarketerOrderOwner(existingOrder, userId)) {
                     return res.status(403).json({
                         message:
                             'Forbidden: You do not have permission to update this order status',
@@ -526,10 +536,7 @@ async function extendDeadline(req: Request, res: Response) {
         ) {
             const isTM = await isTelemarketer(userId);
             if (isTM) {
-                const clientOwnerId = (
-                    existingOrder.clientId as any
-                )?.createdBy?.toString();
-                if (clientOwnerId !== userId) {
+                if (!isTelemarketerOrderOwner(existingOrder, userId)) {
                     return res.status(403).json({
                         message:
                             "Forbidden: You do not have permission to extend this order's deadline",
@@ -593,10 +600,7 @@ async function addRevision(req: Request, res: Response) {
         ) {
             const isTM = await isTelemarketer(userId);
             if (isTM) {
-                const clientOwnerId = (
-                    existingOrder.clientId as any
-                )?.createdBy?.toString();
-                if (clientOwnerId !== userId) {
+                if (!isTelemarketerOrderOwner(existingOrder, userId)) {
                     return res.status(403).json({
                         message:
                             'Forbidden: You do not have permission to add revision to this order',
@@ -639,7 +643,9 @@ async function getOrderStats(req: Request, res: Response) {
         ) {
             const isTM = await isTelemarketer(userId);
             if (isTM) {
-                const myClients = await ClientModel.find({ createdBy: userId })
+                const myClients = await ClientModel.find({
+                    $or: [{ createdBy: userId }, { assignedTelemarketer: userId }],
+                })
                     .select('_id')
                     .lean();
                 clientIds = myClients.map((c) => c._id.toString());
@@ -680,7 +686,13 @@ async function getOrdersByClient(req: Request, res: Response) {
                     await import('../services/client.service.js');
                 const client =
                     await clientService.getClientByIdFromDB(clientId);
-                if (!client || client.createdBy?._id?.toString() !== userId) {
+                const clientOwnerId =
+                    client?.createdBy?._id?.toString() ||
+                    client?.createdBy?.toString();
+                const assignedTMId =
+                    client?.assignedTelemarketer?._id?.toString() ||
+                    client?.assignedTelemarketer?.toString();
+                if (!client || (clientOwnerId !== userId && assignedTMId !== userId)) {
                     return res.status(403).json({
                         message:
                             'Forbidden: You do not have permission to view orders for this client',

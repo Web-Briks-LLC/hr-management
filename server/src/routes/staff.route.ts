@@ -3,7 +3,8 @@ import StaffController from "../controllers/staff.controller.js";
 import { 
     getMyTransactions, 
     getAllTransactions, 
-    adminWithdraw 
+    adminWithdraw,
+    syncCommissions
 } from "../controllers/wallet-transaction.controller.js";
 import { authorize } from "../middlewares/authorize.js";
 import { Role } from "../constants/role.js";
@@ -24,6 +25,11 @@ router.post(
     "/wallet-transactions/withdraw",
     authorize(Role.ADMIN, Role.SUPER_ADMIN),
     adminWithdraw
+);
+router.post(
+    "/wallet-transactions/sync",
+    authorize(Role.HR_MANAGER, Role.ADMIN, Role.SUPER_ADMIN),
+    syncCommissions
 );
 
 router.get(

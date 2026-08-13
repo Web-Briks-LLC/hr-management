@@ -131,33 +131,30 @@ async function getAllOrdersFromDB(filters: GetOrdersFilters): Promise<{
     const pipeline: any[] = [];
 
     // Match stage construction
+    const andConditions: Record<string, unknown>[] = [];
     const matchStage: Record<string, unknown> = {};
-
-    if (createdBy) {
-        matchStage.createdBy = new mongoose.Types.ObjectId(createdBy);
-    }
 
     if (clientId) {
         matchStage.clientId = new mongoose.Types.ObjectId(clientId);
     }
 
     // Ownership filter: restrict to specific client IDs or createdBy (used by Telemarketer role)
-    if (filters.clientIds || filters.createdBy) {
-        const clauses: Record<string, unknown>[] = [];
-        if (filters.createdBy) {
-            clauses.push({ createdBy: new mongoose.Types.ObjectId(filters.createdBy) });
+    if (filters.clientIds || createdBy) {
+        const ownershipClauses: Record<string, unknown>[] = [];
+        if (createdBy) {
+            ownershipClauses.push({ createdBy: new mongoose.Types.ObjectId(createdBy) });
         }
         if (filters.clientIds && filters.clientIds.length > 0) {
-            clauses.push({
+            ownershipClauses.push({
                 clientId: {
                     $in: filters.clientIds.map((id) => new mongoose.Types.ObjectId(id)),
                 },
             });
         }
-        if (clauses.length === 1) {
-            Object.assign(matchStage, clauses[0]);
-        } else if (clauses.length > 1) {
-            matchStage.$or = clauses;
+        if (ownershipClauses.length === 1) {
+            andConditions.push(ownershipClauses[0]);
+        } else if (ownershipClauses.length > 1) {
+            andConditions.push({ $or: ownershipClauses });
         }
     }
 
@@ -170,17 +167,14 @@ async function getAllOrdersFromDB(filters: GetOrdersFilters): Promise<{
     }
 
     if (startDate || endDate) {
-        matchStage.orderDate = {};
+        const orderDateFilter: Record<string, unknown> = {};
         if (startDate) {
-            (matchStage.orderDate as Record<string, unknown>).$gte = new Date(
-                startDate,
-            );
+            orderDateFilter.$gte = new Date(startDate);
         }
         if (endDate) {
-            (matchStage.orderDate as Record<string, unknown>).$lte = new Date(
-                endDate,
-            );
+            orderDateFilter.$lte = new Date(endDate);
         }
+        matchStage.orderDate = orderDateFilter;
     }
 
     // Month and Year filtering
@@ -209,8 +203,6 @@ async function getAllOrdersFromDB(filters: GetOrdersFilters): Promise<{
     }
 
     if (search) {
-        // We'll handle search later in the pipeline or use a separate lookup for clients if needed
-        // But for now, let's keep the existing logic: find clients first then filter orders
         const matchingClients = await ClientModel.find({
             $or: [
                 { name: { $regex: escapeRegex(search), $options: 'i' } },
@@ -220,13 +212,26 @@ async function getAllOrdersFromDB(filters: GetOrdersFilters): Promise<{
 
         const matchingClientIds = matchingClients.map((client) => client._id);
 
-        matchStage.$or = [
-            { orderName: { $regex: escapeRegex(search), $options: 'i' } },
-            { clientId: { $in: matchingClientIds } },
-        ];
+        andConditions.push({
+            $or: [
+                { orderName: { $regex: escapeRegex(search), $options: 'i' } },
+                { clientId: { $in: matchingClientIds } },
+            ],
+        });
     }
 
-    pipeline.push({ $match: matchStage });
+    if (Object.keys(matchStage).length > 0) {
+        andConditions.push(matchStage);
+    }
+
+    const finalMatch =
+        andConditions.length === 0
+            ? {}
+            : andConditions.length === 1
+            ? andConditions[0]
+            : { $and: andConditions };
+
+    pipeline.push({ $match: finalMatch });
 
     // Lookups (Population replacement)
 
@@ -392,7 +397,7 @@ async function getOrderByIdFromDB(id: string): Promise<IOrder | null> {
     const order = await OrderModel.findById(id)
         .populate(
             'clientId',
-            'clientId name email emails phone currency officeAddress address createdBy teamMembers',
+            'clientId name email emails phone currency officeAddress address createdBy assignedTelemarketer teamMembers',
         )
         .populate('services', 'name description')
         .populate('returnFileFormat', 'name extension')
@@ -448,7 +453,7 @@ async function updateOrderInDB(
         })
             .populate(
                 'clientId',
-                'clientId name email emails currency officeAddress address teamMembers',
+                'clientId name email emails currency officeAddress address createdBy assignedTelemarketer teamMembers',
             )
             .populate('services', 'name')
             .populate('returnFileFormat', 'name extension')

@@ -35,6 +35,18 @@ async function getMyTransactions(req: ExpressRequest, res: ExpressResponse) {
             });
         }
 
+        if (/^telemarketer$/i.test(staff.designation || "")) {
+            try {
+                const { default: commissionService } = await import("../services/commission.service.js");
+                await commissionService.syncAllCommissionsAndBalances();
+            } catch (err) {
+                console.error("[getMyTransactions] Auto-sync error:", err);
+            }
+        }
+
+        // Re-fetch staff to get latest synced balance
+        const updatedStaff = (await StaffModel.findById(staff._id).lean()) || staff;
+
         const type = req.query.type as string;
         const skip = (page - 1) * limit;
 
@@ -76,7 +88,7 @@ async function getMyTransactions(req: ExpressRequest, res: ExpressResponse) {
                 total,
                 page,
                 totalPages: Math.ceil(total / limit),
-                balance: staff.balance || 0,
+                balance: updatedStaff.balance || 0,
                 totalEarned,
                 totalWithdrawn,
             },
@@ -198,4 +210,23 @@ async function adminWithdraw(req: ExpressRequest, res: ExpressResponse) {
     }
 }
 
-export { getMyTransactions, getAllTransactions, adminWithdraw };
+/**
+ * Admin triggers commission synchronization across all telemarketers.
+ */
+async function syncCommissions(_req: ExpressRequest, res: ExpressResponse) {
+    try {
+        const { default: commissionService } = await import("../services/commission.service.js");
+        const summary = await commissionService.syncAllCommissionsAndBalances();
+
+        return res.status(200).json({
+            success: true,
+            message: "Commissions and balances synchronized successfully",
+            data: summary,
+        });
+    } catch (error: any) {
+        console.error("Error syncing commissions:", error);
+        return res.status(500).json({ success: false, message: error.message || "Failed to sync commissions" });
+    }
+}
+
+export { getMyTransactions, getAllTransactions, adminWithdraw, syncCommissions };

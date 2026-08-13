@@ -210,6 +210,12 @@ async function deleteEarningForOrder(
 
         if (earning.orderIds.length === 0 && !earning.isLegacy) {
             await EarningModel.deleteOne({ _id: earning._id }).session(session);
+            try {
+                const { default: commissionService } = await import('./commission.service.js');
+                await commissionService.reverseEarningCommission(earning._id.toString(), session);
+            } catch (err) {
+                console.error('[DeleteEarningForOrder] Failed to reverse commission:', err);
+            }
             if (!sessionParam) await session.commitTransaction();
             return earning;
         }
@@ -367,15 +373,23 @@ async function toggleEarningStatus(
                 tax: tax
             } };
         }
-        return EarningModel.findByIdAndUpdate(earningId, updateQuery, { new: true, session: session || null })
-            .populate('clientId', 'clientId name email currency')
-            .then(async (result: any) => {
-                if (result?.orderIds?.length > 0) {
-                    const OrderModel = (await import('../models/order.model.js')).default;
-                    await (OrderModel as any).updateMany({ _id: { $in: result.orderIds } }, { $set: { isPaid: true } }, { session });
-                }
-                return result;
-            }) as any;
+
+        const updated = await EarningModel.findByIdAndUpdate(earningId, updateQuery, { new: true, session: session || null })
+            .populate('clientId', 'clientId name email currency');
+
+        if (updated?.orderIds?.length > 0) {
+            const OrderModel = (await import('../models/order.model.js')).default;
+            await (OrderModel as any).updateMany({ _id: { $in: updated.orderIds } }, { $set: { isPaid: true } }, { session });
+        }
+
+        try {
+            const { default: commissionService } = await import('./commission.service.js');
+            await commissionService.processEarningCommission(earningId, data?.paidBy ? data.paidBy.toString() : '', session);
+        } catch (err) {
+            console.error('[Toggle] Failed to process commission:', err);
+        }
+
+        return updated as any;
     } else {
         const defaultRate = await (await import('./currency-rate.service.js')).default.getRateForCurrency(earning.month, earning.year, earning.currency);
         const updated = await EarningModel.findByIdAndUpdate(
@@ -946,6 +960,12 @@ async function deleteEarningFromDB(id: string): Promise<IEarning | null> {
             throw new Error("Insufficient balance. Transaction exceeds available amount.");
         }
         const result = await EarningModel.findByIdAndDelete(id).session(session).lean();
+        try {
+            const { default: commissionService } = await import('./commission.service.js');
+            await commissionService.reverseEarningCommission(id, session);
+        } catch (err) {
+            console.error('[DeleteEarning] Failed to reverse commission:', err);
+        }
         await session.commitTransaction();
         return result as any;
     } catch (error) {

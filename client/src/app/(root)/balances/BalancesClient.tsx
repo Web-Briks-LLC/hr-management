@@ -8,7 +8,9 @@ import {
     useGetStaffsQuery,
     useGetAllTransactionsQuery,
     useAdminWithdrawMutation,
+    useSyncCommissionsMutation,
 } from "@/redux/features/staff/staffApi";
+import { cn } from "@/lib/utils";
 import {
     Card,
     CardContent,
@@ -37,6 +39,7 @@ import {
     Filter,
     Users,
     History,
+    RefreshCw,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -130,6 +133,7 @@ export default function BalancesClient() {
     );
 
     const [adminWithdraw] = useAdminWithdrawMutation();
+    const [syncCommissions, { isLoading: isSyncing }] = useSyncCommissionsMutation();
 
     const transactions = txData?.data || [];
     const myTxMeta = txData?.meta;
@@ -146,6 +150,16 @@ export default function BalancesClient() {
         } catch (err: unknown) {
             const error = err as { data?: { message?: string } };
             toast.error(error?.data?.message || "Failed to process withdrawal");
+        }
+    };
+
+    const handleSyncCommissions = async () => {
+        try {
+            const res = await syncCommissions({}).unwrap();
+            toast.success(res?.message || "Commissions and balances synchronized successfully");
+        } catch (err: unknown) {
+            const error = err as { data?: { message?: string } };
+            toast.error(error?.data?.message || "Failed to synchronize commissions");
         }
     };
 
@@ -180,6 +194,17 @@ export default function BalancesClient() {
                         Manage staff wallets, commissions, and payout withdrawals.
                     </p>
                 </div>
+                {isAdmin && (
+                    <Button
+                        variant="outline"
+                        onClick={handleSyncCommissions}
+                        disabled={isSyncing}
+                        className="gap-2 shadow-xs"
+                    >
+                        <RefreshCw className={cn("h-4 w-4", isSyncing && "animate-spin")} />
+                        {isSyncing ? "Syncing..." : "Sync Commissions"}
+                    </Button>
+                )}
             </div>
 
             <Tabs defaultValue={isAdmin ? "staff-balances" : "my-balance"} className="w-full space-y-6">
