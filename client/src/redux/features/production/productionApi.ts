@@ -57,9 +57,10 @@ export const productionApi = apiSlice.injectEndpoints({
                               type: 'Production' as const,
                               id: _id,
                           })),
+                          'Production',
                           { type: 'Production', id: 'LIST' },
                       ]
-                    : [{ type: 'Production', id: 'LIST' }],
+                    : ['Production', { type: 'Production', id: 'LIST' }],
         }),
 
         getActiveOrdersProgress: builder.query<
@@ -70,12 +71,13 @@ export const productionApi = apiSlice.injectEndpoints({
                 url: '/production/active-orders',
                 params: params || {},
             }),
-            providesTags: [{ type: 'ProductionOrders', id: 'LIST' }],
+            providesTags: ['ProductionOrders', { type: 'ProductionOrders', id: 'LIST' }],
         }),
 
         getOrderTimeline: builder.query<OrderTimelineResponse, string>({
             query: (orderId) => `/production/order/${orderId}/timeline`,
             providesTags: (_result, _error, orderId) => [
+                'Production',
                 { type: 'Production', id: `TIMELINE_${orderId}` },
             ],
         }),
@@ -88,7 +90,7 @@ export const productionApi = apiSlice.injectEndpoints({
                 url: '/production/stats',
                 params: params || {},
             }),
-            providesTags: [{ type: 'ProductionStats', id: 'STATS' }],
+            providesTags: ['ProductionStats', { type: 'ProductionStats', id: 'STATS' }, { type: 'ProductionStats', id: 'LIST' }],
         }),
 
         createProductionLog: builder.mutation<
@@ -101,6 +103,9 @@ export const productionApi = apiSlice.injectEndpoints({
                 body,
             }),
             invalidatesTags: [
+                'Production',
+                'ProductionOrders',
+                'ProductionStats',
                 { type: 'Production', id: 'LIST' },
                 { type: 'ProductionOrders', id: 'LIST' },
                 { type: 'ProductionStats', id: 'STATS' },
@@ -118,6 +123,9 @@ export const productionApi = apiSlice.injectEndpoints({
                 body: data,
             }),
             invalidatesTags: (_result, _error, { id }) => [
+                'Production',
+                'ProductionOrders',
+                'ProductionStats',
                 { type: 'Production', id },
                 { type: 'Production', id: 'LIST' },
                 { type: 'ProductionOrders', id: 'LIST' },
@@ -136,6 +144,9 @@ export const productionApi = apiSlice.injectEndpoints({
                 body: data,
             }),
             invalidatesTags: (_result, _error, { id }) => [
+                'Production',
+                'ProductionOrders',
+                'ProductionStats',
                 { type: 'Production', id },
                 { type: 'Production', id: 'LIST' },
                 { type: 'ProductionOrders', id: 'LIST' },
@@ -150,9 +161,13 @@ export const productionApi = apiSlice.injectEndpoints({
                 method: 'DELETE',
             }),
             invalidatesTags: [
+                'Production',
+                'ProductionOrders',
+                'ProductionStats',
                 { type: 'Production', id: 'LIST' },
                 { type: 'ProductionOrders', id: 'LIST' },
                 { type: 'ProductionStats', id: 'STATS' },
+                { type: 'Order', id: 'LIST' },
             ],
         }),
     }),

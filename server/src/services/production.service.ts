@@ -65,35 +65,91 @@ const createProductionLog = async (
         notes: staff.notes || '',
     }));
 
-    const docToCreate: any = {
+    // Only merge with an UNINSPECTED active shift log for the same shift/stage today.
+    // CRITICAL: Once a log has QC inspection or revision_required, it is closed/immutable and must not be mutated!
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const existingSessionLog = await ShiftProductionModel.findOne({
         orderId: new Types.ObjectId(payload.orderId),
         shiftId: new Types.ObjectId(payload.shiftId),
-        branchId: new Types.ObjectId(branchId),
-        date,
-        teamLeaderId: new Types.ObjectId(userId),
         stage: payload.stage || 'clipping_path',
-        completedQuantity: Number(payload.completedQuantity) || 0,
-        status: payload.status || 'in_progress',
-        assignedStaffs,
-        handoverNotes: payload.handoverNotes || '',
-        bottlenecks: payload.bottlenecks || '',
-    };
+        date: { $gte: startOfDay, $lte: endOfDay },
+        'qc.checkedAt': { $exists: false },
+        status: { $ne: 'revision_required' },
+    });
 
-    if (payload.serviceId) {
-        docToCreate.serviceId = new Types.ObjectId(payload.serviceId);
-    }
-    if (payload.customStageName) {
-        docToCreate.customStageName = payload.customStageName;
-    }
-    if (payload.targetQuantity !== undefined) {
-        docToCreate.targetQuantity = payload.targetQuantity;
-    }
+    let productionLog: any;
 
-    const createdDocs = await ShiftProductionModel.create([docToCreate]);
-    const productionLog = createdDocs[0];
+    if (existingSessionLog) {
+        // Smart Merge with existing shift session log
+        existingSessionLog.completedQuantity =
+            (existingSessionLog.completedQuantity || 0) + (Number(payload.completedQuantity) || 0);
+        existingSessionLog.status = payload.status || existingSessionLog.status;
+
+        if (payload.handoverNotes) {
+            existingSessionLog.handoverNotes = existingSessionLog.handoverNotes
+                ? `${existingSessionLog.handoverNotes} | ${payload.handoverNotes}`
+                : payload.handoverNotes;
+        }
+        if (payload.bottlenecks) {
+            existingSessionLog.bottlenecks = existingSessionLog.bottlenecks
+                ? `${existingSessionLog.bottlenecks} | ${payload.bottlenecks}`
+                : payload.bottlenecks;
+        }
+
+        // Merge assigned photo editors
+        for (const newStaff of assignedStaffs) {
+            const targetStaff = existingSessionLog.assignedStaffs.find(
+                (s) => s.staffId.toString() === newStaff.staffId.toString()
+            );
+            if (targetStaff) {
+                targetStaff.imageCount = (targetStaff.imageCount || 0) + newStaff.imageCount;
+                if (newStaff.notes) {
+                    targetStaff.notes = targetStaff.notes
+                        ? `${targetStaff.notes}; ${newStaff.notes}`
+                        : newStaff.notes;
+                }
+            } else {
+                existingSessionLog.assignedStaffs.push(newStaff);
+            }
+        }
+
+        await existingSessionLog.save();
+        productionLog = existingSessionLog;
+    } else {
+        const docToCreate: any = {
+            orderId: new Types.ObjectId(payload.orderId),
+            shiftId: new Types.ObjectId(payload.shiftId),
+            branchId: new Types.ObjectId(branchId),
+            date,
+            teamLeaderId: new Types.ObjectId(userId),
+            stage: payload.stage || 'clipping_path',
+            completedQuantity: Number(payload.completedQuantity) || 0,
+            status: payload.status || 'in_progress',
+            assignedStaffs,
+            handoverNotes: payload.handoverNotes || '',
+            bottlenecks: payload.bottlenecks || '',
+        };
+
+        if (payload.serviceId) {
+            docToCreate.serviceId = new Types.ObjectId(payload.serviceId);
+        }
+        if (payload.customStageName) {
+            docToCreate.customStageName = payload.customStageName;
+        }
+        if (payload.targetQuantity !== undefined) {
+            docToCreate.targetQuantity = payload.targetQuantity;
+        }
+
+        const createdDocs = await ShiftProductionModel.create([docToCreate]);
+        productionLog = createdDocs[0];
+    }
 
     if (!productionLog) {
-        throw new Error('Failed to create production log');
+        throw new Error('Failed to save production log');
     }
 
     // Update order status if in progress
@@ -250,7 +306,7 @@ const getActiveOrdersProgress = async (
 
     const orderIds = activeOrders.map((o) => o._id);
 
-    // Aggregate shift production logs per order
+    // Aggregate shift production logs per order with QC inspection awareness
     const stageAggregation = await ShiftProductionModel.aggregate([
         { 
             $match: { 
@@ -261,7 +317,25 @@ const getActiveOrdersProgress = async (
         {
             $group: {
                 _id: { orderId: '$orderId', stage: '$stage' },
-                totalCompletedInStage: { $sum: '$completedQuantity' },
+                totalLoggedQuantity: { $sum: '$completedQuantity' },
+                totalPassedInQC: {
+                    $sum: {
+                        $cond: [
+                            { $gt: ['$qc.checkedAt', null] },
+                            '$qc.passedCount',
+                            '$completedQuantity'
+                        ]
+                    }
+                },
+                totalRejectedInQC: {
+                    $sum: {
+                        $cond: [
+                            { $gt: ['$qc.checkedAt', null] },
+                            '$qc.rejectedCount',
+                            0
+                        ]
+                    }
+                },
                 lastUpdated: { $max: '$updatedAt' },
                 latestStatus: { $last: '$status' },
                 logsCount: { $sum: 1 },
@@ -288,7 +362,10 @@ const getActiveOrdersProgress = async (
         }
         const record = orderProgressMap.get(oId);
         record.stages[item._id.stage] = {
-            completed: item.totalCompletedInStage,
+            completed: Math.max(0, item.totalPassedInQC),
+            loggedTotal: item.totalLoggedQuantity,
+            passedQC: item.totalPassedInQC,
+            rejectedQC: item.totalRejectedInQC,
             lastUpdated: item.lastUpdated,
             status: item.latestStatus,
             logsCount: item.logsCount,
@@ -301,19 +378,27 @@ const getActiveOrdersProgress = async (
         const orderLatestLogs = latestLogs.filter((l) => l.orderId.toString() === oId);
         const latestShiftLog = orderLatestLogs[0] || null;
 
-        // Calculate progress percentage based on image quantity
+        // Calculate progress percentage based on QC-approved/completed image quantity
         const totalOrdered = order.imageQuantity || 1;
         const clippingDone = progressData.stages['clipping_path']?.completed || 0;
         const maskingDone = progressData.stages['masking']?.completed || 0;
         const retouchDone = progressData.stages['retouching']?.completed || 0;
         const ghostDone = progressData.stages['ghost_mannequin']?.completed || 0;
 
-        // Primary progress metric: maximum stage output towards target
-        const primaryCompleted = Math.max(clippingDone, maskingDone, retouchDone, ghostDone);
+        // Primary progress metric: maximum QC-passed stage output towards target across any logged stage
+        const stageValues = Object.values(progressData.stages).map((s: any) => Number(s.completed) || 0);
+        const primaryCompleted = stageValues.length > 0 ? Math.min(totalOrdered, Math.max(...stageValues)) : 0;
         const overallPercentage = Math.min(100, Math.round((primaryCompleted / totalOrdered) * 100));
+
+        // Sum rejected images only if not fully passed
+        const isOrderFullyPassed = primaryCompleted >= totalOrdered;
+        const totalRejected = isOrderFullyPassed
+            ? 0
+            : Object.values(progressData.stages).reduce((acc: number, s: any) => acc + (s.rejectedQC || 0), 0);
 
         return {
             ...order,
+            status: isOrderFullyPassed && order.status === 'revision' ? 'in_progress' : order.status,
             productionProgress: {
                 totalOrdered,
                 overallPercentage,
@@ -322,6 +407,8 @@ const getActiveOrdersProgress = async (
                 maskingCount: maskingDone,
                 retouchingCount: retouchDone,
                 ghostMannequinCount: ghostDone,
+                primaryCompleted,
+                totalRejected,
                 remainingImages: Math.max(0, totalOrdered - primaryCompleted),
                 latestShiftLog: latestShiftLog
                     ? {
@@ -528,6 +615,45 @@ const submitQCReview = async (
         });
     } else {
         log.status = 'quality_check';
+        if (log.revision) {
+            log.revision.isRevision = false;
+            log.revision.resolvedCount = qcData.passedCount;
+        }
+
+        // Calculate total cumulative passed images across all logs for this order
+        const allOrderLogs = await ShiftProductionModel.find({
+            orderId: log.orderId,
+        }).lean();
+
+        const totalPassedSoFar = allOrderLogs.reduce((acc, l: any) => {
+            if (String(l._id) === String(log._id)) {
+                return acc + (qcData.passedCount || 0);
+            }
+            if (l.qc?.checkedAt) {
+                return acc + (l.qc.passedCount || 0);
+            }
+            return acc;
+        }, 0);
+
+        const orderDoc = await OrderModel.findById(log.orderId);
+        if (orderDoc) {
+            const isFullyCompleted = totalPassedSoFar >= orderDoc.imageQuantity;
+
+            if (isFullyCompleted || orderDoc.status === 'revision') {
+                const targetStatus = isFullyCompleted ? 'in_progress' : 'in_progress';
+                await OrderModel.findByIdAndUpdate(log.orderId, {
+                    status: targetStatus,
+                    $push: {
+                        timeline: {
+                            status: targetStatus,
+                            timestamp: new Date(),
+                            changedBy: new Types.ObjectId(userId),
+                            note: `QC Passed: ${qcData.passedCount} images approved. Total passed: ${totalPassedSoFar}/${orderDoc.imageQuantity}. ${isFullyCompleted ? 'Order 100% passed QC inspection.' : 'Revision resolved.'}`,
+                        },
+                    },
+                });
+            }
+        }
     }
 
     await log.save();

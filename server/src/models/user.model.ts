@@ -1,4 +1,4 @@
-import mongoose, { Schema, model } from "mongoose";
+import mongoose, { Schema, model, Model } from "mongoose";
 
 // The 'user' collection is managed by better-auth with collection name 'user' (singular).
 // We register a Mongoose model named "User" bound explicitly to the 'user' collection
@@ -23,5 +23,5 @@ const UserSchema = new Schema(
     }
 );
 
-const UserModel = mongoose.models.User || model("User", UserSchema);
+const UserModel: Model<any> = (mongoose.models.User as Model<any>) || model<any>("User", UserSchema);
 export default UserModel;

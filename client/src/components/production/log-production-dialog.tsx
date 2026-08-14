@@ -60,6 +60,7 @@ interface LogProductionDialogProps {
     onOpenChange: (open: boolean) => void;
     initialOrderId?: string;
     editLog?: IShiftProduction | null;
+    onSuccess?: () => void;
 }
 
 type FormTab = 'order_shift' | 'quantities' | 'editors' | 'handover';
@@ -82,6 +83,7 @@ export function LogProductionDialog({
     onOpenChange,
     initialOrderId,
     editLog,
+    onSuccess,
 }: LogProductionDialogProps) {
     const [activeTab, setActiveTab] = useState<FormTab>('order_shift');
 
@@ -178,23 +180,44 @@ export function LogProductionDialog({
                         notes: s.notes || '',
                     }))
                 );
+                setActiveTab('order_shift');
             } else {
-                if (initialOrderId) {
-                    setOrderId(initialOrderId);
-                } else if (!orderId && activeOrders.length > 0) {
-                    setOrderId(activeOrders[0]._id);
-                }
-                if (shifts.length > 0 && !shiftId) {
+                setOrderId(initialOrderId || (activeOrders[0]?._id || ''));
+                if (shifts.length > 0) {
                     setShiftId(shifts[0]._id);
                 }
+                setStage('clipping_path');
+                setCustomStageName('');
+                setCompletedQuantity(0);
+                setStatus('in_progress');
+                setHandoverNotes('');
+                setBottlenecks('');
+                setAssignedStaffs([]);
+                setActiveTab('order_shift');
             }
         }
-    }, [editLog, initialOrderId, shifts, activeOrders, open]);
+    }, [editLog, initialOrderId, open]);
 
     const selectedOrder = useMemo(
         () => activeOrders.find((o) => o._id === orderId),
         [activeOrders, orderId]
     );
+
+    const orderTotalImages = selectedOrder?.imageQuantity || 0;
+    const orderRemainingImages = selectedOrder?.productionProgress?.remainingImages ?? orderTotalImages;
+    const totalRejectedImages = (selectedOrder?.productionProgress as any)?.totalRejected || 0;
+    const isOrderInRevision = selectedOrder?.status === 'revision' || totalRejectedImages > 0;
+
+    const maxAllowedQty = useMemo(() => {
+        if (editLog) return orderTotalImages || 99999;
+        if (isOrderInRevision && totalRejectedImages > 0) {
+            return totalRejectedImages;
+        }
+        if (orderRemainingImages > 0) {
+            return orderRemainingImages;
+        }
+        return orderTotalImages || 99999;
+    }, [editLog, isOrderInRevision, totalRejectedImages, orderRemainingImages, orderTotalImages]);
 
     const activeStepIndex = useMemo(
         () => FORM_STEPS.findIndex((s) => s.id === activeTab),
@@ -284,6 +307,7 @@ export function LogProductionDialog({
                 toast.success('Shift production logged successfully!');
             }
 
+            onSuccess?.();
             onOpenChange(false);
         } catch (error: any) {
             console.error('Submit production error:', error);
@@ -511,25 +535,67 @@ export function LogProductionDialog({
                                         transition={{ duration: 0.2, ease: 'easeOut' }}
                                         className="space-y-6"
                                     >
+                                        {/* Revision Alert Banner */}
+                                        {isOrderInRevision && (
+                                            <div className="p-3.5 bg-red-500/10 border border-red-500/30 rounded-xl flex items-center justify-between text-xs">
+                                                <div className="flex items-center gap-2.5">
+                                                    <AlertCircle className="h-4 w-4 text-red-500 shrink-0" />
+                                                    <div>
+                                                        <span className="font-bold text-red-600 dark:text-red-400">
+                                                            Revision Fix Mode:
+                                                        </span>{' '}
+                                                        Fixing {totalRejectedImages || orderRemainingImages} rejected images for this order.
+                                                    </div>
+                                                </div>
+                                                <Badge variant="outline" className="bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/30 font-bold text-[10px]">
+                                                    Max: {maxAllowedQty}
+                                                </Badge>
+                                            </div>
+                                        )}
+
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                             {/* Completed Quantity - REQUIRED */}
                                             <div className="space-y-1.5">
-                                                <Label htmlFor="completedQty" className="text-xs font-semibold flex items-center">
-                                                    Completed Images in this Shift
-                                                    <span className="text-destructive font-bold ml-1">*</span>
+                                                <Label htmlFor="completedQty" className="text-xs font-semibold flex items-center justify-between">
+                                                    <span>
+                                                        Completed Images in this Shift
+                                                        <span className="text-destructive font-bold ml-1">*</span>
+                                                    </span>
+                                                    {selectedOrder && (
+                                                        <span className="text-[11px] text-muted-foreground font-normal">
+                                                            Max: <strong className="text-foreground">{maxAllowedQty}</strong> (Order: {orderTotalImages})
+                                                        </span>
+                                                    )}
                                                 </Label>
                                                 <Input
                                                     id="completedQty"
                                                     type="number"
-                                                    min={0}
-                                                    value={completedQuantity || ''}
-                                                    onChange={(e) => setCompletedQuantity(Number(e.target.value))}
+                                                    min={1}
+                                                    max={maxAllowedQty}
+                                                    value={completedQuantity === 0 ? '' : completedQuantity}
+                                                    onFocus={(e) => e.target.select()}
+                                                    onChange={(e) => {
+                                                        const val = e.target.value;
+                                                        if (val === '') {
+                                                            setCompletedQuantity(0);
+                                                            return;
+                                                        }
+                                                        const num = Math.max(0, Number(val));
+                                                        if (num > maxAllowedQty) {
+                                                            toast.warning(`Maximum allowable images for this order is ${maxAllowedQty}`);
+                                                            setCompletedQuantity(maxAllowedQty);
+                                                        } else {
+                                                            setCompletedQuantity(num);
+                                                        }
+                                                    }}
                                                     className="h-10 text-sm font-bold"
                                                     placeholder="0"
                                                     required
                                                 />
                                                 <p className="text-[11px] text-muted-foreground">
-                                                    Total finished images during this shift.
+                                                    {isOrderInRevision
+                                                        ? `Log fixed output for up to ${maxAllowedQty} revision images.`
+                                                        : `Total finished images during this shift (Max: ${maxAllowedQty}).`}
                                                 </p>
                                             </div>
 
@@ -635,10 +701,12 @@ export function LogProductionDialog({
                                                                 type="number"
                                                                 min={0}
                                                                 placeholder="Images count"
-                                                                value={row.imageCount || ''}
-                                                                onChange={(e) =>
-                                                                    handleStaffChange(idx, 'imageCount', Number(e.target.value))
-                                                                }
+                                                                value={row.imageCount === 0 ? '' : row.imageCount}
+                                                                onFocus={(e) => e.target.select()}
+                                                                onChange={(e) => {
+                                                                    const val = e.target.value;
+                                                                    handleStaffChange(idx, 'imageCount', val === '' ? 0 : Math.max(0, Number(val)));
+                                                                }}
                                                                 className="h-10 text-xs bg-background"
                                                             />
                                                         </div>

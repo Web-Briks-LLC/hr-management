@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -44,7 +45,6 @@ import { OrderWorkflowDrawer } from '@/components/production/order-workflow-draw
 import { useSocket } from '@/contexts/SocketContext';
 import {
     IShiftProduction,
-    ProductionStage,
     ProductionStatus,
     STAGE_LABELS,
     STATUS_LABELS,
@@ -53,17 +53,14 @@ import {
     Layers,
     Plus,
     Filter,
-    Download,
     RefreshCw,
     Clock,
     CheckCircle2,
     AlertTriangle,
-    ShieldCheck,
     Search,
     BarChart3,
     FileText,
     ShieldAlert,
-    Trash2,
 } from 'lucide-react';
 
 type DateFilterType = 'all' | 'today' | 'week' | 'month' | 'year';
@@ -84,7 +81,11 @@ const MONTHS = [
     { value: 12, label: 'December' },
 ];
 
-export default function ProductionPage() {
+function ProductionContent() {
+    const router = useRouter();
+    const searchParams = useSearchParams();
+    const pathname = usePathname();
+
     const { data: session, isPending: isSessionLoading } = useSession();
     const { data: meData, isLoading: isMeLoading } = useGetMeQuery({});
     const { socket } = useSocket();
@@ -97,6 +98,15 @@ export default function ProductionPage() {
         userRole as Role
     );
 
+    // Read active tab from URL query params (default to 'orders')
+    const activeTab = searchParams.get('tab') || 'orders';
+
+    const handleTabChange = (newTab: string) => {
+        const params = new URLSearchParams(searchParams.toString());
+        params.set('tab', newTab);
+        router.replace(`${pathname}?${params.toString()}`);
+    };
+
     // Filter states matching Earnings pattern
     const [filterType, setFilterType] = useState<DateFilterType>('all');
     const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
@@ -105,8 +115,6 @@ export default function ProductionPage() {
     const [stageFilter, setStageFilter] = useState<string>('all');
     const [statusFilter, setStatusFilter] = useState<string>('all');
     const [searchQuery, setSearchQuery] = useState<string>('');
-
-    const [activeTab, setActiveTab] = useState<string>('orders');
 
     // Dialog states
     const [isLogDialogOpen, setIsLogDialogOpen] = useState<boolean>(false);
@@ -157,14 +165,18 @@ export default function ProductionPage() {
 
     const [deleteLog, { isLoading: isDeleting }] = useDeleteProductionLogMutation();
 
+    const handleRefetchAll = () => {
+        refetchOrders();
+        refetchLogs();
+        refetchStats();
+    };
+
     // Socket.io Real-time event listeners
     useEffect(() => {
         if (!socket) return;
 
         const handleProductionUpdate = () => {
-            refetchOrders();
-            refetchLogs();
-            refetchStats();
+            handleRefetchAll();
         };
 
         socket.on('production:log_created', handleProductionUpdate);
@@ -209,6 +221,7 @@ export default function ProductionPage() {
             await deleteLog(deleteLogId).unwrap();
             toast.success('Production log deleted successfully');
             setDeleteLogId(null);
+            handleRefetchAll();
         } catch (error: any) {
             toast.error(error?.data?.message || 'Failed to delete log');
         }
@@ -233,7 +246,7 @@ export default function ProductionPage() {
                     <div className="space-y-1">
                         <h2 className="text-xl font-bold text-foreground">Access Restricted</h2>
                         <p className="text-sm text-muted-foreground max-w-md">
-                            The Production & Shift Management board is reserved for Production Floor Team Leaders, Photo Editors, and Administrators.
+                            The Production &amp; Shift Management board is reserved for Production Floor Team Leaders, Photo Editors, and Administrators.
                         </p>
                     </div>
                 </div>
@@ -438,9 +451,7 @@ export default function ProductionPage() {
                                 variant="outline"
                                 className="border-primary text-primary hover:bg-primary/10 shadow-sm h-9 text-xs font-semibold gap-1.5"
                                 onClick={() => {
-                                    refetchOrders();
-                                    refetchLogs();
-                                    refetchStats();
+                                    handleRefetchAll();
                                     toast.success('Production data refreshed');
                                 }}
                             >
@@ -494,7 +505,7 @@ export default function ProductionPage() {
                                     </SelectTrigger>
                                     <SelectContent>
                                         {MONTHS.map((m) => (
-                                            <SelectItem key={m.value} value={m.value.toString()}>
+                                             <SelectItem key={m.value} value={m.value.toString()}>
                                                 {m.label}
                                             </SelectItem>
                                         ))}
@@ -566,8 +577,8 @@ export default function ProductionPage() {
                         </div>
                     </div>
 
-                    {/* Tabs Navigation */}
-                    <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+                    {/* Tabs Navigation with URL Search Query Sync */}
+                    <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
                         <TabsList className="grid grid-cols-3 w-full sm:w-[480px] h-10 p-1 bg-muted/60 rounded-xl">
                             <TabsTrigger value="orders" className="text-xs font-bold gap-1.5 rounded-lg data-[state=active]:shadow-xs">
                                 <Layers className="h-3.5 w-3.5" /> Active Orders
@@ -629,12 +640,14 @@ export default function ProductionPage() {
                 onOpenChange={setIsLogDialogOpen}
                 initialOrderId={selectedOrderIdForLog}
                 editLog={editingLog}
+                onSuccess={handleRefetchAll}
             />
 
             <QCReviewDialog
                 open={isQCDialogOpen}
                 onOpenChange={setIsQCDialogOpen}
                 log={selectedLogForQC}
+                onSuccess={handleRefetchAll}
             />
 
             <OrderWorkflowDrawer
@@ -665,5 +678,24 @@ export default function ProductionPage() {
                 </AlertDialogContent>
             </AlertDialog>
         </div>
+    );
+}
+
+export default function ProductionPage() {
+    return (
+        <Suspense fallback={
+            <div className="space-y-6 p-4">
+                <Skeleton className="h-10 w-60 rounded-xl" />
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <Skeleton className="h-32 rounded-2xl" />
+                    <Skeleton className="h-32 rounded-2xl" />
+                    <Skeleton className="h-32 rounded-2xl" />
+                    <Skeleton className="h-32 rounded-2xl" />
+                </div>
+                <Skeleton className="h-96 rounded-2xl" />
+            </div>
+        }>
+            <ProductionContent />
+        </Suspense>
     );
 }

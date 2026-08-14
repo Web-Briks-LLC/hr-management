@@ -534,13 +534,13 @@ async function getAllAttendanceFromDB({
 
   // Search filter: Find users matching name, then find staff, then filter attendance
   if (search) {
-    const matchingUsers = await UserModel.find({
+    const matchingUsers: any[] = await UserModel.find({
       name: { $regex: escapeRegex(search), $options: "i" },
     })
-      .project({ _id: 1 })
-      .toArray();
+      .select({ _id: 1 })
+      .lean();
 
-    const matchingUserIds = matchingUsers.map((u) => u._id);
+    const matchingUserIds = matchingUsers.map((u: any) => u._id);
 
     const matchingStaff = await StaffModel.find({
       userId: { $in: matchingUserIds },
@@ -614,13 +614,13 @@ async function getAllAttendanceFromDB({
     .filter((id) => id);
 
   if (userIdsToFetch.length > 0) {
-    const users = await UserModel.find({
+    const users: any[] = await UserModel.find({
       _id: { $in: userIdsToFetch },
     })
-      .project({ _id: 1, name: 1, email: 1 })
-      .toArray();
+      .select({ _id: 1, name: 1, email: 1 })
+      .lean();
 
-    const userMap = new Map(users.map((u) => [u._id.toString(), u]));
+    const userMap = new Map(users.map((u: any) => [u._id.toString(), u]));
 
     attendanceRecords = attendanceRecords.map((record: any) => {
       if (record.staffId?.userId) {

@@ -102,10 +102,8 @@ const publishNotice = async (noticeId: string, publishedBy: string) => {
         throw new Error('Notice not found');
     }
 
-    // Get all users and send notifications
-    // UserModel is a MongoDB collection (not mongoose model) because better-auth manages it
     const { default: UserCollection } = await import('../models/user.model.js');
-    const users = await UserCollection.find({}).toArray();
+    const users: any[] = await UserCollection.find({}).lean();
 
     // Create notifications for all users
     const notifications = users.map((user: any) => ({

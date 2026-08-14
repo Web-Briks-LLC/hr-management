@@ -229,10 +229,9 @@ const notifyAdminsOvertimeRequest = async (data: {
     // Get all users with admin roles
     const { default: UserModel } = await import("../models/user.model.js");
 
-    // UserModel is a native MongoDB collection, not a Mongoose model
-    const admins = await UserModel.find({
+    const admins: any[] = await UserModel.find({
         role: { $in: ["super_admin", "admin", "hr_manager"] },
-    }).toArray();
+    }).lean();
 
     // Create notification for each admin
     const notifications = admins.map((admin: any) => ({
@@ -326,10 +325,9 @@ const notifyAdminsLeaveRequest = async (data: {
 }) => {
     const { default: UserModel } = await import("../models/user.model.js");
 
-    // UserModel is a native MongoDB collection, not a Mongoose model
     const admins = await UserModel.find({
         role: { $in: ["super_admin", "admin", "hr_manager"] },
-    }).toArray();
+    }).lean();
 
     const notifications = admins.map((admin: any) => ({
         userId: admin._id,
@@ -362,7 +360,7 @@ const notifyAdminsPaymentReceived = async (data: {
     // Get admins to notify
     const admins = await UserModel.find({
         role: { $in: ["super_admin", "admin", "hr_manager", "owner"] },
-    }).toArray();
+    }).lean();
 
     const notifications = admins.map((admin: any) => ({
         userId: admin._id,

@@ -9,6 +9,14 @@ import {
     CardDescription,
 } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+    ChartContainer,
+    ChartTooltip,
+    ChartTooltipContent,
+    ChartLegend,
+    ChartLegendContent,
+    type ChartConfig,
+} from '@/components/ui/chart';
 import { IProductionStats, STAGE_LABELS } from '@/types/production.type';
 import {
     BarChart,
@@ -16,18 +24,36 @@ import {
     XAxis,
     YAxis,
     CartesianGrid,
-    Tooltip,
-    ResponsiveContainer,
     AreaChart,
     Area,
-    Legend,
 } from 'recharts';
-import { Layers, Flame, BarChart3, TrendingUp, Sparkles } from 'lucide-react';
+import { Layers, Flame, TrendingUp, Sparkles } from 'lucide-react';
 
 interface ProductionStatsViewProps {
     stats?: IProductionStats;
     isLoading: boolean;
 }
+
+const shiftChartConfig: ChartConfig = {
+    images: {
+        label: 'Images Completed',
+        color: 'hsl(var(--primary))',
+    },
+};
+
+const stageChartConfig: ChartConfig = {
+    count: {
+        label: 'Images Processed',
+        color: 'hsl(262, 83%, 58%)',
+    },
+};
+
+const trendChartConfig: ChartConfig = {
+    completed: {
+        label: 'Completed Images',
+        color: 'hsl(142, 76%, 36%)',
+    },
+};
 
 export function ProductionStatsView({ stats, isLoading }: ProductionStatsViewProps) {
     if (isLoading) {
@@ -48,7 +74,6 @@ export function ProductionStatsView({ stats, isLoading }: ProductionStatsViewPro
 
     const stageData = (stats?.stageBreakdown || []).map((st) => ({
         name: STAGE_LABELS[st.stage] || st.stage,
-        fullName: STAGE_LABELS[st.stage] || st.stage,
         count: st.completedImages,
     }));
 
@@ -74,24 +99,28 @@ export function ProductionStatsView({ stats, isLoading }: ProductionStatsViewPro
                                 No shift comparison data available yet.
                             </div>
                         ) : (
-                            <div className="h-72 w-full">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={shiftData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.2} />
-                                        <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                                        <YAxis tick={{ fontSize: 12 }} />
-                                        <Tooltip
-                                            contentStyle={{
-                                                backgroundColor: 'hsl(var(--card))',
-                                                borderColor: 'hsl(var(--border))',
-                                                borderRadius: '8px',
-                                                fontSize: '12px',
-                                            }}
-                                        />
-                                        <Bar dataKey="images" name="Images Completed" fill="#4E12D4" radius={[6, 6, 0, 0]} />
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            </div>
+                            <ChartContainer config={shiftChartConfig} className="h-[280px] w-full">
+                                <BarChart data={shiftData}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-muted" />
+                                    <XAxis
+                                        dataKey="name"
+                                        tickLine={false}
+                                        axisLine={false}
+                                        className="text-xs"
+                                    />
+                                    <YAxis
+                                        tickLine={false}
+                                        axisLine={false}
+                                        className="text-xs"
+                                    />
+                                    <ChartTooltip content={<ChartTooltipContent />} />
+                                    <Bar
+                                        dataKey="images"
+                                        fill="var(--color-images)"
+                                        radius={[6, 6, 0, 0]}
+                                    />
+                                </BarChart>
+                            </ChartContainer>
                         )}
                     </CardContent>
                 </Card>
@@ -103,7 +132,7 @@ export function ProductionStatsView({ stats, isLoading }: ProductionStatsViewPro
                             <Layers className="h-4 w-4 text-purple-600 dark:text-purple-400" /> Stage-Wise Output Volume
                         </CardTitle>
                         <CardDescription>
-                            Volume of images completed across Clipping Path, Masking, and Retouching stages.
+                            Volume of images completed across Clipping Path, Masking, Retouching, and Ghost Mannequin stages.
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -113,24 +142,28 @@ export function ProductionStatsView({ stats, isLoading }: ProductionStatsViewPro
                                 No stage breakdown data available yet.
                             </div>
                         ) : (
-                            <div className="h-72 w-full">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={stageData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.2} />
-                                        <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                                        <YAxis tick={{ fontSize: 12 }} />
-                                        <Tooltip
-                                            contentStyle={{
-                                                backgroundColor: 'hsl(var(--card))',
-                                                borderColor: 'hsl(var(--border))',
-                                                borderRadius: '8px',
-                                                fontSize: '12px',
-                                            }}
-                                        />
-                                        <Bar dataKey="count" name="Images Processed" fill="#8B5CF6" radius={[6, 6, 0, 0]} />
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            </div>
+                            <ChartContainer config={stageChartConfig} className="h-[280px] w-full">
+                                <BarChart data={stageData}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-muted" />
+                                    <XAxis
+                                        dataKey="name"
+                                        tickLine={false}
+                                        axisLine={false}
+                                        className="text-xs"
+                                    />
+                                    <YAxis
+                                        tickLine={false}
+                                        axisLine={false}
+                                        className="text-xs"
+                                    />
+                                    <ChartTooltip content={<ChartTooltipContent />} />
+                                    <Bar
+                                        dataKey="count"
+                                        fill="var(--color-count)"
+                                        radius={[6, 6, 0, 0]}
+                                    />
+                                </BarChart>
+                            </ChartContainer>
                         )}
                     </CardContent>
                 </Card>
@@ -153,39 +186,37 @@ export function ProductionStatsView({ stats, isLoading }: ProductionStatsViewPro
                             No daily trend records found.
                         </div>
                     ) : (
-                        <div className="h-80 w-full">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <AreaChart data={dailyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                                    <defs>
-                                        <linearGradient id="colorCompleted" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#4E12D4" stopOpacity={0.4} />
-                                            <stop offset="95%" stopColor="#4E12D4" stopOpacity={0.0} />
-                                        </linearGradient>
-                                    </defs>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.2} />
-                                    <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                                    <YAxis tick={{ fontSize: 12 }} />
-                                    <Tooltip
-                                        contentStyle={{
-                                            backgroundColor: 'hsl(var(--card))',
-                                            borderColor: 'hsl(var(--border))',
-                                            borderRadius: '8px',
-                                            fontSize: '12px',
-                                        }}
-                                    />
-                                    <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
-                                    <Area
-                                        type="monotone"
-                                        dataKey="completed"
-                                        name="Completed Images"
-                                        stroke="#4E12D4"
-                                        strokeWidth={2.5}
-                                        fillOpacity={1}
-                                        fill="url(#colorCompleted)"
-                                    />
-                                </AreaChart>
-                            </ResponsiveContainer>
-                        </div>
+                        <ChartContainer config={trendChartConfig} className="h-[300px] w-full">
+                            <AreaChart data={dailyData}>
+                                <defs>
+                                    <linearGradient id="fillCompleted" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="var(--color-completed)" stopOpacity={0.4} />
+                                        <stop offset="95%" stopColor="var(--color-completed)" stopOpacity={0.0} />
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-muted" />
+                                <XAxis
+                                    dataKey="date"
+                                    tickLine={false}
+                                    axisLine={false}
+                                    className="text-xs"
+                                />
+                                <YAxis
+                                    tickLine={false}
+                                    axisLine={false}
+                                    className="text-xs"
+                                />
+                                <ChartTooltip content={<ChartTooltipContent />} />
+                                <ChartLegend content={<ChartLegendContent />} />
+                                <Area
+                                    type="monotone"
+                                    dataKey="completed"
+                                    stroke="var(--color-completed)"
+                                    fill="url(#fillCompleted)"
+                                    strokeWidth={2}
+                                />
+                            </AreaChart>
+                        </ChartContainer>
                     )}
                 </CardContent>
             </Card>

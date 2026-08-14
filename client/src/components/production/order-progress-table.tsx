@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
     Table,
     TableBody,
@@ -13,13 +13,28 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
-import { IActiveOrderProductionProgress } from '@/types/production.type';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import {
+    IActiveOrderProductionProgress,
+    STAGE_LABELS,
+    ProductionStage,
+} from '@/types/production.type';
 import { format, formatDistanceToNow } from 'date-fns';
 import {
     Plus,
     Clock,
     History,
     Sparkles,
+    ChevronLeft,
+    ChevronRight,
+    ChevronsLeft,
+    ChevronsRight,
 } from 'lucide-react';
 
 interface OrderProgressTableProps {
@@ -30,12 +45,25 @@ interface OrderProgressTableProps {
     onQCCheck: (orderId: string) => void;
 }
 
+const PER_PAGE_OPTIONS = [10, 20, 50, 100];
+
 export function OrderProgressTable({
     orders,
     isLoading,
     onLogProgress,
     onViewTimeline,
 }: OrderProgressTableProps) {
+    const [page, setPage] = useState<number>(1);
+    const [limit, setLimit] = useState<number>(10);
+
+    const totalPages = Math.max(1, Math.ceil(orders.length / limit));
+    const safePage = Math.min(page, totalPages);
+
+    const paginatedOrders = useMemo(() => {
+        const start = (safePage - 1) * limit;
+        return orders.slice(start, start + limit);
+    }, [orders, safePage, limit]);
+
     const getPriorityBadge = (priority: string) => {
         switch (priority) {
             case 'urgent':
@@ -117,7 +145,7 @@ export function OrderProgressTable({
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {orders.map((order) => {
+                        {paginatedOrders.map((order) => {
                             const prog = order.productionProgress;
                             const isRevision = order.status === 'revision';
 
@@ -168,56 +196,51 @@ export function OrderProgressTable({
 
                                             <Progress value={prog.overallPercentage} className="h-2" />
 
-                                            {/* Multi-stage Badges */}
+                                            {/* Multi-stage Dynamic Badges */}
                                             <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                                                {prog.clippingPathCount > 0 && (
-                                                    <Badge
-                                                        variant="outline"
-                                                        className="text-[10px] py-0 bg-blue-500/5 border-blue-500/20 text-blue-700 dark:text-blue-400 font-medium"
-                                                    >
-                                                        Clipping Path: <strong>{prog.clippingPathCount}</strong>
-                                                    </Badge>
-                                                )}
-                                                {prog.maskingCount > 0 && (
-                                                    <Badge
-                                                        variant="outline"
-                                                        className="text-[10px] py-0 bg-purple-500/5 border-purple-500/20 text-purple-700 dark:text-purple-400 font-medium"
-                                                    >
-                                                        Masking: <strong>{prog.maskingCount}</strong>
-                                                    </Badge>
-                                                )}
-                                                {prog.retouchingCount > 0 && (
-                                                    <Badge
-                                                        variant="outline"
-                                                        className="text-[10px] py-0 bg-emerald-500/5 border-emerald-500/20 text-emerald-700 dark:text-emerald-400 font-medium"
-                                                    >
-                                                        Retouching: <strong>{prog.retouchingCount}</strong>
-                                                    </Badge>
-                                                )}
-                                                {prog.ghostMannequinCount > 0 && (
-                                                    <Badge
-                                                        variant="outline"
-                                                        className="text-[10px] py-0 bg-amber-500/5 border-amber-500/20 text-amber-700 dark:text-amber-400 font-medium"
-                                                    >
-                                                        Ghost Mannequin: <strong>{prog.ghostMannequinCount}</strong>
-                                                    </Badge>
-                                                )}
+                                                {Object.entries(prog.stages || {}).map(([stKey, stData]: [string, any]) => {
+                                                    const count = stData?.completed || 0;
+                                                    if (count <= 0) return null;
+                                                    const stageLabel =
+                                                        STAGE_LABELS[stKey as ProductionStage] ||
+                                                        stKey.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+                                                    return (
+                                                        <Badge
+                                                            key={stKey}
+                                                            variant="outline"
+                                                            className="text-[10px] py-0 bg-primary/5 border-primary/20 text-primary font-medium"
+                                                        >
+                                                            {stageLabel}: <strong>{count}</strong>
+                                                        </Badge>
+                                                    );
+                                                })}
                                             </div>
                                         </div>
                                     </TableCell>
 
                                     {/* Remaining Images */}
                                     <TableCell className="py-3.5">
-                                        <span
-                                            className={`font-bold text-sm ${
-                                                prog.remainingImages > 0
-                                                    ? 'text-amber-600 dark:text-amber-400'
-                                                    : 'text-emerald-600 dark:text-emerald-400'
-                                            }`}
-                                        >
-                                            {prog.remainingImages}{' '}
-                                            <span className="text-xs font-normal text-muted-foreground">left</span>
-                                        </span>
+                                        {order.status === 'revision' || ((prog as any)?.totalRejected || 0) > 0 ? (
+                                            <div className="flex items-center gap-1.5">
+                                                <span className="font-bold text-sm text-destructive">
+                                                    {prog.remainingImages || (prog as any)?.totalRejected || 0}
+                                                </span>
+                                                <Badge variant="outline" className="text-[10px] py-0 px-1 font-bold bg-destructive/10 text-destructive border-destructive/30">
+                                                    revision
+                                                </Badge>
+                                            </div>
+                                        ) : (
+                                            <span
+                                                className={`font-bold text-sm ${
+                                                    prog.remainingImages > 0
+                                                        ? 'text-amber-600 dark:text-amber-400'
+                                                        : 'text-emerald-600 dark:text-emerald-400'
+                                                }`}
+                                            >
+                                                {prog.remainingImages}{' '}
+                                                <span className="text-xs font-normal text-muted-foreground">left</span>
+                                            </span>
+                                        )}
                                     </TableCell>
 
                                     {/* Deadline */}
@@ -284,6 +307,84 @@ export function OrderProgressTable({
                         })}
                     </TableBody>
                 </Table>
+            </div>
+
+            {/* Pagination Controls */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 border-t border-border/60 bg-muted/10">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <span>
+                        Showing {(safePage - 1) * limit + 1} to{' '}
+                        {Math.min(safePage * limit, orders.length)} of {orders.length} orders
+                    </span>
+                    <Select
+                        value={limit.toString()}
+                        onValueChange={(val) => {
+                            setLimit(Number(val));
+                            setPage(1);
+                        }}
+                    >
+                        <SelectTrigger className="h-8 w-[72px] text-xs">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {PER_PAGE_OPTIONS.map((opt) => (
+                                <SelectItem key={opt} value={opt.toString()} className="text-xs">
+                                    {opt}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    <span>per page</span>
+                </div>
+
+                {totalPages > 1 && (
+                    <div className="flex items-center gap-1">
+                        <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => setPage(1)}
+                            disabled={safePage === 1}
+                        >
+                            <ChevronsLeft className="h-4 w-4" />
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => setPage((p) => Math.max(1, p - 1))}
+                            disabled={safePage === 1}
+                        >
+                            <ChevronLeft className="h-4 w-4" />
+                        </Button>
+
+                        <div className="flex items-center gap-1 px-2 text-xs font-medium">
+                            <span>Page</span>
+                            <strong className="text-foreground">{safePage}</strong>
+                            <span>of</span>
+                            <strong className="text-foreground">{totalPages}</strong>
+                        </div>
+
+                        <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                            disabled={safePage === totalPages}
+                        >
+                            <ChevronRight className="h-4 w-4" />
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => setPage(totalPages)}
+                            disabled={safePage === totalPages}
+                        >
+                            <ChevronsRight className="h-4 w-4" />
+                        </Button>
+                    </div>
+                )}
             </div>
         </div>
     );

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Dialog,
     DialogContent,
@@ -23,9 +23,10 @@ interface QCReviewDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     log: IShiftProduction | null;
+    onSuccess?: () => void;
 }
 
-export function QCReviewDialog({ open, onOpenChange, log }: QCReviewDialogProps) {
+export function QCReviewDialog({ open, onOpenChange, log, onSuccess }: QCReviewDialogProps) {
     const [passedCount, setPassedCount] = useState<number>(log?.completedQuantity || 0);
     const [rejectedCount, setRejectedCount] = useState<number>(0);
     const [qcNotes, setQcNotes] = useState<string>('');
@@ -34,27 +35,63 @@ export function QCReviewDialog({ open, onOpenChange, log }: QCReviewDialogProps)
 
     const [submitQC, { isLoading }] = useSubmitQCReviewMutation();
 
-    const handleRejectedChange = (val: number) => {
-        const rejected = Math.max(0, val);
+    useEffect(() => {
+        if (open && log) {
+            if (log.qc?.checkedAt) {
+                // If previously reviewed, load saved review values
+                setPassedCount(log.qc.passedCount ?? log.completedQuantity);
+                setRejectedCount(log.qc.rejectedCount ?? 0);
+                setQcNotes(log.qc.qcNotes || '');
+                setRequiresRevision((log.qc.rejectedCount || 0) > 0);
+                setRevisionInstructions(log.revision?.instructions || '');
+            } else {
+                // Fresh QC inspection for this batch: default all batch images passed
+                setPassedCount(log.completedQuantity);
+                setRejectedCount(0);
+                setQcNotes('');
+                setRequiresRevision(false);
+                setRevisionInstructions('');
+            }
+        }
+    }, [open, log]);
+
+    const handleRejectedChange = (valStr: string) => {
+        if (valStr === '') {
+            setRejectedCount(0);
+            if (log) {
+                setPassedCount(log.completedQuantity);
+            }
+            setRequiresRevision(false);
+            return;
+        }
+        const val = Math.max(0, parseInt(valStr, 10) || 0);
+        const maxQty = log?.completedQuantity || val;
+        const rejected = Math.min(maxQty, val);
         setRejectedCount(rejected);
         if (log) {
             const passed = Math.max(0, log.completedQuantity - rejected);
             setPassedCount(passed);
         }
-        if (rejected > 0) {
-            setRequiresRevision(true);
-        }
+        setRequiresRevision(rejected > 0);
     };
 
-    const handlePassedChange = (val: number) => {
-        const passed = Math.max(0, val);
+    const handlePassedChange = (valStr: string) => {
+        if (valStr === '') {
+            setPassedCount(0);
+            if (log) {
+                setRejectedCount(log.completedQuantity);
+                setRequiresRevision(log.completedQuantity > 0);
+            }
+            return;
+        }
+        const val = Math.max(0, parseInt(valStr, 10) || 0);
+        const maxQty = log?.completedQuantity || val;
+        const passed = Math.min(maxQty, val);
         setPassedCount(passed);
         if (log) {
             const rejected = Math.max(0, log.completedQuantity - passed);
             setRejectedCount(rejected);
-            if (rejected > 0) {
-                setRequiresRevision(true);
-            }
+            setRequiresRevision(rejected > 0);
         }
     };
 
@@ -75,6 +112,7 @@ export function QCReviewDialog({ open, onOpenChange, log }: QCReviewDialogProps)
             }).unwrap();
 
             toast.success('Quality check review submitted successfully!');
+            onSuccess?.();
             onOpenChange(false);
         } catch (error: any) {
             console.error('Submit QC review error:', error);
@@ -124,30 +162,34 @@ export function QCReviewDialog({ open, onOpenChange, log }: QCReviewDialogProps)
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <Label htmlFor="passedQty" className="text-xs font-semibold uppercase text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                                <CheckCircle2 className="h-3.5 w-3.5" /> Passed Count (সঠিক)
+                                <CheckCircle2 className="h-3.5 w-3.5" /> Passed Count
                             </Label>
                             <Input
                                 id="passedQty"
                                 type="number"
                                 min={0}
                                 max={log.completedQuantity}
-                                value={passedCount}
-                                onChange={(e) => handlePassedChange(Number(e.target.value))}
+                                placeholder="0"
+                                value={passedCount === 0 ? '' : passedCount}
+                                onFocus={(e) => e.target.select()}
+                                onChange={(e) => handlePassedChange(e.target.value)}
                                 className="h-10 font-bold text-base text-emerald-600 border-emerald-500/30 focus-visible:ring-emerald-500"
                             />
                         </div>
 
                         <div className="space-y-2">
                             <Label htmlFor="rejectedQty" className="text-xs font-semibold uppercase text-destructive flex items-center gap-1">
-                                <XCircle className="h-3.5 w-3.5" /> Rejected (ভুল / রিভিশন)
+                                <XCircle className="h-3.5 w-3.5" /> Rejected Count
                             </Label>
                             <Input
                                 id="rejectedQty"
                                 type="number"
                                 min={0}
                                 max={log.completedQuantity}
-                                value={rejectedCount}
-                                onChange={(e) => handleRejectedChange(Number(e.target.value))}
+                                placeholder="0"
+                                value={rejectedCount === 0 ? '' : rejectedCount}
+                                onFocus={(e) => e.target.select()}
+                                onChange={(e) => handleRejectedChange(e.target.value)}
                                 className="h-10 font-bold text-base text-destructive border-destructive/30 focus-visible:ring-destructive"
                             />
                         </div>
@@ -180,7 +222,7 @@ export function QCReviewDialog({ open, onOpenChange, log }: QCReviewDialogProps)
                     {requiresRevision && (
                         <div className="space-y-2 p-3 bg-destructive/5 rounded-xl border border-destructive/20 animate-in fade-in-50">
                             <Label htmlFor="revisionInstructions" className="text-xs font-bold text-destructive">
-                                Revision Instructions (রিভিশন সংক্রান্ত নির্দেশনা)
+                                Revision Instructions
                             </Label>
                             <Textarea
                                 id="revisionInstructions"
