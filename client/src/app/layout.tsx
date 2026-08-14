@@ -10,16 +10,6 @@ const fontSans = Inter({
     variable: "--font-sans",
 });
 
-const fontSerif = Inter({
-    subsets: ["latin"],
-    variable: "--font-serif",
-});
-
-const fontMono = Inter({
-    subsets: ["latin"],
-    variable: "--font-mono",
-});
-
 export const metadata: Metadata = {
     title: "HR Management - Web Briks LLC",
     description: "HR Management - Web Briks LLC",
@@ -37,8 +27,6 @@ export default function RootLayout({
                     "font-sans",
                     "antialiased",
                     fontSans.variable,
-                    fontSerif.variable,
-                    fontMono.variable,
                 )}
             >
                 <Main>{children}</Main>
