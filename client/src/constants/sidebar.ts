@@ -20,6 +20,7 @@ import {
     IconShieldLock,
     IconUserShare,
     IconArchive,
+    IconStack2,
 } from "@tabler/icons-react";
 
 export interface SidebarItem {
@@ -28,6 +29,7 @@ export interface SidebarItem {
     icon: React.ComponentType<{ strokeWidth?: number; className?: string }>;
     access: Role[];
     requiredDesignation?: string;
+    excludedDesignation?: string;
 }
 
 export interface SidebarGroup {
@@ -98,6 +100,18 @@ export const sidebarGroups: SidebarGroup[] = [
                     Role.STAFF,
                 ],
                 requiredDesignation: "telemarketer",
+            },
+            {
+                title: "Production",
+                url: "/production",
+                icon: IconStack2,
+                access: [
+                    Role.SUPER_ADMIN,
+                    Role.ADMIN,
+                    Role.HR_MANAGER,
+                    Role.TEAM_LEADER,
+                ],
+                excludedDesignation: "telemarketer",
             },
             {
                 title: "Earnings",

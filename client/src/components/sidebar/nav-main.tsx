@@ -53,6 +53,19 @@ export function NavMain() {
                         return false;
                     }
                 }
+
+                if (
+                    (userRole === Role.STAFF ||
+                        userRole === Role.TEAM_LEADER) &&
+                    item.excludedDesignation
+                ) {
+                    if (
+                        staff?.designation?.toLowerCase() ===
+                        item.excludedDesignation.toLowerCase()
+                    ) {
+                        return false;
+                    }
+                }
                 return true;
             }),
         );
@@ -98,7 +111,20 @@ export function NavMain() {
                         }
                     }
 
-                    // C. Search filter check
+                    // C. Restriction: STAFF and TEAM_LEADER must not match excludedDesignation if specified
+                    if (
+                        (userRole === Role.STAFF || userRole === Role.TEAM_LEADER) &&
+                        item.excludedDesignation
+                    ) {
+                        if (
+                            staff?.designation?.toLowerCase() ===
+                            item.excludedDesignation.toLowerCase()
+                        ) {
+                            return false;
+                        }
+                    }
+
+                    // D. Search filter check
                     if (
                         search &&
                         !item.title.toLowerCase().includes(search.toLowerCase())

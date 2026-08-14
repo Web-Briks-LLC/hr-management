@@ -31,6 +31,7 @@ import paymentRoute from "./payment.route.js";
 import { policyRoute } from "./policy.route.js";
 import { transactionRoute } from "./transaction.route.js";
 import { assetRoute } from "./asset.route.js";
+import { productionRoute } from "./production.route.js";
 
 const router: Router = Router();
 
@@ -162,6 +163,10 @@ const moduleRoutes = [
     {
         path: "/assets",
         route: assetRoute,
+    },
+    {
+        path: "/production",
+        route: productionRoute,
     },
 ];
 

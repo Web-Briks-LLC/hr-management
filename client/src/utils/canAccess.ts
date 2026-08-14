@@ -42,5 +42,18 @@ export function canAccess(userRole: Role, pathname: string, designation?: string
         }
     }
 
+    if (sidebarItem && sidebarItem.excludedDesignation) {
+        if (
+            (userRole === Role.STAFF || userRole === Role.TEAM_LEADER)
+        ) {
+            if (
+                designation?.toLowerCase() ===
+                sidebarItem.excludedDesignation.toLowerCase()
+            ) {
+                return false;
+            }
+        }
+    }
+
     return true;
 }
