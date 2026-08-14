@@ -4,6 +4,7 @@ import { createServer } from "http";
 import app from "./app.js";
 import schedulerService from "./services/scheduler.service.js";
 import { initSocket } from "./socket.js";
+import "./models/user.model.js";
 
 const { port, mongo_uri } = envConfig;
 

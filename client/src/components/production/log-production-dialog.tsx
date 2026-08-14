@@ -20,6 +20,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
@@ -31,7 +32,9 @@ import {
     useGetActiveOrdersProgressQuery,
 } from '@/redux/features/production/productionApi';
 import { useGetAllShiftsQuery } from '@/redux/features/shift/shiftApi';
-import { useGetStaffsQuery } from '@/redux/features/staff/staffApi';
+import { useGetStaffsQuery, useGetMeQuery } from '@/redux/features/staff/staffApi';
+import { useSession } from '@/lib/auth-client';
+import { Role } from '@/constants/role';
 import {
     ProductionStage,
     ProductionStatus,
@@ -39,21 +42,17 @@ import {
     STATUS_LABELS,
     IShiftProduction,
 } from '@/types/production.type';
-import { cn } from '@/lib/utils';
 import {
     Loader,
     Plus,
     Trash2,
     Layers,
-    Clock,
     User,
     Check,
     ChevronRight,
     ChevronLeft,
     AlertCircle,
     CheckCircle2,
-    FileText,
-    Sparkles,
 } from 'lucide-react';
 
 interface LogProductionDialogProps {
@@ -91,7 +90,6 @@ export function LogProductionDialog({
     const [shiftId, setShiftId] = useState<string>('');
     const [stage, setStage] = useState<ProductionStage>('clipping_path');
     const [customStageName, setCustomStageName] = useState<string>('');
-    const [targetQuantity, setTargetQuantity] = useState<number>(0);
     const [completedQuantity, setCompletedQuantity] = useState<number>(0);
     const [status, setStatus] = useState<ProductionStatus>('in_progress');
     const [handoverNotes, setHandoverNotes] = useState<string>('');
@@ -100,21 +98,67 @@ export function LogProductionDialog({
         { staffId: string; imageCount: number; notes: string }[]
     >([]);
 
+    const { data: session } = useSession();
+    const { data: meData } = useGetMeQuery({});
+    const userRole = session?.user?.role as Role | undefined;
+    const myStaff = meData?.staff;
+    const myBranchId = myStaff?.branchId?._id || myStaff?.branchId;
+    const isTeamLeader = userRole === Role.TEAM_LEADER;
+
     // Queries
     const { data: shiftsData, isLoading: isShiftsLoading } = useGetAllShiftsQuery({});
     const { data: ordersData, isLoading: isOrdersLoading } = useGetActiveOrdersProgressQuery({});
-    const { data: staffsData, isLoading: isStaffsLoading } = useGetStaffsQuery({ limit: 100 });
+    const { data: staffsData, isLoading: isStaffsLoading } = useGetStaffsQuery({
+        limit: 1000,
+        status: 'active',
+        branchId: isTeamLeader && myBranchId ? String(myBranchId) : undefined,
+    });
 
     const [createLog, { isLoading: isCreating }] = useCreateProductionLogMutation();
     const [updateLog, { isLoading: isUpdating }] = useUpdateProductionLogMutation();
 
-    const shifts = Array.isArray(shiftsData?.data)
-        ? shiftsData.data
-        : Array.isArray(shiftsData)
-        ? shiftsData
-        : [];
+    // Correctly resolve arrays from backend response shapes
+    const shifts = useMemo(() => {
+        return (
+            shiftsData?.shifts ||
+            shiftsData?.data ||
+            (Array.isArray(shiftsData) ? shiftsData : [])
+        );
+    }, [shiftsData]);
+
     const activeOrders = ordersData?.data || [];
-    const staffs = staffsData?.data || [];
+
+    const rawStaffs = useMemo(() => {
+        return (
+            staffsData?.staffs ||
+            staffsData?.data ||
+            (Array.isArray(staffsData) ? staffsData : [])
+        );
+    }, [staffsData]);
+
+    // Scope staff selection for Team Leader to their own branch
+    const staffs = useMemo(() => {
+        if (!isTeamLeader || !myBranchId) {
+            return rawStaffs;
+        }
+        return rawStaffs.filter((st: any) => {
+            const stBranchId = st.branchId?._id || st.branchId;
+            return !stBranchId || String(stBranchId) === String(myBranchId);
+        });
+    }, [rawStaffs, isTeamLeader, myBranchId]);
+
+    // Format staff options for Combobox - show staff name and avatar
+    const staffOptions: ComboboxOption[] = useMemo(() => {
+        return staffs.map((st: any) => {
+            const name = st.user?.name || st.userId?.name || st.name || st.staffId || 'Staff Member';
+            const image = st.user?.image || st.userId?.image || st.image || st.user?.avatar || st.avatar || '';
+            return {
+                value: st._id,
+                label: name,
+                image: image || undefined,
+            };
+        });
+    }, [staffs]);
 
     useEffect(() => {
         if (open) {
@@ -123,7 +167,6 @@ export function LogProductionDialog({
                 setShiftId((editLog.shiftId as any)?._id || '');
                 setStage(editLog.stage || 'clipping_path');
                 setCustomStageName(editLog.customStageName || '');
-                setTargetQuantity(editLog.targetQuantity || 0);
                 setCompletedQuantity(editLog.completedQuantity || 0);
                 setStatus(editLog.status || 'in_progress');
                 setHandoverNotes(editLog.handoverNotes || '');
@@ -169,7 +212,7 @@ export function LogProductionDialog({
             return;
         }
         if (activeStepIndex === 0 && !shiftId) {
-            toast.error('Please select a shift');
+            toast.error('Please select a working shift');
             return;
         }
         if (activeStepIndex < FORM_STEPS.length - 1) {
@@ -209,7 +252,7 @@ export function LogProductionDialog({
         }
 
         if (!shiftId) {
-            toast.error('Please select a shift');
+            toast.error('Please select a working shift');
             setActiveTab('order_shift');
             return;
         }
@@ -226,7 +269,6 @@ export function LogProductionDialog({
                 shiftId,
                 stage,
                 customStageName: stage === 'other' ? customStageName : undefined,
-                targetQuantity: Number(targetQuantity) || 0,
                 completedQuantity: Number(completedQuantity) || 0,
                 status,
                 handoverNotes,
@@ -406,7 +448,7 @@ export function LogProductionDialog({
                                                     disabled={isShiftsLoading}
                                                 >
                                                     <SelectTrigger id="shiftSelect" className="h-10 text-sm w-full">
-                                                        <SelectValue placeholder="Select shift..." />
+                                                        <SelectValue placeholder={isShiftsLoading ? 'Loading shifts...' : 'Select working shift...'} />
                                                     </SelectTrigger>
                                                     <SelectContent>
                                                         {shifts.map((s: any) => (
@@ -487,31 +529,12 @@ export function LogProductionDialog({
                                                     required
                                                 />
                                                 <p className="text-[11px] text-muted-foreground">
-                                                    Total finished images during your shift for this stage.
-                                                </p>
-                                            </div>
-
-                                            {/* Shift Target */}
-                                            <div className="space-y-1.5">
-                                                <Label htmlFor="targetQty" className="text-xs font-semibold">
-                                                    Shift Target (Optional)
-                                                </Label>
-                                                <Input
-                                                    id="targetQty"
-                                                    type="number"
-                                                    min={0}
-                                                    value={targetQuantity || ''}
-                                                    onChange={(e) => setTargetQuantity(Number(e.target.value))}
-                                                    className="h-10 text-sm"
-                                                    placeholder="e.g. 500"
-                                                />
-                                                <p className="text-[11px] text-muted-foreground">
-                                                    Benchmark goal assigned for this shift.
+                                                    Total finished images during this shift.
                                                 </p>
                                             </div>
 
                                             {/* Shift Status */}
-                                            <div className="md:col-span-2 space-y-1.5">
+                                            <div className="space-y-1.5">
                                                 <Label htmlFor="statusSelect" className="text-xs font-semibold flex items-center">
                                                     Work Status
                                                     <span className="text-destructive font-bold ml-1">*</span>
@@ -531,12 +554,15 @@ export function LogProductionDialog({
                                                         ))}
                                                     </SelectContent>
                                                 </Select>
+                                                <p className="text-[11px] text-muted-foreground">
+                                                    Current progress state of this order batch.
+                                                </p>
                                             </div>
                                         </div>
                                     </motion.div>
                                 )}
 
-                                {/* STEP 3: Editor Output */}
+                                {/* STEP 3: Editor Output with Combobox */}
                                 {activeTab === 'editors' && (
                                     <motion.div
                                         key="editors"
@@ -548,11 +574,20 @@ export function LogProductionDialog({
                                     >
                                         <div className="flex items-center justify-between">
                                             <div>
-                                                <Label className="text-sm font-bold text-foreground">
-                                                    Photo Editors Output Breakdown
-                                                </Label>
+                                                <div className="flex items-center gap-2">
+                                                    <Label className="text-sm font-bold text-foreground">
+                                                        Photo Editors Output Breakdown
+                                                    </Label>
+                                                    {isTeamLeader && myStaff?.branchId?.name && (
+                                                        <Badge variant="outline" className="text-[10px] py-0 bg-primary/5 text-primary border-primary/20">
+                                                            Branch: {myStaff.branchId.name}
+                                                        </Badge>
+                                                    )}
+                                                </div>
                                                 <p className="text-xs text-muted-foreground">
-                                                    Assign processed image counts to individual floor editors for accountability.
+                                                    {isTeamLeader
+                                                        ? 'Select photo editors from your branch and record individual image counts.'
+                                                        : 'Select staff editors and record individual image counts.'}
                                                 </p>
                                             </div>
                                             <Button
@@ -581,35 +616,30 @@ export function LogProductionDialog({
                                                         key={idx}
                                                         className="grid grid-cols-1 sm:grid-cols-12 gap-2 bg-muted/25 p-3 rounded-xl border border-border/50 items-center"
                                                     >
+                                                        {/* Staff Combobox Search */}
                                                         <div className="sm:col-span-5">
-                                                            <Select
+                                                            <Combobox
+                                                                options={staffOptions}
                                                                 value={row.staffId}
-                                                                onValueChange={(val) => handleStaffChange(idx, 'staffId', val)}
-                                                                disabled={isStaffsLoading}
-                                                            >
-                                                                <SelectTrigger className="h-9 text-xs w-full bg-background">
-                                                                    <SelectValue placeholder="Select photo editor..." />
-                                                                </SelectTrigger>
-                                                                <SelectContent>
-                                                                    {staffs.map((st: any) => (
-                                                                        <SelectItem key={st._id} value={st._id}>
-                                                                            {st.userId?.name || st.staffId} ({st.designation || 'Editor'})
-                                                                        </SelectItem>
-                                                                    ))}
-                                                                </SelectContent>
-                                                            </Select>
+                                                                onChange={(val) => handleStaffChange(idx, 'staffId', val)}
+                                                                placeholder="Search photo editor..."
+                                                                searchPlaceholder="Type editor name or ID..."
+                                                                emptyText="No editor found"
+                                                                isLoading={isStaffsLoading}
+                                                                className="h-10 text-xs w-full bg-background"
+                                                            />
                                                         </div>
 
                                                         <div className="sm:col-span-3">
                                                             <Input
                                                                 type="number"
                                                                 min={0}
-                                                                placeholder="Count"
+                                                                placeholder="Images count"
                                                                 value={row.imageCount || ''}
                                                                 onChange={(e) =>
                                                                     handleStaffChange(idx, 'imageCount', Number(e.target.value))
                                                                 }
-                                                                className="h-9 text-xs bg-background"
+                                                                className="h-10 text-xs bg-background"
                                                             />
                                                         </div>
 
@@ -618,7 +648,7 @@ export function LogProductionDialog({
                                                                 placeholder="Notes (optional)"
                                                                 value={row.notes}
                                                                 onChange={(e) => handleStaffChange(idx, 'notes', e.target.value)}
-                                                                className="h-9 text-xs bg-background"
+                                                                className="h-10 text-xs bg-background"
                                                             />
                                                         </div>
 
@@ -628,9 +658,9 @@ export function LogProductionDialog({
                                                                 variant="ghost"
                                                                 size="icon"
                                                                 onClick={() => handleRemoveStaffRow(idx)}
-                                                                className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                                                                className="h-9 w-9 text-destructive hover:bg-destructive/10"
                                                             >
-                                                                <Trash2 className="h-3.5 w-3.5" />
+                                                                <Trash2 className="h-4 w-4" />
                                                             </Button>
                                                         </div>
                                                     </div>

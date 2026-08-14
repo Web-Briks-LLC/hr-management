@@ -175,7 +175,7 @@ export function OrderProgressTable({
                                                         variant="outline"
                                                         className="text-[10px] py-0 bg-blue-500/5 border-blue-500/20 text-blue-700 dark:text-blue-400 font-medium"
                                                     >
-                                                        Path: <strong>{prog.clippingPathCount}</strong>
+                                                        Clipping Path: <strong>{prog.clippingPathCount}</strong>
                                                     </Badge>
                                                 )}
                                                 {prog.maskingCount > 0 && (
@@ -191,7 +191,7 @@ export function OrderProgressTable({
                                                         variant="outline"
                                                         className="text-[10px] py-0 bg-emerald-500/5 border-emerald-500/20 text-emerald-700 dark:text-emerald-400 font-medium"
                                                     >
-                                                        Retouch: <strong>{prog.retouchingCount}</strong>
+                                                        Retouching: <strong>{prog.retouchingCount}</strong>
                                                     </Badge>
                                                 )}
                                                 {prog.ghostMannequinCount > 0 && (
@@ -199,7 +199,7 @@ export function OrderProgressTable({
                                                         variant="outline"
                                                         className="text-[10px] py-0 bg-amber-500/5 border-amber-500/20 text-amber-700 dark:text-amber-400 font-medium"
                                                     >
-                                                        Mannequin: <strong>{prog.ghostMannequinCount}</strong>
+                                                        Ghost Mannequin: <strong>{prog.ghostMannequinCount}</strong>
                                                     </Badge>
                                                 )}
                                             </div>

@@ -17,40 +17,40 @@ export type ProductionStage =
     | 'other';
 
 export const STAGE_LABELS: Record<ProductionStage, string> = {
-    clipping_path: 'Clipping Path (পাত)',
-    masking: 'Masking (মাস্কিং)',
-    retouching: 'Retouching (রিটাচ)',
-    ghost_mannequin: 'Ghost Mannequin (ম্যানিকিন)',
-    color_correction: 'Color Correction (কালার)',
-    neck_joint: 'Neck Joint (নেক জয়েন্ট)',
-    shadow_creation: 'Shadow Creation (শ্যাডো)',
-    vector_conversion: 'Vector Conversion (ভেক্টর)',
-    other: 'Other (অন্যান্য)',
+    clipping_path: 'Clipping Path',
+    masking: 'Masking',
+    retouching: 'Retouching',
+    ghost_mannequin: 'Ghost Mannequin',
+    color_correction: 'Color Correction',
+    neck_joint: 'Neck Joint',
+    shadow_creation: 'Shadow Creation',
+    vector_conversion: 'Vector Conversion',
+    other: 'Other Services',
 };
 
 export const STATUS_LABELS: Record<ProductionStatus, { label: string; color: string; bg: string }> = {
     in_progress: {
-        label: 'In Progress (চলমান)',
+        label: 'In Progress',
         color: 'text-blue-600 dark:text-blue-400',
         bg: 'bg-blue-500/10 border-blue-500/20 text-blue-700 dark:text-blue-400',
     },
     partially_completed: {
-        label: 'Partially Done (আংশিক সম্পন্ন)',
+        label: 'Partially Completed',
         color: 'text-amber-600 dark:text-amber-400',
         bg: 'bg-amber-500/10 border-amber-500/20 text-amber-700 dark:text-amber-400',
     },
     completed: {
-        label: 'Completed (সম্পূর্ণ সম্পন্ন)',
+        label: 'Completed',
         color: 'text-emerald-600 dark:text-emerald-400',
         bg: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-700 dark:text-emerald-400',
     },
     quality_check: {
-        label: 'QC Pending (কিউসি অপেক্ষমাণ)',
+        label: 'Quality Check',
         color: 'text-purple-600 dark:text-purple-400',
         bg: 'bg-purple-500/10 border-purple-500/20 text-purple-700 dark:text-purple-400',
     },
     revision_required: {
-        label: 'Revision Required (রিভিশন প্রয়োজন)',
+        label: 'Revision Required',
         color: 'text-red-600 dark:text-red-400',
         bg: 'bg-red-500/10 border-red-500/20 text-red-700 dark:text-red-400',
     },

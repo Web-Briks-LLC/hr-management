@@ -11,6 +11,7 @@ import { toNodeHandler } from "better-auth/node";
 import { auth } from "./lib/auth.js";
 import { requireAuth } from "./middlewares/auth.middleware.js";
 import router from "./routes/index.js";
+import "./models/user.model.js";
 
 const { trusted_origins } = envConfig;
 

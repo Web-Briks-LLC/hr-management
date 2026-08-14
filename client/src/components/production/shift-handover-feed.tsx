@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { IShiftProduction, STAGE_LABELS, STATUS_LABELS } from '@/types/production.type';
 import { format } from 'date-fns';
 import {
@@ -115,9 +116,9 @@ export function ShiftHandoverFeed({
                                 </div>
 
                                 <div>
-                                    <span className="text-muted-foreground block">Shift Target</span>
-                                    <span className="text-base font-bold text-foreground">
-                                        {log.targetQuantity ? `${log.targetQuantity} imgs` : 'N/A'}
+                                    <span className="text-muted-foreground block">Total Order Size</span>
+                                    <span className="text-base font-bold text-foreground block mt-0.5">
+                                        {log.orderId?.imageQuantity || 'N/A'} images
                                     </span>
                                 </div>
 
@@ -134,9 +135,9 @@ export function ShiftHandoverFeed({
                                 </div>
 
                                 <div>
-                                    <span className="text-muted-foreground block">Total Order Size</span>
+                                    <span className="text-muted-foreground block">Assigned Editors</span>
                                     <span className="font-bold text-foreground block mt-0.5">
-                                        {log.orderId?.imageQuantity || 'N/A'} images
+                                        {log.assignedStaffs?.length || 0} floor editors
                                     </span>
                                 </div>
                             </div>
@@ -148,16 +149,26 @@ export function ShiftHandoverFeed({
                                         Editor Output Breakdown:
                                     </span>
                                     <div className="flex flex-wrap gap-2">
-                                        {log.assignedStaffs.map((st, idx) => (
-                                            <Badge
-                                                key={idx}
-                                                variant="secondary"
-                                                className="text-xs py-1 px-2.5 gap-1.5 font-normal bg-background border border-border/60"
-                                            >
-                                                <span>{st.staffId?.userId?.name || st.staffId?.staffId || 'Editor'}</span>
-                                                <strong className="text-primary font-bold">{st.imageCount} imgs</strong>
-                                            </Badge>
-                                        ))}
+                                        {log.assignedStaffs.map((st, idx) => {
+                                            const editorName = st.staffId?.userId?.name || st.staffId?.staffId || 'Editor';
+                                            const editorImage = (st.staffId as any)?.userId?.image || (st.staffId as any)?.image || '';
+                                            return (
+                                                <Badge
+                                                    key={idx}
+                                                    variant="secondary"
+                                                    className="text-xs py-1 px-2.5 gap-1.5 font-normal bg-background border border-border/60"
+                                                >
+                                                    <Avatar className="h-4 w-4 shrink-0 border border-muted">
+                                                        {editorImage && <AvatarImage src={editorImage} alt={editorName} />}
+                                                        <AvatarFallback className="text-[7px] font-bold bg-primary/10 text-primary uppercase">
+                                                            {editorName.slice(0, 2).toUpperCase()}
+                                                        </AvatarFallback>
+                                                    </Avatar>
+                                                    <span>{editorName}</span>
+                                                    <strong className="text-primary font-bold">{st.imageCount} imgs</strong>
+                                                </Badge>
+                                            );
+                                        })}
                                     </div>
                                 </div>
                             )}

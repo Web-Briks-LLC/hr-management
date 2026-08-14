@@ -47,7 +47,7 @@ export function ProductionStatsView({ stats, isLoading }: ProductionStatsViewPro
     }));
 
     const stageData = (stats?.stageBreakdown || []).map((st) => ({
-        name: STAGE_LABELS[st.stage]?.split(' ')[0] || st.stage,
+        name: STAGE_LABELS[st.stage] || st.stage,
         fullName: STAGE_LABELS[st.stage] || st.stage,
         count: st.completedImages,
     }));

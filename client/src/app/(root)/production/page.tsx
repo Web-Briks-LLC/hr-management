@@ -123,11 +123,13 @@ export default function ProductionPage() {
 
     // Queries
     const { data: shiftsData } = useGetAllShiftsQuery({});
-    const shifts = Array.isArray(shiftsData?.data)
-        ? shiftsData.data
-        : Array.isArray(shiftsData)
-        ? shiftsData
-        : [];
+    const shifts = useMemo(() => {
+        return (
+            shiftsData?.shifts ||
+            shiftsData?.data ||
+            (Array.isArray(shiftsData) ? shiftsData : [])
+        );
+    }, [shiftsData]);
 
     const {
         data: activeOrdersData,

@@ -14,11 +14,14 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 export interface ComboboxOption {
   value: string;
   label: string;
   description?: string;
+  image?: string;
+  avatar?: string;
 }
 
 export interface ComboboxProps {
@@ -33,13 +36,23 @@ export interface ComboboxProps {
   className?: string;
 }
 
+const getInitials = (name: string) => {
+  if (!name) return "";
+  return name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+};
+
 export function Combobox({
   options,
   value,
   onChange,
   placeholder = "Select...",
-  searchPlaceholder = "Search telemarketer...",
-  emptyText = "No telemarketer found.",
+  searchPlaceholder = "Search...",
+  emptyText = "No option found.",
   isLoading = false,
   disabled = false,
   className,
@@ -62,9 +75,21 @@ export function Combobox({
             className
           )}
         >
-          <span className="truncate">
-            {isLoading ? "Loading..." : selected ? selected.label : placeholder}
-          </span>
+          <div className="flex items-center gap-2 min-w-0 truncate">
+            {selected && (
+              <Avatar className="h-5 w-5 shrink-0 border border-muted">
+                {(selected.image || selected.avatar) && (
+                  <AvatarImage src={selected.image || selected.avatar} alt={selected.label} />
+                )}
+                <AvatarFallback className="text-[9px] font-bold bg-primary/10 text-primary uppercase">
+                  {getInitials(selected.label)}
+                </AvatarFallback>
+              </Avatar>
+            )}
+            <span className="truncate">
+              {isLoading ? "Loading..." : selected ? selected.label : placeholder}
+            </span>
+          </div>
           {isLoading ? (
             <Loader2 className="ml-2 h-4 w-4 shrink-0 animate-spin opacity-50" />
           ) : (
@@ -92,7 +117,7 @@ export function Combobox({
                     onChange(option.value === value ? "" : option.value);
                     setOpen(false);
                   }}
-                  className="flex items-center gap-2 cursor-pointer"
+                  className="flex items-center gap-2.5 cursor-pointer py-2"
                 >
                   <Check
                     className={cn(
@@ -100,10 +125,18 @@ export function Combobox({
                       value === option.value ? "opacity-100 text-primary" : "opacity-0"
                     )}
                   />
+                  <Avatar className="h-6 w-6 shrink-0 border border-muted">
+                    {(option.image || option.avatar) && (
+                      <AvatarImage src={option.image || option.avatar} alt={option.label} />
+                    )}
+                    <AvatarFallback className="text-[10px] font-bold bg-primary/10 text-primary uppercase">
+                      {getInitials(option.label)}
+                    </AvatarFallback>
+                  </Avatar>
                   <div className="min-w-0 flex-1">
-                    <div className="truncate font-medium">{option.label}</div>
+                    <div className="truncate font-medium text-xs">{option.label}</div>
                     {option.description && (
-                      <div className="truncate text-xs text-muted-foreground">
+                      <div className="truncate text-[11px] text-muted-foreground">
                         {option.description}
                       </div>
                     )}
