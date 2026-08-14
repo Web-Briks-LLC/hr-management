@@ -35,6 +35,7 @@ import {
     ChevronRight,
     ChevronsLeft,
     ChevronsRight,
+    Check,
 } from 'lucide-react';
 
 interface OrderProgressTableProps {
@@ -282,14 +283,26 @@ export function OrderProgressTable({
                                     {/* Actions */}
                                     <TableCell className="text-right py-3.5 pr-4">
                                         <div className="flex items-center justify-end gap-1.5">
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() => onLogProgress(order._id)}
-                                                className="h-8 text-xs font-semibold gap-1 bg-primary/5 hover:bg-primary/10 text-primary border-primary/20"
-                                            >
-                                                <Plus className="h-3.5 w-3.5" /> Output
-                                            </Button>
+                                            {prog.overallPercentage >= 100 || prog.remainingImages <= 0 || order.status === 'completed' ? (
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    disabled
+                                                    className="h-8 text-xs font-semibold gap-1 opacity-60 cursor-not-allowed bg-emerald-500/5 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+                                                    title="All images in this order have been completed and passed QC"
+                                                >
+                                                    <Check className="h-3.5 w-3.5" /> Done
+                                                </Button>
+                                            ) : (
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => onLogProgress(order._id)}
+                                                    className="h-8 text-xs font-semibold gap-1 bg-primary/5 hover:bg-primary/10 text-primary border-primary/20"
+                                                >
+                                                    <Plus className="h-3.5 w-3.5" /> Output
+                                                </Button>
+                                            )}
 
                                             <Button
                                                 variant="ghost"

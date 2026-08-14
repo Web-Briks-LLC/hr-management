@@ -390,11 +390,10 @@ const getActiveOrdersProgress = async (
         const primaryCompleted = stageValues.length > 0 ? Math.min(totalOrdered, Math.max(...stageValues)) : 0;
         const overallPercentage = Math.min(100, Math.round((primaryCompleted / totalOrdered) * 100));
 
-        // Sum rejected images only if not fully passed
+        // Calculate remaining images needed to complete the order
+        const remainingImages = Math.max(0, totalOrdered - primaryCompleted);
         const isOrderFullyPassed = primaryCompleted >= totalOrdered;
-        const totalRejected = isOrderFullyPassed
-            ? 0
-            : Object.values(progressData.stages).reduce((acc: number, s: any) => acc + (s.rejectedQC || 0), 0);
+        const totalRejected = isOrderFullyPassed ? 0 : remainingImages;
 
         return {
             ...order,
@@ -409,7 +408,7 @@ const getActiveOrdersProgress = async (
                 ghostMannequinCount: ghostDone,
                 primaryCompleted,
                 totalRejected,
-                remainingImages: Math.max(0, totalOrdered - primaryCompleted),
+                remainingImages,
                 latestShiftLog: latestShiftLog
                     ? {
                           _id: latestShiftLog._id,

@@ -204,20 +204,25 @@ export function LogProductionDialog({
     );
 
     const orderTotalImages = selectedOrder?.imageQuantity || 0;
-    const orderRemainingImages = selectedOrder?.productionProgress?.remainingImages ?? orderTotalImages;
-    const totalRejectedImages = (selectedOrder?.productionProgress as any)?.totalRejected || 0;
-    const isOrderInRevision = selectedOrder?.status === 'revision' || totalRejectedImages > 0;
+    const orderRemainingImages =
+        selectedOrder?.productionProgress?.remainingImages ?? orderTotalImages;
+    const isOrderFullyPassed = selectedOrder
+        ? (selectedOrder.productionProgress?.overallPercentage || 0) >= 100 ||
+          (selectedOrder.productionProgress?.remainingImages ?? 1) <= 0 ||
+          selectedOrder.status === 'completed'
+        : false;
+    const isOrderInRevision =
+        !isOrderFullyPassed &&
+        (selectedOrder?.status === 'revision' ||
+            ((selectedOrder?.productionProgress as any)?.totalRejected || 0) > 0);
 
     const maxAllowedQty = useMemo(() => {
         if (editLog) return orderTotalImages || 99999;
-        if (isOrderInRevision && totalRejectedImages > 0) {
-            return totalRejectedImages;
-        }
         if (orderRemainingImages > 0) {
             return orderRemainingImages;
         }
         return orderTotalImages || 99999;
-    }, [editLog, isOrderInRevision, totalRejectedImages, orderRemainingImages, orderTotalImages]);
+    }, [editLog, orderRemainingImages, orderTotalImages]);
 
     const activeStepIndex = useMemo(
         () => FORM_STEPS.findIndex((s) => s.id === activeTab),
@@ -229,14 +234,56 @@ export function LogProductionDialog({
         [activeStepIndex]
     );
 
-    const handleNext = () => {
-        if (activeStepIndex === 0 && !orderId) {
-            toast.error('Please select an order');
-            return;
+    const handleTabClick = (targetTab: FormTab) => {
+        const targetIndex = FORM_STEPS.findIndex((s) => s.id === targetTab);
+        if (targetIndex > activeStepIndex) {
+            if (!orderId) {
+                toast.error('Please select an order first');
+                setActiveTab('order_shift');
+                return;
+            }
+            if (!shiftId) {
+                toast.error('Please select a working shift first');
+                setActiveTab('order_shift');
+                return;
+            }
+            if (isOrderFullyPassed && !editLog) {
+                toast.error('This order is already 100% completed and passed!');
+                return;
+            }
+            if (targetIndex > 1 && (completedQuantity <= 0 || completedQuantity > maxAllowedQty)) {
+                toast.error(`Please specify valid completed images quantity (1 - ${maxAllowedQty})`);
+                setActiveTab('quantities');
+                return;
+            }
         }
-        if (activeStepIndex === 0 && !shiftId) {
-            toast.error('Please select a working shift');
-            return;
+        setActiveTab(targetTab);
+    };
+
+    const handleNext = () => {
+        if (activeStepIndex === 0) {
+            if (!orderId) {
+                toast.error('Please select an order');
+                return;
+            }
+            if (!shiftId) {
+                toast.error('Please select a working shift');
+                return;
+            }
+            if (isOrderFullyPassed && !editLog) {
+                toast.error('This order is already 100% completed and passed!');
+                return;
+            }
+        }
+        if (activeStepIndex === 1) {
+            if (completedQuantity <= 0) {
+                toast.error('Please enter completed image quantity greater than 0');
+                return;
+            }
+            if (completedQuantity > maxAllowedQty) {
+                toast.error(`Completed quantity cannot exceed maximum allowable images (${maxAllowedQty})`);
+                return;
+            }
         }
         if (activeStepIndex < FORM_STEPS.length - 1) {
             setActiveTab(FORM_STEPS[activeStepIndex + 1].id);
@@ -268,6 +315,12 @@ export function LogProductionDialog({
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
+        // Guard: Prevent premature submission if user is not on the final step
+        if (activeStepIndex < FORM_STEPS.length - 1) {
+            handleNext();
+            return;
+        }
+
         if (!orderId) {
             toast.error('Please select an order');
             setActiveTab('order_shift');
@@ -280,8 +333,14 @@ export function LogProductionDialog({
             return;
         }
 
-        if (completedQuantity < 0) {
-            toast.error('Completed quantity cannot be negative');
+        if (completedQuantity <= 0) {
+            toast.error('Completed quantity must be greater than 0');
+            setActiveTab('quantities');
+            return;
+        }
+
+        if (completedQuantity > maxAllowedQty) {
+            toast.error(`Completed quantity cannot exceed maximum allowable images (${maxAllowedQty})`);
             setActiveTab('quantities');
             return;
         }
@@ -362,7 +421,7 @@ export function LogProductionDialog({
                                 <button
                                     key={step.id}
                                     type="button"
-                                    onClick={() => setActiveTab(step.id)}
+                                    onClick={() => handleTabClick(step.id)}
                                     className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all text-left border ${
                                         isActive
                                             ? 'bg-background border-primary/40 text-primary shadow-xs font-semibold'
@@ -447,16 +506,24 @@ export function LogProductionDialog({
                                                     </div>
                                                     <div>
                                                         <span className="text-muted-foreground block">Overall Progress</span>
-                                                        <span className="font-bold text-primary text-sm">
-                                                            {selectedOrder.productionProgress.overallPercentage}%
+                                                        <span className={`font-bold text-sm ${isOrderFullyPassed ? 'text-emerald-600 dark:text-emerald-400' : 'text-primary'}`}>
+                                                            {selectedOrder.productionProgress.overallPercentage}% {isOrderFullyPassed ? '✓' : ''}
                                                         </span>
                                                     </div>
                                                     <div>
                                                         <span className="text-muted-foreground block">Remaining</span>
-                                                        <span className="font-bold text-amber-600 dark:text-amber-400 text-sm">
-                                                            {selectedOrder.productionProgress.remainingImages} imgs
+                                                        <span className={`font-bold text-sm ${isOrderFullyPassed ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                                                            {isOrderFullyPassed ? '0 (Completed)' : `${selectedOrder.productionProgress.remainingImages} imgs`}
                                                         </span>
                                                     </div>
+                                                </div>
+                                            )}
+
+                                            {/* Full Completed Notice */}
+                                            {isOrderFullyPassed && !editLog && (
+                                                <div className="md:col-span-2 p-3.5 bg-emerald-500/10 border border-emerald-500/30 rounded-xl flex items-center gap-2.5 text-xs text-emerald-600 dark:text-emerald-400 font-semibold">
+                                                    <CheckCircle2 className="h-4 w-4 shrink-0" />
+                                                    <span>This order is 100% completed and all images are fully QC passed. No further output logging is required.</span>
                                                 </div>
                                             )}
 
@@ -544,7 +611,7 @@ export function LogProductionDialog({
                                                         <span className="font-bold text-red-600 dark:text-red-400">
                                                             Revision Fix Mode:
                                                         </span>{' '}
-                                                        Fixing {totalRejectedImages || orderRemainingImages} rejected images for this order.
+                                                        Fixing {orderRemainingImages} remaining revision {orderRemainingImages === 1 ? 'image' : 'images'} for this order.
                                                     </div>
                                                 </div>
                                                 <Badge variant="outline" className="bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/30 font-bold text-[10px]">
@@ -591,6 +658,12 @@ export function LogProductionDialog({
                                                     className="h-10 text-sm font-bold"
                                                     placeholder="0"
                                                     required
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter') {
+                                                            e.preventDefault();
+                                                            handleNext();
+                                                        }
+                                                    }}
                                                 />
                                                 <p className="text-[11px] text-muted-foreground">
                                                     {isOrderInRevision
@@ -707,6 +780,12 @@ export function LogProductionDialog({
                                                                     const val = e.target.value;
                                                                     handleStaffChange(idx, 'imageCount', val === '' ? 0 : Math.max(0, Number(val)));
                                                                 }}
+                                                                onKeyDown={(e) => {
+                                                                    if (e.key === 'Enter') {
+                                                                        e.preventDefault();
+                                                                        handleNext();
+                                                                    }
+                                                                }}
                                                                 className="h-10 text-xs bg-background"
                                                             />
                                                         </div>
@@ -716,6 +795,12 @@ export function LogProductionDialog({
                                                                 placeholder="Notes (optional)"
                                                                 value={row.notes}
                                                                 onChange={(e) => handleStaffChange(idx, 'notes', e.target.value)}
+                                                                onKeyDown={(e) => {
+                                                                    if (e.key === 'Enter') {
+                                                                        e.preventDefault();
+                                                                        handleNext();
+                                                                    }
+                                                                }}
                                                                 className="h-10 text-xs bg-background"
                                                             />
                                                         </div>
