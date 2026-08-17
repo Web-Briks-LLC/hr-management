@@ -118,6 +118,17 @@ export interface IUpdateProductionLogDTO {
     isVerifiedByAdmin?: boolean | undefined;
 }
 
+export interface IActiveOrdersProgressFilters {
+    status?: string | undefined;
+    filterType?: string | undefined;
+    month?: number | undefined;
+    year?: number | undefined;
+    startDate?: string | undefined;
+    endDate?: string | undefined;
+    sortBy?: string | undefined;
+    stage?: string | undefined;
+}
+
 export interface IProductionQueryFilters {
     orderId?: string | undefined;
     shiftId?: string | undefined;
@@ -126,9 +137,13 @@ export interface IProductionQueryFilters {
     serviceId?: string | undefined;
     stage?: string | undefined;
     status?: ProductionStatus | undefined;
+    filterType?: string | undefined;
+    month?: number | undefined;
+    year?: number | undefined;
     startDate?: string | undefined;
     endDate?: string | undefined;
     search?: string | undefined;
     page?: number | undefined;
     limit?: number | undefined;
 }
+

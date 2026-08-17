@@ -114,6 +114,7 @@ function ProductionContent() {
     const [shiftFilter, setShiftFilter] = useState<string>('all');
     const [stageFilter, setStageFilter] = useState<string>('all');
     const [statusFilter, setStatusFilter] = useState<string>('all');
+    const [sortBy, setSortBy] = useState<string>('newest');
     const [searchQuery, setSearchQuery] = useState<string>('');
 
     // Dialog states
@@ -139,29 +140,75 @@ function ProductionContent() {
         );
     }, [shiftsData]);
 
+    const activeOrdersParams = useMemo(() => {
+        const params: any = {
+            search: searchQuery || undefined,
+            status: statusFilter !== 'all' ? statusFilter : undefined,
+            stage: stageFilter !== 'all' ? stageFilter : undefined,
+            sortBy,
+            filterType,
+        };
+
+        if (filterType === 'month') {
+            params.month = selectedMonth;
+            params.year = selectedYear;
+        } else if (filterType === 'year') {
+            params.year = selectedYear;
+        }
+
+        return params;
+    }, [searchQuery, statusFilter, stageFilter, sortBy, filterType, selectedMonth, selectedYear]);
+
     const {
         data: activeOrdersData,
         isLoading: isOrdersLoading,
         refetch: refetchOrders,
-    } = useGetActiveOrdersProgressQuery({ search: searchQuery || undefined });
+    } = useGetActiveOrdersProgressQuery(activeOrdersParams);
+
+    const logsParams = useMemo(() => {
+        const params: any = {
+            shiftId: shiftFilter !== 'all' ? shiftFilter : undefined,
+            stage: stageFilter !== 'all' ? stageFilter : undefined,
+            status: statusFilter !== 'all' ? (statusFilter as ProductionStatus) : undefined,
+            search: searchQuery || undefined,
+            filterType,
+            limit: 100,
+        };
+
+        if (filterType === 'month') {
+            params.month = selectedMonth;
+            params.year = selectedYear;
+        } else if (filterType === 'year') {
+            params.year = selectedYear;
+        }
+
+        return params;
+    }, [shiftFilter, stageFilter, statusFilter, searchQuery, filterType, selectedMonth, selectedYear]);
 
     const {
         data: logsData,
         isLoading: isLogsLoading,
         refetch: refetchLogs,
-    } = useGetProductionLogsQuery({
-        shiftId: shiftFilter !== 'all' ? shiftFilter : undefined,
-        stage: stageFilter !== 'all' ? stageFilter : undefined,
-        status: statusFilter !== 'all' ? (statusFilter as ProductionStatus) : undefined,
-        search: searchQuery || undefined,
-        limit: 100,
-    });
+    } = useGetProductionLogsQuery(logsParams);
+
+    const statsParams = useMemo(() => {
+        const params: any = {
+            filterType,
+        };
+        if (filterType === 'month') {
+            params.month = selectedMonth;
+            params.year = selectedYear;
+        } else if (filterType === 'year') {
+            params.year = selectedYear;
+        }
+        return params;
+    }, [filterType, selectedMonth, selectedYear]);
 
     const {
         data: statsData,
         isLoading: isStatsLoading,
         refetch: refetchStats,
-    } = useGetProductionStatsQuery();
+    } = useGetProductionStatsQuery(statsParams);
 
     const [deleteLog, { isLoading: isDeleting }] = useDeleteProductionLogMutation();
 
@@ -561,6 +608,21 @@ function ProductionContent() {
                                             {val.label}
                                         </SelectItem>
                                     ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        {/* Sort By Filter */}
+                        <div className="w-full sm:w-[150px]">
+                            <Select value={sortBy} onValueChange={setSortBy}>
+                                <SelectTrigger className="w-full h-9 bg-background/60 text-xs">
+                                    <SelectValue placeholder="Sort Order" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="newest">Newest Orders</SelectItem>
+                                    <SelectItem value="deadline">Nearest Deadline</SelectItem>
+                                    <SelectItem value="oldest">Oldest Orders</SelectItem>
+                                    <SelectItem value="volume">Highest Volume</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>

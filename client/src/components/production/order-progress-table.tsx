@@ -216,13 +216,22 @@ export function OrderProgressTable({
 
                                     {/* Remaining Images */}
                                     <TableCell className="py-3.5">
-                                        {order.status === 'revision' || ((prog as any)?.totalRejected || 0) > 0 ? (
+                                        {isRevision ? (
                                             <div className="flex items-center gap-1.5">
                                                 <span className="font-bold text-sm text-destructive">
-                                                    {prog.remainingImages || (prog as any)?.totalRejected || 0}
+                                                    {prog.remainingImages}
                                                 </span>
-                                                <Badge variant="outline" className="text-[10px] py-0 px-1 font-bold bg-destructive/10 text-destructive border-destructive/30">
-                                                    revision
+                                                <Badge variant="outline" className="text-[10px] py-0 px-1.5 font-bold bg-destructive/10 text-destructive border-destructive/30">
+                                                    Revision
+                                                </Badge>
+                                            </div>
+                                        ) : (prog.totalRejected && prog.totalRejected > 0) ? (
+                                            <div className="flex items-center gap-1.5">
+                                                <span className="font-bold text-sm text-destructive">
+                                                    {prog.remainingImages}
+                                                </span>
+                                                <Badge variant="outline" className="text-[10px] py-0 px-1.5 font-bold bg-destructive/10 text-destructive border-destructive/30" title={`${prog.totalRejected} QC rejected image(s)`}>
+                                                    {prog.totalRejected} Rejected
                                                 </Badge>
                                             </div>
                                         ) : (

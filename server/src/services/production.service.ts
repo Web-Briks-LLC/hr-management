@@ -4,10 +4,12 @@ import OrderModel from '../models/order.model.js';
 import ShiftModel from '../models/shift.model.js';
 import StaffModel from '../models/staff.model.js';
 import { getIO } from '../socket.js';
+import { startOfDay, endOfDay, startOfWeek, endOfWeek } from 'date-fns';
 import type {
     ICreateProductionLogDTO,
     IUpdateProductionLogDTO,
     IProductionQueryFilters,
+    IActiveOrdersProgressFilters,
 } from '../types/production.type.js';
 import { Role } from '../constants/role.js';
 
@@ -220,18 +222,42 @@ const getAllProductionLogs = async (
         query.teamLeaderId = new Types.ObjectId(filters.teamLeaderId);
     }
 
-    // Date range filter
-    if (filters.startDate || filters.endDate) {
-        query.date = {};
-        if (filters.startDate) {
-            const start = new Date(filters.startDate);
-            start.setHours(0, 0, 0, 0);
-            query.date.$gte = start;
+    // Date filter logic (Date range, filterType, month, year)
+    if (filters.filterType || filters.startDate || filters.endDate || filters.month || filters.year) {
+        const now = new Date();
+        let start: Date | null = null;
+        let end: Date | null = null;
+
+        if (filters.startDate || filters.endDate) {
+            if (filters.startDate) {
+                start = new Date(filters.startDate);
+                start.setHours(0, 0, 0, 0);
+            }
+            if (filters.endDate) {
+                end = new Date(filters.endDate);
+                end.setHours(23, 59, 59, 999);
+            }
+        } else if (filters.filterType === 'today') {
+            start = startOfDay(now);
+            end = endOfDay(now);
+        } else if (filters.filterType === 'week') {
+            start = startOfWeek(now, { weekStartsOn: 1 });
+            end = endOfWeek(now, { weekStartsOn: 1 });
+        } else if (filters.filterType === 'month') {
+            const yr = filters.year || now.getFullYear();
+            const mo = filters.month || (now.getMonth() + 1);
+            start = new Date(yr, mo - 1, 1, 0, 0, 0, 0);
+            end = new Date(yr, mo, 0, 23, 59, 59, 999);
+        } else if (filters.filterType === 'year') {
+            const yr = filters.year || now.getFullYear();
+            start = new Date(yr, 0, 1, 0, 0, 0, 0);
+            end = new Date(yr, 11, 31, 23, 59, 59, 999);
         }
-        if (filters.endDate) {
-            const end = new Date(filters.endDate);
-            end.setHours(23, 59, 59, 999);
-            query.date.$lte = end;
+
+        if (start || end) {
+            query.date = {};
+            if (start) query.date.$gte = start;
+            if (end) query.date.$lte = end;
         }
     }
 
@@ -281,11 +307,18 @@ const getAllProductionLogs = async (
  */
 const getActiveOrdersProgress = async (
     branchId?: string,
-    search?: string
+    search?: string,
+    filters?: IActiveOrdersProgressFilters
 ) => {
-    const orderQuery: any = {
-        status: { $in: ['pending', 'in_progress', 'quality_check', 'revision'] },
-    };
+    const orderQuery: any = {};
+
+    // Status filter
+    if (filters?.status && filters.status !== 'all') {
+        const mappedStatus = filters.status === 'revision_required' ? 'revision' : filters.status;
+        orderQuery.status = mappedStatus;
+    } else {
+        orderQuery.status = { $in: ['pending', 'in_progress', 'quality_check', 'revision'] };
+    }
 
     if (search) {
         orderQuery.$or = [
@@ -293,11 +326,64 @@ const getActiveOrdersProgress = async (
         ];
     }
 
+    // Date filtering (checks orderDate or createdAt)
+    if (filters?.filterType || filters?.startDate || filters?.endDate || filters?.month || filters?.year) {
+        const now = new Date();
+        let start: Date | null = null;
+        let end: Date | null = null;
+
+        if (filters?.startDate || filters?.endDate) {
+            if (filters.startDate) {
+                start = new Date(filters.startDate);
+                start.setHours(0, 0, 0, 0);
+            }
+            if (filters.endDate) {
+                end = new Date(filters.endDate);
+                end.setHours(23, 59, 59, 999);
+            }
+        } else if (filters?.filterType === 'today') {
+            start = startOfDay(now);
+            end = endOfDay(now);
+        } else if (filters?.filterType === 'week') {
+            start = startOfWeek(now, { weekStartsOn: 1 });
+            end = endOfWeek(now, { weekStartsOn: 1 });
+        } else if (filters?.filterType === 'month') {
+            const yr = filters.year || now.getFullYear();
+            const mo = filters.month || (now.getMonth() + 1);
+            start = new Date(yr, mo - 1, 1, 0, 0, 0, 0);
+            end = new Date(yr, mo, 0, 23, 59, 59, 999);
+        } else if (filters?.filterType === 'year') {
+            const yr = filters.year || now.getFullYear();
+            start = new Date(yr, 0, 1, 0, 0, 0, 0);
+            end = new Date(yr, 11, 31, 23, 59, 59, 999);
+        }
+
+        if (start || end) {
+            orderQuery.orderDate = {};
+            if (start) orderQuery.orderDate.$gte = start;
+            if (end) orderQuery.orderDate.$lte = end;
+        }
+    }
+
+    // Sorting criteria: Default to newest orders first so recent orders are immediately visible
+    let sortCriteria: any = { orderDate: -1, createdAt: -1 };
+    if (filters?.sortBy === 'deadline') {
+        sortCriteria = { deadline: 1, createdAt: -1 };
+    } else if (filters?.sortBy === 'oldest') {
+        sortCriteria = { orderDate: 1, createdAt: 1 };
+    } else if (filters?.sortBy === 'volume') {
+        sortCriteria = { imageQuantity: -1, orderDate: -1 };
+    } else if (filters?.sortBy === 'priority') {
+        sortCriteria = { priority: 1, orderDate: -1 };
+    } else if (filters?.sortBy === 'newest') {
+        sortCriteria = { orderDate: -1, createdAt: -1 };
+    }
+
     const activeOrders = await OrderModel.find(orderQuery)
         .populate('clientId', 'name clientCode email')
         .populate('services', 'name')
         .populate('returnFileFormat', 'name format')
-        .sort({ deadline: 1, createdAt: -1 })
+        .sort(sortCriteria)
         .lean();
 
     if (activeOrders.length === 0) {
@@ -358,6 +444,7 @@ const getActiveOrdersProgress = async (
             orderProgressMap.set(oId, {
                 stages: {},
                 totalProcessedImages: 0,
+                totalRejectedInQC: 0,
             });
         }
         const record = orderProgressMap.get(oId);
@@ -370,11 +457,12 @@ const getActiveOrdersProgress = async (
             status: item.latestStatus,
             logsCount: item.logsCount,
         };
+        record.totalRejectedInQC = (record.totalRejectedInQC || 0) + (item.totalRejectedInQC || 0);
     }
 
     const result = activeOrders.map((order) => {
         const oId = (order._id as Types.ObjectId).toString();
-        const progressData = orderProgressMap.get(oId) || { stages: {}, totalProcessedImages: 0 };
+        const progressData = orderProgressMap.get(oId) || { stages: {}, totalProcessedImages: 0, totalRejectedInQC: 0 };
         const orderLatestLogs = latestLogs.filter((l) => l.orderId.toString() === oId);
         const latestShiftLog = orderLatestLogs[0] || null;
 
@@ -393,7 +481,7 @@ const getActiveOrdersProgress = async (
         // Calculate remaining images needed to complete the order
         const remainingImages = Math.max(0, totalOrdered - primaryCompleted);
         const isOrderFullyPassed = primaryCompleted >= totalOrdered;
-        const totalRejected = isOrderFullyPassed ? 0 : remainingImages;
+        const totalRejected = progressData.totalRejectedInQC || 0;
 
         return {
             ...order,
@@ -682,14 +770,42 @@ const getProductionStats = async (filters: {
     startDate?: string | undefined;
     endDate?: string | undefined;
     branchId?: string | undefined;
+    filterType?: string | undefined;
+    month?: number | undefined;
+    year?: number | undefined;
 }) => {
     const query: any = {};
     if (filters.branchId) {
         query.branchId = new Types.ObjectId(filters.branchId);
     }
 
-    const start = filters.startDate ? new Date(filters.startDate) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const end = filters.endDate ? new Date(filters.endDate) : new Date();
+    const now = new Date();
+    let start: Date = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    let end: Date = new Date();
+
+    if (filters.startDate || filters.endDate) {
+        if (filters.startDate) start = new Date(filters.startDate);
+        if (filters.endDate) end = new Date(filters.endDate);
+    } else if (filters.filterType === 'today') {
+        start = startOfDay(now);
+        end = endOfDay(now);
+    } else if (filters.filterType === 'week') {
+        start = startOfWeek(now, { weekStartsOn: 1 });
+        end = endOfWeek(now, { weekStartsOn: 1 });
+    } else if (filters.filterType === 'month') {
+        const yr = filters.year || now.getFullYear();
+        const mo = filters.month || (now.getMonth() + 1);
+        start = new Date(yr, mo - 1, 1, 0, 0, 0, 0);
+        end = new Date(yr, mo, 0, 23, 59, 59, 999);
+    } else if (filters.filterType === 'year') {
+        const yr = filters.year || now.getFullYear();
+        start = new Date(yr, 0, 1, 0, 0, 0, 0);
+        end = new Date(yr, 11, 31, 23, 59, 59, 999);
+    } else if (filters.filterType === 'all') {
+        start = new Date(0);
+        end = new Date();
+    }
+
     start.setHours(0, 0, 0, 0);
     end.setHours(23, 59, 59, 999);
     query.date = { $gte: start, $lte: end };

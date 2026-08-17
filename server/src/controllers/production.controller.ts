@@ -65,11 +65,32 @@ export const getAllProductionLogs = async (req: Request, res: Response) => {
 
 export const getActiveOrdersProgress = async (req: Request, res: Response) => {
     try {
-        const { branchId, search } = req.query;
+        const {
+            branchId,
+            search,
+            status,
+            filterType,
+            month,
+            year,
+            startDate,
+            endDate,
+            sortBy,
+            stage,
+        } = req.query;
 
         const result = await productionService.getActiveOrdersProgress(
             branchId as string | undefined,
-            search as string | undefined
+            search as string | undefined,
+            {
+                status: status as string | undefined,
+                filterType: filterType as string | undefined,
+                month: month ? parseInt(month as string) : undefined,
+                year: year ? parseInt(year as string) : undefined,
+                startDate: startDate as string | undefined,
+                endDate: endDate as string | undefined,
+                sortBy: sortBy as string | undefined,
+                stage: stage as string | undefined,
+            }
         );
 
         return res.status(200).json({
@@ -207,12 +228,15 @@ export const deleteProductionLog = async (req: Request, res: Response) => {
 
 export const getProductionStats = async (req: Request, res: Response) => {
     try {
-        const { startDate, endDate, branchId } = req.query;
+        const { startDate, endDate, branchId, filterType, month, year } = req.query;
 
         const result = await productionService.getProductionStats({
             startDate: startDate as string | undefined,
             endDate: endDate as string | undefined,
             branchId: branchId as string | undefined,
+            filterType: filterType as string | undefined,
+            month: month ? parseInt(month as string) : undefined,
+            year: year ? parseInt(year as string) : undefined,
         });
 
         return res.status(200).json({

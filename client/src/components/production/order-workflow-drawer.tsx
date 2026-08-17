@@ -71,13 +71,7 @@ export function OrderWorkflowDrawer({
                     <div className="space-y-6 pt-2">
                         {/* Order Summary Top Card */}
                         {order && (
-                            <div className="p-4 rounded-xl bg-muted/40 border border-border/60 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                                <div>
-                                    <span className="text-muted-foreground block">Client</span>
-                                    <span className="font-bold text-foreground truncate block">
-                                        {order.clientId?.name || 'N/A'}
-                                    </span>
-                                </div>
+                            <div className="p-4 rounded-xl bg-muted/40 border border-border/60 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
                                 <div>
                                     <span className="text-muted-foreground block">Total Images</span>
                                     <span className="font-bold text-foreground text-sm">

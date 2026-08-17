@@ -7,6 +7,7 @@ import type {
     IUpdateProductionLogInput,
     ISubmitQCReviewInput,
     IProductionFilters,
+    IActiveOrdersProgressFilters,
 } from '@/types/production.type';
 
 interface ProductionLogsResponse {
@@ -65,7 +66,7 @@ export const productionApi = apiSlice.injectEndpoints({
 
         getActiveOrdersProgress: builder.query<
             ActiveOrdersProgressResponse,
-            { branchId?: string; search?: string } | void
+            IActiveOrdersProgressFilters | void
         >({
             query: (params) => ({
                 url: '/production/active-orders',
@@ -84,7 +85,14 @@ export const productionApi = apiSlice.injectEndpoints({
 
         getProductionStats: builder.query<
             ProductionStatsResponse,
-            { startDate?: string; endDate?: string; branchId?: string } | void
+            {
+                startDate?: string;
+                endDate?: string;
+                branchId?: string;
+                filterType?: string;
+                month?: number;
+                year?: number;
+            } | void
         >({
             query: (params) => ({
                 url: '/production/stats',

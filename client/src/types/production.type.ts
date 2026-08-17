@@ -181,6 +181,7 @@ export interface IActiveOrderProductionProgress {
         retouchingCount: number;
         ghostMannequinCount: number;
         remainingImages: number;
+        totalRejected?: number;
         latestShiftLog?: {
             _id: string;
             shiftName: string;
@@ -193,6 +194,19 @@ export interface IActiveOrderProductionProgress {
         } | null;
         totalShiftsLogged: number;
     };
+}
+
+export interface IActiveOrdersProgressFilters {
+    branchId?: string;
+    search?: string;
+    status?: string;
+    stage?: string;
+    filterType?: string;
+    month?: number;
+    year?: number;
+    startDate?: string;
+    endDate?: string;
+    sortBy?: string;
 }
 
 export interface IProductionStats {
@@ -272,6 +286,9 @@ export interface IProductionFilters {
     serviceId?: string;
     stage?: string;
     status?: ProductionStatus;
+    filterType?: string;
+    month?: number;
+    year?: number;
     startDate?: string;
     endDate?: string;
     search?: string;
