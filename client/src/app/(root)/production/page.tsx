@@ -637,7 +637,13 @@ function ProductionContent() {
             {/* Modals & Dialogs */}
             <LogProductionDialog
                 open={isLogDialogOpen}
-                onOpenChange={setIsLogDialogOpen}
+                onOpenChange={(open) => {
+                    setIsLogDialogOpen(open);
+                    if (!open) {
+                        setSelectedOrderIdForLog(undefined);
+                        setEditingLog(null);
+                    }
+                }}
                 initialOrderId={selectedOrderIdForLog}
                 editLog={editingLog}
                 onSuccess={handleRefetchAll}

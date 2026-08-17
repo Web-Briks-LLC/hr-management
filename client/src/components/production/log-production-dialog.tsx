@@ -182,9 +182,12 @@ export function LogProductionDialog({
                 );
                 setActiveTab('order_shift');
             } else {
-                setOrderId(initialOrderId || (activeOrders[0]?._id || ''));
+                // If initialOrderId is passed (e.g. from specific row '+ Output'), use it; otherwise start clean
+                setOrderId(initialOrderId || '');
                 if (shifts.length > 0) {
                     setShiftId(shifts[0]._id);
+                } else {
+                    setShiftId('');
                 }
                 setStage('clipping_path');
                 setCustomStageName('');
@@ -196,7 +199,7 @@ export function LogProductionDialog({
                 setActiveTab('order_shift');
             }
         }
-    }, [editLog, initialOrderId, open]);
+    }, [editLog, initialOrderId, open, shifts]);
 
     const selectedOrder = useMemo(
         () => activeOrders.find((o) => o._id === orderId),
@@ -315,9 +318,8 @@ export function LogProductionDialog({
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        // Guard: Prevent premature submission if user is not on the final step
-        if (activeStepIndex < FORM_STEPS.length - 1) {
-            handleNext();
+        // Guard: Under no circumstances allow form submission unless user is on the final step (Step 4)
+        if (activeTab !== 'handover' || activeStepIndex < FORM_STEPS.length - 1) {
             return;
         }
 
@@ -451,7 +453,15 @@ export function LogProductionDialog({
                 {/* Form Body ScrollArea */}
                 <ScrollArea className="flex-1 min-h-0">
                     <div className="p-6 md:p-8">
-                        <form id="shift-production-form" onSubmit={handleSubmit}>
+                        <form
+                            id="shift-production-form"
+                            onSubmit={handleSubmit}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' && (e.target as HTMLElement).tagName !== 'TEXTAREA') {
+                                    e.preventDefault();
+                                }
+                            }}
+                        >
                             <AnimatePresence mode="wait">
                                 {/* STEP 1: Order & Shift */}
                                 {activeTab === 'order_shift' && (
@@ -484,7 +494,7 @@ export function LogProductionDialog({
                                                                 <div className="flex items-center justify-between gap-4 w-full">
                                                                     <span className="font-semibold text-foreground">{ord.orderName}</span>
                                                                     <span className="text-xs text-muted-foreground">
-                                                                        ({ord.imageQuantity} imgs • {ord.clientId?.name || 'Client'})
+                                                                        ({ord.imageQuantity} imgs)
                                                                     </span>
                                                                 </div>
                                                             </SelectItem>
@@ -497,8 +507,8 @@ export function LogProductionDialog({
                                             {selectedOrder && (
                                                 <div className="md:col-span-2 p-4 rounded-xl bg-muted/40 border border-border/60 text-xs grid grid-cols-2 sm:grid-cols-4 gap-3">
                                                     <div>
-                                                        <span className="text-muted-foreground block">Client</span>
-                                                        <span className="font-bold text-foreground">{selectedOrder.clientId?.name || 'N/A'}</span>
+                                                        <span className="text-muted-foreground block">Order Title</span>
+                                                        <span className="font-bold text-foreground truncate block">{selectedOrder.orderName}</span>
                                                     </div>
                                                     <div>
                                                         <span className="text-muted-foreground block">Total Images</span>
@@ -658,12 +668,6 @@ export function LogProductionDialog({
                                                     className="h-10 text-sm font-bold"
                                                     placeholder="0"
                                                     required
-                                                    onKeyDown={(e) => {
-                                                        if (e.key === 'Enter') {
-                                                            e.preventDefault();
-                                                            handleNext();
-                                                        }
-                                                    }}
                                                 />
                                                 <p className="text-[11px] text-muted-foreground">
                                                     {isOrderInRevision
@@ -780,12 +784,6 @@ export function LogProductionDialog({
                                                                     const val = e.target.value;
                                                                     handleStaffChange(idx, 'imageCount', val === '' ? 0 : Math.max(0, Number(val)));
                                                                 }}
-                                                                onKeyDown={(e) => {
-                                                                    if (e.key === 'Enter') {
-                                                                        e.preventDefault();
-                                                                        handleNext();
-                                                                    }
-                                                                }}
                                                                 className="h-10 text-xs bg-background"
                                                             />
                                                         </div>
@@ -795,12 +793,6 @@ export function LogProductionDialog({
                                                                 placeholder="Notes (optional)"
                                                                 value={row.notes}
                                                                 onChange={(e) => handleStaffChange(idx, 'notes', e.target.value)}
-                                                                onKeyDown={(e) => {
-                                                                    if (e.key === 'Enter') {
-                                                                        e.preventDefault();
-                                                                        handleNext();
-                                                                    }
-                                                                }}
                                                                 className="h-10 text-xs bg-background"
                                                             />
                                                         </div>

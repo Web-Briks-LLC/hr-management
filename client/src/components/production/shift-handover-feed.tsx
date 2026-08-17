@@ -296,7 +296,7 @@ export function ShiftHandoverFeed({
                                 <TableRow className="hover:bg-transparent bg-muted/40 border-b border-border/60">
                                     <TableHead className="w-[40px] px-3 text-center"></TableHead>
                                     <TableHead className="text-xs font-bold uppercase tracking-wider py-3.5">
-                                        Order &amp; Client
+                                        Order Title
                                     </TableHead>
                                     <TableHead className="text-xs font-bold uppercase tracking-wider py-3.5">
                                         Latest Shift &amp; TL
@@ -353,31 +353,20 @@ export function ShiftHandoverFeed({
                                                     </Button>
                                                 </TableCell>
 
-                                                {/* Order & Client */}
+                                                {/* Order Title */}
                                                 <TableCell className="py-3.5 font-medium">
-                                                    <div className="space-y-0.5">
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="font-bold text-foreground text-sm hover:text-primary transition-colors">
-                                                                {group.orderName}
-                                                            </span>
-                                                            {hasRevisions && (
-                                                                <Badge
-                                                                    variant="outline"
-                                                                    className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 text-[10px] py-0 px-1.5 font-bold"
-                                                                >
-                                                                    {group.logs.length} Cycles
-                                                                </Badge>
-                                                            )}
-                                                        </div>
-                                                        <div className="text-[11px] text-muted-foreground flex items-center gap-2">
-                                                            <span>Client: <strong>{group.clientName}</strong></span>
-                                                            {group.totalImageQuantity && (
-                                                                <>
-                                                                    <span>•</span>
-                                                                    <span>Total: <strong>{group.totalImageQuantity} imgs</strong></span>
-                                                                </>
-                                                            )}
-                                                        </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-bold text-foreground text-sm hover:text-primary transition-colors">
+                                                            {group.orderName}
+                                                        </span>
+                                                        {hasRevisions && (
+                                                            <Badge
+                                                                variant="outline"
+                                                                className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 text-[10px] py-0 px-1.5 font-bold"
+                                                            >
+                                                                {group.logs.length} Cycles
+                                                            </Badge>
+                                                        )}
                                                     </div>
                                                 </TableCell>
 
@@ -710,10 +699,6 @@ export function ShiftHandoverFeed({
                                                 )}
                                             </div>
                                             <div className="text-xs text-muted-foreground flex items-center gap-2">
-                                                <span>
-                                                    Client: <strong>{group.clientName}</strong>
-                                                </span>
-                                                <span>•</span>
                                                 <span className="flex items-center gap-1">
                                                     <Calendar className="h-3 w-3" />
                                                     {latestLog.date ? format(new Date(latestLog.date), 'dd MMM, yyyy') : 'N/A'}
@@ -892,7 +877,7 @@ export function ShiftHandoverFeed({
                                         Date &amp; Shift
                                     </TableHead>
                                     <TableHead className="text-xs font-bold uppercase tracking-wider py-3.5">
-                                        Order &amp; Client
+                                        Order Title
                                     </TableHead>
                                     <TableHead className="text-xs font-bold uppercase tracking-wider py-3.5">
                                         Stage
@@ -930,9 +915,6 @@ export function ShiftHandoverFeed({
                                             <TableCell className="text-xs py-3.5 font-medium">
                                                 <div className="font-bold text-foreground">
                                                     {(log.orderId as any)?.orderName || 'Order'}
-                                                </div>
-                                                <div className="text-[11px] text-muted-foreground">
-                                                    {(log.orderId as any)?.clientId?.name || 'Client'}
                                                 </div>
                                             </TableCell>
                                             <TableCell className="py-3.5">
@@ -1024,10 +1006,6 @@ export function ShiftHandoverFeed({
                                                 </Badge>
                                             </div>
                                             <div className="text-xs text-muted-foreground flex items-center gap-2">
-                                                <span>
-                                                    Client: <strong>{(log.orderId as any)?.clientId?.name || 'N/A'}</strong>
-                                                </span>
-                                                <span>•</span>
                                                 <span className="flex items-center gap-1">
                                                     <Calendar className="h-3 w-3" />
                                                     {log.date ? format(new Date(log.date), 'dd MMM, yyyy') : 'N/A'}

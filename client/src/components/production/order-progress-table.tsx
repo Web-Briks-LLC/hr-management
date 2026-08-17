@@ -123,7 +123,7 @@ export function OrderProgressTable({
                     <TableHeader>
                         <TableRow className="hover:bg-transparent bg-muted/40 border-b border-border/60">
                             <TableHead className="text-xs font-bold uppercase tracking-wider py-3.5">
-                                Order &amp; Client
+                                Order Title
                             </TableHead>
                             <TableHead className="text-xs font-bold uppercase tracking-wider text-center py-3.5">
                                 Total Images
@@ -155,26 +155,21 @@ export function OrderProgressTable({
                                     key={order._id}
                                     className="hover:bg-muted/30 transition-colors border-b border-border/40"
                                 >
-                                    {/* Order & Client */}
+                                    {/* Order Title */}
                                     <TableCell className="font-medium py-3.5">
-                                        <div className="space-y-1">
-                                            <div className="flex items-center gap-2">
-                                                <span
-                                                    className="font-bold text-foreground hover:text-primary transition-colors cursor-pointer text-sm"
-                                                    onClick={() => onViewTimeline(order._id)}
-                                                >
-                                                    {order.orderName}
-                                                </span>
-                                                {getPriorityBadge(order.priority)}
-                                                {isRevision && (
-                                                    <Badge className="bg-red-500/15 text-red-600 border-red-500/30 text-[10px] py-0 font-bold">
-                                                        Revision
-                                                    </Badge>
-                                                )}
-                                            </div>
-                                            <div className="text-xs text-muted-foreground">
-                                                {order.clientId?.name || 'Client'}
-                                            </div>
+                                        <div className="flex items-center gap-2">
+                                            <span
+                                                className="font-bold text-foreground hover:text-primary transition-colors cursor-pointer text-sm"
+                                                onClick={() => onViewTimeline(order._id)}
+                                            >
+                                                {order.orderName}
+                                            </span>
+                                            {getPriorityBadge(order.priority)}
+                                            {isRevision && (
+                                                <Badge className="bg-red-500/15 text-red-600 border-red-500/30 text-[10px] py-0 font-bold">
+                                                    Revision
+                                                </Badge>
+                                            )}
                                         </div>
                                     </TableCell>
 
