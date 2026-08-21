@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useGetStaffsQuery } from "@/redux/features/staff/staffApi";
 import { useGetAllShiftsQuery } from "@/redux/features/shift/shiftApi";
+import { useGetAllDepartmentsQuery } from "@/redux/features/department/departmentApi";
+import { useGetAllDesignationsQuery } from "@/redux/features/designation/designationApi";
 import { DESIGNATIONS, DEPARTMENTS } from "@/constants/metadata";
 import {
     Card,
@@ -136,7 +138,17 @@ export default function StaffsPage() {
     };
 
     const { data, isLoading, isFetching } = useGetStaffsQuery(queryParams);
-    const { data: shiftsData } = useGetAllShiftsQuery({});
+    const { data: shiftsData } = useGetAllShiftsQuery(undefined);
+    const { data: depData } = useGetAllDepartmentsQuery(undefined);
+    const { data: desData } = useGetAllDesignationsQuery(undefined);
+
+    const departmentsList = depData?.departments?.length
+        ? depData.departments.map((d: any) => ({ value: d.name, label: d.name }))
+        : DEPARTMENTS;
+
+    const designationsList = desData?.designations?.length
+        ? desData.designations.map((d: any) => ({ value: d.title, label: d.title }))
+        : DESIGNATIONS;
 
     const staffs: Staff[] = data?.staffs || [];
     const meta = data?.meta;
@@ -215,7 +227,7 @@ export default function StaffsPage() {
                                 <SelectItem value="all">
                                     All Departments
                                 </SelectItem>
-                                {DEPARTMENTS.map((dept) => (
+                                {departmentsList.map((dept: any) => (
                                     <SelectItem
                                         key={dept.value}
                                         value={dept.value}
@@ -241,7 +253,7 @@ export default function StaffsPage() {
                                 <SelectItem value="all">
                                     All Designations
                                 </SelectItem>
-                                {DESIGNATIONS.map((desig) => (
+                                {designationsList.map((desig: any) => (
                                     <SelectItem
                                         key={desig.value}
                                         value={desig.value}

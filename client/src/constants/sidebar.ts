@@ -21,6 +21,7 @@ import {
     IconUserShare,
     IconArchive,
     IconStack2,
+    IconBuildingSkyscraper,
 } from "@tabler/icons-react";
 
 export interface SidebarItem {
@@ -181,6 +182,12 @@ export const sidebarGroups: SidebarGroup[] = [
                 title: "Careers",
                 url: "/careers",
                 icon: IconBriefcase,
+                access: [Role.SUPER_ADMIN, Role.ADMIN, Role.HR_MANAGER],
+            },
+            {
+                title: "Organization",
+                url: "/organization",
+                icon: IconBuildingSkyscraper,
                 access: [Role.SUPER_ADMIN, Role.ADMIN, Role.HR_MANAGER],
             },
         ],

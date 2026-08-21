@@ -18,7 +18,29 @@ export const branchApi = apiSlice.injectEndpoints({
             }),
             invalidatesTags: ['Branch'],
         }),
+
+        updateBranch: builder.mutation({
+            query: ({ id, data }) => ({
+                url: `/branches/${id}`,
+                method: 'PUT',
+                body: data,
+            }),
+            invalidatesTags: ['Branch'],
+        }),
+
+        deleteBranch: builder.mutation({
+            query: (id) => ({
+                url: `/branches/${id}`,
+                method: 'DELETE',
+            }),
+            invalidatesTags: ['Branch'],
+        }),
     }),
 });
 
-export const { useGetAllBranchesQuery, useCreateBranchMutation } = branchApi;
+export const {
+    useGetAllBranchesQuery,
+    useCreateBranchMutation,
+    useUpdateBranchMutation,
+    useDeleteBranchMutation,
+} = branchApi;

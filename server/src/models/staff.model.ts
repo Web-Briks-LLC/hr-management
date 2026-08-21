@@ -1,6 +1,5 @@
 import { model, Schema } from 'mongoose';
 import type IStaff from '../types/staff.type.js';
-import { Designation } from '../constants/designation.js';
 
 const StaffSchema = new Schema<IStaff>(
     {
@@ -39,7 +38,6 @@ const StaffSchema = new Schema<IStaff>(
 
         designation: {
             type: String,
-            enum: Object.values(Designation),
             required: true,
             index: true,
         },

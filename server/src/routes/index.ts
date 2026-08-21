@@ -33,6 +33,9 @@ import { transactionRoute } from "./transaction.route.js";
 import { assetRoute } from "./asset.route.js";
 import { productionRoute } from "./production.route.js";
 
+import { departmentRoute } from "./department.route.js";
+import { designationRoute } from "./designation.route.js";
+
 const router: Router = Router();
 
 const moduleRoutes = [
@@ -47,6 +50,14 @@ const moduleRoutes = [
     {
         path: "/branches",
         route: branchRoute,
+    },
+    {
+        path: "/departments",
+        route: departmentRoute,
+    },
+    {
+        path: "/designations",
+        route: designationRoute,
     },
     {
         path: "/shifts",

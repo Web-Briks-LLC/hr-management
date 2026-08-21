@@ -1,5 +1,4 @@
 import { model, Schema } from 'mongoose';
-import { Designation } from '../constants/designation.js';
 
 export interface IPolicyAcceptance {
     user: Schema.Types.ObjectId | string;
@@ -62,7 +61,6 @@ const policySchema = new Schema<IPolicy>(
         designations: [
             {
                 type: String,
-                enum: Object.values(Designation),
             },
         ],
         requiresAcceptance: {

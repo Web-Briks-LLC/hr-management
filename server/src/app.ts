@@ -59,7 +59,8 @@ app.use(
         // Allow public access to metadata type routes (for invite dialog dropdowns)
         const isPublicMetadataRoute =
             req.method === "GET" &&
-            /^\/metadata\/type\/(department|designation)$/.test(req.path);
+            (/^\/metadata\/type\/(department|designation)$/.test(req.path) ||
+                /^\/(departments|designations)/.test(req.path));
 
         // Allow public access to career routes
         const isPublicCareerRoute =

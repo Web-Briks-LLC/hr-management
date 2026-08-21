@@ -23,6 +23,8 @@ import { Switch } from "@/components/ui/switch";
 import { Role } from "@/constants/role";
 import { useGetAllBranchesQuery } from "@/redux/features/branch/branchApi";
 import { useUpdateStaffMutation } from "@/redux/features/staff/staffApi";
+import { useGetAllDepartmentsQuery } from "@/redux/features/department/departmentApi";
+import { useGetAllDesignationsQuery } from "@/redux/features/designation/designationApi";
 import IStaff from "@/types/staff.type";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { DESIGNATIONS, DEPARTMENTS } from "@/constants/metadata";
@@ -69,8 +71,18 @@ interface EditStaffDialogProps {
 export function EditStaffDialog({ staff }: EditStaffDialogProps) {
     const [open, setOpen] = useState(false);
 
-    const { data: branchesData } = useGetAllBranchesQuery({});
     const [updateStaff, { isLoading }] = useUpdateStaffMutation();
+    const { data: branchesData } = useGetAllBranchesQuery({});
+    const { data: depData } = useGetAllDepartmentsQuery(undefined);
+    const { data: desData } = useGetAllDesignationsQuery(undefined);
+
+    const departmentsList = depData?.departments?.length
+        ? depData.departments.filter((d: any) => d.isActive).map((d: any) => ({ value: d.name, label: d.name }))
+        : DEPARTMENTS;
+
+    const designationsList = desData?.designations?.length
+        ? desData.designations.filter((d: any) => d.isActive).map((d: any) => ({ value: d.title, label: d.title }))
+        : DESIGNATIONS;
 
     const form = useForm<FormData>({
         resolver: zodResolver(formSchema),
@@ -172,7 +184,7 @@ export function EditStaffDialog({ staff }: EditStaffDialogProps) {
                                             <SelectValue placeholder="Select department" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            {DEPARTMENTS.map((dept) => (
+                                            {departmentsList.map((dept: any) => (
                                                 <SelectItem
                                                     key={dept.value}
                                                     value={dept.value}
@@ -206,7 +218,7 @@ export function EditStaffDialog({ staff }: EditStaffDialogProps) {
                                             <SelectValue placeholder="Select designation" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            {DESIGNATIONS.map((desig) => (
+                                            {designationsList.map((desig: any) => (
                                                 <SelectItem
                                                     key={desig.value}
                                                     value={desig.value}

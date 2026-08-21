@@ -43,9 +43,52 @@ const getAllBranches = async (_req: Request, res: Response) => {
     }
 };
 
+const updateBranch = async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        if (!id) {
+            return res.status(400).json({ success: false, message: 'Branch ID required' });
+        }
+
+        const branch = await BranchServices.updateBranch(id, req.body);
+        return res.status(200).json({
+            success: true,
+            message: 'Branch updated successfully',
+            branch,
+        });
+    } catch (error) {
+        return res.status(400).json({
+            success: false,
+            message: (error as Error).message,
+        });
+    }
+};
+
+const deleteBranch = async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        if (!id) {
+            return res.status(400).json({ success: false, message: 'Branch ID required' });
+        }
+
+        await BranchServices.deleteBranch(id);
+        return res.status(200).json({
+            success: true,
+            message: 'Branch deleted successfully',
+        });
+    } catch (error) {
+        return res.status(400).json({
+            success: false,
+            message: (error as Error).message,
+        });
+    }
+};
+
 const BranchControllers = {
     createBranch,
     getAllBranches,
+    updateBranch,
+    deleteBranch,
 };
 
 export default BranchControllers;
