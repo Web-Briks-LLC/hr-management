@@ -1,15 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from "@/components/ui/dialog";
+import { AppDialog } from "@/components/shared/app-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -178,26 +170,46 @@ export function EditStaffDialog({ staff }: EditStaffDialogProps) {
     }
 
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
+        <AppDialog
+            open={open}
+            onOpenChange={setOpen}
+            trigger={
                 <Button variant="outline" size="sm">
                     <Edit className="h-4 w-4 mr-2" />
                     Edit Profile
                 </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                    <DialogTitle>Edit Staff Profile</DialogTitle>
-                    <DialogDescription>
-                        Update employment details, role, salary and bank
-                        information.
-                    </DialogDescription>
-                </DialogHeader>
-
-                <form
-                    onSubmit={form.handleSubmit(onSubmit)}
-                    className="space-y-6"
-                >
+            }
+            maxWidth="xl"
+            title="Edit Staff Profile"
+            description="Update employment details, role, salary and bank information."
+            icon={<Edit className="h-5 w-5" />}
+            footer={
+                <>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setOpen(false)}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        type="submit"
+                        form="edit-staff-form"
+                        disabled={isLoading}
+                    >
+                        {isLoading && (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        )}
+                        Save Changes
+                    </Button>
+                </>
+            }
+        >
+            <form
+                id="edit-staff-form"
+                onSubmit={form.handleSubmit(onSubmit)}
+                className="space-y-6"
+            >
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {/* Department */}
                         <div className="space-y-2">
@@ -210,17 +222,17 @@ export function EditStaffDialog({ staff }: EditStaffDialogProps) {
                                         onValueChange={field.onChange}
                                         value={field.value}
                                     >
-                                        <SelectTrigger>
+                                        <SelectTrigger className="w-full">
                                             <SelectValue placeholder="Select department" />
                                         </SelectTrigger>
                                         <SelectContent>
                                             {departmentsList.map((dept: any) => (
-                                                <SelectItem
-                                                    key={dept.value}
-                                                    value={dept.value}
-                                                >
-                                                    {dept.label}
-                                                </SelectItem>
+                                                 <SelectItem
+                                                     key={dept.value}
+                                                     value={dept.value}
+                                                 >
+                                                     {dept.label}
+                                                 </SelectItem>
                                             ))}
                                             {field.value && !departmentsList.some((d: any) => d.value === field.value) && (
                                                 <SelectItem value={field.value}>{field.value}</SelectItem>
@@ -247,17 +259,17 @@ export function EditStaffDialog({ staff }: EditStaffDialogProps) {
                                         onValueChange={field.onChange}
                                         value={field.value}
                                     >
-                                        <SelectTrigger>
+                                        <SelectTrigger className="w-full">
                                             <SelectValue placeholder="Select designation" />
                                         </SelectTrigger>
                                         <SelectContent>
                                             {designationsList.map((desig: any) => (
-                                                <SelectItem
-                                                    key={desig.value}
-                                                    value={desig.value}
-                                                >
-                                                    {desig.label}
-                                                </SelectItem>
+                                                 <SelectItem
+                                                     key={desig.value}
+                                                     value={desig.value}
+                                                 >
+                                                     {desig.label}
+                                                 </SelectItem>
                                             ))}
                                             {field.value && !designationsList.some((d: any) => d.value === field.value) && (
                                                 <SelectItem value={field.value}>{field.value}</SelectItem>
@@ -284,7 +296,7 @@ export function EditStaffDialog({ staff }: EditStaffDialogProps) {
                                         onValueChange={field.onChange}
                                         value={field.value}
                                     >
-                                        <SelectTrigger>
+                                        <SelectTrigger className="w-full">
                                             <SelectValue placeholder="Select branch" />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -326,7 +338,7 @@ export function EditStaffDialog({ staff }: EditStaffDialogProps) {
                                         onValueChange={field.onChange}
                                         value={field.value}
                                     >
-                                        <SelectTrigger>
+                                        <SelectTrigger className="w-full">
                                             <SelectValue placeholder="Select status" />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -406,7 +418,7 @@ export function EditStaffDialog({ staff }: EditStaffDialogProps) {
                                         onValueChange={field.onChange}
                                         value={field.value}
                                     >
-                                        <SelectTrigger>
+                                        <SelectTrigger className="w-full">
                                             <SelectValue placeholder="Select role" />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -537,24 +549,7 @@ export function EditStaffDialog({ staff }: EditStaffDialogProps) {
                             </div>
                         </div>
                     </div>
-
-                    <DialogFooter>
-                        <Button
-                            type="button"
-                            variant="secondary"
-                            onClick={() => setOpen(false)}
-                        >
-                            Cancel
-                        </Button>
-                        <Button type="submit" disabled={isLoading}>
-                            {isLoading && (
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            )}
-                            Save Changes
-                        </Button>
-                    </DialogFooter>
-                </form>
-            </DialogContent>
-        </Dialog>
+            </form>
+        </AppDialog>
     );
 }
