@@ -122,8 +122,8 @@ export default function UpdateShift({
 
     const onSubmit = async (data: UpdateShiftFormData) => {
         try {
-            if (data.startTime >= data.endTime) {
-                toast.error('End time must be after start time');
+            if (data.startTime === data.endTime) {
+                toast.error('Start time and end time cannot be the same');
                 return;
             }
 

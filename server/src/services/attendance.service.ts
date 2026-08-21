@@ -367,14 +367,28 @@ async function getTodayAttendanceFromDB(userId: string) {
 
   const staffId = staff._id;
 
-  const attendanceDay = await AttendanceDayModel.findOne({
+  let attendanceDay = await AttendanceDayModel.findOne({
     staffId,
     date: dayStart,
   }).lean();
 
+  // Handle Overnight Shift: If checking status in the morning for a shift started yesterday (e.g. 10 PM to 6 AM)
+  if (!attendanceDay) {
+    const yesterdayStart = new Date(dayStart);
+    yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+
+    attendanceDay = await AttendanceDayModel.findOne({
+      staffId,
+      date: yesterdayStart,
+      checkOutAt: null,
+    }).lean();
+  }
+
+  const startDateForEvents = attendanceDay ? attendanceDay.date : dayStart;
+
   const attendanceEvents = await AttendanceEventModel.find({
     staffId,
-    at: { $gte: dayStart, $lte: dayEnd },
+    at: { $gte: startDateForEvents, $lte: dayEnd },
   })
     .sort({ at: 1 })
     .lean();
