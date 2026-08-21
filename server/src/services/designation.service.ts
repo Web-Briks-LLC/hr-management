@@ -96,6 +96,7 @@ const deleteDesignation = async (id: string) => {
 };
 
 const DesignationServices = {
+    seedDefaultsIfNeeded,
     createDesignation,
     getAllDesignations,
     updateDesignation,

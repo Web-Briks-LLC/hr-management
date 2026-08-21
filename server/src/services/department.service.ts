@@ -90,6 +90,7 @@ const deleteDepartment = async (id: string) => {
 };
 
 const DepartmentServices = {
+    seedDefaultsIfNeeded,
     createDepartment,
     getAllDepartments,
     updateDepartment,

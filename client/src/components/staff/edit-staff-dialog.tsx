@@ -84,12 +84,42 @@ export function EditStaffDialog({ staff }: EditStaffDialogProps) {
         ? desData.designations.filter((d: any) => d.isActive).map((d: any) => ({ value: d.title, label: d.title }))
         : DESIGNATIONS;
 
+    const getResolvedBranchId = () => {
+        return (
+            (typeof staff.branchId === "string" ? staff.branchId : (staff.branch as any)?._id) ||
+            (staff as any).branchId ||
+            ""
+        );
+    };
+
+    const getResolvedDepartment = () => {
+        const raw = staff.department?.trim() || "";
+        if (!raw) return "";
+        const match = departmentsList.find(
+            (d: any) =>
+                d.value.toLowerCase() === raw.toLowerCase() ||
+                d.label.toLowerCase() === raw.toLowerCase()
+        );
+        return match ? match.value : raw;
+    };
+
+    const getResolvedDesignation = () => {
+        const raw = staff.designation?.trim() || "";
+        if (!raw) return "";
+        const match = designationsList.find(
+            (d: any) =>
+                d.value.toLowerCase() === raw.toLowerCase() ||
+                d.label.toLowerCase() === raw.toLowerCase()
+        );
+        return match ? match.value : raw;
+    };
+
     const form = useForm<FormData>({
         resolver: zodResolver(formSchema),
         defaultValues: {
-            branchId: staff.branchId || "",
-            department: staff.department || "",
-            designation: staff.designation || "",
+            branchId: getResolvedBranchId(),
+            department: getResolvedDepartment(),
+            designation: getResolvedDesignation(),
             role: staff.user?.role || Role.STAFF,
             status: staff.status || "active",
             salary: staff.salary || 0,
@@ -108,9 +138,9 @@ export function EditStaffDialog({ staff }: EditStaffDialogProps) {
     useEffect(() => {
         if (open) {
             form.reset({
-                branchId: staff.branchId || "",
-                department: staff.department || "",
-                designation: staff.designation || "",
+                branchId: getResolvedBranchId(),
+                department: getResolvedDepartment(),
+                designation: getResolvedDesignation(),
                 role: staff.user?.role || Role.STAFF,
                 status: staff.status || "active",
                 salary: staff.salary || 0,
@@ -126,7 +156,7 @@ export function EditStaffDialog({ staff }: EditStaffDialogProps) {
                 },
             });
         }
-    }, [open, staff, form]);
+    }, [open, staff, depData, desData, branchesData]);
 
     async function onSubmit(values: FormData) {
         try {
@@ -192,6 +222,9 @@ export function EditStaffDialog({ staff }: EditStaffDialogProps) {
                                                     {dept.label}
                                                 </SelectItem>
                                             ))}
+                                            {field.value && !departmentsList.some((d: any) => d.value === field.value) && (
+                                                <SelectItem value={field.value}>{field.value}</SelectItem>
+                                            )}
                                         </SelectContent>
                                     </Select>
                                 )}
@@ -226,6 +259,9 @@ export function EditStaffDialog({ staff }: EditStaffDialogProps) {
                                                     {desig.label}
                                                 </SelectItem>
                                             ))}
+                                            {field.value && !designationsList.some((d: any) => d.value === field.value) && (
+                                                <SelectItem value={field.value}>{field.value}</SelectItem>
+                                            )}
                                         </SelectContent>
                                     </Select>
                                 )}
@@ -264,6 +300,9 @@ export function EditStaffDialog({ staff }: EditStaffDialogProps) {
                                                         {branch.name}
                                                     </SelectItem>
                                                 ),
+                                            )}
+                                            {field.value && !branchesData?.branches?.some((b: any) => b._id === field.value) && (
+                                                <SelectItem value={field.value}>{(staff.branch as any)?.name || field.value}</SelectItem>
                                             )}
                                         </SelectContent>
                                     </Select>
