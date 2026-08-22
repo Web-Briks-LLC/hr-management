@@ -111,9 +111,11 @@ export const sidebarGroups: SidebarGroup[] = [
                     Role.ADMIN,
                     Role.HR_MANAGER,
                     Role.TEAM_LEADER,
+                    Role.STAFF,
                 ],
                 excludedDesignation: "telemarketer",
             },
+
             {
                 title: "Earnings",
                 url: "/earnings",

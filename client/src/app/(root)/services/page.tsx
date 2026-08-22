@@ -111,17 +111,21 @@ export default function ServicesPage() {
     name: string;
     description: string;
     price?: number | '';
+    steps: Array<{ name: string; code: string; isDefault?: boolean }>;
     isActive: boolean;
   }>({
     name: "",
     description: "",
     price: "",
+    steps: [],
     isActive: true,
   });
+  const [newStepInput, setNewStepInput] = useState("");
 
   const handleOpenAdd = useCallback(() => {
     setSelectedService(null);
-    setFormData({ name: "", description: "", price: "", isActive: true });
+    setFormData({ name: "", description: "", price: "", steps: [], isActive: true });
+    setNewStepInput("");
     setIsAddEditOpen(true);
   }, []);
 
@@ -131,10 +135,13 @@ export default function ServicesPage() {
       name: service.name,
       description: service.description || "",
       price: service.price || "",
+      steps: service.steps || [],
       isActive: service.isActive,
     });
+    setNewStepInput("");
     setIsAddEditOpen(true);
   }, []);
+
 
   const handleDeleteClick = useCallback(async (
     service: IService & { usageCount: number },
@@ -626,7 +633,90 @@ export default function ServicesPage() {
                 onChange={(e) => setFormData({ ...formData, price: e.target.value ? Number(e.target.value) : "" })}
               />
             </div>
-            <div className="flex items-center space-x-2">
+
+            {/* Sub-Services / Operational Steps */}
+            <div className="space-y-2 border-t pt-3">
+              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Sub-Services / Work Steps (ধাপসমূহ)
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                এই সার্ভিসের ছবিগুলো সম্পন্ন করতে ফটো এডিটরদের কী কী কাজ করতে হবে তা যোগ করুন।
+              </p>
+
+              <div className="flex gap-2">
+                <Input
+                  placeholder="যেমন: Clipping Path, Skin Retouching, BG Removal..."
+                  value={newStepInput}
+                  onChange={(e) => setNewStepInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      const val = newStepInput.trim();
+                      if (val && !formData.steps.some((s) => s.name.toLowerCase() === val.toLowerCase())) {
+                        setFormData({
+                          ...formData,
+                          steps: [
+                            ...formData.steps,
+                            { name: val, code: val.toLowerCase().replace(/\s+/g, "_") },
+                          ],
+                        });
+                        setNewStepInput("");
+                      }
+                    }
+                  }}
+                  className="h-9 text-xs"
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    const val = newStepInput.trim();
+                    if (val && !formData.steps.some((s) => s.name.toLowerCase() === val.toLowerCase())) {
+                      setFormData({
+                        ...formData,
+                        steps: [
+                          ...formData.steps,
+                          { name: val, code: val.toLowerCase().replace(/\s+/g, "_") },
+                        ],
+                      });
+                      setNewStepInput("");
+                    }
+                  }}
+                  className="h-9 text-xs"
+                >
+                  <Plus className="h-3.5 w-3.5 mr-1" /> Add Step
+                </Button>
+              </div>
+
+              {formData.steps.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {formData.steps.map((step, idx) => (
+                    <span
+                      key={idx}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/20"
+                    >
+                      <span className="text-[10px] text-muted-foreground font-mono">{idx + 1}.</span>
+                      {step.name}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setFormData({
+                            ...formData,
+                            steps: formData.steps.filter((_, i) => i !== idx),
+                          })
+                        }
+                        className="text-muted-foreground hover:text-destructive transition-colors ml-0.5"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center space-x-2 border-t pt-2">
               <input
                 type="checkbox"
                 id="isActive"
@@ -636,6 +726,7 @@ export default function ServicesPage() {
               />
               <Label htmlFor="isActive">Active</Label>
             </div>
+
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsAddEditOpen(false)}>
                 Cancel

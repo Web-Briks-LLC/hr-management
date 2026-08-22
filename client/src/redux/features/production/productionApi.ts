@@ -8,6 +8,14 @@ import type {
     ISubmitQCReviewInput,
     IProductionFilters,
     IActiveOrdersProgressFilters,
+    ISanitizedProductionOrder,
+    IOrderImageStatusResponse,
+    IProductionWorkSession,
+    IStaffPerformanceAnalytics,
+    IStartWorkSessionInput,
+    IFinishWorkSessionInput,
+    ICancelWorkSessionInput,
+    IFlagImageRevisionInput,
 } from '@/types/production.type';
 
 interface ProductionLogsResponse {
@@ -44,8 +52,154 @@ interface OrderTimelineResponse {
     };
 }
 
+interface SanitizedOrdersResponse {
+    success: boolean;
+    data: ISanitizedProductionOrder[];
+}
+
+interface OrderImagesResponse {
+    success: boolean;
+    data: IOrderImageStatusResponse;
+}
+
+interface ActiveSessionResponse {
+    success: boolean;
+    data: IProductionWorkSession | null;
+}
+
+interface StaffAnalyticsResponse {
+    success: boolean;
+    data: IStaffPerformanceAnalytics;
+}
+
 export const productionApi = apiSlice.injectEndpoints({
     endpoints: (builder) => ({
+        // --- Workstation Endpoints ---
+        getSanitizedOrders: builder.query<SanitizedOrdersResponse, { search?: string } | void>({
+            query: (params) => ({
+                url: '/production/orders/sanitized',
+                params: params || {},
+            }),
+            providesTags: ['ProductionOrders', { type: 'ProductionOrders', id: 'SANITIZED' }],
+        }),
+
+        getOrderImages: builder.query<
+            OrderImagesResponse,
+            { orderId: string; status?: string; search?: string }
+        >({
+            query: ({ orderId, ...params }) => ({
+                url: `/production/orders/${orderId}/images`,
+                params,
+            }),
+            providesTags: (_result, _error, { orderId }) => [
+                'ProductionImages',
+                { type: 'ProductionImages', id: orderId },
+            ],
+        }),
+
+        getActiveSession: builder.query<ActiveSessionResponse, void>({
+            query: () => '/production/session/active',
+            providesTags: ['ActiveWorkSession', { type: 'ActiveWorkSession', id: 'CURRENT' }],
+        }),
+
+        startWorkSession: builder.mutation<
+            { success: boolean; message: string; data: any },
+            IStartWorkSessionInput
+        >({
+            query: (body) => ({
+                url: '/production/session/start',
+                method: 'POST',
+                body,
+            }),
+            invalidatesTags: [
+                'ActiveWorkSession',
+                'ProductionImages',
+                'ProductionOrders',
+                { type: 'ActiveWorkSession', id: 'CURRENT' },
+                { type: 'ProductionOrders', id: 'SANITIZED' },
+                { type: 'ProductionOrders', id: 'LIST' },
+            ],
+        }),
+
+        finishWorkSession: builder.mutation<
+            { success: boolean; message: string; data: any },
+            IFinishWorkSessionInput
+        >({
+            query: (body) => ({
+                url: '/production/session/finish',
+                method: 'POST',
+                body,
+            }),
+            invalidatesTags: [
+                'ActiveWorkSession',
+                'ProductionImages',
+                'ProductionOrders',
+                'Production',
+                'ProductionStats',
+                { type: 'ActiveWorkSession', id: 'CURRENT' },
+                { type: 'ProductionOrders', id: 'SANITIZED' },
+                { type: 'ProductionOrders', id: 'LIST' },
+                { type: 'Production', id: 'LIST' },
+                { type: 'ProductionStats', id: 'STATS' },
+            ],
+        }),
+
+        cancelWorkSession: builder.mutation<
+            { success: boolean; message: string },
+            ICancelWorkSessionInput
+        >({
+            query: (body) => ({
+                url: '/production/session/cancel',
+                method: 'POST',
+                body,
+            }),
+            invalidatesTags: [
+                'ActiveWorkSession',
+                'ProductionImages',
+                'ProductionOrders',
+                { type: 'ActiveWorkSession', id: 'CURRENT' },
+                { type: 'ProductionOrders', id: 'SANITIZED' },
+            ],
+        }),
+
+        flagImageRevision: builder.mutation<
+            { success: boolean; message: string },
+            IFlagImageRevisionInput
+        >({
+            query: (body) => ({
+                url: '/production/images/revision',
+                method: 'POST',
+                body,
+            }),
+            invalidatesTags: [
+                'ProductionImages',
+                'ProductionOrders',
+                { type: 'ProductionOrders', id: 'SANITIZED' },
+                { type: 'ProductionOrders', id: 'LIST' },
+            ],
+        }),
+
+        getStaffPerformanceAnalytics: builder.query<
+            StaffAnalyticsResponse,
+            {
+                startDate?: string;
+                endDate?: string;
+                month?: number;
+                year?: number;
+                staffId?: string;
+                shiftId?: string;
+                branchId?: string;
+                filterType?: string;
+            } | void
+        >({
+            query: (params) => ({
+                url: '/production/analytics/staff',
+                params: params || {},
+            }),
+            providesTags: ['StaffPerformance', { type: 'StaffPerformance', id: 'ANALYTICS' }],
+        }),
+
+        // --- Existing Shift & Overview Endpoints ---
         getProductionLogs: builder.query<ProductionLogsResponse, IProductionFilters | void>({
             query: (params) => ({
                 url: '/production',
@@ -151,6 +305,7 @@ export const productionApi = apiSlice.injectEndpoints({
                 method: 'POST',
                 body: data,
             }),
+
             invalidatesTags: (_result, _error, { id }) => [
                 'Production',
                 'ProductionOrders',
@@ -182,6 +337,14 @@ export const productionApi = apiSlice.injectEndpoints({
 });
 
 export const {
+    useGetSanitizedOrdersQuery,
+    useGetOrderImagesQuery,
+    useGetActiveSessionQuery,
+    useStartWorkSessionMutation,
+    useFinishWorkSessionMutation,
+    useCancelWorkSessionMutation,
+    useFlagImageRevisionMutation,
+    useGetStaffPerformanceAnalyticsQuery,
     useGetProductionLogsQuery,
     useGetActiveOrdersProgressQuery,
     useGetOrderTimelineQuery,
@@ -191,3 +354,4 @@ export const {
     useSubmitQCReviewMutation,
     useDeleteProductionLogMutation,
 } = productionApi;
+

@@ -4,7 +4,12 @@ import {
     createProductionLogSchema,
     updateProductionLogSchema,
     submitQCReviewSchema,
+    startWorkSessionSchema,
+    finishWorkSessionSchema,
+    cancelWorkSessionSchema,
+    flagImageRevisionSchema,
 } from '../validators/production.validator.js';
+
 
 export const createProductionLog = async (req: Request, res: Response) => {
     try {
@@ -251,3 +256,214 @@ export const getProductionStats = async (req: Request, res: Response) => {
         });
     }
 };
+
+export const getSanitizedActiveOrders = async (req: Request, res: Response) => {
+    try {
+        const { search } = req.query;
+        const result = await productionService.getSanitizedActiveOrders(
+            search as string | undefined
+        );
+
+        return res.status(200).json({
+            success: true,
+            data: result,
+        });
+    } catch (error: any) {
+        console.error('getSanitizedActiveOrders error:', error);
+        return res.status(500).json({
+            success: false,
+            message: error.message || 'Failed to retrieve active orders',
+        });
+    }
+};
+
+export const getOrderImageStatus = async (req: Request, res: Response) => {
+    try {
+        const { orderId } = req.params;
+        const { status, search } = req.query;
+
+        if (!orderId) {
+            return res.status(400).json({
+                success: false,
+                message: 'Order ID is required',
+            });
+        }
+
+        const result = await productionService.getOrderImageStatus(
+            orderId,
+            status as string | undefined,
+            search as string | undefined
+        );
+
+        return res.status(200).json({
+            success: true,
+            data: result,
+        });
+    } catch (error: any) {
+        console.error('getOrderImageStatus error:', error);
+        return res.status(500).json({
+            success: false,
+            message: error.message || 'Failed to retrieve image status',
+        });
+    }
+};
+
+export const startWorkSession = async (req: Request, res: Response) => {
+    try {
+        const validatedData = startWorkSessionSchema.parse(req.body);
+        const userId = req.user!.id;
+
+        const result = await productionService.startWorkSession(
+            validatedData,
+            userId
+        );
+
+        return res.status(201).json({
+            success: true,
+            message: `Work started successfully on ${result.lockedCount} image(s)`,
+            data: result,
+        });
+    } catch (error: any) {
+        console.error('startWorkSession error:', error);
+        return res.status(error.name === 'ZodError' ? 400 : 400).json({
+            success: false,
+            message: error.message || 'Failed to start work session',
+            errors: error.errors || undefined,
+        });
+    }
+};
+
+export const getActiveWorkSession = async (req: Request, res: Response) => {
+    try {
+        const userId = req.user!.id;
+        const result = await productionService.getActiveWorkSession(userId);
+
+        return res.status(200).json({
+            success: true,
+            data: result,
+        });
+    } catch (error: any) {
+        console.error('getActiveWorkSession error:', error);
+        return res.status(500).json({
+            success: false,
+            message: error.message || 'Failed to retrieve active session',
+        });
+    }
+};
+
+export const finishWorkSession = async (req: Request, res: Response) => {
+    try {
+        const validatedData = finishWorkSessionSchema.parse(req.body);
+        const userId = req.user!.id;
+
+        const result = await productionService.finishWorkSession(
+            validatedData,
+            userId
+        );
+
+        return res.status(200).json({
+            success: true,
+            message: `Work session completed! ${result.imagesCompleted} image(s) updated.`,
+            data: result,
+        });
+    } catch (error: any) {
+        console.error('finishWorkSession error:', error);
+        return res.status(error.name === 'ZodError' ? 400 : 400).json({
+            success: false,
+            message: error.message || 'Failed to finish work session',
+            errors: error.errors || undefined,
+        });
+    }
+};
+
+export const cancelWorkSession = async (req: Request, res: Response) => {
+    try {
+        const validatedData = cancelWorkSessionSchema.parse(req.body);
+        const userId = req.user!.id;
+
+        const result = await productionService.cancelWorkSession(
+            validatedData.sessionId,
+            userId,
+            validatedData.reason
+        );
+
+        return res.status(200).json({
+            success: true,
+            message: result.message,
+            data: result,
+        });
+    } catch (error: any) {
+        console.error('cancelWorkSession error:', error);
+        return res.status(error.name === 'ZodError' ? 400 : 400).json({
+            success: false,
+            message: error.message || 'Failed to cancel work session',
+            errors: error.errors || undefined,
+        });
+    }
+};
+
+export const flagImageRevision = async (req: Request, res: Response) => {
+    try {
+        const validatedData = flagImageRevisionSchema.parse(req.body);
+        const userId = req.user!.id;
+
+        const result = await productionService.flagImageRevision(
+            validatedData,
+            userId
+        );
+
+        return res.status(200).json({
+            success: true,
+            message: result.message,
+            data: result,
+        });
+    } catch (error: any) {
+        console.error('flagImageRevision error:', error);
+        return res.status(error.name === 'ZodError' ? 400 : 400).json({
+            success: false,
+            message: error.message || 'Failed to flag image revision',
+            errors: error.errors || undefined,
+        });
+    }
+};
+
+export const getStaffPerformanceAnalytics = async (
+    req: Request,
+    res: Response
+) => {
+    try {
+        const {
+            startDate,
+            endDate,
+            month,
+            year,
+            staffId,
+            shiftId,
+            branchId,
+            filterType,
+        } = req.query;
+
+        const result = await productionService.getStaffPerformanceAnalytics({
+            startDate: startDate as string | undefined,
+            endDate: endDate as string | undefined,
+            month: month ? parseInt(month as string) : undefined,
+            year: year ? parseInt(year as string) : undefined,
+            staffId: staffId as string | undefined,
+            shiftId: shiftId as string | undefined,
+            branchId: branchId as string | undefined,
+            filterType: filterType as string | undefined,
+        });
+
+        return res.status(200).json({
+            success: true,
+            data: result,
+        });
+    } catch (error: any) {
+        console.error('getStaffPerformanceAnalytics error:', error);
+        return res.status(500).json({
+            success: false,
+            message: error.message || 'Failed to retrieve staff performance analytics',
+        });
+    }
+};
+

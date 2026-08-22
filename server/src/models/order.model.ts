@@ -51,6 +51,33 @@ const timelineEntrySchema = new Schema(
     { _id: false }
 );
 
+const orderRequiredStepSchema = new Schema(
+    {
+        stepId: {
+            type: String,
+        },
+        name: {
+            type: String,
+            required: true,
+            trim: true,
+        },
+        code: {
+            type: String,
+            required: true,
+            trim: true,
+        },
+        serviceId: {
+            type: Schema.Types.ObjectId,
+            ref: 'Service',
+        },
+        order: {
+            type: Number,
+            default: 0,
+        },
+    },
+    { _id: false }
+);
+
 const orderSchema = new Schema<IOrder>(
     {
         orderName: {
@@ -100,6 +127,8 @@ const orderSchema = new Schema<IOrder>(
                 required: true,
             },
         ],
+        requiredSteps: [orderRequiredStepSchema],
+
         returnFileFormat: {
             type: Schema.Types.ObjectId,
             ref: 'ReturnFileFormat',

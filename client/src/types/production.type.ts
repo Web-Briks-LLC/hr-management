@@ -295,3 +295,211 @@ export interface IProductionFilters {
     page?: number;
     limit?: number;
 }
+
+export interface ISanitizedProductionOrder {
+    _id: string;
+    orderName: string;
+    deadline: string;
+    originalDeadline?: string;
+    imageQuantity: number;
+    services: {
+        _id: string;
+        name: string;
+        description?: string;
+    }[];
+    requiredSteps: {
+        stepId?: string;
+        name: string;
+        code: string;
+        serviceId?: string;
+        order?: number;
+    }[];
+    returnFileFormat?: {
+        _id: string;
+        name: string;
+        extension: string;
+    };
+    instruction?: string;
+    priority: string;
+    notes?: string;
+    status: string;
+    createdAt: string;
+    imageStats: {
+        totalExpected: number;
+        totalRegistered: number;
+        completedCount: number;
+        inProgressCount: number;
+        partiallyCompletedCount: number;
+        revisionCount: number;
+        unassignedCount: number;
+    };
+}
+
+export interface IImageCompletedStep {
+    stepName: string;
+    completedBy: {
+        _id: string;
+        name?: string;
+        staffId?: string;
+        designation?: string;
+    };
+    shiftId?: string | null;
+    completedAt: string;
+    durationSeconds?: number;
+    sessionId?: string | null;
+}
+
+export interface IImageRevisionEntry {
+    instruction: string;
+    requestedBy: {
+        _id: string;
+        name?: string;
+        email?: string;
+        role?: string;
+    };
+    createdAt: string;
+    resolvedAt?: string | null;
+    resolvedBy?: {
+        _id: string;
+        name?: string;
+        staffId?: string;
+    } | null;
+}
+
+export interface IOrderImage {
+    _id: string;
+    orderId: string;
+    imageName: string;
+    status: 'unassigned' | 'in_progress' | 'partially_completed' | 'completed' | 'in_revision';
+    requiredSteps: string[];
+    completedSteps: IImageCompletedStep[];
+    currentAssignedStaffId?: {
+        _id: string;
+        name?: string;
+        staffId?: string;
+        employeeId?: string;
+        designation?: string;
+        branchId?: string;
+    } | null;
+    currentSessionId?: string | null;
+    lockedAt?: string | null;
+    isRevision: boolean;
+    revisionHistory: IImageRevisionEntry[];
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface IOrderImageStatusResponse {
+    order: {
+        _id: string;
+        orderName: string;
+        deadline: string;
+        imageQuantity: number;
+        requiredSteps: {
+            stepId?: string;
+            name: string;
+            code: string;
+            serviceId?: string;
+        }[];
+        instruction?: string;
+    };
+    images: IOrderImage[];
+    summary: {
+        totalExpected: number;
+        totalRegistered: number;
+        completedCount: number;
+        inProgressCount: number;
+        partiallyCompletedCount: number;
+        revisionCount: number;
+        unassignedCount: number;
+    };
+}
+
+export interface IProductionWorkSession {
+    _id: string;
+    staffId: string;
+    orderId: {
+        _id: string;
+        orderName: string;
+        deadline?: string;
+        requiredSteps?: {
+            name: string;
+            code: string;
+        }[];
+        instruction?: string;
+        notes?: string;
+        priority?: string;
+        services?: {
+            _id: string;
+            name: string;
+            description?: string;
+        }[];
+    } | string;
+    shiftId?: string | null;
+    branchId?: string | null;
+    imageNames: string[];
+    imageCount: number;
+    startTime: string;
+    endTime?: string | null;
+    durationSeconds: number;
+    status: 'active' | 'completed' | 'cancelled' | 'paused';
+    completedSteps: string[];
+    notes?: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface IStaffPerformanceAnalytics {
+    summary: {
+        totalImages: number;
+        totalSessions: number;
+        totalHours: number;
+        activeStaffCount: number;
+    };
+    staffPerformance: {
+        staffId: string;
+        staffName: string;
+        employeeId: string;
+        designation: string;
+        totalSessions: number;
+        totalImages: number;
+        totalHours: number;
+        avgSecondsPerImage: number;
+    }[];
+    shiftPerformance: {
+        shiftId?: string;
+        shiftName: string;
+        shiftCode?: string;
+        totalImages: number;
+        totalSessions: number;
+        totalHours: number;
+    }[];
+    stepBreakdown: {
+        stepName: string;
+        count: number;
+    }[];
+}
+
+export interface IStartWorkSessionInput {
+    orderId: string;
+    imageNames: string[];
+    shiftId?: string;
+}
+
+export interface IFinishWorkSessionInput {
+    sessionId: string;
+    completedSteps: string[];
+    notes?: string;
+}
+
+export interface ICancelWorkSessionInput {
+    sessionId: string;
+    reason?: string;
+}
+
+export interface IFlagImageRevisionInput {
+    orderId: string;
+    imageNames: string[];
+    instruction: string;
+}
+

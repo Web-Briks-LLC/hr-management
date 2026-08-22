@@ -26,6 +26,14 @@ export interface ITimelineEntry {
     note?: string;
 }
 
+export interface IOrderRequiredStep {
+    stepId?: string;
+    name: string;
+    code: string;
+    serviceId?: Types.ObjectId;
+    order?: number;
+}
+
 export interface IOrder extends Document {
     _id: Types.ObjectId;
     orderName: string;
@@ -37,6 +45,7 @@ export interface IOrder extends Document {
     perImagePrice: number;
     totalPrice: number;
     services: Types.ObjectId[];
+    requiredSteps?: IOrderRequiredStep[];
     returnFileFormat: Types.ObjectId;
     instruction?: string;
     status: OrderStatus;
@@ -55,6 +64,7 @@ export interface IOrder extends Document {
     createdAt: Date;
     updatedAt: Date;
 }
+
 
 // Populated version for API responses
 export interface IOrderPopulated extends Omit<

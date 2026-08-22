@@ -31,8 +31,8 @@ export const authorizeProductionAccess = async (
             return next();
         }
 
-        // 2. Team Leader access (must NOT be a telemarketer)
-        if (role === Role.TEAM_LEADER) {
+        // 2. Staff and Team Leader access (must NOT be a telemarketer)
+        if (role === Role.TEAM_LEADER || role === Role.STAFF) {
             const isTM = await isTelemarketer(user.id);
             if (!isTM) {
                 return next();
@@ -44,6 +44,7 @@ export const authorizeProductionAccess = async (
             success: false,
             message: 'Forbidden: You do not have permission to access the production management system.',
         });
+
     } catch (error) {
         console.error('authorizeProductionAccess error:', error);
         return res.status(500).json({

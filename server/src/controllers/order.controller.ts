@@ -99,9 +99,11 @@ async function createOrder(req: Request, res: Response) {
         if (priority) orderData.priority = priority;
         if (notes) orderData.notes = notes;
         if (contactPersonId) orderData.contactPersonId = contactPersonId;
+        if (req.body.requiredSteps) orderData.requiredSteps = req.body.requiredSteps;
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const order = await orderService.createOrderInDB(orderData as any);
+
 
         return res.status(201).json({
             message: 'Order created successfully',

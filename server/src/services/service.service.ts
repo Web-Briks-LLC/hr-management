@@ -7,11 +7,13 @@ async function createServiceInDB(data: {
     name: string;
     description?: string;
     price?: number;
+    steps?: Array<{ name: string; code: string; description?: string; order?: number; isDefault?: boolean }>;
     createdBy: string;
 }): Promise<IService> {
     const service = await ServiceModel.create(data);
     return service;
 }
+
 
 async function getAllServicesFromDB(options: {
     isActive?: boolean | undefined;
@@ -114,6 +116,7 @@ async function updateServiceInDB(
         name?: string;
         description?: string;
         price?: number;
+        steps?: Array<{ name: string; code: string; description?: string; order?: number; isDefault?: boolean }>;
         isActive?: boolean;
     },
 ): Promise<IService | null> {
@@ -122,6 +125,7 @@ async function updateServiceInDB(
         runValidators: true,
     }).lean();
 }
+
 
 async function deleteServiceFromDB(id: string): Promise<IService | null> {
     return ServiceModel.findByIdAndDelete(id).lean();

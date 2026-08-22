@@ -1,9 +1,11 @@
 import OrderModel from '../models/order.model.js';
 import ClientModel from '../models/client.model.js';
+import ServiceModel from '../models/service.model.js';
 import type {
     IOrder,
     OrderStatus,
     OrderPriority,
+    IOrderRequiredStep,
 } from '../types/order.type.js';
 import mongoose from 'mongoose';
 import earningService from './earning.service.js';
@@ -18,6 +20,13 @@ interface CreateOrderData {
     perImagePrice: number;
     totalPrice: number;
     services: string[];
+    requiredSteps?: Array<{
+        stepId?: string;
+        name: string;
+        code: string;
+        serviceId?: any;
+        order?: number;
+    }>;
     returnFileFormat: string;
     instruction?: string;
     priority?: OrderPriority;
@@ -35,6 +44,13 @@ interface UpdateOrderData {
     perImagePrice?: number;
     totalPrice?: number;
     services?: string[];
+    requiredSteps?: Array<{
+        stepId?: string;
+        name: string;
+        code: string;
+        serviceId?: any;
+        order?: number;
+    }>;
     returnFileFormat?: string;
     instruction?: string;
     status?: OrderStatus;
@@ -65,9 +81,42 @@ async function createOrderInDB(data: CreateOrderData): Promise<IOrder> {
     session.startTransaction();
 
     try {
+        // If requiredSteps are not provided, auto-generate them from selected services
+        let resolvedSteps: IOrderRequiredStep[] = data.requiredSteps || [];
+        if (!resolvedSteps || resolvedSteps.length === 0) {
+            const servicesDocs = await ServiceModel.find({
+                _id: { $in: data.services },
+            })
+                .session(session)
+                .lean();
+
+            for (const svc of servicesDocs) {
+                if (svc.steps && svc.steps.length > 0) {
+                    for (const step of svc.steps) {
+                        resolvedSteps.push({
+                            stepId: (step._id as any)?.toString?.() || step.code,
+                            name: step.name,
+                            code: step.code,
+                            serviceId: svc._id,
+                            order: step.order || 0,
+                        });
+                    }
+                } else {
+                    resolvedSteps.push({
+                        stepId: svc._id.toString(),
+                        name: svc.name,
+                        code: svc.name.toLowerCase().replace(/\s+/g, '_'),
+                        serviceId: svc._id,
+                        order: 0,
+                    });
+                }
+            }
+        }
+
         // Create order with initial timeline entry
         const orderData = {
             ...data,
+            requiredSteps: resolvedSteps,
             revisionCount: 0,
             revisionInstructions: [],
             timeline: [
@@ -79,6 +128,7 @@ async function createOrderInDB(data: CreateOrderData): Promise<IOrder> {
                 },
             ],
         };
+
 
         const orders = await (OrderModel as any).create([orderData], { session });
         const order = orders[0];

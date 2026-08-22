@@ -39,6 +39,9 @@ import {
 import { OrderProgressTable } from '@/components/production/order-progress-table';
 import { ShiftHandoverFeed } from '@/components/production/shift-handover-feed';
 import { ProductionStatsView } from '@/components/production/production-stats-view';
+import { ProductionWorkstation } from '@/components/production/production-workstation';
+import { ImageStatusGrid } from '@/components/production/image-status-grid';
+import { StaffPerformanceAnalytics } from '@/components/production/staff-performance-analytics';
 import { LogProductionDialog } from '@/components/production/log-production-dialog';
 import { QCReviewDialog } from '@/components/production/qc-review-dialog';
 import { OrderWorkflowDrawer } from '@/components/production/order-workflow-drawer';
@@ -61,7 +64,12 @@ import {
     BarChart3,
     FileText,
     ShieldAlert,
+    Play,
+    FileImage,
+    Award,
+    UploadCloud,
 } from 'lucide-react';
+
 
 type DateFilterType = 'all' | 'today' | 'week' | 'month' | 'year';
 
@@ -98,14 +106,15 @@ function ProductionContent() {
         userRole as Role
     );
 
-    // Read active tab from URL query params (default to 'orders')
-    const activeTab = searchParams.get('tab') || 'orders';
+    // Read active tab from URL query params (default to 'workstation')
+    const activeTab = searchParams.get('tab') || 'workstation';
 
     const handleTabChange = (newTab: string) => {
         const params = new URLSearchParams(searchParams.toString());
         params.set('tab', newTab);
         router.replace(`${pathname}?${params.toString()}`);
     };
+
 
     // Filter states matching Earnings pattern
     const [filterType, setFilterType] = useState<DateFilterType>('all');
@@ -641,19 +650,38 @@ function ProductionContent() {
 
                     {/* Tabs Navigation with URL Search Query Sync */}
                     <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-                        <TabsList className="grid grid-cols-3 w-full sm:w-[480px] h-10 p-1 bg-muted/60 rounded-xl">
-                            <TabsTrigger value="orders" className="text-xs font-bold gap-1.5 rounded-lg data-[state=active]:shadow-xs">
+                        <TabsList className="flex flex-wrap w-full md:w-auto h-auto p-1 bg-muted/60 rounded-xl gap-1">
+                            <TabsTrigger value="workstation" className="text-xs font-bold gap-1.5 rounded-lg data-[state=active]:shadow-xs py-2 px-3">
+                                <Play className="h-3.5 w-3.5 fill-current" /> Workstation (লাইভ কাজ)
+                            </TabsTrigger>
+                            <TabsTrigger value="images" className="text-xs font-bold gap-1.5 rounded-lg data-[state=active]:shadow-xs py-2 px-3">
+                                <FileImage className="h-3.5 w-3.5" /> Image Tracking (ম্যাট্রিক্স)
+                            </TabsTrigger>
+                            <TabsTrigger value="orders" className="text-xs font-bold gap-1.5 rounded-lg data-[state=active]:shadow-xs py-2 px-3">
                                 <Layers className="h-3.5 w-3.5" /> Active Orders
                             </TabsTrigger>
-                            <TabsTrigger value="logs" className="text-xs font-bold gap-1.5 rounded-lg data-[state=active]:shadow-xs">
+                            <TabsTrigger value="logs" className="text-xs font-bold gap-1.5 rounded-lg data-[state=active]:shadow-xs py-2 px-3">
                                 <FileText className="h-3.5 w-3.5" /> Shift Logs
                             </TabsTrigger>
-                            <TabsTrigger value="analytics" className="text-xs font-bold gap-1.5 rounded-lg data-[state=active]:shadow-xs">
-                                <BarChart3 className="h-3.5 w-3.5" /> Analytics
+                            <TabsTrigger value="staff_analytics" className="text-xs font-bold gap-1.5 rounded-lg data-[state=active]:shadow-xs py-2 px-3">
+                                <Award className="h-3.5 w-3.5" /> Staff Leaderboard
+                            </TabsTrigger>
+                            <TabsTrigger value="analytics" className="text-xs font-bold gap-1.5 rounded-lg data-[state=active]:shadow-xs py-2 px-3">
+                                <BarChart3 className="h-3.5 w-3.5" /> Overview Stats
                             </TabsTrigger>
                         </TabsList>
 
-                        {/* TAB 1: Active Orders Multi-Stage Progression */}
+                        {/* TAB 1: Workstation (Drag & Drop, Stopwatch, Step Completion) */}
+                        <TabsContent value="workstation" className="space-y-6 focus-visible:outline-hidden">
+                            <ProductionWorkstation />
+                        </TabsContent>
+
+                        {/* TAB 2: Image-Level Status Matrix */}
+                        <TabsContent value="images" className="space-y-6 focus-visible:outline-hidden">
+                            <ImageStatusGrid />
+                        </TabsContent>
+
+                        {/* TAB 3: Active Orders Multi-Stage Progression */}
                         <TabsContent value="orders" className="space-y-6 focus-visible:outline-hidden">
                             <OrderProgressTable
                                 orders={activeOrdersData?.data || []}
@@ -673,7 +701,7 @@ function ProductionContent() {
                             />
                         </TabsContent>
 
-                        {/* TAB 2: Shift Production Logs */}
+                        {/* TAB 4: Shift Production Logs */}
                         <TabsContent value="logs" className="space-y-6 focus-visible:outline-hidden">
                             <ShiftHandoverFeed
                                 logs={logsData?.data || []}
@@ -685,7 +713,12 @@ function ProductionContent() {
                             />
                         </TabsContent>
 
-                        {/* TAB 3: Production Analytics */}
+                        {/* TAB 5: Staff Performance Analytics */}
+                        <TabsContent value="staff_analytics" className="space-y-6 focus-visible:outline-hidden">
+                            <StaffPerformanceAnalytics />
+                        </TabsContent>
+
+                        {/* TAB 6: Production Overview Analytics */}
                         <TabsContent value="analytics" className="space-y-6 focus-visible:outline-hidden">
                             <ProductionStatsView
                                 stats={statsData?.data}
@@ -693,6 +726,7 @@ function ProductionContent() {
                             />
                         </TabsContent>
                     </Tabs>
+
                 </CardContent>
             </Card>
 

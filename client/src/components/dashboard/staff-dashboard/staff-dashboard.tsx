@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import StaffHeader from './staff-header';
 import StaffTracking from './staff-tracking';
+import { ProductionQuickWidget } from './production-quick-widget';
 
 import { useGetMonthlyStatsQuery } from '@/redux/features/attendance/attendanceApi';
 import { useGetMeQuery } from '@/redux/features/staff/staffApi';
@@ -77,7 +78,11 @@ export default function StaffDashboard() {
             <ShiftOffNotice />
             <StaffHeader />
 
+            {/* Quick Production Workstation for Photo Editors & Designers */}
+            <ProductionQuickWidget staff={staff} />
+
             <StaffTracking />
+
 
             {/* This Month & Salary */}
             <div className="grid lg:grid-cols-2 gap-6 items-start">

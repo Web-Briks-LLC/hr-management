@@ -3,8 +3,11 @@ import ShiftProductionModel from '../models/shift-production.model.js';
 import OrderModel from '../models/order.model.js';
 import ShiftModel from '../models/shift.model.js';
 import StaffModel from '../models/staff.model.js';
+import OrderImageModel from '../models/order-image.model.js';
+import ProductionWorkSessionModel from '../models/production-session.model.js';
 import { getIO } from '../socket.js';
 import { startOfDay, endOfDay, startOfWeek, endOfWeek } from 'date-fns';
+
 import type {
     ICreateProductionLogDTO,
     IUpdateProductionLogDTO,
@@ -917,6 +920,902 @@ const getProductionStats = async (filters: {
     };
 };
 
+/**
+ * Get sanitized active orders for photo editors (NO client or financial data)
+ */
+const getSanitizedActiveOrders = async (search?: string) => {
+    const query: any = {
+        status: { $in: ['pending', 'in_progress', 'quality_check', 'revision'] },
+    };
+
+    if (search) {
+        query.$or = [
+            { orderName: { $regex: search, $options: 'i' } },
+            { instruction: { $regex: search, $options: 'i' } },
+        ];
+    }
+
+    const orders = await OrderModel.find(query)
+        .select(
+            'orderName deadline originalDeadline imageQuantity services requiredSteps returnFileFormat instruction priority notes status createdAt'
+        )
+        .populate('services', 'name description')
+        .populate('returnFileFormat', 'name extension')
+        .sort({ deadline: 1, createdAt: -1 })
+        .lean();
+
+    // Attach real-time image status summary for each order
+    const orderIds = orders.map((o) => o._id);
+    const imageStats = await OrderImageModel.aggregate([
+        { $match: { orderId: { $in: orderIds } } },
+        {
+            $group: {
+                _id: '$orderId',
+                totalRegistered: { $sum: 1 },
+                completedCount: {
+                    $sum: { $cond: [{ $eq: ['$status', 'completed'] }, 1, 0] },
+                },
+                inProgressCount: {
+                    $sum: { $cond: [{ $eq: ['$status', 'in_progress'] }, 1, 0] },
+                },
+                partiallyCompletedCount: {
+                    $sum: {
+                        $cond: [{ $eq: ['$status', 'partially_completed'] }, 1, 0],
+                    },
+                },
+                revisionCount: {
+                    $sum: { $cond: [{ $eq: ['$status', 'in_revision'] }, 1, 0] },
+                },
+            },
+        },
+    ]);
+
+    const statsMap = new Map<string, any>();
+    imageStats.forEach((stat) => {
+        statsMap.set(stat._id.toString(), stat);
+    });
+
+    return orders.map((order) => {
+        const stats = statsMap.get(order._id.toString()) || {
+            totalRegistered: 0,
+            completedCount: 0,
+            inProgressCount: 0,
+            partiallyCompletedCount: 0,
+            revisionCount: 0,
+        };
+
+        return {
+            _id: order._id,
+            orderName: order.orderName,
+            deadline: order.deadline,
+            originalDeadline: order.originalDeadline,
+            imageQuantity: order.imageQuantity,
+            services: order.services,
+            requiredSteps: order.requiredSteps || [],
+            returnFileFormat: order.returnFileFormat,
+            instruction: order.instruction,
+            priority: order.priority,
+            notes: order.notes,
+            status: order.status,
+            createdAt: order.createdAt,
+            imageStats: {
+                totalExpected: order.imageQuantity,
+                totalRegistered: stats.totalRegistered,
+                completedCount: stats.completedCount,
+                inProgressCount: stats.inProgressCount,
+                partiallyCompletedCount: stats.partiallyCompletedCount,
+                revisionCount: stats.revisionCount,
+                unassignedCount: Math.max(
+                    0,
+                    order.imageQuantity -
+                        (stats.completedCount +
+                            stats.inProgressCount +
+                            stats.partiallyCompletedCount +
+                            stats.revisionCount)
+                ),
+            },
+        };
+    });
+};
+
+/**
+ * Get detailed image tracking matrix for an order
+ */
+const getOrderImageStatus = async (
+    orderId: string,
+    statusFilter?: string,
+    search?: string
+) => {
+    const order = await OrderModel.findById(orderId)
+        .select('orderName deadline imageQuantity requiredSteps instruction')
+        .lean();
+
+    if (!order) {
+        throw new Error('Order not found');
+    }
+
+    const query: any = {
+        orderId: new Types.ObjectId(orderId),
+    };
+
+    if (statusFilter && statusFilter !== 'all') {
+        query.status = statusFilter;
+    }
+
+    if (search) {
+        query.imageName = { $regex: search, $options: 'i' };
+    }
+
+    const images = await OrderImageModel.find(query)
+        .populate({
+            path: 'currentAssignedStaffId',
+            select: 'name staffId employeeId designation branchId',
+        })
+        .populate({
+            path: 'completedSteps.completedBy',
+            select: 'name staffId designation',
+        })
+        .populate({
+            path: 'revisionHistory.requestedBy',
+            select: 'name email role',
+        })
+        .sort({ updatedAt: -1, imageName: 1 })
+        .lean();
+
+    const summaryStats = await OrderImageModel.aggregate([
+        { $match: { orderId: new Types.ObjectId(orderId) } },
+        {
+            $group: {
+                _id: null,
+                totalRegistered: { $sum: 1 },
+                completedCount: {
+                    $sum: { $cond: [{ $eq: ['$status', 'completed'] }, 1, 0] },
+                },
+                inProgressCount: {
+                    $sum: { $cond: [{ $eq: ['$status', 'in_progress'] }, 1, 0] },
+                },
+                partiallyCompletedCount: {
+                    $sum: {
+                        $cond: [{ $eq: ['$status', 'partially_completed'] }, 1, 0],
+                    },
+                },
+                revisionCount: {
+                    $sum: { $cond: [{ $eq: ['$status', 'in_revision'] }, 1, 0] },
+                },
+            },
+        },
+    ]);
+
+    const stats = summaryStats[0] || {
+        totalRegistered: 0,
+        completedCount: 0,
+        inProgressCount: 0,
+        partiallyCompletedCount: 0,
+        revisionCount: 0,
+    };
+
+    return {
+        order: {
+            _id: order._id,
+            orderName: order.orderName,
+            deadline: order.deadline,
+            imageQuantity: order.imageQuantity,
+            requiredSteps: order.requiredSteps || [],
+            instruction: order.instruction,
+        },
+        images,
+        summary: {
+            totalExpected: order.imageQuantity,
+            totalRegistered: stats.totalRegistered,
+            completedCount: stats.completedCount,
+            inProgressCount: stats.inProgressCount,
+            partiallyCompletedCount: stats.partiallyCompletedCount,
+            revisionCount: stats.revisionCount,
+            unassignedCount: Math.max(
+                0,
+                order.imageQuantity -
+                    (stats.completedCount +
+                        stats.inProgressCount +
+                        stats.partiallyCompletedCount +
+                        stats.revisionCount)
+            ),
+        },
+    };
+};
+
+/**
+ * Start a photo editor work session with image concurrency lock
+ */
+const startWorkSession = async (
+    payload: { orderId: string; imageNames: string[]; shiftId?: string | undefined },
+    userId: string
+) => {
+    const staff = await StaffModel.findOne({ userId })
+        .populate('userId', 'name email')
+        .lean();
+    if (!staff) {
+        throw new Error('Staff profile not found for this user');
+    }
+    const staffName = (staff.userId as any)?.name || 'Editor';
+
+    const order = await OrderModel.findById(payload.orderId).lean();
+    if (!order) {
+        throw new Error('Order not found');
+    }
+
+    // Check if staff already has an active work session
+    const existingActiveSession = await ProductionWorkSessionModel.findOne({
+        staffId: staff._id,
+        status: 'active',
+    }).populate('orderId', 'orderName deadline').lean();
+
+    if (existingActiveSession) {
+        throw new Error(
+            `You already have an active work session on order "${
+                (existingActiveSession.orderId as any)?.orderName || 'Order'
+            }". Please finish or cancel it before starting a new one.`
+        );
+    }
+
+    // Deduplicate image names and trim
+    const cleanImageNames = Array.from(
+        new Set(payload.imageNames.map((name) => name.trim()).filter(Boolean))
+    );
+
+    if (cleanImageNames.length === 0) {
+        throw new Error('No valid image names provided');
+    }
+
+    // Concurrency Lock Check: Are any of these images currently locked by someone else?
+    const lockedImages = await OrderImageModel.find({
+        orderId: new Types.ObjectId(payload.orderId),
+        imageName: { $in: cleanImageNames },
+        status: 'in_progress',
+        currentAssignedStaffId: { $ne: null, $nin: [staff._id] },
+    })
+        .populate('currentAssignedStaffId', 'name staffId')
+        .lean();
+
+    if (lockedImages.length > 0) {
+        const lockedDetails = lockedImages
+            .map(
+                (img: any) =>
+                    `"${img.imageName}" (locked by ${img.currentAssignedStaffId?.name || 'another editor'})`
+            )
+            .join(', ');
+        throw new Error(
+            `Cannot start work. The following images are currently locked by another editor: ${lockedDetails}`
+        );
+    }
+
+    // Determine shift ID (from payload, or first active shift in staff's branch)
+    let shiftId: Types.ObjectId | undefined = payload.shiftId ? new Types.ObjectId(payload.shiftId) : undefined;
+    if (!shiftId && staff.branchId) {
+        const anyShift = await ShiftModel.findOne({ branchId: staff.branchId as Types.ObjectId }).lean();
+        if (anyShift) {
+            shiftId = anyShift._id as Types.ObjectId;
+        }
+    }
+
+    // Create active ProductionWorkSession
+    const session = (await (ProductionWorkSessionModel as any).create({
+        staffId: staff._id,
+        orderId: order._id,
+        shiftId: shiftId || null,
+        branchId: (staff.branchId as Types.ObjectId) || null,
+        imageNames: cleanImageNames,
+        imageCount: cleanImageNames.length,
+        startTime: new Date(),
+        status: 'active',
+        completedSteps: [],
+    })) as any;
+
+
+    // Derive required steps from order snapshot or default list
+    const orderRequiredStepNames =
+        order.requiredSteps && order.requiredSteps.length > 0
+            ? order.requiredSteps.map((s) => s.name)
+            : ['Editing & Retouching'];
+
+    // Upsert and Lock each image to this staff and session
+    const bulkOps = cleanImageNames.map((imgName) => ({
+        updateOne: {
+            filter: {
+                orderId: order._id,
+                imageName: imgName,
+            },
+            update: {
+                $setOnInsert: {
+                    requiredSteps: orderRequiredStepNames,
+                    completedSteps: [],
+                    isRevision: false,
+                    revisionHistory: [],
+                },
+                $set: {
+                    status: 'in_progress',
+                    currentAssignedStaffId: staff._id,
+                    currentSessionId: session._id,
+                    lockedAt: new Date(),
+                },
+            },
+            upsert: true,
+        },
+    }));
+
+    await OrderImageModel.bulkWrite(bulkOps);
+
+    // Update order status to in_progress if currently pending
+    if (order.status === 'pending') {
+        await OrderModel.findByIdAndUpdate(order._id, {
+            status: 'in_progress',
+        });
+    }
+
+    // Real-time broadcast
+    notifyProductionUpdate('production:session_started', {
+        sessionId: session._id,
+        orderId: order._id,
+        orderName: order.orderName,
+        staffId: staff._id,
+        staffName,
+        imageCount: cleanImageNames.length,
+    });
+
+    notifyProductionUpdate('production:images_locked', {
+        orderId: order._id,
+        imageNames: cleanImageNames,
+        lockedBy: {
+            _id: staff._id,
+            name: staffName,
+        },
+    });
+
+    return {
+        session,
+        lockedCount: cleanImageNames.length,
+        order: {
+            _id: order._id,
+            orderName: order.orderName,
+            deadline: order.deadline,
+            requiredSteps: order.requiredSteps || [],
+        },
+    };
+};
+
+/**
+ * Get current active work session for a staff user
+ */
+const getActiveWorkSession = async (userId: string) => {
+    const staff = await StaffModel.findOne({ userId }).lean();
+    if (!staff) {
+        return null;
+    }
+
+    const session = await ProductionWorkSessionModel.findOne({
+        staffId: staff._id,
+        status: 'active',
+    })
+        .populate({
+            path: 'orderId',
+            select: 'orderName deadline requiredSteps instruction notes priority',
+            populate: {
+                path: 'services',
+                select: 'name description',
+            },
+        })
+        .lean();
+
+    return session;
+};
+
+/**
+ * Finish a work session, record completed steps per image, release locks, and update shift production
+ */
+const finishWorkSession = async (
+    payload: {
+        sessionId: string;
+        completedSteps: string[];
+        notes?: string | undefined;
+    },
+    userId: string
+) => {
+
+    const staff = await StaffModel.findOne({ userId }).lean();
+    if (!staff) {
+        throw new Error('Staff profile not found');
+    }
+
+    const session = await ProductionWorkSessionModel.findById(payload.sessionId);
+    if (!session) {
+        throw new Error('Work session not found');
+    }
+
+    if (session.staffId.toString() !== staff._id.toString()) {
+        throw new Error('You are not authorized to finish this work session');
+    }
+
+    if (session.status !== 'active') {
+        throw new Error('This work session is already closed or cancelled');
+    }
+
+    const now = new Date();
+    const durationSeconds = Math.max(
+        1,
+        Math.floor((now.getTime() - session.startTime.getTime()) / 1000)
+    );
+
+    const order = await OrderModel.findById(session.orderId).lean();
+    const orderRequiredSteps =
+        order?.requiredSteps && order.requiredSteps.length > 0
+            ? order.requiredSteps.map((s) => s.name)
+            : ['Editing & Retouching'];
+
+    // Update each image in this session
+    const images = await OrderImageModel.find({
+        orderId: session.orderId,
+        imageName: { $in: session.imageNames },
+    });
+
+    for (const image of images) {
+        // Append completed steps
+        for (const stepName of payload.completedSteps) {
+            image.completedSteps.push({
+                stepName,
+                completedBy: staff._id,
+                shiftId: session.shiftId || null,
+                completedAt: now,
+                durationSeconds: Math.floor(durationSeconds / session.imageCount),
+                sessionId: session._id,
+            });
+        }
+
+        // Determine if all required steps are completed
+        const requiredStepsList =
+            image.requiredSteps && image.requiredSteps.length > 0
+                ? image.requiredSteps
+                : orderRequiredSteps;
+
+        const completedSet = new Set(image.completedSteps.map((s) => s.stepName));
+        const isAllDone = requiredStepsList.every((reqStep) => completedSet.has(reqStep));
+
+        if (isAllDone && requiredStepsList.length > 0) {
+            image.status = 'completed';
+        } else {
+            image.status = 'partially_completed';
+        }
+
+        // Release concurrency lock so other editors can work on remaining steps
+        image.currentAssignedStaffId = null as any;
+        image.currentSessionId = null as any;
+        image.lockedAt = null as any;
+
+        // If it was a revision, mark resolved
+        if (image.isRevision) {
+            image.isRevision = false;
+            if (image.revisionHistory && image.revisionHistory.length > 0) {
+                const lastRev = image.revisionHistory[image.revisionHistory.length - 1];
+                if (lastRev && !lastRev.resolvedAt) {
+                    lastRev.resolvedAt = now;
+                    lastRev.resolvedBy = staff._id;
+                }
+            }
+        }
+
+        await image.save();
+    }
+
+    // Update session record
+    session.status = 'completed';
+    session.endTime = now;
+    session.durationSeconds = durationSeconds;
+    session.completedSteps = payload.completedSteps;
+    if (payload.notes) session.notes = payload.notes;
+    await session.save();
+
+    // Auto-sync into daily shift production record for seamless supervisor reporting
+    try {
+        if (session.shiftId) {
+            const startOfToday = new Date(now);
+            startOfToday.setHours(0, 0, 0, 0);
+            const endOfToday = new Date(now);
+            endOfToday.setHours(23, 59, 59, 999);
+
+            const existingShiftLog = await ShiftProductionModel.findOne({
+                orderId: session.orderId,
+                shiftId: session.shiftId,
+                date: { $gte: startOfToday, $lte: endOfToday },
+                'qc.checkedAt': { $exists: false },
+            });
+
+            if (existingShiftLog) {
+                existingShiftLog.completedQuantity =
+                    (existingShiftLog.completedQuantity || 0) + session.imageCount;
+                const matchStaff = existingShiftLog.assignedStaffs.find(
+                    (s) => s.staffId.toString() === staff._id.toString()
+                );
+                if (matchStaff) {
+                    matchStaff.imageCount = (matchStaff.imageCount || 0) + session.imageCount;
+                } else {
+                    existingShiftLog.assignedStaffs.push({
+                        staffId: staff._id,
+                        imageCount: session.imageCount,
+                        notes: payload.completedSteps.join(', '),
+                    });
+                }
+                await existingShiftLog.save();
+            } else {
+                await (ShiftProductionModel as any).create({
+                    orderId: session.orderId,
+                    shiftId: session.shiftId,
+                    branchId: session.branchId || staff.branchId,
+                    date: now,
+                    teamLeaderId: staff.userId,
+                    stage: 'other',
+                    customStageName: payload.completedSteps.join(', '),
+                    completedQuantity: session.imageCount,
+                    targetQuantity: session.imageCount,
+                    status: 'completed',
+                    assignedStaffs: [
+                        {
+                            staffId: staff._id,
+                            imageCount: session.imageCount,
+                            notes: payload.completedSteps.join(', '),
+                        },
+                    ],
+                });
+            }
+        }
+    } catch (shiftSyncErr) {
+        console.error('Failed to sync session with shift log:', shiftSyncErr);
+    }
+
+
+    // Check if entire order is completed
+    const remainingIncompleteImages = await OrderImageModel.countDocuments({
+        orderId: session.orderId,
+        status: { $ne: 'completed' },
+    });
+
+    const totalOrderImages = await OrderImageModel.countDocuments({
+        orderId: session.orderId,
+    });
+
+    if (
+        totalOrderImages >= (order?.imageQuantity || 1) &&
+        remainingIncompleteImages === 0
+    ) {
+        await OrderModel.findByIdAndUpdate(session.orderId, {
+            status: 'quality_check',
+        });
+    }
+
+    // Broadcast real-time update
+    notifyProductionUpdate('production:session_finished', {
+        sessionId: session._id,
+        orderId: session.orderId,
+        staffId: staff._id,
+        imageCount: session.imageCount,
+        completedSteps: payload.completedSteps,
+        durationSeconds,
+    });
+
+    notifyProductionUpdate('production:images_updated', {
+        orderId: session.orderId,
+    });
+
+    return {
+        session,
+        durationSeconds,
+        imagesCompleted: session.imageCount,
+        completedSteps: payload.completedSteps,
+    };
+};
+
+/**
+ * Cancel an active work session and release locks
+ */
+const cancelWorkSession = async (
+    sessionId: string,
+    userId: string,
+    reason?: string
+) => {
+    const staff = await StaffModel.findOne({ userId }).lean();
+    if (!staff) {
+        throw new Error('Staff profile not found');
+    }
+
+    const session = await ProductionWorkSessionModel.findById(sessionId);
+    if (!session) {
+        throw new Error('Work session not found');
+    }
+
+    if (session.staffId.toString() !== staff._id.toString()) {
+        throw new Error('You are not authorized to cancel this session');
+    }
+
+    if (session.status !== 'active') {
+        throw new Error('Session is not currently active');
+    }
+
+    // Unlock images in OrderImage
+    const images = await OrderImageModel.find({
+        orderId: session.orderId,
+        imageName: { $in: session.imageNames },
+        currentSessionId: session._id,
+    });
+
+    for (const img of images) {
+        img.currentAssignedStaffId = null as any;
+        img.currentSessionId = null as any;
+        img.lockedAt = null as any;
+        if (img.completedSteps && img.completedSteps.length > 0) {
+            img.status = 'partially_completed';
+        } else {
+            img.status = 'unassigned';
+        }
+        await img.save();
+    }
+
+    session.status = 'cancelled';
+    session.endTime = new Date();
+    if (reason) session.notes = reason;
+    await session.save();
+
+    notifyProductionUpdate('production:session_cancelled', {
+        sessionId: session._id,
+        orderId: session.orderId,
+    });
+
+    notifyProductionUpdate('production:images_updated', {
+        orderId: session.orderId,
+    });
+
+    return { success: true, message: 'Work session cancelled and images unlocked' };
+};
+
+/**
+ * Flag specific images in an order for revision
+ */
+const flagImageRevision = async (
+    payload: {
+        orderId: string;
+        imageNames: string[];
+        instruction: string;
+    },
+    userId: string
+) => {
+    const order = await OrderModel.findById(payload.orderId);
+    if (!order) {
+        throw new Error('Order not found');
+    }
+
+    const now = new Date();
+
+    for (const imgName of payload.imageNames) {
+        let orderImage = await OrderImageModel.findOne({
+            orderId: order._id,
+            imageName: imgName.trim(),
+        });
+
+        if (!orderImage) {
+            orderImage = new OrderImageModel({
+                orderId: order._id,
+                imageName: imgName.trim(),
+                requiredSteps:
+                    order.requiredSteps?.map((s) => s.name) || ['Editing & Retouching'],
+                completedSteps: [],
+            });
+        }
+
+        orderImage.status = 'in_revision';
+        orderImage.isRevision = true;
+        orderImage.currentAssignedStaffId = null as any;
+        orderImage.currentSessionId = null as any;
+        orderImage.lockedAt = null as any;
+        orderImage.revisionHistory.push({
+            instruction: payload.instruction,
+            requestedBy: new Types.ObjectId(userId),
+            createdAt: now,
+        });
+
+        await orderImage.save();
+    }
+
+    // Update order status to revision
+    order.status = 'revision';
+    order.revisionCount = (order.revisionCount || 0) + 1;
+    order.revisionInstructions.push({
+        instruction: payload.instruction,
+        createdAt: now,
+        createdBy: new Types.ObjectId(userId),
+    });
+    await order.save();
+
+    notifyProductionUpdate('production:images_updated', {
+        orderId: order._id,
+    });
+
+    return {
+        success: true,
+        message: `${payload.imageNames.length} image(s) flagged for revision`,
+    };
+};
+
+/**
+ * Detailed staff performance analytics (Hourly, Daily, Monthly, Yearly, Shift-wise)
+ */
+const getStaffPerformanceAnalytics = async (filters: {
+    startDate?: string | undefined;
+    endDate?: string | undefined;
+    month?: number | undefined;
+    year?: number | undefined;
+    staffId?: string | undefined;
+    shiftId?: string | undefined;
+    branchId?: string | undefined;
+    filterType?: string | undefined;
+}) => {
+
+    const query: any = {
+        status: 'completed',
+    };
+
+    if (filters.staffId && filters.staffId !== 'all') {
+        query.staffId = new Types.ObjectId(filters.staffId);
+    }
+
+    if (filters.shiftId && filters.shiftId !== 'all') {
+        query.shiftId = new Types.ObjectId(filters.shiftId);
+    }
+
+    if (filters.branchId && filters.branchId !== 'all') {
+        query.branchId = new Types.ObjectId(filters.branchId);
+    }
+
+    // Date range filters
+    const now = new Date();
+    if (filters.filterType === 'today') {
+        query.startTime = { $gte: startOfDay(now), $lte: endOfDay(now) };
+    } else if (filters.filterType === 'week') {
+        query.startTime = { $gte: startOfWeek(now), $lte: endOfWeek(now) };
+    } else if (filters.filterType === 'month' || (filters.month && filters.year)) {
+        const m = filters.month || now.getMonth() + 1;
+        const y = filters.year || now.getFullYear();
+        const start = new Date(y, m - 1, 1);
+        const end = new Date(y, m, 0, 23, 59, 59, 999);
+        query.startTime = { $gte: start, $lte: end };
+    } else if (filters.filterType === 'year' || filters.year) {
+        const y = filters.year || now.getFullYear();
+        const start = new Date(y, 0, 1);
+        const end = new Date(y, 11, 31, 23, 59, 59, 999);
+        query.startTime = { $gte: start, $lte: end };
+    } else if (filters.startDate && filters.endDate) {
+        query.startTime = {
+            $gte: new Date(filters.startDate),
+            $lte: new Date(filters.endDate),
+        };
+    }
+
+    // 1. Staff Leaderboard & Individual Output
+    const staffSummary = await ProductionWorkSessionModel.aggregate([
+        { $match: query },
+        {
+            $group: {
+                _id: '$staffId',
+                totalSessions: { $sum: 1 },
+                totalImages: { $sum: '$imageCount' },
+                totalDurationSeconds: { $sum: '$durationSeconds' },
+                completedSteps: { $push: '$completedSteps' },
+            },
+        },
+        {
+            $lookup: {
+                from: 'staffs',
+                localField: '_id',
+                foreignField: '_id',
+                as: 'staffInfo',
+            },
+        },
+        { $unwind: '$staffInfo' },
+        {
+            $project: {
+                staffId: '$_id',
+                staffName: '$staffInfo.name',
+                employeeId: '$staffInfo.staffId',
+                designation: '$staffInfo.designation',
+                totalSessions: 1,
+                totalImages: 1,
+                totalDurationSeconds: 1,
+                totalHours: {
+                    $round: [{ $divide: ['$totalDurationSeconds', 3600] }, 2],
+                },
+                avgSecondsPerImage: {
+                    $cond: [
+                        { $gt: ['$totalImages', 0] },
+                        { $round: [{ $divide: ['$totalDurationSeconds', '$totalImages'] }, 0] },
+                        0,
+                    ],
+                },
+                completedSteps: 1,
+            },
+        },
+        { $sort: { totalImages: -1 } },
+    ]);
+
+    // 2. Shift-wise performance comparison
+    const shiftOutput = await ProductionWorkSessionModel.aggregate([
+        { $match: query },
+        {
+            $group: {
+                _id: '$shiftId',
+                totalImages: { $sum: '$imageCount' },
+                totalSessions: { $sum: 1 },
+                totalDurationSeconds: { $sum: '$durationSeconds' },
+            },
+        },
+        {
+            $lookup: {
+                from: 'shifts',
+                localField: '_id',
+                foreignField: '_id',
+                as: 'shiftInfo',
+            },
+        },
+        { $unwind: { path: '$shiftInfo', preserveNullAndEmptyArrays: true } },
+        {
+            $project: {
+                shiftId: '$_id',
+                shiftName: { $ifNull: ['$shiftInfo.name', 'General Shift'] },
+                shiftCode: '$shiftInfo.shiftCode',
+                totalImages: 1,
+                totalSessions: 1,
+                totalHours: {
+                    $round: [{ $divide: ['$totalDurationSeconds', 3600] }, 2],
+                },
+            },
+        },
+        { $sort: { totalImages: -1 } },
+    ]);
+
+    // 3. Step/Sub-Service Breakdown
+    const stepBreakdownMap: Record<string, number> = {};
+    staffSummary.forEach((s) => {
+        (s.completedSteps || []).forEach((stepList: string[]) => {
+            (stepList || []).forEach((step) => {
+                stepBreakdownMap[step] = (stepBreakdownMap[step] || 0) + 1;
+            });
+        });
+    });
+
+    // 4. Overall Totals
+    const totalImagesAgg = staffSummary.reduce((acc, s) => acc + s.totalImages, 0);
+    const totalSessionsAgg = staffSummary.reduce((acc, s) => acc + s.totalSessions, 0);
+    const totalHoursAgg = staffSummary.reduce((acc, s) => acc + s.totalHours, 0);
+
+    return {
+        summary: {
+            totalImages: totalImagesAgg,
+            totalSessions: totalSessionsAgg,
+            totalHours: Number(totalHoursAgg.toFixed(2)),
+            activeStaffCount: staffSummary.length,
+        },
+        staffPerformance: staffSummary.map((s) => ({
+            staffId: s.staffId,
+            staffName: s.staffName,
+            employeeId: s.employeeId,
+            designation: s.designation,
+            totalSessions: s.totalSessions,
+            totalImages: s.totalImages,
+            totalHours: s.totalHours,
+            avgSecondsPerImage: s.avgSecondsPerImage,
+        })),
+        shiftPerformance: shiftOutput,
+        stepBreakdown: Object.entries(stepBreakdownMap).map(([step, count]) => ({
+            stepName: step,
+            count,
+        })),
+    };
+};
+
 const productionService = {
     createProductionLog,
     getAllProductionLogs,
@@ -926,6 +1825,15 @@ const productionService = {
     submitQCReview,
     deleteProductionLog,
     getProductionStats,
+    getSanitizedActiveOrders,
+    getOrderImageStatus,
+    startWorkSession,
+    getActiveWorkSession,
+    finishWorkSession,
+    cancelWorkSession,
+    flagImageRevision,
+    getStaffPerformanceAnalytics,
 };
 
 export default productionService;
+

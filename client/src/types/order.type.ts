@@ -9,11 +9,21 @@ export type OrderStatus =
 
 export type OrderPriority = "low" | "normal" | "high" | "urgent";
 
+export interface IServiceStep {
+    _id?: string;
+    name: string;
+    code: string;
+    description?: string;
+    order?: number;
+    isDefault?: boolean;
+}
+
 export interface IService {
     _id: string;
     name: string;
     description?: string;
     price?: number;
+    steps?: IServiceStep[];
     isActive: boolean;
     createdBy: string;
     createdAt: string;
@@ -46,6 +56,14 @@ export interface ITimelineEntry {
     note?: string;
 }
 
+export interface IOrderRequiredStep {
+    stepId?: string;
+    name: string;
+    code: string;
+    serviceId?: string;
+    order?: number;
+}
+
 export interface IOrder {
     _id: string;
     orderName: string;
@@ -71,6 +89,7 @@ export interface IOrder {
         _id: string;
         name: string;
     }[];
+    requiredSteps?: IOrderRequiredStep[];
     returnFileFormat: {
         _id: string;
         name: string;
@@ -96,6 +115,7 @@ export interface IOrder {
     createdAt: string;
     updatedAt: string;
 }
+
 
 export interface IOrderStats {
     total: number;

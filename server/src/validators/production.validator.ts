@@ -76,7 +76,41 @@ export const shiftHandoverSchema = z.object({
     bottlenecks: z.string().max(2000).optional(),
 });
 
+export const startWorkSessionSchema = z.object({
+    orderId: z.string({ message: 'Order ID is required' }),
+    imageNames: z
+        .array(z.string().min(1, 'Image name cannot be empty'))
+        .min(1, 'At least one image name is required'),
+    shiftId: z.string().optional(),
+});
+
+export const finishWorkSessionSchema = z.object({
+    sessionId: z.string({ message: 'Session ID is required' }),
+    completedSteps: z
+        .array(z.string().min(1, 'Step name cannot be empty'))
+        .min(1, 'Select at least one completed step'),
+    notes: z.string().max(1000).optional(),
+});
+
+export const cancelWorkSessionSchema = z.object({
+    sessionId: z.string({ message: 'Session ID is required' }),
+    reason: z.string().max(500).optional(),
+});
+
+export const flagImageRevisionSchema = z.object({
+    orderId: z.string({ message: 'Order ID is required' }),
+    imageNames: z
+        .array(z.string().min(1, 'Image name cannot be empty'))
+        .min(1, 'At least one image name is required'),
+    instruction: z.string().min(1, 'Revision instruction is required').max(2000),
+});
+
 export type CreateProductionLogInput = z.infer<typeof createProductionLogSchema>;
 export type UpdateProductionLogInput = z.infer<typeof updateProductionLogSchema>;
 export type SubmitQCReviewInput = z.infer<typeof submitQCReviewSchema>;
 export type ShiftHandoverInput = z.infer<typeof shiftHandoverSchema>;
+export type StartWorkSessionInput = z.infer<typeof startWorkSessionSchema>;
+export type FinishWorkSessionInput = z.infer<typeof finishWorkSessionSchema>;
+export type CancelWorkSessionInput = z.infer<typeof cancelWorkSessionSchema>;
+export type FlagImageRevisionInput = z.infer<typeof flagImageRevisionSchema>;
+
