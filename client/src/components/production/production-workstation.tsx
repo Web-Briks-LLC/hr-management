@@ -114,7 +114,12 @@ export function ProductionWorkstation() {
     const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
 
     const activeSession = activeSessionData?.data;
-    const orders = ordersData?.data || [];
+    const orders = useMemo(() => {
+        return [...(ordersData?.data || [])].sort(
+            (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+        );
+    }, [ordersData]);
+
 
     // Selected order details
     const activeOrder = useMemo(() => {
@@ -219,7 +224,7 @@ export function ProductionWorkstation() {
             const set = new Set([...prev, ...revNames]);
             return Array.from(set);
         });
-        toast.info(`Added ${revNames.length} revision image(s) to staging.`);
+        toast.info(`Added ${revNames.length} revision image(s) to staging queue.`);
     };
 
     // Format stopwatch seconds (HH:MM:SS)
@@ -321,7 +326,7 @@ export function ProductionWorkstation() {
 
     return (
         <div className="space-y-6">
-            {/* 1. ACTIVE LIVE SESSION BANNER & STOPWATCH (Sticky/High Priority) */}
+            {/* 1. ACTIVE LIVE SESSION BANNER & STOPWATCH */}
             {activeSession ? (
                 <div className="relative overflow-hidden rounded-2xl border-2 border-emerald-500/40 bg-linear-to-r from-emerald-500/15 via-emerald-500/5 to-card p-6 shadow-xl shadow-emerald-500/10">
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -384,7 +389,7 @@ export function ProductionWorkstation() {
                                     className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-md h-10 px-5 gap-1.5"
                                 >
                                     <CheckCircle2 className="h-4 w-4" />
-                                    Finish Work (কাজ শেষ)
+                                    Finish Work
                                 </Button>
                                 <Button
                                     variant="outline"
@@ -419,17 +424,17 @@ export function ProductionWorkstation() {
                 </div>
             ) : null}
 
-            {/* 2. MAIN WORKSTATION WORKSPACE (Order Selector + Drag & Drop) */}
+            {/* 2. MAIN WORKSTATION WORKSPACE */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* LEFT COL: Order Selection & Step Breakdown (1 Col) */}
+                {/* LEFT COL: Order Selection & Step Breakdown */}
                 <Card className="lg:col-span-1 border-border/60 shadow-sm flex flex-col justify-between">
                     <CardHeader className="pb-3">
                         <CardTitle className="text-lg font-bold flex items-center gap-2">
                             <Layers className="h-5 w-5 text-primary" />
-                            ১. অর্ডার সিলেক্ট করুন (Select Order)
+                            1. Select Order
                         </CardTitle>
                         <CardDescription className="text-xs">
-                            প্রোডাকশন ফ্লোরের যে অর্ডারে কাজ করতে চান তার Order ID সিলেক্ট করুন।
+                            Select the Order ID you want to work on from the active production floor.
                         </CardDescription>
                     </CardHeader>
 
@@ -534,7 +539,7 @@ export function ProductionWorkstation() {
                                 {/* Order Steps Required */}
                                 <div className="space-y-1.5 pt-2 border-t border-border/50">
                                     <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
-                                        Required Core Steps (কাজের ধাপসমূহ):
+                                        Required Core Steps:
                                     </span>
                                     <div className="flex flex-wrap gap-1.5">
                                         {((activeOrder as any).requiredSteps || []).map(
@@ -580,7 +585,7 @@ export function ProductionWorkstation() {
                                             {revisionImages.length} Image(s) in Revision!
                                         </div>
                                         <p className="text-[11px] text-muted-foreground">
-                                            এই অর্ডারের কিছু ইমেজে রিভিশন এসেছে। রিভিশন ইমেজে কাজ করতে নিচের বাটনে ক্লিক করুন।
+                                            Some images in this order require revision. Click below to load revision images.
                                         </p>
                                         <Button
                                             size="sm"
@@ -597,26 +602,26 @@ export function ProductionWorkstation() {
                         ) : (
                             <div className="h-40 border border-dashed rounded-xl flex flex-col items-center justify-center text-center p-4 text-muted-foreground gap-2">
                                 <Layers className="h-8 w-8 opacity-20" />
-                                <p className="text-xs font-medium">কোনো অর্ডার সিলেক্ট করা হয়নি</p>
+                                <p className="text-xs font-medium">No order selected</p>
                                 <p className="text-[11px] opacity-70">
-                                    কাজের ধাপ এবং ইমেজের অগ্রগতি দেখতে উপরে একটি Order ID সিলেক্ট করুন।
+                                    Select an Order ID above to view required steps and progress.
                                 </p>
                             </div>
                         )}
                     </CardContent>
                 </Card>
 
-                {/* RIGHT COL: Drag & Drop Zone + Staging Table (2 Cols) */}
+                {/* RIGHT COL: Drag & Drop Zone + Staging Table */}
                 <Card className="lg:col-span-2 border-border/60 shadow-sm flex flex-col justify-between">
                     <CardHeader className="pb-3">
                         <div className="flex items-center justify-between">
                             <div>
                                 <CardTitle className="text-lg font-bold flex items-center gap-2">
                                     <UploadCloud className="h-5 w-5 text-primary" />
-                                    ২. ইমেজ ড্র্যাগ অ্যান্ড ড্রপ (Drag &amp; Drop Images)
+                                    2. Drag &amp; Drop Images
                                 </CardTitle>
                                 <CardDescription className="text-xs">
-                                    যে ছবিগুলোতে কাজ করবেন সেগুলো ড্রপ করুন (ছবি আপলোড হবে না, শুধু নাম সিলেক্ট হবে)।
+                                    Drop the files you want to work on (Zero byte upload, filenames extracted locally).
                                 </CardDescription>
                             </div>
 
@@ -647,11 +652,11 @@ export function ProductionWorkstation() {
                             <div className="space-y-1">
                                 <h4 className="font-bold text-sm text-foreground">
                                     {isDragActive
-                                        ? 'ছবিগুলো এখানে ড্রপ করুন...'
-                                        : 'কম্পিউটার থেকে ছবি ড্র্যাগ অ্যান্ড ড্রপ করুন অথবা ব্রাউজ করুন'}
+                                        ? 'Drop the images here...'
+                                        : 'Drag & drop image files from your computer or click to browse'}
                                 </h4>
                                 <p className="text-xs text-muted-foreground max-w-sm">
-                                    ফাইলের সাইজ নিয়ে চিন্তা নেই; সার্ভারে কোনো ডেটা আপলোড হবে না, শুধুমাত্র স্বয়ংক্রিয়ভাবে নামগুলো নেওয়া হবে।
+                                    No file size limits. Images are never uploaded to the server; only their names are registered into your work batch.
                                 </p>
                             </div>
                         </div>
@@ -662,7 +667,7 @@ export function ProductionWorkstation() {
                                 <div className="flex items-center justify-between">
                                     <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
                                         <FileCheck2 className="h-4 w-4 text-emerald-500" />
-                                        কাজের জন্য প্রস্তুত ইমেজসমূহ ({stagedFiles.length}):
+                                        Ready for Work Batch ({stagedFiles.length}):
                                     </span>
                                     <Button
                                         variant="ghost"
@@ -699,7 +704,7 @@ export function ProductionWorkstation() {
                                 {/* Start Work Action Trigger */}
                                 <div className="pt-3 border-t flex flex-col sm:flex-row items-center justify-between gap-3">
                                     <div className="text-xs text-muted-foreground">
-                                        &bull; কাজ শুরু করার সাথে সাথে এই {stagedFiles.length}টি ছবি আপনার নামে লক হবে এবং টাইমার চালু হবে।
+                                        &bull; Starting work will lock these {stagedFiles.length} image(s) to your session and start your active timer.
                                     </div>
                                     <Button
                                         onClick={handleStartWork}
@@ -716,16 +721,16 @@ export function ProductionWorkstation() {
                 </Card>
             </div>
 
-            {/* 3. FINISH WORK STEP CHECKLIST MODAL (Crucial Step-by-Step Selection) */}
+            {/* 3. FINISH WORK STEP CHECKLIST MODAL */}
             <Dialog open={isFinishDialogOpen} onOpenChange={setIsFinishDialogOpen}>
                 <DialogContent className="sm:max-w-[500px]">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2 text-lg font-bold">
                             <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-                            কাজ সম্পন্ন করুন (Complete Work Session)
+                            Complete Work Session
                         </DialogTitle>
                         <DialogDescription className="text-xs">
-                            আপনি এই ব্যাচের ছবিগুলোতে কোন কোন সার্ভিস/স্টেপের কাজ সম্পন্ন করেছেন তা নির্বাচন করুন।
+                            Select the sub-services / steps you have completed for this image batch.
                         </DialogDescription>
                     </DialogHeader>
 
@@ -791,7 +796,7 @@ export function ProductionWorkstation() {
                                                         : 'text-muted-foreground'
                                                 )}
                                             >
-                                                {isChecked ? 'Done (সম্পন্ন)' : 'Pending (বাকি)'}
+                                                {isChecked ? 'Completed' : 'Pending'}
                                             </Badge>
                                         </div>
                                     );
@@ -802,19 +807,19 @@ export function ProductionWorkstation() {
                         {/* Partial Step Notice */}
                         <div className="rounded-lg bg-blue-500/10 border border-blue-500/20 p-3 text-xs text-muted-foreground">
                             <span className="font-semibold text-blue-600 dark:text-blue-400">
-                                ℹ️ পার্শিয়াল রিলিজ নিয়ম:
+                                ℹ️ Partial Step Release:
                             </span>{' '}
-                            যদি সবকটি স্টেপ টিক না দেওয়া হয়, তবে যেসব স্টেপ বাকি আছে সেগুলোর জন্য ছবিগুলো আনলক হয়ে পরবর্তী এডিটরের জন্য পুলে ওপেন হয়ে যাবে।
+                            If not all steps are checked, the remaining steps will be released and opened in the floor queue for other editors to continue.
                         </div>
 
                         {/* Remarks / Notes */}
                         <div className="space-y-1.5">
                             <Label htmlFor="finishNotes" className="text-xs font-semibold">
-                                Handover / Remarks (ঐচ্ছিক মন্তব্য)
+                                Handover / Remarks (Optional)
                             </Label>
                             <Textarea
                                 id="finishNotes"
-                                placeholder="কোনো ফাইল নিয়ে মন্তব্য বা হ্যান্ডওভার নোট থাকলে লিখুন..."
+                                placeholder="Add any handover notes or remarks about this batch..."
                                 value={finishNotes}
                                 onChange={(e) => setFinishNotes(e.target.value)}
                                 className="text-xs min-h-[70px]"
@@ -848,14 +853,14 @@ export function ProductionWorkstation() {
             <AlertDialog open={isCancelAlertOpen} onOpenChange={setIsCancelAlertOpen}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>কাজ বাতিল করবেন?</AlertDialogTitle>
+                        <AlertDialogTitle>Cancel Work Session?</AlertDialogTitle>
                         <AlertDialogDescription className="space-y-2 text-xs">
                             <span>
-                                আপনি কি নিশ্চিত যে এই সেশনটি বাতিল করতে চান? লক করা সমস্ত ইমেজ আনলক হয়ে যাবে এবং কোনো কাজ সেভ হবে না।
+                                Are you sure you want to cancel this work session? All locked images will be unlocked immediately and no progress will be saved.
                             </span>
                             <div className="pt-2">
                                 <Input
-                                    placeholder="বাতিলের কারণ লিখুন (ঐচ্ছিক)..."
+                                    placeholder="Enter cancellation reason (optional)..."
                                     value={cancelReason}
                                     onChange={(e) => setCancelReason(e.target.value)}
                                     className="text-xs h-9"
@@ -864,13 +869,13 @@ export function ProductionWorkstation() {
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel disabled={isCancelling}>না, ফিরে যান</AlertDialogCancel>
+                        <AlertDialogCancel disabled={isCancelling}>No, Keep Session</AlertDialogCancel>
                         <AlertDialogAction
                             onClick={handleCancelConfirm}
                             disabled={isCancelling}
                             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         >
-                            হ্যাঁ, সেশন বাতিল করুন
+                            Yes, Cancel Session
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

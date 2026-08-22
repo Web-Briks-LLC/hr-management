@@ -941,8 +941,9 @@ const getSanitizedActiveOrders = async (search?: string) => {
         )
         .populate('services', 'name description')
         .populate('returnFileFormat', 'name extension')
-        .sort({ deadline: 1, createdAt: -1 })
+        .sort({ createdAt: -1 })
         .lean();
+
 
     // Attach real-time image status summary for each order
     const orderIds = orders.map((o) => o._id);

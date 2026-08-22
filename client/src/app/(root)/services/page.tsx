@@ -637,17 +637,18 @@ export default function ServicesPage() {
             {/* Sub-Services / Operational Steps */}
             <div className="space-y-2 border-t pt-3">
               <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                Sub-Services / Work Steps (ধাপসমূহ)
+                Sub-Services / Operational Steps
               </Label>
               <p className="text-xs text-muted-foreground">
-                এই সার্ভিসের ছবিগুলো সম্পন্ন করতে ফটো এডিটরদের কী কী কাজ করতে হবে তা যোগ করুন।
+                Add required processing steps (e.g., Clipping Path, Retouching) for editors working on this service.
               </p>
 
               <div className="flex gap-2">
                 <Input
-                  placeholder="যেমন: Clipping Path, Skin Retouching, BG Removal..."
+                  placeholder="E.g., Clipping Path, Skin Retouching, BG Removal..."
                   value={newStepInput}
                   onChange={(e) => setNewStepInput(e.target.value)}
+
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       e.preventDefault();

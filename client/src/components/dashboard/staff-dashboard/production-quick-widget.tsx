@@ -98,10 +98,10 @@ export function ProductionQuickWidget({ staff }: { staff?: any }) {
                             ) : null}
                         </div>
                         <h4 className="text-base font-bold text-foreground mt-1">
-                            প্রোডাকশন ওয়ার্কস্টেশন (Start Image Batch)
+                            Production Workstation
                         </h4>
                         <p className="text-xs text-muted-foreground">
-                            অর্ডার সিলেক্ট করুন এবং ড্র্যাগ অ্যান্ড ড্রপ করে সরাসরি কাজের টাইমার চালু করুন।
+                            Select an order, drag &amp; drop images, and start your live work session timer.
                         </p>
                     </div>
                 </div>
@@ -112,6 +112,7 @@ export function ProductionQuickWidget({ staff }: { staff?: any }) {
                         Launch Workstation
                     </Link>
                 </Button>
+
             </CardContent>
         </Card>
     );

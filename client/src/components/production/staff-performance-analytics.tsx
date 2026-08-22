@@ -106,10 +106,10 @@ export function StaffPerformanceAnalytics() {
                 <div>
                     <h3 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
                         <Award className="h-5 w-5 text-primary" />
-                        স্টাফ পারফরম্যান্স ও প্রোডাক্টিভিটি অ্যানালিটিক্স
+                        Staff Performance &amp; Productivity Analytics
                     </h3>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                        ফটো এডিটরদের দৈনিক/মাসিক ইমেজ ডেলিভারি, সেশনের সময় এবং পারফরম্যান্স স্কোর ট্র্যাক করুন।
+                        Track daily and monthly image deliveries, active work sessions, and speed metrics for photo editors.
                     </p>
                 </div>
 
@@ -120,11 +120,11 @@ export function StaffPerformanceAnalytics() {
                                 <SelectValue placeholder="Time Period" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="today">Today (আজকের)</SelectItem>
-                                <SelectItem value="week">This Week (এই সপ্তাহ)</SelectItem>
-                                <SelectItem value="month">This Month (এই মাস)</SelectItem>
-                                <SelectItem value="year">This Year (এই বছর)</SelectItem>
-                                <SelectItem value="all">All Time (সর্বমোট)</SelectItem>
+                                <SelectItem value="today">Today</SelectItem>
+                                <SelectItem value="week">This Week</SelectItem>
+                                <SelectItem value="month">This Month</SelectItem>
+                                <SelectItem value="year">This Year</SelectItem>
+                                <SelectItem value="all">All Time</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
@@ -215,10 +215,10 @@ export function StaffPerformanceAnalytics() {
                     <CardHeader className="pb-3">
                         <CardTitle className="text-base font-bold flex items-center gap-2">
                             <TrendingUp className="h-4 w-4 text-primary" />
-                            ফটো এডিটর পারফরম্যান্স লিডারবোর্ড (Staff Leaderboard)
+                            Photo Editor Leaderboard
                         </CardTitle>
                         <CardDescription className="text-xs">
-                            ব্যক্তিগতভাবে প্রতিটি স্টাফের সম্পন্নকৃত মোট ইমেজ সংখ্যা এবং কাজের গতি।
+                            Individual performance scorecard, output volume, and processing efficiency.
                         </CardDescription>
                     </CardHeader>
 
@@ -249,7 +249,7 @@ export function StaffPerformanceAnalytics() {
                                 ) : staffList.length === 0 ? (
                                     <TableRow>
                                         <TableCell colSpan={6} className="h-32 text-center text-muted-foreground text-xs">
-                                            কোনো স্টাফের কাজের রেকর্ড পাওয়া যায়নি।
+                                            No staff performance records found for this timeframe.
                                         </TableCell>
                                     </TableRow>
                                 ) : (
@@ -300,13 +300,13 @@ export function StaffPerformanceAnalytics() {
                         <CardHeader className="pb-3">
                             <CardTitle className="text-sm font-bold flex items-center gap-2">
                                 <Zap className="h-4 w-4 text-amber-500" />
-                                সাব-সার্ভিস অনুসারে কাজের বন্টন
+                                Sub-Service Distribution
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-3">
                             {stepBreakdown.length === 0 ? (
                                 <p className="text-xs text-muted-foreground text-center py-4">
-                                    কোনো ডাটা নেই
+                                    No step data available
                                 </p>
                             ) : (
                                 stepBreakdown.map((step, idx) => (
@@ -343,13 +343,13 @@ export function StaffPerformanceAnalytics() {
                         <CardHeader className="pb-3">
                             <CardTitle className="text-sm font-bold flex items-center gap-2">
                                 <Clock className="h-4 w-4 text-blue-500" />
-                                শিফট অনুসারে আউটপুট (Shift Comparison)
+                                Shift Output Comparison
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-2.5">
                             {shiftList.length === 0 ? (
                                 <p className="text-xs text-muted-foreground text-center py-4">
-                                    কোনো শিফটের ডাটা নেই
+                                    No shift records available
                                 </p>
                             ) : (
                                 shiftList.map((shift, idx) => (
