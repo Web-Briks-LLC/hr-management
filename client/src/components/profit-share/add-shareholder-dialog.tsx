@@ -358,7 +358,7 @@ export default function AddShareholderDialog({
                             disabled={
                                 isLoading || (!isEditing && !selectedAdmin)
                             }
-                            className="gap-2"
+                            className=""
                         >
                             {isLoading ? (
                                 <>

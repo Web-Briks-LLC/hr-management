@@ -387,7 +387,7 @@ export function ProductionWorkstation() {
                                 <Button
                                     onClick={handleOpenFinishDialog}
                                     disabled={isFinishing}
-                                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-xs h-10 px-5 gap-1.5"
+                                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-xs h-10 px-5"
                                 >
                                     <CheckCircle2 className="h-4 w-4" />
                                     Finish Work
@@ -711,7 +711,7 @@ export function ProductionWorkstation() {
                                     <Button
                                         onClick={handleStartWork}
                                         disabled={isStarting || !!activeSession || !activeOrder}
-                                        className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-md h-10 px-6 gap-2"
+                                        className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-md h-10 px-6"
                                     >
                                         <Play className="h-4 w-4 fill-current" />
                                         Start Work ({stagedFiles.length} Images)
@@ -842,7 +842,7 @@ export function ProductionWorkstation() {
                             type="button"
                             onClick={handleFinishConfirm}
                             disabled={isFinishing || selectedCompletedSteps.length === 0}
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold gap-1.5"
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
                         >
                             <CheckCircle2 className="h-4 w-4" />
                             Submit &amp; Release Locks

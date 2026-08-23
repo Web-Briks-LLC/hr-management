@@ -379,7 +379,7 @@ export default function InviteEmployeeDialog() {
                         <Button
                             type="submit"
                             disabled={isLoading}
-                            className="gap-2"
+                            className=""
                         >
                             {isLoading ? (
                                 <>

@@ -292,7 +292,7 @@ export function OrderProgressTable({
                                                     variant="outline"
                                                     size="sm"
                                                     disabled
-                                                    className="h-8 text-xs font-semibold gap-1 opacity-60 cursor-not-allowed bg-emerald-500/5 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+                                                    className="h-8 text-xs font-semibold opacity-60 cursor-not-allowed bg-emerald-500/5 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
                                                     title="All images in this order have been completed and passed QC"
                                                 >
                                                     <Check className="h-3.5 w-3.5" /> Done
@@ -302,7 +302,7 @@ export function OrderProgressTable({
                                                     variant="outline"
                                                     size="sm"
                                                     onClick={() => onLogProgress(order._id)}
-                                                    className="h-8 text-xs font-semibold gap-1 bg-primary/5 hover:bg-primary/10 text-primary border-primary/20"
+                                                    className="h-8 text-xs font-semibold bg-primary/5 hover:bg-primary/10 text-primary border-primary/20"
                                                 >
                                                     <Plus className="h-3.5 w-3.5" /> Output
                                                 </Button>

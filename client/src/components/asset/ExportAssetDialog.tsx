@@ -208,7 +208,7 @@ export function ExportAssetDialog({
                         size="sm"
                         onClick={handleExport}
                         disabled={isExporting || isFetching}
-                        className="text-xs gap-1.5 font-semibold"
+                        className="text-xs font-semibold"
                     >
                         {isExporting ? (
                             <Loader className="h-3.5 w-3.5 animate-spin" />

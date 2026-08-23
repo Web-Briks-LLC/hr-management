@@ -1335,7 +1335,7 @@ export function AssetFormDialog({
                                                     variant="outline"
                                                     size="sm"
                                                     onClick={handleAddCustomSpec}
-                                                    className="h-8 text-xs font-medium gap-1"
+                                                    className="h-8 text-xs font-medium"
                                                 >
                                                     <Plus className="h-3.5 w-3.5" /> Add Attribute
                                                 </Button>
@@ -1404,7 +1404,7 @@ export function AssetFormDialog({
                                     else if (activeTab === 'assignment') setActiveTab('financial');
                                     else if (activeTab === 'financial') setActiveTab('basic');
                                 }}
-                                className="h-9 px-3.5 text-xs font-medium gap-1"
+                                className="h-9 px-3.5 text-xs font-medium"
                             >
                                 <ChevronLeft className="h-3.5 w-3.5" />
                                 Back
@@ -1420,7 +1420,7 @@ export function AssetFormDialog({
                                     else if (activeTab === 'financial') setActiveTab('assignment');
                                     else if (activeTab === 'assignment') setActiveTab('specs');
                                 }}
-                                className="h-9 px-4 text-xs font-medium gap-1"
+                                className="h-9 px-4 text-xs font-medium"
                             >
                                 Next Section
                                 <ChevronRight className="h-3.5 w-3.5" />
@@ -1444,7 +1444,7 @@ export function AssetFormDialog({
                             form="asset-form"
                             disabled={!isFormValid || isSubmitting}
                             className={cn(
-                                'h-9 px-5 text-xs font-semibold gap-1.5 shadow-sm transition-all',
+                                'h-9 px-5 text-xs font-semibold shadow-sm transition-all',
                                 isFormValid
                                     ? 'bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer'
                                     : 'opacity-50 cursor-not-allowed bg-muted text-muted-foreground hover:bg-muted'

@@ -67,7 +67,7 @@ export function ProductionQuickWidget({ staff }: { staff?: any }) {
                         </div>
                     </div>
 
-                    <Button asChild className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold gap-2 shadow-md">
+                    <Button asChild className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-md">
                         <Link href="/production">
                             Open Workstation
                             <ArrowRight className="h-4 w-4" />
@@ -106,7 +106,7 @@ export function ProductionQuickWidget({ staff }: { staff?: any }) {
                     </div>
                 </div>
 
-                <Button asChild className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold gap-2 shadow-md shrink-0">
+                <Button asChild className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-md shrink-0">
                     <Link href="/production">
                         <Play className="h-4 w-4 fill-current" />
                         Launch Workstation

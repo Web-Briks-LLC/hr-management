@@ -360,7 +360,7 @@ export default function DistributeProfitDialog({
                             disabled={
                                 isLoading || selectedShareholders.length === 0
                             }
-                            className="gap-2"
+                            className=""
                         >
                             {isLoading ? (
                                 <>

@@ -199,7 +199,7 @@ export default function BalancesClient() {
                         variant="outline"
                         onClick={handleSyncCommissions}
                         disabled={isSyncing}
-                        className="gap-2 shadow-xs"
+                        className="shadow-xs"
                     >
                         <RefreshCw className={cn("h-4 w-4", isSyncing && "animate-spin")} />
                         {isSyncing ? "Syncing..." : "Sync Commissions"}

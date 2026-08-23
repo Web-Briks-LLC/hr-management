@@ -327,7 +327,7 @@ export function ExportEarningDialog({
                             variant="outline"
                             onClick={() => handleExport('excel')}
                             disabled={isGenerating}
-                            className="flex-1 sm:flex-none gap-2"
+                            className="flex-1 sm:flex-none"
                         >
                             {isGenerating ? <Loader className="animate-spin h-4 w-4" /> : <IconFileExcel className="h-4 w-4 text-green-600" />}
                             Excel
@@ -335,7 +335,7 @@ export function ExportEarningDialog({
                         <Button
                             onClick={() => handleExport('pdf')}
                             disabled={isGenerating}
-                            className="flex-1 sm:flex-none gap-2"
+                            className="flex-1 sm:flex-none"
                         >
                             {isGenerating ? <Loader className="animate-spin h-4 w-4" /> : <Download className="h-4 w-4" />}
                             PDF

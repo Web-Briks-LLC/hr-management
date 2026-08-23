@@ -152,7 +152,7 @@ export function StaffPerformanceAnalytics() {
                     variant="outline"
                     size="sm"
                     onClick={handleExportCSV}
-                    className="h-9 text-xs gap-1.5 font-semibold border-border/80 shadow-xs"
+                    className="h-9 text-xs font-semibold border-border/80 shadow-xs"
                 >
                     <Download className="h-3.5 w-3.5" />
                     Export CSV

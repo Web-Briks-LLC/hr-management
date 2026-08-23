@@ -313,7 +313,7 @@ export default function ShareProfitDialog() {
                             disabled={
                                 isLoading || !selectedPartnerId || !amount
                             }
-                            className="gap-2"
+                            className=""
                         >
                             {isLoading ? (
                                 <>

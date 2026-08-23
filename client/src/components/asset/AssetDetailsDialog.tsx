@@ -338,7 +338,7 @@ export function AssetDetailsDialog({
                                     onOpenChange(false);
                                     onEdit(asset);
                                 }}
-                                className="h-9 px-4 text-xs font-semibold gap-1.5 border-primary/30 text-primary hover:bg-primary/10"
+                                className="h-9 px-4 text-xs font-semibold border-primary/30 text-primary hover:bg-primary/10"
                             >
                                 <Edit className="h-3.5 w-3.5" /> Edit Asset
                             </Button>
@@ -352,7 +352,7 @@ export function AssetDetailsDialog({
                                     onOpenChange(false);
                                     onDelete(asset);
                                 }}
-                                className="h-9 px-3.5 text-xs font-semibold gap-1.5 text-destructive hover:bg-destructive/10 border-destructive/30"
+                                className="h-9 px-3.5 text-xs font-semibold text-destructive hover:bg-destructive/10 border-destructive/30"
                             >
                                 <Trash2 className="h-3.5 w-3.5" /> Delete
                             </Button>

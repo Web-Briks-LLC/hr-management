@@ -337,7 +337,7 @@ export default function PayrollPage() {
                                 size="sm"
                                 variant={isLocked ? "outline" : "secondary"}
                                 className={cn(
-                                    "h-9 gap-2 shadow-xs transition-all",
+                                    "h-9 shadow-xs transition-all",
                                     isLocked
                                         ? "border-amber-500/30 text-amber-600 hover:bg-amber-500/10"
                                         : "bg-muted hover:bg-muted/80"
@@ -542,7 +542,7 @@ export default function PayrollPage() {
                             {activeTab === "salary" && canWrite && (
                                 <Button
                                     variant={isSelectMode ? "default" : "outline"}
-                                    className="gap-2 shadow-xs"
+                                    className="shadow-xs"
                                     onClick={() => setIsSelectMode(!isSelectMode)}
                                 >
                                     <CheckCircle2 className="h-4 w-4" />
@@ -554,7 +554,7 @@ export default function PayrollPage() {
                                 <DropdownMenuTrigger asChild>
                                     <Button
                                         variant="outline"
-                                        className="border-primary text-primary hover:bg-primary/10 shadow-xs gap-2"
+                                        className="border-primary text-primary hover:bg-primary/10 shadow-xs"
                                     >
                                         <Download className="h-4 w-4" />
                                         Export Reports
@@ -598,7 +598,7 @@ export default function PayrollPage() {
                                     variant="outline"
                                     size="sm"
                                     onClick={handleToggleLock}
-                                    className="gap-2 border-amber-500/40 text-amber-600 hover:bg-amber-500/10"
+                                    className="border-amber-500/40 text-amber-600 hover:bg-amber-500/10"
                                 >
                                     <Lock className="h-3.5 w-3.5" />
                                     Lock Billing Period

@@ -536,7 +536,7 @@ export default function OrderInspectPage() {
                                 size="sm"
                                 onClick={() => setIsAcceptAllOpen(true)}
                                 disabled={summary.pendingQcCount === 0}
-                                className="h-9 text-xs border-emerald-500/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/10 font-semibold gap-1.5"
+                                className="h-9 text-xs border-emerald-500/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/10 font-semibold"
                             >
                                 <CheckCheck className="h-3.5 w-3.5" />
                                 Accept All
@@ -545,7 +545,7 @@ export default function OrderInspectPage() {
                             <Button
                                 size="sm"
                                 onClick={() => setIsBulkRevisionOpen(true)}
-                                className="h-9 text-xs bg-primary hover:bg-primary/90 text-primary-foreground font-semibold gap-1.5"
+                                className="h-9 text-xs bg-primary hover:bg-primary/90 text-primary-foreground font-semibold"
                             >
                                 <UploadCloud className="h-3.5 w-3.5" />
                                 Bulk Revision
@@ -657,7 +657,7 @@ export default function OrderInspectPage() {
                     variant="outline"
                     size="sm"
                     onClick={() => refetchImages()}
-                    className="h-9 text-xs gap-1.5 font-semibold"
+                    className="h-9 text-xs font-semibold"
                 >
                     <RefreshCw className="h-3.5 w-3.5" />
                     Refresh

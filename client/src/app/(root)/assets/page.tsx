@@ -243,7 +243,7 @@ export default function AssetsPage() {
                             size="sm"
                             onClick={() => refetch()}
                             disabled={isFetching}
-                            className="h-9 px-3 text-xs gap-1.5 border-border/70 shadow-xs"
+                            className="h-9 px-3 text-xs border-border/70 shadow-xs"
                         >
                             <RefreshCcw className={`h-3.5 w-3.5 ${isFetching ? 'animate-spin' : ''}`} />
                             <span className="hidden sm:inline">Refresh</span>
@@ -253,7 +253,7 @@ export default function AssetsPage() {
                             variant="outline"
                             size="sm"
                             onClick={() => setIsExportDialogOpen(true)}
-                            className="h-9 px-3 text-xs gap-1.5 border-border/70 shadow-xs"
+                            className="h-9 px-3 text-xs border-border/70 shadow-xs"
                         >
                             <Download className="h-3.5 w-3.5" />
                             <span>Export</span>
@@ -262,7 +262,7 @@ export default function AssetsPage() {
                         <Button
                             onClick={handleOpenAdd}
                             size="sm"
-                            className="h-9 px-4 text-xs font-semibold gap-1.5 shadow-sm bg-primary hover:bg-primary/90 text-primary-foreground"
+                            className="h-9 px-4 text-xs font-semibold shadow-sm bg-primary hover:bg-primary/90 text-primary-foreground"
                         >
                             <Plus className="h-4 w-4" />
                             <span>Add Asset</span>
@@ -635,7 +635,7 @@ export default function AssetsPage() {
                                 variant="outline"
                                 size="sm"
                                 onClick={handleResetFilters}
-                                className="h-9 px-2.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/80 shrink-0 gap-1"
+                                className="h-9 px-2.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/80 shrink-0"
                             >
                                 <RotateCcw className="h-3.5 w-3.5" />
                                 <span>Reset</span>

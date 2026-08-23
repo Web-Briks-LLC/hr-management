@@ -407,7 +407,7 @@ export function ImageStatusGrid({ isAdmin = false }: ImageStatusGridProps) {
                                                         <Button
                                                             size="sm"
                                                             asChild
-                                                            className="h-8 px-3 text-xs bg-primary hover:bg-primary/90 text-primary-foreground font-semibold gap-1"
+                                                            className="h-8 px-3 text-xs bg-primary hover:bg-primary/90 text-primary-foreground font-semibold"
                                                         >
                                                             <Link
                                                                 href={`/production/orders/${order._id}?from=${encodeURIComponent('/production?tab=images')}`}

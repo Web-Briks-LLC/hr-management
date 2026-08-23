@@ -244,7 +244,7 @@ export function ShiftHandoverFeed({
                                 setGroupMode('grouped');
                                 setPage(1);
                             }}
-                            className="h-7 text-xs px-2.5 gap-1.5 shadow-none font-semibold"
+                            className="h-7 text-xs px-2.5 shadow-none font-semibold"
                             title="Group all revisions under 1 order row with collapsible accordion"
                         >
                             <Layers className="h-3.5 w-3.5" /> Group by Order
@@ -256,7 +256,7 @@ export function ShiftHandoverFeed({
                                 setGroupMode('flat');
                                 setPage(1);
                             }}
-                            className="h-7 text-xs px-2.5 gap-1.5 shadow-none"
+                            className="h-7 text-xs px-2.5 shadow-none"
                             title="Flat chronological audit ledger of every single log"
                         >
                             <ListFilter className="h-3.5 w-3.5" /> Flat Ledger
@@ -269,7 +269,7 @@ export function ShiftHandoverFeed({
                             variant={viewMode === 'table' ? 'default' : 'ghost'}
                             size="sm"
                             onClick={() => setViewMode('table')}
-                            className="h-7 text-xs px-2.5 gap-1.5 shadow-none"
+                            className="h-7 text-xs px-2.5 shadow-none"
                         >
                             <TableIcon className="h-3.5 w-3.5" /> Compact Table
                         </Button>
@@ -277,7 +277,7 @@ export function ShiftHandoverFeed({
                             variant={viewMode === 'cards' ? 'default' : 'ghost'}
                             size="sm"
                             onClick={() => setViewMode('cards')}
-                            className="h-7 text-xs px-2.5 gap-1.5 shadow-none"
+                            className="h-7 text-xs px-2.5 shadow-none"
                         >
                             <LayoutGrid className="h-3.5 w-3.5" /> Detailed Cards
                         </Button>
@@ -447,7 +447,7 @@ export function ShiftHandoverFeed({
                                                             variant="outline"
                                                             size="sm"
                                                             onClick={() => toggleOrderExpand(group.orderId)}
-                                                            className="h-7 text-xs px-2 gap-1"
+                                                            className="h-7 text-xs px-2"
                                                         >
                                                             <History className="h-3 w-3" />
                                                             {isExpanded ? 'Hide History' : `History (${group.logs.length})`}
@@ -759,7 +759,7 @@ export function ShiftHandoverFeed({
                                             variant="ghost"
                                             size="sm"
                                             onClick={() => toggleOrderExpand(group.orderId)}
-                                            className="h-8 text-xs font-semibold gap-1.5 text-primary hover:text-primary hover:bg-primary/10"
+                                            className="h-8 text-xs font-semibold text-primary hover:text-primary hover:bg-primary/10"
                                         >
                                             <History className="h-3.5 w-3.5" />
                                             {isExpanded ? 'Hide Revision Cycles' : `View Revision Cycles (${group.logs.length})`}
@@ -771,7 +771,7 @@ export function ShiftHandoverFeed({
                                                 variant="outline"
                                                 size="sm"
                                                 onClick={() => onQCCheck(latestLog)}
-                                                className="h-8 text-xs font-semibold gap-1.5 text-purple-600 hover:text-purple-700 dark:text-purple-400 border-purple-500/30 bg-purple-500/5 hover:bg-purple-500/10"
+                                                className="h-8 text-xs font-semibold text-purple-600 hover:text-purple-700 dark:text-purple-400 border-purple-500/30 bg-purple-500/5 hover:bg-purple-500/10"
                                             >
                                                 <ShieldCheck className="h-3.5 w-3.5" /> Quality Check
                                             </Button>
@@ -780,7 +780,7 @@ export function ShiftHandoverFeed({
                                                 variant="outline"
                                                 size="sm"
                                                 onClick={() => onEditLog(latestLog)}
-                                                className="h-8 text-xs gap-1.5"
+                                                className="h-8 text-xs"
                                             >
                                                 <Edit2 className="h-3.5 w-3.5" /> Edit Log
                                             </Button>
@@ -790,7 +790,7 @@ export function ShiftHandoverFeed({
                                                     variant="ghost"
                                                     size="sm"
                                                     onClick={() => onDeleteLog(latestLog._id)}
-                                                    className="h-8 text-xs text-destructive hover:bg-destructive/10 gap-1.5"
+                                                    className="h-8 text-xs text-destructive hover:bg-destructive/10"
                                                 >
                                                     <Trash2 className="h-3.5 w-3.5" /> Delete
                                                 </Button>
@@ -1056,7 +1056,7 @@ export function ShiftHandoverFeed({
                                             variant="outline"
                                             size="sm"
                                             onClick={() => onQCCheck(log)}
-                                            className="h-8 text-xs font-semibold gap-1.5 text-purple-600 hover:text-purple-700"
+                                            className="h-8 text-xs font-semibold text-purple-600 hover:text-purple-700"
                                         >
                                             <ShieldCheck className="h-3.5 w-3.5" /> Quality Check
                                         </Button>
@@ -1064,7 +1064,7 @@ export function ShiftHandoverFeed({
                                             variant="outline"
                                             size="sm"
                                             onClick={() => onEditLog(log)}
-                                            className="h-8 text-xs gap-1.5"
+                                            className="h-8 text-xs"
                                         >
                                             <Edit2 className="h-3.5 w-3.5" /> Edit Log
                                         </Button>
@@ -1073,7 +1073,7 @@ export function ShiftHandoverFeed({
                                                 variant="ghost"
                                                 size="sm"
                                                 onClick={() => onDeleteLog(log._id)}
-                                                className="h-8 text-xs text-destructive hover:bg-destructive/10 gap-1.5"
+                                                className="h-8 text-xs text-destructive hover:bg-destructive/10"
                                             >
                                                 <Trash2 className="h-3.5 w-3.5" /> Delete
                                             </Button>

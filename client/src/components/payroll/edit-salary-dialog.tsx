@@ -270,7 +270,7 @@ export default function EditSalaryDialog({
                             variant="secondary"
                             onClick={handleSave}
                             disabled={isLoading}
-                            className="gap-2"
+                            className=""
                         >
                             <Save className="h-4 w-4" />
                             Save
