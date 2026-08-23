@@ -994,8 +994,9 @@ const getSanitizedActiveOrders = async (search?: string, includeCompleted?: bool
 
     const orders = await OrderModel.find(query)
         .select(
-            'orderName deadline originalDeadline imageQuantity services requiredSteps returnFileFormat instruction priority notes status createdAt'
+            'orderName clientId deadline originalDeadline imageQuantity services requiredSteps returnFileFormat instruction priority notes status createdAt'
         )
+        .populate('clientId', 'clientId name')
         .populate('services', 'name description')
         .populate('returnFileFormat', 'name extension')
         .sort({ createdAt: -1 })
@@ -1049,6 +1050,7 @@ const getSanitizedActiveOrders = async (search?: string, includeCompleted?: bool
         return {
             _id: order._id,
             orderName: order.orderName,
+            clientId: order.clientId,
             deadline: order.deadline,
             originalDeadline: order.originalDeadline,
             imageQuantity: order.imageQuantity,

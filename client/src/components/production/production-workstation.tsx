@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -106,6 +106,7 @@ export function ProductionWorkstation() {
 
     // Timer state for active session
     const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
+    const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     const activeSession = activeSessionData?.data;
     const orders = useMemo(() => {
@@ -152,8 +153,26 @@ export function ProductionWorkstation() {
 
         updateTimer();
         const interval = setInterval(updateTimer, 1000);
-        return () => clearInterval(interval);
+        timerIntervalRef.current = interval;
+        return () => {
+            clearInterval(interval);
+            if (timerIntervalRef.current === interval) {
+                timerIntervalRef.current = null;
+            }
+        };
     }, [activeSession?.startTime]);
+
+    // Stops the stopwatch immediately (rather than waiting on the
+    // finish/cancel mutation's cache invalidation to round-trip and re-run
+    // the effect above) so the timer never keeps ticking after the session
+    // has actually ended.
+    const stopTimerImmediately = () => {
+        if (timerIntervalRef.current) {
+            clearInterval(timerIntervalRef.current);
+            timerIntervalRef.current = null;
+        }
+        setElapsedSeconds(0);
+    };
 
     // Auto-sync with socket events
     useEffect(() => {
@@ -289,6 +308,7 @@ export function ProductionWorkstation() {
 
             toast.success(res.message || 'Work session finished successfully!');
             setIsFinishDialogOpen(false);
+            stopTimerImmediately();
             refetchActiveSession();
             refetchOrders();
             refetchOrderImages();
@@ -310,6 +330,7 @@ export function ProductionWorkstation() {
             toast.success('Work session cancelled and images unlocked');
             setIsCancelAlertOpen(false);
             setCancelReason('');
+            stopTimerImmediately();
             refetchActiveSession();
             refetchOrders();
             refetchOrderImages();
@@ -454,9 +475,9 @@ export function ProductionWorkstation() {
                     </CardHeader>
 
                     <CardContent className="space-y-4 flex-1">
-                        {/* Order ID Combobox */}
+                        {/* Client ID Combobox */}
                         <div className="space-y-1.5">
-                            <Label className="text-xs font-semibold">Order ID</Label>
+                            <Label className="text-xs font-semibold">Client ID</Label>
                             <Popover open={orderComboboxOpen} onOpenChange={setOrderComboboxOpen}>
                                 <PopoverTrigger asChild>
                                     <Button
@@ -465,17 +486,30 @@ export function ProductionWorkstation() {
                                         disabled={!!activeSession}
                                         className="w-full justify-between h-10 text-xs font-mono font-medium bg-background/60"
                                     >
-                                        {selectedOrderId
-                                            ? orders.find((o) => o._id === selectedOrderId)?.orderName ||
-                                              'Select Order'
-                                            : 'Select Order ID...'}
+                                        {selectedOrderId ? (
+                                            (() => {
+                                                const sel = orders.find((o) => o._id === selectedOrderId);
+                                                return sel ? (
+                                                    <span className="truncate">
+                                                        {sel.clientId?.clientId || '—'}
+                                                        <span className="text-muted-foreground font-normal">
+                                                            {' '}&middot; {sel.orderName}
+                                                        </span>
+                                                    </span>
+                                                ) : (
+                                                    'Select Order'
+                                                );
+                                            })()
+                                        ) : (
+                                            'Select Client ID...'
+                                        )}
                                         <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
                                     </Button>
                                 </PopoverTrigger>
                                 <PopoverContent className="w-[320px] p-0" align="start">
                                     <Command>
                                         <CommandInput
-                                            placeholder="Search Order ID..."
+                                            placeholder="Search by Client ID..."
                                             value={searchOrder}
                                             onValueChange={setSearchOrder}
                                             className="h-9 text-xs"
@@ -488,7 +522,7 @@ export function ProductionWorkstation() {
                                                 {orders.map((order) => (
                                                     <CommandItem
                                                         key={order._id}
-                                                        value={order.orderName}
+                                                        value={`${order.clientId?.clientId || ''} ${order.orderName}`}
                                                         onSelect={() => {
                                                             setSelectedOrderId(order._id);
                                                             setOrderComboboxOpen(false);
@@ -497,21 +531,18 @@ export function ProductionWorkstation() {
                                                     >
                                                         <Check
                                                             className={cn(
-                                                                'mr-2 h-3.5 w-3.5',
+                                                                'h-3.5 w-3.5 shrink-0',
                                                                 selectedOrderId === order._id
                                                                     ? 'opacity-100'
                                                                     : 'opacity-0'
                                                             )}
                                                         />
-                                                        <div className="flex flex-col">
-                                                            <span className="font-bold text-foreground">
-                                                                {order.orderName}
-                                                            </span>
-                                                            <span className="text-[10px] text-muted-foreground">
-                                                                Qty: {order.imageQuantity} | Due:{' '}
-                                                                {format(new Date(order.deadline), 'dd MMM yyyy')}
-                                                            </span>
-                                                        </div>
+                                                        <span className="font-bold text-foreground font-mono whitespace-nowrap shrink-0">
+                                                            {order.clientId?.clientId || '—'}
+                                                        </span>
+                                                        <span className="text-muted-foreground truncate">
+                                                            {order.orderName}
+                                                        </span>
                                                     </CommandItem>
                                                 ))}
                                             </CommandGroup>
@@ -870,20 +901,18 @@ export function ProductionWorkstation() {
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>Cancel Work Session?</AlertDialogTitle>
-                        <AlertDialogDescription className="space-y-2 text-xs">
-                            <span>
-                                Are you sure you want to cancel this work session? All locked images will be unlocked immediately and no progress will be saved.
-                            </span>
-                            <div className="pt-2">
-                                <Input
-                                    placeholder="Enter cancellation reason (optional)..."
-                                    value={cancelReason}
-                                    onChange={(e) => setCancelReason(e.target.value)}
-                                    className="text-xs h-9"
-                                />
-                            </div>
+                        <AlertDialogDescription className="text-xs">
+                            Are you sure you want to cancel this work session? All locked images will be unlocked immediately and no progress will be saved.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
+                    <div className="pt-2">
+                        <Input
+                            placeholder="Enter cancellation reason (optional)..."
+                            value={cancelReason}
+                            onChange={(e) => setCancelReason(e.target.value)}
+                            className="text-xs h-9"
+                        />
+                    </div>
                     <AlertDialogFooter>
                         <AlertDialogCancel disabled={isCancelling}>No, Keep Session</AlertDialogCancel>
                         <AlertDialogAction

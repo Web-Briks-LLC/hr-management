@@ -299,6 +299,11 @@ export interface IProductionFilters {
 export interface ISanitizedProductionOrder {
     _id: string;
     orderName: string;
+    clientId?: {
+        _id: string;
+        clientId: string;
+        name: string;
+    };
     deadline: string;
     originalDeadline?: string;
     imageQuantity: number;
