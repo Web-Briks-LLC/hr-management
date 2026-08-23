@@ -45,11 +45,39 @@ interface SingleProductionLogResponse {
     message?: string;
 }
 
+export interface IOrderTimelineWorkSession {
+    _id: string;
+    staffId:
+        | {
+              _id: string;
+              staffId?: string;
+              userId?: { name?: string; email?: string };
+          }
+        | string;
+    imageNames: string[];
+    imageCount: number;
+    startTime: string;
+    endTime?: string;
+    durationSeconds?: number;
+    status: 'active' | 'completed' | 'cancelled' | 'paused';
+    completedSteps: string[];
+    notes?: string;
+}
+
+export interface IOrderTimelineRevision {
+    instruction: string;
+    createdAt: string;
+    createdBy?: { _id: string; name?: string; email?: string } | string;
+    affectedImages: string[];
+}
+
 interface OrderTimelineResponse {
     success: boolean;
     data: {
         order: any;
         logs: IShiftProduction[];
+        workSessions: IOrderTimelineWorkSession[];
+        revisions: IOrderTimelineRevision[];
     };
 }
 

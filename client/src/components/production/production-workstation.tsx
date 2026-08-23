@@ -10,14 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
+import { AppDialog } from '@/components/shared/app-dialog';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -93,6 +86,7 @@ export function ProductionWorkstation() {
     const {
         data: activeSessionData,
         isLoading: isSessionLoading,
+        isError: isSessionError,
         refetch: refetchActiveSession,
     } = useGetActiveSessionQuery();
 
@@ -327,7 +321,26 @@ export function ProductionWorkstation() {
     return (
         <div className="space-y-6">
             {/* 1. ACTIVE LIVE SESSION BANNER & STOPWATCH */}
-            {activeSession ? (
+            {isSessionError ? (
+                <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div className="flex items-start gap-3">
+                        <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+                        <div>
+                            <p className="text-sm font-semibold text-foreground">
+                                Couldn&apos;t check for an active work session
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                                If you had a session running, it may still be active on the server.
+                                Retry before starting new work to avoid a lock conflict.
+                            </p>
+                        </div>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={() => refetchActiveSession()}>
+                        <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                        Retry
+                    </Button>
+                </div>
+            ) : activeSession ? (
                 <div className="group relative overflow-hidden rounded-2xl border border-emerald-500/30 bg-linear-to-br from-emerald-500/10 via-card to-card p-6 shadow-xl shadow-emerald-500/5 transition-all duration-300">
                     <div className="absolute -right-6 -top-6 h-32 w-32 rounded-full bg-emerald-500/10 blur-3xl transition-all duration-300 group-hover:bg-emerald-500/20" />
                     <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -710,7 +723,12 @@ export function ProductionWorkstation() {
                                     </div>
                                     <Button
                                         onClick={handleStartWork}
-                                        disabled={isStarting || !!activeSession || !activeOrder}
+                                        disabled={
+                                            isStarting ||
+                                            !!activeSession ||
+                                            !activeOrder ||
+                                            isSessionError
+                                        }
                                         className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-md h-10 px-6"
                                     >
                                         <Play className="h-4 w-4 fill-current" />
@@ -724,20 +742,37 @@ export function ProductionWorkstation() {
             </div>
 
             {/* 3. FINISH WORK STEP CHECKLIST MODAL */}
-            <Dialog open={isFinishDialogOpen} onOpenChange={setIsFinishDialogOpen}>
-                <DialogContent className="sm:max-w-[500px]">
-                    <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2 text-lg font-bold">
-                            <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-                            Complete Work Session
-                        </DialogTitle>
-                        <DialogDescription className="text-xs">
-                            Select the sub-services / steps you have completed for this image batch.
-                        </DialogDescription>
-                    </DialogHeader>
-
-                    <div className="space-y-4 py-2">
-                        {/* Step Checkboxes */}
+            <AppDialog
+                open={isFinishDialogOpen}
+                onOpenChange={setIsFinishDialogOpen}
+                maxWidth="lg"
+                title="Complete Work Session"
+                description="Select the sub-services / steps you have completed for this image batch."
+                icon={<CheckCircle2 className="h-5 w-5" />}
+                footer={
+                    <>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setIsFinishDialogOpen(false)}
+                            disabled={isFinishing}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            type="button"
+                            onClick={handleFinishConfirm}
+                            disabled={isFinishing || selectedCompletedSteps.length === 0}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
+                        >
+                            <CheckCircle2 className="h-4 w-4" />
+                            Submit &amp; Release Locks
+                        </Button>
+                    </>
+                }
+            >
+                <div className="space-y-4">
+                    {/* Step Checkboxes */}
                         <div className="space-y-2">
                             <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
                                 Completed Sub-Services / Steps:
@@ -827,29 +862,8 @@ export function ProductionWorkstation() {
                                 className="text-xs min-h-[70px]"
                             />
                         </div>
-                    </div>
-
-                    <DialogFooter>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setIsFinishDialogOpen(false)}
-                            disabled={isFinishing}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            type="button"
-                            onClick={handleFinishConfirm}
-                            disabled={isFinishing || selectedCompletedSteps.length === 0}
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
-                        >
-                            <CheckCircle2 className="h-4 w-4" />
-                            Submit &amp; Release Locks
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+                </div>
+            </AppDialog>
 
             {/* 4. CANCEL WORK ALERT DIALOG */}
             <AlertDialog open={isCancelAlertOpen} onOpenChange={setIsCancelAlertOpen}>

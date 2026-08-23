@@ -283,11 +283,17 @@ export function ImageStatusGrid({ isAdmin = false }: ImageStatusGridProps) {
                                             unassignedCount: order.imageQuantity,
                                         };
 
+                                        // "Done" here means the editor has finished every required
+                                        // step on the image (it's awaiting QC or already QC-approved).
+                                        // Images sent back to revision are excluded since they still
+                                        // need rework — counting only `completedCount` used to make
+                                        // this bar read 0% for orders that were fully edited but not
+                                        // yet QC-approved.
+                                        const doneCount = stats.completedCount + stats.pendingQcCount;
                                         const percentage = Math.min(
                                             100,
                                             Math.round(
-                                                (stats.completedCount / Math.max(1, order.imageQuantity)) *
-                                                    100
+                                                (doneCount / Math.max(1, order.imageQuantity)) * 100
                                             )
                                         );
 
@@ -344,7 +350,7 @@ export function ImageStatusGrid({ isAdmin = false }: ImageStatusGridProps) {
                                                     <div className="space-y-1.5 max-w-[180px]">
                                                         <div className="flex justify-between text-[11px] font-mono">
                                                             <span className="text-muted-foreground">
-                                                                {stats.completedCount} / {order.imageQuantity} imgs
+                                                                {doneCount} / {order.imageQuantity} imgs
                                                             </span>
                                                             <span className="font-bold text-foreground">
                                                                 {percentage}%
@@ -372,7 +378,7 @@ export function ImageStatusGrid({ isAdmin = false }: ImageStatusGridProps) {
                                                         )}
                                                         {stats.completedCount > 0 && (
                                                             <Badge className="bg-green-500/20 text-green-700 dark:text-green-400 border-green-500/30 text-[10px] font-mono">
-                                                                Done: {stats.completedCount}
+                                                                Approved: {stats.completedCount}
                                                             </Badge>
                                                         )}
                                                         {stats.revisionCount > 0 && (

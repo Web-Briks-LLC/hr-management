@@ -527,12 +527,17 @@ const getOrderTimelineLogs = async (orderId: string) => {
     const order = await OrderModel.findById(orderId)
         .populate('clientId', 'name clientCode email')
         .populate('services', 'name')
+        .populate('revisionInstructions.createdBy', 'name email')
         .lean();
 
     if (!order) {
         throw new Error('Order not found');
     }
 
+    // Legacy per-shift team-leader logs. Left in place for branches that use
+    // the shift-production workflow, but many orders (worked on via the
+    // individual editor work-session flow) will have zero of these — that is
+    // not itself a sign nothing happened, see workSessions/revisions below.
     const logs = await ShiftProductionModel.find({ orderId: new Types.ObjectId(orderId) })
         .populate('shiftId', 'name code startTime endTime')
         .populate('branchId', 'name')
@@ -546,9 +551,57 @@ const getOrderTimelineLogs = async (orderId: string) => {
         .sort({ date: 1, createdAt: 1 })
         .lean();
 
+    // Individual editor work sessions (lock -> finish/cancel), which is the
+    // actual source of truth for who worked on this order and when — this
+    // previously had no visibility in the timeline drawer at all.
+    const workSessions = await ProductionWorkSessionModel.find({
+        orderId: new Types.ObjectId(orderId),
+    })
+        .populate({
+            path: 'staffId',
+            select: 'staffId userId',
+            populate: { path: 'userId', select: 'name email' },
+        })
+        .sort({ startTime: 1 })
+        .lean();
+
+    // Revision instructions, cross-referenced with the OrderImage records
+    // that were actually flagged in the same call, so each entry shows which
+    // images it applied to. Previously revisionInstructions existed on the
+    // Order but were never surfaced anywhere in the UI.
+    const imagesWithRevisions = await OrderImageModel.find({
+        orderId: new Types.ObjectId(orderId),
+        'revisionHistory.0': { $exists: true },
+    })
+        .select('imageName revisionHistory')
+        .lean();
+
+    const revisions = (order.revisionInstructions || []).map((ri) => {
+        const riTime = new Date(ri.createdAt).getTime();
+        const affectedImages = imagesWithRevisions
+            .filter((img) =>
+                (img.revisionHistory || []).some(
+                    (rh) =>
+                        rh.instruction === ri.instruction &&
+                        rh.createdAt &&
+                        Math.abs(new Date(rh.createdAt).getTime() - riTime) < 10_000
+                )
+            )
+            .map((img) => img.imageName);
+
+        return {
+            instruction: ri.instruction,
+            createdAt: ri.createdAt,
+            createdBy: ri.createdBy,
+            affectedImages,
+        };
+    });
+
     return {
         order,
         logs,
+        workSessions,
+        revisions,
     };
 };
 
@@ -1190,18 +1243,50 @@ const startWorkSession = async (
         status: 'in_progress',
         currentAssignedStaffId: { $ne: null, $nin: [staff._id] },
     })
-        .populate('currentAssignedStaffId', 'name staffId')
+        .populate({
+            path: 'currentAssignedStaffId',
+            select: 'staffId userId',
+            populate: { path: 'userId', select: 'name' },
+        })
         .lean();
 
     if (lockedImages.length > 0) {
         const lockedDetails = lockedImages
-            .map(
-                (img: any) =>
-                    `"${img.imageName}" (locked by ${img.currentAssignedStaffId?.name || 'another editor'})`
-            )
+            .map((img: any) => {
+                const lockOwner = img.currentAssignedStaffId;
+                const lockOwnerName =
+                    lockOwner?.userId?.name || lockOwner?.staffId || 'another editor';
+                return `"${img.imageName}" (locked by ${lockOwnerName})`;
+            })
             .join(', ');
         throw new Error(
             `Cannot start work. The following images are currently locked by another editor: ${lockedDetails}`
+        );
+    }
+
+    // Images that have already finished the editing stage (awaiting or passed
+    // QC) must not be reopened by an editor picking them again for a new
+    // session — that would silently reset their status/progress. Only QC
+    // rejecting an image back to 'in_revision' should make it workable again.
+    const nonReworkableImages = await OrderImageModel.find({
+        orderId: new Types.ObjectId(payload.orderId),
+        imageName: { $in: cleanImageNames },
+        status: { $in: ['completed', 'pending_qc'] },
+    }).lean();
+
+    if (nonReworkableImages.length > 0) {
+        const details = nonReworkableImages
+            .map(
+                (img) =>
+                    `"${img.imageName}" (${
+                        img.status === 'completed'
+                            ? 'already approved'
+                            : 'awaiting QC review'
+                    })`
+            )
+            .join(', ');
+        throw new Error(
+            `Cannot start work. The following images are already submitted and cannot be reopened: ${details}`
         );
     }
 
@@ -1373,9 +1458,22 @@ const finishWorkSession = async (
         imageName: { $in: session.imageNames },
     });
 
+    // Dedupe defensively against the same step name being submitted twice in
+    // one request (e.g. a double-click), which used to create duplicate
+    // completedSteps entries and skew per-step duration stats.
+    const uniqueCompletedSteps = Array.from(new Set(payload.completedSteps));
+
     for (const image of images) {
-        // Append completed steps
-        for (const stepName of payload.completedSteps) {
+        // A step already recorded for this image (from a previous session)
+        // should not be re-appended — that inflated completedSteps with
+        // duplicates every time a batch was re-locked to finish remaining
+        // steps.
+        const alreadyDoneStepNames = new Set(
+            image.completedSteps.map((s) => s.stepName)
+        );
+
+        for (const stepName of uniqueCompletedSteps) {
+            if (alreadyDoneStepNames.has(stepName)) continue;
             image.completedSteps.push({
                 stepName,
                 completedBy: staff._id,
@@ -1427,7 +1525,7 @@ const finishWorkSession = async (
     session.status = 'completed';
     session.endTime = now;
     session.durationSeconds = durationSeconds;
-    session.completedSteps = payload.completedSteps;
+    session.completedSteps = uniqueCompletedSteps;
     if (payload.notes) session.notes = payload.notes;
     await session.save();
 
@@ -1458,7 +1556,7 @@ const finishWorkSession = async (
                     existingShiftLog.assignedStaffs.push({
                         staffId: staff._id,
                         imageCount: session.imageCount,
-                        notes: payload.completedSteps.join(', '),
+                        notes: uniqueCompletedSteps.join(', '),
                     });
                 }
                 await existingShiftLog.save();
@@ -1470,7 +1568,7 @@ const finishWorkSession = async (
                     date: now,
                     teamLeaderId: staff.userId,
                     stage: 'other',
-                    customStageName: payload.completedSteps.join(', '),
+                    customStageName: uniqueCompletedSteps.join(', '),
                     completedQuantity: session.imageCount,
                     targetQuantity: session.imageCount,
                     status: 'completed',
@@ -1478,7 +1576,7 @@ const finishWorkSession = async (
                         {
                             staffId: staff._id,
                             imageCount: session.imageCount,
-                            notes: payload.completedSteps.join(', '),
+                            notes: uniqueCompletedSteps.join(', '),
                         },
                     ],
                 });
@@ -1516,7 +1614,7 @@ const finishWorkSession = async (
         orderId: session.orderId,
         staffId: staff._id,
         imageCount: session.imageCount,
-        completedSteps: payload.completedSteps,
+        completedSteps: uniqueCompletedSteps,
         durationSeconds,
     });
 
@@ -1528,7 +1626,7 @@ const finishWorkSession = async (
         session,
         durationSeconds,
         imagesCompleted: session.imageCount,
-        completedSteps: payload.completedSteps,
+        completedSteps: uniqueCompletedSteps,
     };
 };
 

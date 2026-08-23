@@ -10,8 +10,13 @@ import {
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useGetOrderTimelineQuery } from '@/redux/features/production/productionApi';
+import {
+    useGetOrderTimelineQuery,
+    type IOrderTimelineWorkSession,
+    type IOrderTimelineRevision,
+} from '@/redux/features/production/productionApi';
 import { STAGE_LABELS, STATUS_LABELS } from '@/types/production.type';
+import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import {
     Clock,
@@ -22,6 +27,8 @@ import {
     Calendar,
     ArrowRight,
     Sparkles,
+    History,
+    RotateCcw,
 } from 'lucide-react';
 
 interface OrderWorkflowDrawerProps {
@@ -41,6 +48,20 @@ export function OrderWorkflowDrawer({
 
     const order = data?.data?.order;
     const logs = data?.data?.logs || [];
+    const workSessions = data?.data?.workSessions || [];
+    const revisions = data?.data?.revisions || [];
+
+    const getStaffName = (
+        staffId: IOrderTimelineWorkSession['staffId'] | IOrderTimelineRevision['createdBy'],
+    ) => {
+        if (!staffId || typeof staffId === 'string') return 'Staff';
+        return (
+            ('userId' in staffId && staffId.userId?.name) ||
+            ('name' in staffId && staffId.name) ||
+            ('staffId' in staffId && staffId.staffId) ||
+            'Staff'
+        );
+    };
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -92,6 +113,118 @@ export function OrderWorkflowDrawer({
                                 </div>
                             </div>
                         )}
+
+                        {/* Editor Work Sessions */}
+                        <div className="space-y-3">
+                            <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                                <History className="h-4 w-4 text-primary" /> Editor Work Sessions ({workSessions.length})
+                            </h4>
+
+                            {workSessions.length === 0 ? (
+                                <div className="text-center py-6 border border-dashed rounded-xl bg-muted/20">
+                                    <p className="text-xs text-muted-foreground">
+                                        No editor work sessions recorded for this order yet.
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    {workSessions.map((ws) => (
+                                        <div
+                                            key={ws._id}
+                                            className="p-3 rounded-lg bg-card border border-border/60 text-xs space-y-1.5"
+                                        >
+                                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                                <span className="font-semibold text-foreground flex items-center gap-1.5">
+                                                    <User className="h-3.5 w-3.5 text-muted-foreground" />
+                                                    {getStaffName(ws.staffId)}
+                                                </span>
+                                                <div className="flex items-center gap-2 text-muted-foreground">
+                                                    <Calendar className="h-3.5 w-3.5" />
+                                                    <span>{format(new Date(ws.startTime), 'dd MMM, hh:mm a')}</span>
+                                                    <Badge
+                                                        variant="outline"
+                                                        className={cn(
+                                                            'capitalize',
+                                                            ws.status === 'completed' &&
+                                                                'border-emerald-500/30 text-emerald-700 dark:text-emerald-400',
+                                                            ws.status === 'cancelled' &&
+                                                                'border-destructive/30 text-destructive',
+                                                            ws.status === 'active' &&
+                                                                'border-blue-500/30 text-blue-700 dark:text-blue-400',
+                                                        )}
+                                                    >
+                                                        {ws.status}
+                                                    </Badge>
+                                                </div>
+                                            </div>
+                                            <div className="text-muted-foreground">
+                                                Locked <strong className="text-foreground">{ws.imageCount}</strong> image(s)
+                                                {ws.completedSteps.length > 0 && (
+                                                    <>
+                                                        {' '}&middot; steps submitted:{' '}
+                                                        <span className="text-foreground">
+                                                            {ws.completedSteps.join(', ')}
+                                                        </span>
+                                                    </>
+                                                )}
+                                            </div>
+                                            {ws.notes && (
+                                                <p className="text-muted-foreground italic">&ldquo;{ws.notes}&rdquo;</p>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Revision History */}
+                        <div className="space-y-3">
+                            <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                                <RotateCcw className="h-4 w-4 text-amber-600 dark:text-amber-400" /> Revision History ({revisions.length})
+                            </h4>
+
+                            {revisions.length === 0 ? (
+                                <div className="text-center py-6 border border-dashed rounded-xl bg-muted/20">
+                                    <p className="text-xs text-muted-foreground">
+                                        No revisions have been requested on this order.
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    {revisions.map((rev, idx) => (
+                                        <div
+                                            key={idx}
+                                            className="p-3 rounded-lg bg-amber-500/5 border border-amber-500/20 text-xs space-y-1.5"
+                                        >
+                                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                                <span className="font-semibold text-foreground flex items-center gap-1.5">
+                                                    <User className="h-3.5 w-3.5 text-muted-foreground" />
+                                                    {getStaffName(rev.createdBy)}
+                                                </span>
+                                                <div className="flex items-center gap-1.5 text-muted-foreground">
+                                                    <Calendar className="h-3.5 w-3.5" />
+                                                    <span>{format(new Date(rev.createdAt), 'dd MMM, hh:mm a')}</span>
+                                                </div>
+                                            </div>
+                                            <p className="text-foreground">{rev.instruction}</p>
+                                            {rev.affectedImages.length > 0 && (
+                                                <div className="flex flex-wrap gap-1 pt-1">
+                                                    {rev.affectedImages.map((name) => (
+                                                        <Badge
+                                                            key={name}
+                                                            variant="outline"
+                                                            className="text-[10px] font-mono"
+                                                        >
+                                                            {name}
+                                                        </Badge>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
 
                         {/* Shift Timeline Stepper */}
                         <div className="space-y-4">
