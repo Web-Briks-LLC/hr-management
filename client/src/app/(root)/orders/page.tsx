@@ -602,6 +602,7 @@ export default function OrdersPage() {
             perImagePrice: order.perImagePrice,
             totalPrice: order.totalPrice,
             services: order.services.map((s) => s._id),
+            requiredSteps: order.requiredSteps,
             returnFileFormat: order.returnFileFormat._id,
             instruction: order.instruction || "",
             priority: order.priority,

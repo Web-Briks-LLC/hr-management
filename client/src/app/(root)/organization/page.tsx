@@ -2,10 +2,14 @@
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
-import { Building, Briefcase, MapPin } from 'lucide-react';
+import { Building, Briefcase, MapPin, FileType, Landmark, Tags, DollarSign } from 'lucide-react';
 import DepartmentTab from '@/components/organization/department-tab';
 import DesignationTab from '@/components/organization/designation-tab';
 import BranchTab from '@/components/organization/branch-tab';
+import ReturnFileFormatTab from '@/components/organization/return-file-format-tab';
+import PayrollBankSettingsTab from '@/components/organization/payroll-bank-settings-tab';
+import ExpenseCategoryTab from '@/components/organization/expense-category-tab';
+import CurrencyRateTab from '@/components/organization/currency-rate-tab';
 import { useGetAllDepartmentsQuery } from '@/redux/features/department/departmentApi';
 import { useGetAllDesignationsQuery } from '@/redux/features/designation/designationApi';
 import { useGetAllBranchesQuery } from '@/redux/features/branch/branchApi';
@@ -76,10 +80,26 @@ export default function OrganizationPage() {
 
             {/* Main Tabs */}
             <Tabs defaultValue="departments" className="w-full space-y-4">
-                <TabsList className="grid w-full sm:w-[400px] grid-cols-3">
+                <TabsList className="h-auto w-full flex-wrap justify-start gap-1">
                     <TabsTrigger value="departments">Departments</TabsTrigger>
                     <TabsTrigger value="designations">Designations</TabsTrigger>
                     <TabsTrigger value="branches">Branches</TabsTrigger>
+                    <TabsTrigger value="file-formats">
+                        <FileType className="h-3.5 w-3.5" />
+                        File Formats
+                    </TabsTrigger>
+                    <TabsTrigger value="bank-accounts">
+                        <Landmark className="h-3.5 w-3.5" />
+                        Bank Accounts
+                    </TabsTrigger>
+                    <TabsTrigger value="expense-categories">
+                        <Tags className="h-3.5 w-3.5" />
+                        Expense Categories
+                    </TabsTrigger>
+                    <TabsTrigger value="currency-rates">
+                        <DollarSign className="h-3.5 w-3.5" />
+                        Currency Rates
+                    </TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="departments" className="pt-2">
@@ -92,6 +112,22 @@ export default function OrganizationPage() {
 
                 <TabsContent value="branches" className="pt-2">
                     <BranchTab />
+                </TabsContent>
+
+                <TabsContent value="file-formats" className="pt-2">
+                    <ReturnFileFormatTab />
+                </TabsContent>
+
+                <TabsContent value="bank-accounts" className="pt-2">
+                    <PayrollBankSettingsTab />
+                </TabsContent>
+
+                <TabsContent value="expense-categories" className="pt-2">
+                    <ExpenseCategoryTab />
+                </TabsContent>
+
+                <TabsContent value="currency-rates" className="pt-2">
+                    <CurrencyRateTab />
                 </TabsContent>
             </Tabs>
         </div>

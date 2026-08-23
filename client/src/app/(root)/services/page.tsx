@@ -368,6 +368,7 @@ export default function ServicesPage() {
             <TableRow className="hover:bg-muted/40 border-b-border/60">
               <TableHead className="font-semibold">Name</TableHead>
               <TableHead className="font-semibold">Description</TableHead>
+              <TableHead className="font-semibold">Sub-Services</TableHead>
               <TableHead className="font-semibold text-center">Price</TableHead>
               <TableHead className="font-semibold text-center">Status</TableHead>
               <TableHead className="font-semibold text-center">Usage</TableHead>
@@ -380,6 +381,7 @@ export default function ServicesPage() {
                 <TableRow key={i}>
                   <TableCell><Skeleton className="h-4 w-32" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-48" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-40" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-12 mx-auto" /></TableCell>
                   <TableCell><Skeleton className="h-6 w-16 mx-auto rounded-full" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-12 mx-auto" /></TableCell>
@@ -388,7 +390,7 @@ export default function ServicesPage() {
               ))
             ) : services.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="h-48 text-center">
+                <TableCell colSpan={7} className="h-48 text-center">
                   <div className="flex flex-col items-center justify-center text-muted-foreground gap-2">
                     <div className="bg-muted/50 p-3 rounded-full">
                       <Settings2 className="h-6 w-6 opacity-30" />
@@ -406,6 +408,42 @@ export default function ServicesPage() {
                   </TableCell>
                   <TableCell className="text-muted-foreground max-w-[300px] truncate">
                     {service.description || '-'}
+                  </TableCell>
+                  <TableCell className="max-w-[220px]">
+                    {service.steps && service.steps.length > 0 ? (
+                      <div className="flex flex-wrap items-center gap-1">
+                        {service.steps.slice(0, 3).map((step, idx) => (
+                          <span
+                            key={step._id || `${step.code}-${idx}`}
+                            className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/20 truncate max-w-[100px]"
+                            title={step.name}
+                          >
+                            {step.name}
+                          </span>
+                        ))}
+                        {service.steps.length > 3 && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-muted text-muted-foreground border cursor-default">
+                                  +{service.steps.length - 3} more
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="max-w-[220px]">
+                                  {service.steps
+                                    .slice(3)
+                                    .map((step) => step.name)
+                                    .join(", ")}
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground text-xs">-</span>
+                    )}
                   </TableCell>
                   <TableCell className="text-center font-medium text-muted-foreground">
                     ${service.price?.toFixed(2) || '0.00'}

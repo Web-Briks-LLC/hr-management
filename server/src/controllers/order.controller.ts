@@ -286,6 +286,7 @@ async function updateOrder(req: Request, res: Response) {
             perImagePrice,
             totalPrice,
             services,
+            requiredSteps,
             returnFileFormat,
             instruction,
             status,
@@ -343,6 +344,7 @@ async function updateOrder(req: Request, res: Response) {
             updateData.perImagePrice = finalPerImagePrice;
         if (finalTotalPrice !== undefined) updateData.totalPrice = finalTotalPrice;
         if (services !== undefined) updateData.services = services;
+        if (requiredSteps !== undefined) updateData.requiredSteps = requiredSteps;
         if (returnFileFormat !== undefined)
             updateData.returnFileFormat = returnFileFormat;
         if (instruction !== undefined) updateData.instruction = instruction;

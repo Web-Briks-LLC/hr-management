@@ -56,6 +56,7 @@ import {
     Flag,
     FileText,
     StickyNote,
+    ListChecks,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -63,7 +64,12 @@ import { DatePicker } from '@/components/shared/DatePicker';
 import { DateTimePicker } from '@/components/shared/DateTimePicker';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import type { OrderPriority } from '@/types/order.type';
+import { Checkbox } from '@/components/ui/checkbox';
+import type {
+    OrderPriority,
+    IServiceStep,
+    IOrderRequiredStep,
+} from '@/types/order.type';
 
 export interface OrderFormData {
     orderName: string;
@@ -74,6 +80,7 @@ export interface OrderFormData {
     perImagePrice: number;
     totalPrice: number;
     services: string[];
+    requiredSteps?: IOrderRequiredStep[];
     returnFileFormat: string;
     instruction?: string;
     priority: OrderPriority;
@@ -119,6 +126,19 @@ export function OrderForm({
     );
     const [selectedServices, setSelectedServices] = useState<string[]>(
         defaultValues?.services || [],
+    );
+    // Per-service selected work-process step keys (keyed by serviceId -> Set of step _id/code)
+    const [stepSelections, setStepSelections] = useState<Record<string, Set<string>>>(
+        () => {
+            const grouped: Record<string, Set<string>> = {};
+            defaultValues?.requiredSteps?.forEach((step) => {
+                if (!step.serviceId) return;
+                const key = step.stepId || step.code;
+                if (!grouped[step.serviceId]) grouped[step.serviceId] = new Set();
+                grouped[step.serviceId].add(key);
+            });
+            return grouped;
+        },
     );
     const [returnFileFormat, setReturnFileFormat] = useState(
         defaultValues?.returnFileFormat || '',
@@ -282,12 +302,45 @@ export function OrderForm({
         });
     }, [services, debouncedServiceSearch]);
 
+    const getStepKey = (step: IServiceStep) => step._id || step.code;
+
+    const handleStepToggle = (serviceId: string, stepKey: string) => {
+        setStepSelections((prev) => {
+            const next = { ...prev };
+            const set = new Set(next[serviceId] || []);
+            if (set.has(stepKey)) {
+                set.delete(stepKey);
+            } else {
+                set.add(stepKey);
+            }
+            next[serviceId] = set;
+            return next;
+        });
+        clearError('requiredSteps');
+    };
+
     const handleServiceToggle = (serviceId: string) => {
         const isRemoving = selectedServices.includes(serviceId);
-        
+
         const newSelectedServices = isRemoving
             ? selectedServices.filter((id) => id !== serviceId)
             : [...selectedServices, serviceId];
+
+        setStepSelections((prev) => {
+            const next = { ...prev };
+            if (isRemoving) {
+                delete next[serviceId];
+                return next;
+            }
+            const svc = allServices.find((s) => s._id === serviceId);
+            if (svc?.steps && svc.steps.length > 0) {
+                const defaultKeys = svc.steps
+                    .filter((step) => step.isDefault !== false)
+                    .map(getStepKey);
+                next[serviceId] = new Set(defaultKeys);
+            }
+            return next;
+        });
 
         let totalPerImagePrice = 0;
         newSelectedServices.forEach((id) => {
@@ -361,6 +414,53 @@ export function OrderForm({
         }
     };
 
+    // Services (from the full catalog) that have a work-process step list and are selected
+    const servicesWithSteps = useMemo(
+        () =>
+            selectedServices
+                .map((id) => allServices.find((s) => s._id === id))
+                .filter(
+                    (svc): svc is (typeof allServices)[number] =>
+                        !!svc?.steps?.length,
+                ),
+        [selectedServices, allServices],
+    );
+
+    // Builds the requiredSteps payload from the current step selections.
+    // Always computed explicitly (mirroring the backend's own fallback for
+    // step-less services) so edits reliably overwrite any stale steps left
+    // over from a previous service selection.
+    const buildRequiredSteps = (): IOrderRequiredStep[] => {
+        const result: IOrderRequiredStep[] = [];
+        selectedServices.forEach((id) => {
+            const svc = allServices.find((s) => s._id === id);
+            if (!svc) return;
+            if (svc.steps && svc.steps.length > 0) {
+                const selectedKeys = stepSelections[id] || new Set<string>();
+                svc.steps.forEach((step) => {
+                    if (selectedKeys.has(getStepKey(step))) {
+                        result.push({
+                            stepId: step._id,
+                            name: step.name,
+                            code: step.code,
+                            serviceId: svc._id,
+                            order: step.order || 0,
+                        });
+                    }
+                });
+            } else {
+                result.push({
+                    stepId: svc._id,
+                    name: svc.name,
+                    code: svc.name.toLowerCase().replace(/\s+/g, '_'),
+                    serviceId: svc._id,
+                    order: 0,
+                });
+            }
+        });
+        return result;
+    };
+
     // Manual Zod validation
     const validateForm = (): boolean => {
         const payload = {
@@ -392,6 +492,16 @@ export function OrderForm({
             return false;
         }
 
+        const missingStepsService = servicesWithSteps.find(
+            (svc) => (stepSelections[svc._id]?.size || 0) === 0,
+        );
+        if (missingStepsService) {
+            setErrors({
+                requiredSteps: `Select at least one work-process step for "${missingStepsService.name}"`,
+            });
+            return false;
+        }
+
         setErrors({});
         return true;
     };
@@ -414,6 +524,7 @@ export function OrderForm({
             perImagePrice,
             totalPrice,
             services: selectedServices,
+            requiredSteps: buildRequiredSteps(),
             returnFileFormat,
             instruction,
             priority,
@@ -504,6 +615,7 @@ export function OrderForm({
                                                         clearError('clientId');
                                                         setContactPersonId('');
                                                         setSelectedServices([]);
+                                                        setStepSelections({});
                                                         clearError('services');
                                                         setOpenClient(false);
                                                         setShowAllServices(
@@ -844,6 +956,65 @@ export function OrderForm({
                             </p>
                         )}
                     </div>
+
+                    {/* Work Process (per-service step checklist) */}
+                    {servicesWithSteps.length > 0 && (
+                        <div className="space-y-3">
+                            <Label className="text-sm font-medium flex items-center gap-2">
+                                <ListChecks className="h-3.5 w-3.5 text-muted-foreground" />
+                                Work Process
+                                <span className="text-muted-foreground font-normal text-xs">
+                                    (steps needed to complete this order)
+                                </span>
+                            </Label>
+
+                            <div className="space-y-3 p-3 border rounded-md max-h-56 overflow-y-auto">
+                                {servicesWithSteps.map((svc) => {
+                                    const selectedKeys =
+                                        stepSelections[svc._id] || new Set<string>();
+                                    return (
+                                        <div key={svc._id} className="space-y-1.5">
+                                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                                                {svc.name}
+                                            </p>
+                                            <div className="grid grid-cols-2 gap-1">
+                                                {[...(svc.steps || [])]
+                                                    .sort(
+                                                        (a: IServiceStep, b: IServiceStep) =>
+                                                            (a.order || 0) - (b.order || 0),
+                                                    )
+                                                    .map((step: IServiceStep) => {
+                                                        const key = getStepKey(step);
+                                                        const checked = selectedKeys.has(key);
+                                                        return (
+                                                            <label
+                                                                key={key}
+                                                                className="flex items-center gap-2 px-2 py-1 rounded-md hover:bg-accent cursor-pointer text-sm"
+                                                            >
+                                                                <Checkbox
+                                                                    checked={checked}
+                                                                    onCheckedChange={() =>
+                                                                        handleStepToggle(svc._id, key)
+                                                                    }
+                                                                />
+                                                                <span className="truncate">
+                                                                    {step.name}
+                                                                </span>
+                                                            </label>
+                                                        );
+                                                    })}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                            {errors.requiredSteps && (
+                                <p className="text-xs text-destructive">
+                                    {errors.requiredSteps}
+                                </p>
+                            )}
+                        </div>
+                    )}
 
                     {/* Return File Format & Priority Row */}
                     <div className="grid grid-cols-2 gap-4">

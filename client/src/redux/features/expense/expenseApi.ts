@@ -136,6 +136,28 @@ export const expenseApi = apiSlice.injectEndpoints({
             }),
             invalidatesTags: ["ExpenseCategory"],
         }),
+        updateExpenseCategory: builder.mutation({
+            query: ({
+                id,
+                ...body
+            }: {
+                id: string;
+                name?: string;
+                description?: string;
+            }) => ({
+                url: `/expenses/categories/${id}`,
+                method: "PATCH",
+                body,
+            }),
+            invalidatesTags: ["ExpenseCategory"],
+        }),
+        deleteExpenseCategory: builder.mutation({
+            query: (id: string) => ({
+                url: `/expenses/categories/${id}`,
+                method: "DELETE",
+            }),
+            invalidatesTags: ["ExpenseCategory"],
+        }),
         getExpenseYears: builder.query({
             query: () => ({
                 url: "/expenses/years",
@@ -158,5 +180,7 @@ export const {
     useDeleteExpenseMutation,
     useGetExpenseCategoriesQuery,
     useCreateExpenseCategoryMutation,
+    useUpdateExpenseCategoryMutation,
+    useDeleteExpenseCategoryMutation,
     useGetExpenseYearsQuery,
 } = expenseApi;

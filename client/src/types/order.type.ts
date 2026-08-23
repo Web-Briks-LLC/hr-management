@@ -137,6 +137,7 @@ export interface CreateOrderInput {
     perImagePrice: number;
     totalPrice: number;
     services: string[];
+    requiredSteps?: IOrderRequiredStep[];
     returnFileFormat: string;
     instruction?: string;
     priority?: OrderPriority;
