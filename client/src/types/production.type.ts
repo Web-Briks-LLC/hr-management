@@ -330,6 +330,7 @@ export interface ISanitizedProductionOrder {
         completedCount: number;
         inProgressCount: number;
         partiallyCompletedCount: number;
+        pendingQcCount: number;
         revisionCount: number;
         unassignedCount: number;
     };
@@ -370,7 +371,7 @@ export interface IOrderImage {
     _id: string;
     orderId: string;
     imageName: string;
-    status: 'unassigned' | 'in_progress' | 'partially_completed' | 'completed' | 'in_revision';
+    status: 'unassigned' | 'in_progress' | 'partially_completed' | 'pending_qc' | 'completed' | 'in_revision';
     requiredSteps: string[];
     completedSteps: IImageCompletedStep[];
     currentAssignedStaffId?: {
@@ -385,6 +386,11 @@ export interface IOrderImage {
     lockedAt?: string | null;
     isRevision: boolean;
     revisionHistory: IImageRevisionEntry[];
+    qcApprovedBy?: {
+        _id: string;
+        name?: string;
+    } | null;
+    qcApprovedAt?: string | null;
     createdAt: string;
     updatedAt: string;
 }
@@ -410,6 +416,7 @@ export interface IOrderImageStatusResponse {
         completedCount: number;
         inProgressCount: number;
         partiallyCompletedCount: number;
+        pendingQcCount: number;
         revisionCount: number;
         unassignedCount: number;
     };
@@ -501,5 +508,10 @@ export interface IFlagImageRevisionInput {
     orderId: string;
     imageNames: string[];
     instruction: string;
+}
+
+export interface IQcApproveImagesInput {
+    orderId: string;
+    imageNames: string[];
 }
 

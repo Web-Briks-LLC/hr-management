@@ -16,6 +16,7 @@ import type {
     IFinishWorkSessionInput,
     ICancelWorkSessionInput,
     IFlagImageRevisionInput,
+    IQcApproveImagesInput,
 } from '@/types/production.type';
 
 interface ProductionLogsResponse {
@@ -75,7 +76,10 @@ interface StaffAnalyticsResponse {
 export const productionApi = apiSlice.injectEndpoints({
     endpoints: (builder) => ({
         // --- Workstation Endpoints ---
-        getSanitizedOrders: builder.query<SanitizedOrdersResponse, { search?: string } | void>({
+        getSanitizedOrders: builder.query<
+            SanitizedOrdersResponse,
+            { search?: string; includeCompleted?: boolean } | void
+        >({
             query: (params) => ({
                 url: '/production/orders/sanitized',
                 params: params || {},
@@ -168,6 +172,23 @@ export const productionApi = apiSlice.injectEndpoints({
         >({
             query: (body) => ({
                 url: '/production/images/revision',
+                method: 'POST',
+                body,
+            }),
+            invalidatesTags: [
+                'ProductionImages',
+                'ProductionOrders',
+                { type: 'ProductionOrders', id: 'SANITIZED' },
+                { type: 'ProductionOrders', id: 'LIST' },
+            ],
+        }),
+
+        qcApproveImages: builder.mutation<
+            { success: boolean; message: string; data: { approvedCount: number; orderCompleted: boolean } },
+            IQcApproveImagesInput
+        >({
+            query: (body) => ({
+                url: '/production/images/qc-approve',
                 method: 'POST',
                 body,
             }),
@@ -344,6 +365,7 @@ export const {
     useFinishWorkSessionMutation,
     useCancelWorkSessionMutation,
     useFlagImageRevisionMutation,
+    useQcApproveImagesMutation,
     useGetStaffPerformanceAnalyticsQuery,
     useGetProductionLogsQuery,
     useGetActiveOrdersProgressQuery,

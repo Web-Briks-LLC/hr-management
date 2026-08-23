@@ -79,6 +79,7 @@ const orderImageSchema = new Schema<IOrderImage>(
                 'unassigned',
                 'in_progress',
                 'partially_completed',
+                'pending_qc',
                 'completed',
                 'in_revision',
             ],
@@ -113,6 +114,15 @@ const orderImageSchema = new Schema<IOrderImage>(
             index: true,
         },
         revisionHistory: [imageRevisionEntrySchema],
+        qcApprovedBy: {
+            type: Schema.Types.ObjectId,
+            ref: 'User',
+            default: null,
+        },
+        qcApprovedAt: {
+            type: Date,
+            default: null,
+        },
     },
     { timestamps: true }
 );

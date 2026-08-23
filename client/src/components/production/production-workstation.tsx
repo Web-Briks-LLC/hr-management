@@ -328,15 +328,16 @@ export function ProductionWorkstation() {
         <div className="space-y-6">
             {/* 1. ACTIVE LIVE SESSION BANNER & STOPWATCH */}
             {activeSession ? (
-                <div className="relative overflow-hidden rounded-2xl border-2 border-emerald-500/40 bg-linear-to-r from-emerald-500/15 via-emerald-500/5 to-card p-6 shadow-xl shadow-emerald-500/10">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div className="group relative overflow-hidden rounded-2xl border border-emerald-500/30 bg-linear-to-br from-emerald-500/10 via-card to-card p-6 shadow-xl shadow-emerald-500/5 transition-all duration-300">
+                    <div className="absolute -right-6 -top-6 h-32 w-32 rounded-full bg-emerald-500/10 blur-3xl transition-all duration-300 group-hover:bg-emerald-500/20" />
+                    <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
                         <div className="space-y-2">
                             <div className="flex items-center gap-2">
                                 <span className="relative flex h-3 w-3">
                                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                                     <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
                                 </span>
-                                <Badge className="bg-emerald-500 text-white font-bold text-xs px-2.5 py-0.5">
+                                <Badge className="bg-emerald-500 text-white font-bold text-xs px-2.5 py-0.5 shadow-xs">
                                     LIVE WORK SESSION RUNNING
                                 </Badge>
                                 <span className="text-xs text-muted-foreground font-mono">
@@ -348,14 +349,14 @@ export function ProductionWorkstation() {
                                 <h3 className="text-2xl font-black tracking-tight text-foreground">
                                     Order: {(activeSession.orderId as any)?.orderName || 'Active Order'}
                                 </h3>
-                                <Badge variant="outline" className="font-mono text-xs">
+                                <Badge variant="outline" className="font-mono text-xs bg-emerald-500/5 border-emerald-500/30 text-emerald-700 dark:text-emerald-300">
                                     {activeSession.imageCount} Images in Batch
                                 </Badge>
                             </div>
 
                             <div className="flex flex-wrap items-center gap-2 pt-1">
                                 <span className="text-xs text-muted-foreground font-medium">
-                                    Required Steps for Order:
+                                    Required Steps:
                                 </span>
                                 {((activeSession.orderId as any)?.requiredSteps || []).map(
                                     (step: any, idx: number) => (
@@ -372,7 +373,7 @@ export function ProductionWorkstation() {
                         </div>
 
                         {/* Stopwatch & Action Buttons */}
-                        <div className="flex flex-col sm:flex-row items-center gap-4 bg-background/80 backdrop-blur-md p-4 rounded-xl border border-emerald-500/30">
+                        <div className="flex flex-col sm:flex-row items-center gap-4 bg-background/80 backdrop-blur-md p-4 rounded-xl border border-emerald-500/30 shadow-xs">
                             <div className="text-center sm:text-right pr-2">
                                 <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block">
                                     Elapsed Work Time
@@ -386,7 +387,7 @@ export function ProductionWorkstation() {
                                 <Button
                                     onClick={handleOpenFinishDialog}
                                     disabled={isFinishing}
-                                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-md h-10 px-5 gap-1.5"
+                                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-xs h-10 px-5 gap-1.5"
                                 >
                                     <CheckCircle2 className="h-4 w-4" />
                                     Finish Work
@@ -423,6 +424,7 @@ export function ProductionWorkstation() {
                     </div>
                 </div>
             ) : null}
+
 
             {/* 2. MAIN WORKSTATION WORKSPACE */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

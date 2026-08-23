@@ -53,7 +53,6 @@ import {
     DialogDescription,
     DialogHeader,
     DialogTitle,
-    DialogTrigger,
     DialogFooter,
 } from "@/components/ui/dialog";
 import {
@@ -95,6 +94,7 @@ import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { OrderForm, type OrderFormData } from "@/components/order/OrderForm";
+import { AppDialog } from "@/components/shared/app-dialog";
 import { DeadlineCountdown } from "@/components/order/DeadlineCountdown";
 import { OrderTimeline } from "@/components/order/OrderTimeline";
 import { EmailDialog } from "./EmailDialog";
@@ -108,7 +108,6 @@ import {
 import { format } from "date-fns";
 import { DateTimePicker } from "@/components/shared/DateTimePicker";
 import { cn } from "@/lib/utils";
-import { Separator } from "@/components/ui/separator";
 import { useSession } from "@/lib/auth-client";
 import { useGetMeQuery } from "@/redux/features/staff/staffApi";
 import { Role } from "@/constants/role";
@@ -857,42 +856,53 @@ export default function OrdersPage() {
                                     Generate Invoice
                                 </Link>
                             </Button>
-                            <Dialog
+                            <AppDialog
                                 open={isAddDialogOpen}
                                 onOpenChange={(open) => {
                                     setIsAddDialogOpen(open);
                                     if (!open) setServerErrors(undefined);
                                 }}
-                            >
-                                <DialogTrigger asChild>
+                                trigger={
                                     <Button className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-xs">
                                         <Plus className="h-4 w-4" />
                                         Add Order
                                     </Button>
-                                </DialogTrigger>
-                                <DialogContent className="sm:max-w-[650px] p-0 gap-0 max-h-[85vh] overflow-hidden flex flex-col">
-                                    <div className="px-6 pt-6 pb-4 shrink-0">
-                                        <DialogHeader>
-                                            <DialogTitle className="text-xl font-semibold">
-                                                Create New Order
-                                            </DialogTitle>
-                                            <DialogDescription>
-                                                Fill in the order details below.
-                                            </DialogDescription>
-                                        </DialogHeader>
-                                    </div>
-                                    <Separator className="shrink-0" />
-                                    <OrderForm
-                                        onSubmit={handleCreateOrder}
-                                        isSubmitting={isCreating}
-                                        submitLabel="Create Order"
-                                        onCancel={() => setIsAddDialogOpen(false)}
-                                        serverErrors={serverErrors}
-                                        isTelemarketer={isTelemarketer}
-                                        isAdmin={isAdmin}
-                                    />
-                                </DialogContent>
-                            </Dialog>
+                                }
+                                maxWidth="2xl"
+                                title="Create New Order"
+                                description="Fill in the order details below."
+                                icon={<Plus className="h-5 w-5" />}
+                                footer={
+                                    <>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            onClick={() => setIsAddDialogOpen(false)}
+                                            disabled={isCreating}
+                                        >
+                                            Cancel
+                                        </Button>
+                                        <Button
+                                            type="submit"
+                                            form="add-order-form"
+                                            disabled={isCreating}
+                                        >
+                                            {isCreating && (
+                                                <Loader className="h-4 w-4 animate-spin" />
+                                            )}
+                                            Create Order
+                                        </Button>
+                                    </>
+                                }
+                            >
+                                <OrderForm
+                                    formId="add-order-form"
+                                    onSubmit={handleCreateOrder}
+                                    serverErrors={serverErrors}
+                                    isTelemarketer={isTelemarketer}
+                                    isAdmin={isAdmin}
+                                />
+                            </AppDialog>
                         </div>
                     </div>
                 </CardHeader>
@@ -1677,40 +1687,51 @@ export default function OrdersPage() {
             </Card>
 
             {/* Edit Dialog */}
-            <Dialog
+            <AppDialog
                 open={isEditDialogOpen}
                 onOpenChange={(open) => {
                     setIsEditDialogOpen(open);
                     if (!open) setServerErrors(undefined);
                 }}
+                maxWidth="2xl"
+                title="Edit Order"
+                description="Update the order details below."
+                icon={<Edit2 className="h-5 w-5" />}
+                footer={
+                    <>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setIsEditDialogOpen(false)}
+                            disabled={isUpdating}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            type="submit"
+                            form="edit-order-form"
+                            disabled={isUpdating}
+                        >
+                            {isUpdating && (
+                                <Loader className="h-4 w-4 animate-spin" />
+                            )}
+                            Update Order
+                        </Button>
+                    </>
+                }
             >
-                <DialogContent className="sm:max-w-[650px] p-0 gap-0 max-h-[85vh] overflow-hidden flex flex-col">
-                    <div className="px-6 pt-6 pb-4 shrink-0">
-                        <DialogHeader>
-                            <DialogTitle className="text-xl font-semibold">
-                                Edit Order
-                            </DialogTitle>
-                            <DialogDescription>
-                                Update the order details below.
-                            </DialogDescription>
-                        </DialogHeader>
-                    </div>
-                    <Separator className="shrink-0" />
-                    {editDefaultValues && (
-                        <OrderForm
-                            key={selectedOrder?._id}
-                            defaultValues={editDefaultValues}
-                            onSubmit={handleUpdateOrder}
-                            isSubmitting={isUpdating}
-                            submitLabel="Update Order"
-                            onCancel={() => setIsEditDialogOpen(false)}
-                            serverErrors={serverErrors}
-                            isTelemarketer={isTelemarketer}
-                            isAdmin={isAdmin}
-                        />
-                    )}
-                </DialogContent>
-            </Dialog>
+                {editDefaultValues && (
+                    <OrderForm
+                        formId="edit-order-form"
+                        key={selectedOrder?._id}
+                        defaultValues={editDefaultValues}
+                        onSubmit={handleUpdateOrder}
+                        serverErrors={serverErrors}
+                        isTelemarketer={isTelemarketer}
+                        isAdmin={isAdmin}
+                    />
+                )}
+            </AppDialog>
 
             {/* View Dialog */}
             <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>

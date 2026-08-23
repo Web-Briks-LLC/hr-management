@@ -8,6 +8,7 @@ import {
     finishWorkSessionSchema,
     cancelWorkSessionSchema,
     flagImageRevisionSchema,
+    qcApproveImagesSchema,
 } from '../validators/production.validator.js';
 
 
@@ -259,9 +260,10 @@ export const getProductionStats = async (req: Request, res: Response) => {
 
 export const getSanitizedActiveOrders = async (req: Request, res: Response) => {
     try {
-        const { search } = req.query;
+        const { search, includeCompleted } = req.query;
         const result = await productionService.getSanitizedActiveOrders(
-            search as string | undefined
+            search as string | undefined,
+            includeCompleted === 'true'
         );
 
         return res.status(200).json({
@@ -422,6 +424,31 @@ export const flagImageRevision = async (req: Request, res: Response) => {
         return res.status(error.name === 'ZodError' ? 400 : 400).json({
             success: false,
             message: error.message || 'Failed to flag image revision',
+            errors: error.errors || undefined,
+        });
+    }
+};
+
+export const qcApproveImages = async (req: Request, res: Response) => {
+    try {
+        const validatedData = qcApproveImagesSchema.parse(req.body);
+        const userId = req.user!.id;
+
+        const result = await productionService.qcApproveImages(
+            validatedData,
+            userId
+        );
+
+        return res.status(200).json({
+            success: true,
+            message: result.message,
+            data: result,
+        });
+    } catch (error: any) {
+        console.error('qcApproveImages error:', error);
+        return res.status(error.name === 'ZodError' ? 400 : 400).json({
+            success: false,
+            message: error.message || 'Failed to approve images',
             errors: error.errors || undefined,
         });
     }

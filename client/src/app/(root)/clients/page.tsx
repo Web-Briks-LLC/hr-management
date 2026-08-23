@@ -8,13 +8,7 @@ import {
     useMigrateClientIdsMutation,
 } from "@/redux/features/client/clientApi";
 import { useGetMeQuery } from "@/redux/features/staff/staffApi";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-} from "@/components/ui/dialog";
+import { AppDialog } from "@/components/shared/app-dialog";
 import { Button } from "@/components/ui/button";
 import {
     Select,
@@ -27,6 +21,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
     Plus,
+    Edit,
+    Loader2,
     ChevronLeft,
     ChevronRight,
     ChevronsLeft,
@@ -104,6 +100,8 @@ export default function ClientsPage() {
     const [updateServerErrors, setUpdateServerErrors] = useState<
         Record<string, string[]> | undefined
     >(undefined);
+    const [isAddSubmitDisabled, setIsAddSubmitDisabled] = useState(false);
+    const [isUpdateSubmitDisabled, setIsUpdateSubmitDisabled] = useState(false);
 
     const clients = useMemo(
         () => clientsData?.clients || [],
@@ -410,49 +408,84 @@ export default function ClientsPage() {
             </Card>
 
             {/* Add Client Dialog */}
-            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-                <DialogContent className="sm:max-w-2xl h-[85vh] max-h-[85vh] flex flex-col p-0 overflow-hidden gap-0 border shadow-2xl">
-                    <DialogHeader className="p-6 pb-4 border-b border-border/60 shrink-0 bg-background">
-                        <DialogTitle className="text-xl font-bold">
-                            Add New Client
-                        </DialogTitle>
-                        <DialogDescription>
-                            Create a new client profile with contact and team
-                            details.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <ClientForm
-                        onSubmit={handleAddClient}
-                        isSubmitting={isCreating}
-                        submitLabel="Add Client"
-                        onCancel={() => setIsAddDialogOpen(false)}
-                        serverErrors={addServerErrors}
-                    />
-                </DialogContent>
-            </Dialog>
+            <AppDialog
+                open={isAddDialogOpen}
+                onOpenChange={setIsAddDialogOpen}
+                maxWidth="2xl"
+                title="Add New Client"
+                description="Create a new client profile with contact and team details."
+                icon={<Plus className="h-5 w-5" />}
+                footer={
+                    <>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setIsAddDialogOpen(false)}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            type="submit"
+                            form="add-client-form"
+                            disabled={isCreating || isAddSubmitDisabled}
+                            className="min-w-[120px]"
+                        >
+                            {isCreating && (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                            )}
+                            Add Client
+                        </Button>
+                    </>
+                }
+            >
+                <ClientForm
+                    formId="add-client-form"
+                    onSubmit={handleAddClient}
+                    serverErrors={addServerErrors}
+                    onSubmitDisabledChange={setIsAddSubmitDisabled}
+                />
+            </AppDialog>
 
             {/* Edit Client Dialog */}
-            <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-                <DialogContent className="sm:max-w-2xl h-[85vh] max-h-[85vh] flex flex-col p-0 overflow-hidden gap-0 border shadow-2xl">
-                    <DialogHeader className="p-6 pb-4 border-b border-border/60 shrink-0 bg-background">
-                        <DialogTitle className="text-xl font-bold">
-                            Edit Client
-                        </DialogTitle>
-                        <DialogDescription>
-                            Update client information and settings.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <ClientForm
-                        onSubmit={handleUpdateClient}
-                        isSubmitting={isUpdating}
-                        submitLabel="Update Client"
-                        onCancel={() => setIsEditDialogOpen(false)}
-                        defaultValues={editDefaultValues}
-                        isEditMode={true}
-                        serverErrors={updateServerErrors}
-                    />
-                </DialogContent>
-            </Dialog>
+            <AppDialog
+                open={isEditDialogOpen}
+                onOpenChange={setIsEditDialogOpen}
+                maxWidth="2xl"
+                title="Edit Client"
+                description="Update client information and settings."
+                icon={<Edit className="h-5 w-5" />}
+                footer={
+                    <>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setIsEditDialogOpen(false)}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            type="submit"
+                            form="edit-client-form"
+                            disabled={isUpdating || isUpdateSubmitDisabled}
+                            className="min-w-[120px]"
+                        >
+                            {isUpdating && (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                            )}
+                            Update Client
+                        </Button>
+                    </>
+                }
+            >
+                <ClientForm
+                    formId="edit-client-form"
+                    onSubmit={handleUpdateClient}
+                    defaultValues={editDefaultValues}
+                    isEditMode={true}
+                    serverErrors={updateServerErrors}
+                    onSubmitDisabledChange={setIsUpdateSubmitDisabled}
+                />
+            </AppDialog>
         </div>
     );
 }

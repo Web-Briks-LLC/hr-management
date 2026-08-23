@@ -923,9 +923,13 @@ const getProductionStats = async (filters: {
 /**
  * Get sanitized active orders for photo editors (NO client or financial data)
  */
-const getSanitizedActiveOrders = async (search?: string) => {
+const getSanitizedActiveOrders = async (search?: string, includeCompleted?: boolean) => {
+    const activeStatuses = ['pending', 'in_progress', 'quality_check', 'revision'];
     const query: any = {
-        status: { $in: ['pending', 'in_progress', 'quality_check', 'revision'] },
+        // Completed orders are excluded by default (e.g. the editor's "pick an order
+        // to work on" list), but views like the QC/Image Tracking grid need them to
+        // stay visible after the last image is approved instead of vanishing.
+        status: { $in: includeCompleted ? [...activeStatuses, 'completed'] : activeStatuses },
     };
 
     if (search) {
@@ -964,6 +968,9 @@ const getSanitizedActiveOrders = async (search?: string) => {
                         $cond: [{ $eq: ['$status', 'partially_completed'] }, 1, 0],
                     },
                 },
+                pendingQcCount: {
+                    $sum: { $cond: [{ $eq: ['$status', 'pending_qc'] }, 1, 0] },
+                },
                 revisionCount: {
                     $sum: { $cond: [{ $eq: ['$status', 'in_revision'] }, 1, 0] },
                 },
@@ -982,6 +989,7 @@ const getSanitizedActiveOrders = async (search?: string) => {
             completedCount: 0,
             inProgressCount: 0,
             partiallyCompletedCount: 0,
+            pendingQcCount: 0,
             revisionCount: 0,
         };
 
@@ -1005,6 +1013,7 @@ const getSanitizedActiveOrders = async (search?: string) => {
                 completedCount: stats.completedCount,
                 inProgressCount: stats.inProgressCount,
                 partiallyCompletedCount: stats.partiallyCompletedCount,
+                pendingQcCount: stats.pendingQcCount,
                 revisionCount: stats.revisionCount,
                 unassignedCount: Math.max(
                     0,
@@ -1012,6 +1021,7 @@ const getSanitizedActiveOrders = async (search?: string) => {
                         (stats.completedCount +
                             stats.inProgressCount +
                             stats.partiallyCompletedCount +
+                            stats.pendingQcCount +
                             stats.revisionCount)
                 ),
             },
@@ -1080,6 +1090,9 @@ const getOrderImageStatus = async (
                         $cond: [{ $eq: ['$status', 'partially_completed'] }, 1, 0],
                     },
                 },
+                pendingQcCount: {
+                    $sum: { $cond: [{ $eq: ['$status', 'pending_qc'] }, 1, 0] },
+                },
                 revisionCount: {
                     $sum: { $cond: [{ $eq: ['$status', 'in_revision'] }, 1, 0] },
                 },
@@ -1092,6 +1105,7 @@ const getOrderImageStatus = async (
         completedCount: 0,
         inProgressCount: 0,
         partiallyCompletedCount: 0,
+        pendingQcCount: 0,
         revisionCount: 0,
     };
 
@@ -1111,6 +1125,7 @@ const getOrderImageStatus = async (
             completedCount: stats.completedCount,
             inProgressCount: stats.inProgressCount,
             partiallyCompletedCount: stats.partiallyCompletedCount,
+            pendingQcCount: stats.pendingQcCount,
             revisionCount: stats.revisionCount,
             unassignedCount: Math.max(
                 0,
@@ -1118,6 +1133,7 @@ const getOrderImageStatus = async (
                     (stats.completedCount +
                         stats.inProgressCount +
                         stats.partiallyCompletedCount +
+                        stats.pendingQcCount +
                         stats.revisionCount)
             ),
         },
@@ -1380,7 +1396,9 @@ const finishWorkSession = async (
         const isAllDone = requiredStepsList.every((reqStep) => completedSet.has(reqStep));
 
         if (isAllDone && requiredStepsList.length > 0) {
-            image.status = 'completed';
+            // Editor work is done, but the image still needs to pass Quality Check
+            // (QA Analyst / Team Leader / Admin / Super Admin) before it counts as complete.
+            image.status = 'pending_qc';
         } else {
             image.status = 'partially_completed';
         }
@@ -1471,10 +1489,12 @@ const finishWorkSession = async (
     }
 
 
-    // Check if entire order is completed
+    // Check if editors are done with every image in the order (either fully
+    // completed already or awaiting QC review) so the order can move to the
+    // Quality Check stage.
     const remainingIncompleteImages = await OrderImageModel.countDocuments({
         orderId: session.orderId,
-        status: { $ne: 'completed' },
+        status: { $nin: ['completed', 'pending_qc'] },
     });
 
     const totalOrderImages = await OrderImageModel.countDocuments({
@@ -1639,6 +1659,85 @@ const flagImageRevision = async (
     return {
         success: true,
         message: `${payload.imageNames.length} image(s) flagged for revision`,
+    };
+};
+
+/**
+ * Approve images that have passed Quality Check (QA Analyst / Team Leader / Admin / Super Admin).
+ * Only images currently awaiting QC (`pending_qc`) are affected. Once every image on the order
+ * has been approved, the order itself rolls up to `completed`.
+ */
+const qcApproveImages = async (
+    payload: {
+        orderId: string;
+        imageNames: string[];
+    },
+    userId: string
+) => {
+    const order = await OrderModel.findById(payload.orderId);
+    if (!order) {
+        throw new Error('Order not found');
+    }
+
+    const now = new Date();
+
+    const updateResult = await OrderImageModel.updateMany(
+        {
+            orderId: order._id,
+            imageName: { $in: payload.imageNames },
+            status: 'pending_qc',
+        },
+        {
+            $set: {
+                status: 'completed',
+                qcApprovedBy: new Types.ObjectId(userId),
+                qcApprovedAt: now,
+            },
+        }
+    );
+
+    // Roll the order up to fully completed once every registered image has passed QC
+    const remainingIncompleteImages = await OrderImageModel.countDocuments({
+        orderId: order._id,
+        status: { $ne: 'completed' },
+    });
+
+    const totalOrderImages = await OrderImageModel.countDocuments({
+        orderId: order._id,
+    });
+
+    const orderJustCompleted =
+        totalOrderImages >= order.imageQuantity &&
+        remainingIncompleteImages === 0 &&
+        order.status !== 'completed';
+
+    if (orderJustCompleted) {
+        order.status = 'completed';
+        order.completedAt = now;
+        order.timeline.push({
+            status: 'completed',
+            timestamp: now,
+            changedBy: new Types.ObjectId(userId),
+            note: `Quality Check passed: all ${totalOrderImages} images approved.`,
+        });
+        await order.save();
+    }
+
+    notifyProductionUpdate('production:qc_reviewed', {
+        orderId: order._id,
+        orderCompleted: orderJustCompleted,
+    });
+    notifyProductionUpdate('production:images_updated', {
+        orderId: order._id,
+    });
+
+    return {
+        success: true,
+        message: orderJustCompleted
+            ? `${updateResult.modifiedCount} image(s) approved — order fully completed!`
+            : `${updateResult.modifiedCount} image(s) approved`,
+        approvedCount: updateResult.modifiedCount,
+        orderCompleted: orderJustCompleted,
     };
 };
 
@@ -1833,6 +1932,7 @@ const productionService = {
     finishWorkSession,
     cancelWorkSession,
     flagImageRevision,
+    qcApproveImages,
     getStaffPerformanceAnalytics,
 };
 

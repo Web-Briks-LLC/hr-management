@@ -82,22 +82,19 @@ export interface OrderFormData {
 }
 
 interface OrderFormProps {
+    /** id applied to the <form> so an external submit button (in AppDialog's footer) can target it via the `form` attribute */
+    formId: string;
     defaultValues?: OrderFormData;
     onSubmit: (data: OrderFormData) => Promise<void>;
-    isSubmitting: boolean;
-    submitLabel: string;
-    onCancel: () => void;
     serverErrors?: Record<string, string[]>;
     isTelemarketer?: boolean;
     isAdmin?: boolean;
 }
 
 export function OrderForm({
+    formId,
     defaultValues,
     onSubmit,
-    isSubmitting,
-    submitLabel,
-    onCancel,
     serverErrors,
     isTelemarketer,
     isAdmin,
@@ -426,12 +423,7 @@ export function OrderForm({
     };
 
     return (
-        <form
-            onSubmit={handleFormSubmit}
-            className="flex flex-col overflow-hidden h-full"
-        >
-            <div className="flex-1 min-h-0 overflow-y-auto px-6">
-                <div className="space-y-5 py-5">
+        <form id={formId} onSubmit={handleFormSubmit} className="space-y-5">
                     {/* Order Name */}
                     <div className="space-y-2">
                         <Label className="text-sm font-medium flex items-center gap-2">
@@ -1022,28 +1014,6 @@ export function OrderForm({
                             </p>
                         )}
                     </div>
-                </div>
-            </div>
-
-            <Separator className="shrink-0" />
-
-            {/* Footer */}
-            <div className="px-6 py-4 shrink-0 flex justify-end gap-2">
-                <Button
-                    type="button"
-                    variant="outline"
-                    onClick={onCancel}
-                    disabled={isSubmitting}
-                >
-                    Cancel
-                </Button>
-                <Button type="submit" disabled={isSubmitting}>
-                    {isSubmitting && (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                    )}
-                    {submitLabel}
-                </Button>
-            </div>
         </form>
     );
 }

@@ -4,6 +4,7 @@ export type ImageProductionStatus =
     | 'unassigned'
     | 'in_progress'
     | 'partially_completed'
+    | 'pending_qc'
     | 'completed'
     | 'in_revision';
 
@@ -36,6 +37,8 @@ export interface IOrderImage extends Document {
     lockedAt?: Date | null;
     isRevision: boolean;
     revisionHistory: IImageRevisionEntry[];
+    qcApprovedBy?: Types.ObjectId | null;
+    qcApprovedAt?: Date | null;
     createdAt: Date;
     updatedAt: Date;
 }

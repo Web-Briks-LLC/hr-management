@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -32,12 +32,19 @@ import {
     Sparkles,
     CheckCircle2,
     Zap,
+    Filter,
+    ChevronLeft,
+    ChevronRight,
+    ChevronsLeft,
+    ChevronsRight,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 
 export function StaffPerformanceAnalytics() {
     const [filterType, setFilterType] = useState<string>('month');
+    const [page, setPage] = useState<number>(1);
+    const [limit, setLimit] = useState<number>(10);
 
     const { data: analyticsData, isLoading } = useGetStaffPerformanceAnalyticsQuery({
         filterType,
@@ -50,13 +57,21 @@ export function StaffPerformanceAnalytics() {
         totalHours: 0,
         activeStaffCount: 0,
     };
-    const staffList = data?.staffPerformance || [];
+    const allStaff = data?.staffPerformance || [];
     const stepBreakdown = data?.stepBreakdown || [];
     const shiftList = data?.shiftPerformance || [];
 
+    // Paginated Staff List
+    const totalPages = Math.max(1, Math.ceil(allStaff.length / limit));
+    const safePage = Math.min(page, totalPages);
+    const paginatedStaff = useMemo(() => {
+        const start = (safePage - 1) * limit;
+        return allStaff.slice(start, start + limit);
+    }, [allStaff, safePage, limit]);
+
     // Export to CSV for HR appraisal/salary review
     const handleExportCSV = () => {
-        if (staffList.length === 0) {
+        if (allStaff.length === 0) {
             toast.error('No staff analytics data to export');
             return;
         }
@@ -71,7 +86,7 @@ export function StaffPerformanceAnalytics() {
             'Avg Sec Per Image',
         ];
 
-        const rows = staffList.map((s) => [
+        const rows = allStaff.map((s) => [
             s.employeeId,
             `"${s.staffName}"`,
             `"${s.designation}"`,
@@ -101,22 +116,25 @@ export function StaffPerformanceAnalytics() {
 
     return (
         <div className="space-y-6">
-            {/* Header & Filter Controls */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h3 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
-                        <Award className="h-5 w-5 text-primary" />
-                        Staff Performance &amp; Productivity Analytics
-                    </h3>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                        Track daily and monthly image deliveries, active work sessions, and speed metrics for photo editors.
-                    </p>
-                </div>
+            {/* Filter Toolbar (Matching Orders/Earnings style) */}
+            <div className="flex flex-wrap items-center justify-between gap-4 p-4 bg-muted/30 rounded-lg border border-border/50">
+                <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
+                        <div className="bg-primary/10 p-2 rounded-full">
+                            <Filter className="h-4 w-4 text-primary" />
+                        </div>
+                        <span className="text-sm font-medium">Time Period:</span>
+                    </div>
 
-                <div className="flex flex-wrap items-center gap-3">
                     <div className="w-[150px]">
-                        <Select value={filterType} onValueChange={setFilterType}>
-                            <SelectTrigger className="h-9 text-xs bg-background">
+                        <Select
+                            value={filterType}
+                            onValueChange={(v) => {
+                                setFilterType(v);
+                                setPage(1);
+                            }}
+                        >
+                            <SelectTrigger className="h-9 text-xs bg-background/60">
                                 <SelectValue placeholder="Time Period" />
                             </SelectTrigger>
                             <SelectContent>
@@ -128,91 +146,111 @@ export function StaffPerformanceAnalytics() {
                             </SelectContent>
                         </Select>
                     </div>
-
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleExportCSV}
-                        className="h-9 text-xs gap-1.5 font-semibold"
-                    >
-                        <Download className="h-3.5 w-3.5" />
-                        Export CSV
-                    </Button>
                 </div>
+
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleExportCSV}
+                    className="h-9 text-xs gap-1.5 font-semibold border-border/80 shadow-xs"
+                >
+                    <Download className="h-3.5 w-3.5" />
+                    Export CSV
+                </Button>
             </div>
 
-            {/* KPI Summary Cards */}
+            {/* KPI Summary Cards (Matching Orders/Earnings Glassmorphism Design) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <Card className="border-border/60 shadow-xs">
-                    <CardContent className="p-5 flex items-center justify-between">
-                        <div className="space-y-1">
-                            <span className="text-xs font-semibold text-muted-foreground uppercase">
-                                Total Images Processed
-                            </span>
-                            <p className="text-2xl font-black text-foreground">
-                                {isLoading ? <Skeleton className="h-8 w-20" /> : summary.totalImages.toLocaleString()}
-                            </p>
+                {/* Total Images Processed */}
+                <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-primary/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-primary/5 hover:border-primary/30">
+                    <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-primary/10 blur-2xl transition-all duration-300 group-hover:bg-primary/20" />
+                    <div className="relative">
+                        <div className="flex items-center justify-between mb-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary transition-all duration-300 group-hover:scale-110 group-hover:bg-primary/20">
+                                <Layers className="h-5 w-5" />
+                            </div>
+                            <Badge variant="outline" className="text-[10px] font-medium opacity-70">
+                                Output
+                            </Badge>
                         </div>
-                        <div className="p-3 rounded-xl bg-primary/10 text-primary">
-                            <Layers className="h-6 w-6" />
-                        </div>
-                    </CardContent>
-                </Card>
+                        <h3 className="text-3xl font-bold tracking-tight text-foreground">
+                            {isLoading ? <Skeleton className="h-8 w-20" /> : summary.totalImages.toLocaleString()}
+                        </h3>
+                        <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-primary/10 font-medium">
+                            Total Images Processed
+                        </p>
+                    </div>
+                </div>
 
-                <Card className="border-border/60 shadow-xs">
-                    <CardContent className="p-5 flex items-center justify-between">
-                        <div className="space-y-1">
-                            <span className="text-xs font-semibold text-muted-foreground uppercase">
-                                Total Work Sessions
-                            </span>
-                            <p className="text-2xl font-black text-foreground">
-                                {isLoading ? <Skeleton className="h-8 w-16" /> : summary.totalSessions.toLocaleString()}
-                            </p>
+                {/* Total Work Sessions */}
+                <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-emerald-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-emerald-500/5 hover:border-emerald-500/30">
+                    <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-emerald-500/10 blur-2xl transition-all duration-300 group-hover:bg-emerald-500/20" />
+                    <div className="relative">
+                        <div className="flex items-center justify-between mb-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 transition-all duration-300 group-hover:scale-110 group-hover:bg-emerald-500/20">
+                                <CheckCircle2 className="h-5 w-5" />
+                            </div>
+                            <Badge variant="outline" className="text-[10px] font-medium bg-emerald-500/5 text-emerald-500 border-emerald-500/20">
+                                Batches
+                            </Badge>
                         </div>
-                        <div className="p-3 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                            <CheckCircle2 className="h-6 w-6" />
-                        </div>
-                    </CardContent>
-                </Card>
+                        <h3 className="text-3xl font-bold tracking-tight text-foreground">
+                            {isLoading ? <Skeleton className="h-8 w-16" /> : summary.totalSessions.toLocaleString()}
+                        </h3>
+                        <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-emerald-500/10 font-medium">
+                            Completed Work Sessions
+                        </p>
+                    </div>
+                </div>
 
-                <Card className="border-border/60 shadow-xs">
-                    <CardContent className="p-5 flex items-center justify-between">
-                        <div className="space-y-1">
-                            <span className="text-xs font-semibold text-muted-foreground uppercase">
-                                Total Editor Hours
-                            </span>
-                            <p className="text-2xl font-black text-foreground">
-                                {isLoading ? <Skeleton className="h-8 w-16" /> : `${summary.totalHours} hrs`}
-                            </p>
+                {/* Total Editor Hours */}
+                <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-amber-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-amber-500/5 hover:border-amber-500/30">
+                    <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-amber-500/10 blur-2xl transition-all duration-300 group-hover:bg-amber-500/20" />
+                    <div className="relative">
+                        <div className="flex items-center justify-between mb-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 transition-all duration-300 group-hover:scale-110 group-hover:bg-amber-500/20">
+                                <Clock className="h-5 w-5" />
+                            </div>
+                            <Badge variant="outline" className="text-[10px] font-medium bg-amber-500/5 text-amber-500 border-amber-500/20">
+                                Time
+                            </Badge>
                         </div>
-                        <div className="p-3 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
-                            <Clock className="h-6 w-6" />
-                        </div>
-                    </CardContent>
-                </Card>
+                        <h3 className="text-3xl font-bold tracking-tight text-foreground">
+                            {isLoading ? <Skeleton className="h-8 w-16" /> : `${summary.totalHours} hrs`}
+                        </h3>
+                        <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-amber-500/10 font-medium">
+                            Total Editor Working Hours
+                        </p>
+                    </div>
+                </div>
 
-                <Card className="border-border/60 shadow-xs">
-                    <CardContent className="p-5 flex items-center justify-between">
-                        <div className="space-y-1">
-                            <span className="text-xs font-semibold text-muted-foreground uppercase">
-                                Active Editors
-                            </span>
-                            <p className="text-2xl font-black text-foreground">
-                                {isLoading ? <Skeleton className="h-8 w-12" /> : summary.activeStaffCount}
-                            </p>
+                {/* Active Editors */}
+                <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-blue-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/5 hover:border-blue-500/30">
+                    <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-blue-500/10 blur-2xl transition-all duration-300 group-hover:bg-blue-500/20" />
+                    <div className="relative">
+                        <div className="flex items-center justify-between mb-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 transition-all duration-300 group-hover:scale-110 group-hover:bg-blue-500/20">
+                                <Users className="h-5 w-5" />
+                            </div>
+                            <Badge variant="outline" className="text-[10px] font-medium opacity-70">
+                                Staff
+                            </Badge>
                         </div>
-                        <div className="p-3 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
-                            <Users className="h-6 w-6" />
-                        </div>
-                    </CardContent>
-                </Card>
+                        <h3 className="text-3xl font-bold tracking-tight text-foreground">
+                            {isLoading ? <Skeleton className="h-8 w-12" /> : summary.activeStaffCount}
+                        </h3>
+                        <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-blue-500/10 font-medium">
+                            Active Photo Editors
+                        </p>
+                    </div>
+                </div>
             </div>
 
             {/* Staff Leaderboard & Breakdown Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Staff Output Table (2 cols) */}
-                <Card className="lg:col-span-2 border-border/60 shadow-sm">
-                    <CardHeader className="pb-3">
+                <Card className="lg:col-span-2 border-border/60 shadow-xs">
+                    <CardHeader className="pb-3 border-b border-border/60">
                         <CardTitle className="text-base font-bold flex items-center gap-2">
                             <TrendingUp className="h-4 w-4 text-primary" />
                             Photo Editor Leaderboard
@@ -224,9 +262,9 @@ export function StaffPerformanceAnalytics() {
 
                     <CardContent className="p-0">
                         <Table>
-                            <TableHeader className="bg-muted/30">
-                                <TableRow className="text-xs">
-                                    <TableHead className="font-bold">Staff Name &amp; ID</TableHead>
+                            <TableHeader className="bg-muted/40">
+                                <TableRow className="text-xs border-b-border/60">
+                                    <TableHead className="font-bold">Staff Member</TableHead>
                                     <TableHead className="font-bold">Designation</TableHead>
                                     <TableHead className="font-bold text-center">Sessions</TableHead>
                                     <TableHead className="font-bold text-right">Images Done</TableHead>
@@ -246,19 +284,19 @@ export function StaffPerformanceAnalytics() {
                                             <TableCell><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
                                         </TableRow>
                                     ))
-                                ) : staffList.length === 0 ? (
+                                ) : paginatedStaff.length === 0 ? (
                                     <TableRow>
                                         <TableCell colSpan={6} className="h-32 text-center text-muted-foreground text-xs">
                                             No staff performance records found for this timeframe.
                                         </TableCell>
                                     </TableRow>
                                 ) : (
-                                    staffList.map((staff, idx) => (
-                                        <TableRow key={staff.staffId} className="hover:bg-muted/20 text-xs">
+                                    paginatedStaff.map((staff, idx) => (
+                                        <TableRow key={staff.staffId} className="hover:bg-muted/20 text-xs py-3">
                                             <TableCell className="font-bold">
                                                 <div className="flex items-center gap-2">
                                                     <span className="w-5 h-5 rounded-full bg-primary/10 text-primary text-[10px] flex items-center justify-center font-bold">
-                                                        {idx + 1}
+                                                        {(safePage - 1) * limit + idx + 1}
                                                     </span>
                                                     <div>
                                                         <p className="text-foreground">{staff.staffName}</p>
@@ -290,20 +328,93 @@ export function StaffPerformanceAnalytics() {
                                 )}
                             </TableBody>
                         </Table>
+
+                        {/* Pagination Footer */}
+                        {allStaff.length > 0 && (
+                            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 border-t border-border/60 bg-muted/10">
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    <span>Rows per page:</span>
+                                    <Select
+                                        value={limit.toString()}
+                                        onValueChange={(v) => {
+                                            setLimit(Number(v));
+                                            setPage(1);
+                                        }}
+                                    >
+                                        <SelectTrigger className="h-8 w-16 text-xs bg-background">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {[10, 20, 50].map((l) => (
+                                                <SelectItem key={l} value={l.toString()} className="text-xs">
+                                                    {l}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    <span className="ml-2">
+                                        Showing {Math.min((safePage - 1) * limit + 1, allStaff.length)} to{' '}
+                                        {Math.min(safePage * limit, allStaff.length)} of {allStaff.length} editors
+                                    </span>
+                                </div>
+
+                                <div className="flex items-center gap-1.5">
+                                    <Button
+                                        variant="outline"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        onClick={() => setPage(1)}
+                                        disabled={safePage === 1}
+                                    >
+                                        <ChevronsLeft className="h-3.5 w-3.5" />
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        onClick={() => setPage((p) => Math.max(1, p - 1))}
+                                        disabled={safePage === 1}
+                                    >
+                                        <ChevronLeft className="h-3.5 w-3.5" />
+                                    </Button>
+                                    <span className="text-xs font-medium px-2">
+                                        Page {safePage} of {totalPages}
+                                    </span>
+                                    <Button
+                                        variant="outline"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                                        disabled={safePage >= totalPages}
+                                    >
+                                        <ChevronRight className="h-3.5 w-3.5" />
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        onClick={() => setPage(totalPages)}
+                                        disabled={safePage >= totalPages}
+                                    >
+                                        <ChevronsRight className="h-3.5 w-3.5" />
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
 
                 {/* Sub-Service Breakdown & Shift Output (1 col) */}
                 <div className="space-y-6">
                     {/* Step Breakdown */}
-                    <Card className="border-border/60 shadow-sm">
-                        <CardHeader className="pb-3">
+                    <Card className="border-border/60 shadow-xs">
+                        <CardHeader className="pb-3 border-b border-border/60">
                             <CardTitle className="text-sm font-bold flex items-center gap-2">
                                 <Zap className="h-4 w-4 text-amber-500" />
                                 Sub-Service Distribution
                             </CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-3">
+                        <CardContent className="space-y-3 pt-4">
                             {stepBreakdown.length === 0 ? (
                                 <p className="text-xs text-muted-foreground text-center py-4">
                                     No step data available
@@ -339,14 +450,14 @@ export function StaffPerformanceAnalytics() {
                     </Card>
 
                     {/* Shift Performance */}
-                    <Card className="border-border/60 shadow-sm">
-                        <CardHeader className="pb-3">
+                    <Card className="border-border/60 shadow-xs">
+                        <CardHeader className="pb-3 border-b border-border/60">
                             <CardTitle className="text-sm font-bold flex items-center gap-2">
                                 <Clock className="h-4 w-4 text-blue-500" />
                                 Shift Output Comparison
                             </CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-2.5">
+                        <CardContent className="space-y-2.5 pt-4">
                             {shiftList.length === 0 ? (
                                 <p className="text-xs text-muted-foreground text-center py-4">
                                     No shift records available

@@ -105,6 +105,13 @@ export const flagImageRevisionSchema = z.object({
     instruction: z.string().min(1, 'Revision instruction is required').max(2000),
 });
 
+export const qcApproveImagesSchema = z.object({
+    orderId: z.string({ message: 'Order ID is required' }),
+    imageNames: z
+        .array(z.string().min(1, 'Image name cannot be empty'))
+        .min(1, 'At least one image name is required'),
+});
+
 export type CreateProductionLogInput = z.infer<typeof createProductionLogSchema>;
 export type UpdateProductionLogInput = z.infer<typeof updateProductionLogSchema>;
 export type SubmitQCReviewInput = z.infer<typeof submitQCReviewSchema>;
@@ -113,4 +120,5 @@ export type StartWorkSessionInput = z.infer<typeof startWorkSessionSchema>;
 export type FinishWorkSessionInput = z.infer<typeof finishWorkSessionSchema>;
 export type CancelWorkSessionInput = z.infer<typeof cancelWorkSessionSchema>;
 export type FlagImageRevisionInput = z.infer<typeof flagImageRevisionSchema>;
+export type QcApproveImagesInput = z.infer<typeof qcApproveImagesSchema>;
 

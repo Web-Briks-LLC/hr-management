@@ -29,7 +29,6 @@ import { cn } from '@/lib/utils';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { Card, CardContent } from '@/components/ui/card';
 import { Combobox } from '@/components/ui/combobox';
-import { ScrollArea } from '@/components/ui/scroll-area';
 
 // Zod schema for client form validation
 // Team member schema needs _id to correctly handle existing records from the API
@@ -102,13 +101,14 @@ export interface ClientFormData {
 }
 
 interface ClientFormProps {
+    /** id applied to the <form> so an external submit button (in AppDialog's footer) can target it via the `form` attribute */
+    formId: string;
     defaultValues?: Partial<ClientFormData>;
     onSubmit: (data: ClientFormData) => Promise<void>;
-    isSubmitting: boolean;
-    submitLabel: string;
-    onCancel: () => void;
     serverErrors?: Record<string, string[]>;
     isEditMode?: boolean;
+    /** Notifies the parent whenever the external submit button should be disabled (e.g. Client ID is being checked or conflicts) */
+    onSubmitDisabledChange?: (disabled: boolean) => void;
 }
 
 const statusOptions = [
@@ -125,13 +125,12 @@ const currencyOptions = [
 ];
 
 export function ClientForm({
+    formId,
     defaultValues,
     onSubmit,
-    isSubmitting,
-    submitLabel,
-    onCancel,
     serverErrors,
     isEditMode = false,
+    onSubmitDisabledChange,
 }: ClientFormProps) {
     const [checkClientId, { isFetching: isCheckingId, data: checkResult, originalArgs: lastCheckedClientId }] =
         useLazyCheckClientIdQuery();
@@ -216,6 +215,10 @@ export function ClientForm({
         }
         return null;
     }, [isEditMode, clientIdValue, lastCheckedClientId, checkResult]);
+
+    useEffect(() => {
+        onSubmitDisabledChange?.(isCheckingId || (!!clientIdError && !isEditMode));
+    }, [isCheckingId, clientIdError, isEditMode, onSubmitDisabledChange]);
 
     // Debounced client ID check
     useEffect(() => {
@@ -321,9 +324,7 @@ export function ClientForm({
     })) || [];
 
     return (
-        <form onSubmit={handleSubmit(handleFormSubmit)} className="flex flex-col flex-1 h-full min-h-0 overflow-hidden">
-            <ScrollArea className="flex-1 min-h-0 h-full w-full px-6">
-                <div className="py-6 pb-8 space-y-6">
+        <form id={formId} onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
                 <div className="flex items-center gap-2 pb-2 border-b border-muted">
                     <Users className="h-5 w-5 text-primary" />
                     <h3 className="font-semibold">Basic Information</h3>
@@ -456,7 +457,6 @@ export function ClientForm({
                         </p>
                     </div>
                 </div>
-            </div>
 
             <div className="space-y-4 pt-4 border-t">
                 <div className="flex items-center gap-2 pb-2 border-b border-muted">
@@ -644,21 +644,6 @@ export function ClientForm({
                         className="min-h-[100px]"
                     />
                 </div>
-                </div>
-            </ScrollArea>
-
-            <div className="p-6 pb-8 border-t border-border/60 bg-slate-50/80 dark:bg-slate-900/80 shrink-0 flex items-center justify-end gap-3 font-semibold">
-                <Button type="button" variant="outline" onClick={onCancel}>
-                    Cancel
-                </Button>
-                <Button
-                    type="submit"
-                    disabled={isSubmitting || (!!clientIdError && !isEditMode)}
-                    className="min-w-[120px]"
-                >
-                    {isSubmitting ? <Loader className="h-4 w-4 animate-spin" /> : null}
-                    {submitLabel}
-                </Button>
             </div>
         </form>
     );

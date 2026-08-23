@@ -15,6 +15,7 @@ import {
     finishWorkSession,
     cancelWorkSession,
     flagImageRevision,
+    qcApproveImages,
     getStaffPerformanceAnalytics,
 } from '../controllers/production.controller.js';
 import { authorizeProductionAccess } from '../middlewares/authorizeProductionAccess.js';
@@ -24,6 +25,7 @@ import { Role } from '../constants/role.js';
 const router = Router();
 
 const adminRoles = [Role.SUPER_ADMIN, Role.ADMIN, Role.HR_MANAGER];
+const qcRoles = [Role.SUPER_ADMIN, Role.ADMIN, Role.HR_MANAGER, Role.TEAM_LEADER];
 
 // All production routes require authorizeProductionAccess (Admins + Non-Telemarketer Staff & Team Leaders)
 router.use(authorizeProductionAccess);
@@ -35,7 +37,8 @@ router.post('/session/start', startWorkSession);
 router.get('/session/active', getActiveWorkSession);
 router.post('/session/finish', finishWorkSession);
 router.post('/session/cancel', cancelWorkSession);
-router.post('/images/revision', flagImageRevision);
+router.post('/images/revision', authorize(...qcRoles), flagImageRevision);
+router.post('/images/qc-approve', authorize(...qcRoles), qcApproveImages);
 router.get('/analytics/staff', getStaffPerformanceAnalytics);
 
 // Existing Shift Logs & Overview Endpoints
