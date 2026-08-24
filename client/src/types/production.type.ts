@@ -520,3 +520,86 @@ export interface IQcApproveImagesInput {
     imageNames: string[];
 }
 
+export interface IStaffImageSummary {
+    totalImagesWorked: number;
+    todayImagesWorked: number;
+    qcApprovedCount: number;
+    revisionCount: number;
+    totalWorkSessions: number;
+    totalWorkSeconds: number;
+    avgSecondsPerImage: number;
+}
+
+export interface IStaffEditedImageItem {
+    _id: string;
+    orderId: {
+        _id: string;
+        orderName: string;
+        imageQuantity: number;
+        priority: string;
+        deadline: string;
+        status: string;
+        clientId?: {
+            _id: string;
+            name: string;
+            clientCode?: string;
+            email?: string;
+        };
+    };
+    imageName: string;
+    status: 'unassigned' | 'in_progress' | 'partially_completed' | 'pending_qc' | 'completed' | 'in_revision';
+    requiredSteps: string[];
+    completedSteps: {
+        stepName: string;
+        completedBy: {
+            _id: string;
+            staffId: string;
+            userId?: { name: string; email?: string };
+        };
+        shiftId?: { _id: string; name: string; code: string };
+        completedAt: string;
+        durationSeconds?: number;
+        sessionId?: string;
+    }[];
+    isRevision: boolean;
+    revisionHistory: {
+        instruction: string;
+        requestedBy?: { name: string; email?: string };
+        createdAt: string;
+        resolvedAt?: string;
+        resolvedBy?: { staffId: string; userId?: { name: string } };
+    }[];
+    qcApprovedBy?: { _id: string; name: string; email: string };
+    qcApprovedAt?: string;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface IStaffEditedImagesResponse {
+    success: boolean;
+    data: {
+        summary: IStaffImageSummary;
+        images: IStaffEditedImageItem[];
+        meta: {
+            total: number;
+            page: number;
+            limit: number;
+            totalPages: number;
+        };
+    };
+}
+
+export interface IStaffEditedImagesFilters {
+    staffId?: string;
+    search?: string;
+    status?: string;
+    step?: string;
+    filterType?: string;
+    startDate?: string;
+    endDate?: string;
+    month?: number;
+    year?: number;
+    page?: number;
+    limit?: number;
+}
+

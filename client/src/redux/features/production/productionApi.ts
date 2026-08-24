@@ -17,6 +17,8 @@ import type {
     ICancelWorkSessionInput,
     IFlagImageRevisionInput,
     IQcApproveImagesInput,
+    IStaffEditedImagesResponse,
+    IStaffEditedImagesFilters,
 } from '@/types/production.type';
 
 interface ProductionLogsResponse {
@@ -382,6 +384,16 @@ export const productionApi = apiSlice.injectEndpoints({
                 { type: 'Order', id: 'LIST' },
             ],
         }),
+        getStaffEditedImages: builder.query<
+            IStaffEditedImagesResponse,
+            IStaffEditedImagesFilters | void
+        >({
+            query: (params) => ({
+                url: '/production/staff-images',
+                params: params || {},
+            }),
+            providesTags: ['ProductionImages', { type: 'ProductionImages', id: 'STAFF_LIST' }],
+        }),
     }),
 });
 
@@ -395,6 +407,7 @@ export const {
     useFlagImageRevisionMutation,
     useQcApproveImagesMutation,
     useGetStaffPerformanceAnalyticsQuery,
+    useGetStaffEditedImagesQuery,
     useGetProductionLogsQuery,
     useGetActiveOrdersProgressQuery,
     useGetOrderTimelineQuery,

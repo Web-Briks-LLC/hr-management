@@ -1,3 +1,5 @@
+import { Role } from '../constants/role.js';
+import StaffModel from '../models/staff.model.js';
 import type { Request, Response } from 'express';
 import productionService from '../services/production.service.js';
 import {
@@ -493,4 +495,52 @@ export const getStaffPerformanceAnalytics = async (
         });
     }
 };
+
+export const getStaffEditedImages = async (req: Request, res: Response) => {
+    try {
+        const userId = req.user!.id;
+        const userRole = req.user!.role;
+
+        let targetStaffId = req.query.staffId as string | undefined;
+
+        // If targetStaffId is not provided, or standard staff is querying, find their own staff ID
+        if (!targetStaffId || (userRole === Role.STAFF && !targetStaffId)) {
+            const staff = await StaffModel.findOne({ userId }).select('_id').lean();
+            if (!staff) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Staff profile not found for this user',
+                });
+            }
+            targetStaffId = staff._id.toString();
+        }
+
+        const filters = {
+            search: req.query.search as string | undefined,
+            status: req.query.status as string | undefined,
+            step: req.query.step as string | undefined,
+            filterType: req.query.filterType as string | undefined,
+            startDate: req.query.startDate as string | undefined,
+            endDate: req.query.endDate as string | undefined,
+            month: req.query.month ? parseInt(req.query.month as string) : undefined,
+            year: req.query.year ? parseInt(req.query.year as string) : undefined,
+            page: req.query.page ? parseInt(req.query.page as string) : 1,
+            limit: req.query.limit ? parseInt(req.query.limit as string) : 20,
+        };
+
+        const result = await productionService.getStaffEditedImages(targetStaffId, filters);
+
+        return res.status(200).json({
+            success: true,
+            data: result,
+        });
+    } catch (error: any) {
+        console.error('getStaffEditedImages error:', error);
+        return res.status(500).json({
+            success: false,
+            message: error.message || 'Failed to retrieve staff edited images',
+        });
+    }
+};
+
 

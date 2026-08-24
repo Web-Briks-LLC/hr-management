@@ -2016,6 +2016,220 @@ const getStaffPerformanceAnalytics = async (filters: {
     };
 };
 
+/**
+ * Get edited images history and metrics for a specific staff member
+ */
+const getStaffEditedImages = async (
+    targetStaffId: string,
+    filters: {
+        search?: string | undefined;
+        status?: string | undefined;
+        step?: string | undefined;
+        filterType?: string | undefined;
+        startDate?: string | undefined;
+        endDate?: string | undefined;
+        month?: number | undefined;
+        year?: number | undefined;
+        page?: number | undefined;
+        limit?: number | undefined;
+    }
+) => {
+    const page = Math.max(1, Number(filters.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(filters.limit) || 20));
+    const skip = (page - 1) * limit;
+
+    let staffObjId: Types.ObjectId;
+    if (Types.ObjectId.isValid(targetStaffId)) {
+        // Double check if this is an existing staff ObjectId or if staffId field matches
+        const staffByObjId = await StaffModel.findById(targetStaffId).select('_id').lean();
+        if (staffByObjId) {
+            staffObjId = staffByObjId._id as Types.ObjectId;
+        } else {
+            const staffByCode = await StaffModel.findOne({ staffId: targetStaffId }).select('_id').lean();
+            staffObjId = (staffByCode ? staffByCode._id : new Types.ObjectId(targetStaffId)) as Types.ObjectId;
+        }
+    } else {
+        const staffByCode = await StaffModel.findOne({ staffId: targetStaffId }).select('_id').lean();
+        if (staffByCode) {
+            staffObjId = staffByCode._id as Types.ObjectId;
+        } else {
+            staffObjId = new Types.ObjectId(targetStaffId);
+        }
+    }
+
+    // Build match query for OrderImage
+    const matchQuery: any = {
+        $or: [
+            { 'completedSteps.completedBy': staffObjId },
+            { currentAssignedStaffId: staffObjId },
+        ],
+    };
+
+    if (filters.status && filters.status !== 'all') {
+        matchQuery.status = filters.status;
+    }
+
+    if (filters.step && filters.step !== 'all') {
+        matchQuery.completedSteps = {
+            $elemMatch: {
+                stepName: filters.step,
+                completedBy: staffObjId,
+            },
+        };
+    }
+
+    // Date range filter
+    const now = new Date();
+    let start: Date | null = null;
+    let end: Date | null = null;
+
+    if (filters.startDate || filters.endDate) {
+        if (filters.startDate) {
+            start = new Date(filters.startDate);
+            start.setHours(0, 0, 0, 0);
+        }
+        if (filters.endDate) {
+            end = new Date(filters.endDate);
+            end.setHours(23, 59, 59, 999);
+        }
+    } else if (filters.filterType === 'today') {
+        start = startOfDay(now);
+        end = endOfDay(now);
+    } else if (filters.filterType === 'week') {
+        start = startOfWeek(now, { weekStartsOn: 1 });
+        end = endOfWeek(now, { weekStartsOn: 1 });
+    } else if (filters.filterType === 'month') {
+        const yr = filters.year || now.getFullYear();
+        const mo = filters.month || (now.getMonth() + 1);
+        start = new Date(yr, mo - 1, 1, 0, 0, 0, 0);
+        end = new Date(yr, mo, 0, 23, 59, 59, 999);
+    } else if (filters.filterType === 'year') {
+        const yr = filters.year || now.getFullYear();
+        start = new Date(yr, 0, 1, 0, 0, 0, 0);
+        end = new Date(yr, 11, 31, 23, 59, 59, 999);
+    }
+
+    if (start || end) {
+        const dateMatch: any = {};
+        if (start) dateMatch.$gte = start;
+        if (end) dateMatch.$lte = end;
+        matchQuery['completedSteps.completedAt'] = dateMatch;
+    }
+
+    // Search by image name or order name
+    if (filters.search) {
+        const matchingOrders = await OrderModel.find({
+            orderName: { $regex: filters.search, $options: 'i' },
+        })
+            .select('_id')
+            .lean();
+        const orderMatchIds = matchingOrders.map((o) => o._id as Types.ObjectId);
+
+        matchQuery.$and = [
+            {
+                $or: [
+                    { imageName: { $regex: filters.search, $options: 'i' } },
+                    { orderId: { $in: orderMatchIds } },
+                ],
+            },
+        ];
+    }
+
+    const [images, total] = await Promise.all([
+        OrderImageModel.find(matchQuery)
+            .populate({
+                path: 'orderId',
+                select: 'orderName imageQuantity priority deadline status clientId',
+                populate: { path: 'clientId', select: 'name clientCode email' },
+            })
+            .populate({
+                path: 'completedSteps.completedBy',
+                select: 'staffId userId',
+                populate: { path: 'userId', select: 'name email' },
+            })
+            .populate('completedSteps.shiftId', 'name code')
+            .populate('qcApprovedBy', 'name email')
+            .populate('revisionHistory.requestedBy', 'name email')
+            .populate({
+                path: 'revisionHistory.resolvedBy',
+                select: 'staffId userId',
+                populate: { path: 'userId', select: 'name' },
+            })
+            .sort({ updatedAt: -1 })
+            .skip(skip)
+            .limit(limit)
+            .lean(),
+        OrderImageModel.countDocuments(matchQuery),
+    ]);
+
+    // Compute summary metrics for this staff
+    const todayStart = startOfDay(now);
+    const todayEnd = endOfDay(now);
+
+    const [totalCompleted, todayCompleted, approvedCount, revisionCount, workSessionsStats] =
+        await Promise.all([
+            OrderImageModel.countDocuments({
+                'completedSteps.completedBy': staffObjId,
+            }),
+            OrderImageModel.countDocuments({
+                completedSteps: {
+                    $elemMatch: {
+                        completedBy: staffObjId,
+                        completedAt: { $gte: todayStart, $lte: todayEnd },
+                    },
+                },
+            }),
+            OrderImageModel.countDocuments({
+                'completedSteps.completedBy': staffObjId,
+                status: 'completed',
+            }),
+            OrderImageModel.countDocuments({
+                'completedSteps.completedBy': staffObjId,
+                'revisionHistory.0': { $exists: true },
+            }),
+            ProductionWorkSessionModel.aggregate([
+                { $match: { staffId: staffObjId, status: 'completed' } },
+                {
+                    $group: {
+                        _id: null,
+                        totalSessions: { $sum: 1 },
+                        totalSeconds: { $sum: '$durationSeconds' },
+                        totalImages: { $sum: '$imageCount' },
+                    },
+                },
+            ]),
+        ]);
+
+    const sessionStats = workSessionsStats[0] || {
+        totalSessions: 0,
+        totalSeconds: 0,
+        totalImages: 0,
+    };
+    const avgSecondsPerImage =
+        sessionStats.totalImages > 0
+            ? Math.round(sessionStats.totalSeconds / sessionStats.totalImages)
+            : 0;
+
+    return {
+        summary: {
+            totalImagesWorked: totalCompleted,
+            todayImagesWorked: todayCompleted,
+            qcApprovedCount: approvedCount,
+            revisionCount,
+            totalWorkSessions: sessionStats.totalSessions,
+            totalWorkSeconds: sessionStats.totalSeconds,
+            avgSecondsPerImage,
+        },
+        images,
+        meta: {
+            total,
+            page,
+            limit,
+            totalPages: Math.ceil(total / limit),
+        },
+    };
+};
+
 const productionService = {
     createProductionLog,
     getAllProductionLogs,
@@ -2034,6 +2248,7 @@ const productionService = {
     flagImageRevision,
     qcApproveImages,
     getStaffPerformanceAnalytics,
+    getStaffEditedImages,
 };
 
 export default productionService;

@@ -35,16 +35,17 @@ import {
     Check,
     CalendarCheck,
     CalendarOff,
-    CheckCircle2,
     ShieldCheck,
     PhoneCall,
     Sparkles,
+    Layers,
 } from "lucide-react";
 import { format, differenceInMonths, differenceInYears } from "date-fns";
 import { StaffAttendanceTab } from "@/app/(root)/staffs/[id]/_components/attendance-tab";
 import { StaffLeaveTab } from "@/app/(root)/staffs/[id]/_components/staff-leave-tab";
 import { StaffOvertimeTab } from "@/app/(root)/staffs/[id]/_components/overtime-tab";
 import { PaymentHistoryTab } from "@/app/(root)/staffs/[id]/_components/payment-history-tab";
+import { StaffProductionTab } from "@/app/(root)/staffs/[id]/_components/production-tab";
 import { useSession } from "@/lib/auth-client";
 import { Role } from "@/constants/role";
 import { EditStaffDialog } from "@/components/staff/edit-staff-dialog";
@@ -175,6 +176,13 @@ export default function StaffDetailsPage() {
 
     const { user, branch, currentShift } = staff;
     const tenure = getTenure(staff.joinDate);
+    const isProductionStaff =
+        staff?.department?.toLowerCase()?.includes('production') ||
+        staff?.designation?.toLowerCase()?.includes('editor') ||
+        staff?.designation?.toLowerCase()?.includes('designer') ||
+        staff?.designation?.toLowerCase()?.includes('retoucher') ||
+        staff?.designation?.toLowerCase()?.includes('artist') ||
+        !staff?.designation?.toLowerCase()?.includes('telemarketer');
 
     return (
         <div className="space-y-6">
@@ -332,6 +340,16 @@ export default function StaffDetailsPage() {
                         <UserCircle className="h-4 w-4" />
                         <span>Overview</span>
                     </TabsTrigger>
+
+                    {isProductionStaff && (
+                        <TabsTrigger
+                            value="production"
+                            className="flex items-center gap-2 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-xs"
+                        >
+                            <Layers className="h-4 w-4" />
+                            <span>Production</span>
+                        </TabsTrigger>
+                    )}
 
                     <TabsTrigger
                         value="attendance"
@@ -763,6 +781,26 @@ export default function StaffDetailsPage() {
                         </div>
                     </div>
                 </TabsContent>
+
+                {/* TAB CONTENT: Production */}
+                {isProductionStaff && (
+                    <TabsContent value="production">
+                        <Card className="border border-border/50 shadow-xs rounded-2xl overflow-hidden bg-card">
+                            <CardHeader className="border-b border-border/40 pb-4 pt-5 px-6">
+                                <CardTitle className="text-lg font-bold flex items-center gap-2">
+                                    <Layers className="h-5 w-5 text-primary" />
+                                    Production &amp; Editing History
+                                </CardTitle>
+                                <CardDescription>
+                                    Complete log of edited images, turnaround durations, and QC review status.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="p-6">
+                                <StaffProductionTab staffId={staff._id || id} />
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+                )}
 
                 {/* TAB CONTENT: Attendance */}
                 <TabsContent value="attendance">

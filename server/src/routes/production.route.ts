@@ -17,6 +17,7 @@ import {
     flagImageRevision,
     qcApproveImages,
     getStaffPerformanceAnalytics,
+    getStaffEditedImages,
 } from '../controllers/production.controller.js';
 import { authorizeProductionAccess } from '../middlewares/authorizeProductionAccess.js';
 import { authorize } from '../middlewares/authorize.js';
@@ -33,6 +34,7 @@ router.use(authorizeProductionAccess);
 // Workstation & Editor Real-Time Endpoints
 router.get('/orders/sanitized', getSanitizedActiveOrders);
 router.get('/orders/:orderId/images', getOrderImageStatus);
+router.get('/staff-images', getStaffEditedImages);
 router.post('/session/start', startWorkSession);
 router.get('/session/active', getActiveWorkSession);
 router.post('/session/finish', finishWorkSession);

@@ -31,6 +31,7 @@ import { StaffAttendanceTab } from "@/app/(root)/staffs/[id]/_components/attenda
 import { StaffLeaveTab } from "@/app/(root)/staffs/[id]/_components/staff-leave-tab";
 import { StaffOvertimeTab } from "@/app/(root)/staffs/[id]/_components/overtime-tab";
 import { PaymentHistoryTab } from "@/app/(root)/staffs/[id]/_components/payment-history-tab";
+import { StaffProductionTab } from "@/app/(root)/staffs/[id]/_components/production-tab";
 
 export default function RootAccount() {
     const { data, isPending } = useSession();
@@ -51,6 +52,14 @@ export default function RootAccount() {
     const showDefault = !showChangePassword && !editProfile;
 
     const staff = staffData?.staff;
+
+    const isProductionStaff =
+        staff?.department?.toLowerCase()?.includes('production') ||
+        staff?.designation?.toLowerCase()?.includes('editor') ||
+        staff?.designation?.toLowerCase()?.includes('designer') ||
+        staff?.designation?.toLowerCase()?.includes('retoucher') ||
+        staff?.designation?.toLowerCase()?.includes('artist') ||
+        !staff?.designation?.toLowerCase()?.includes('telemarketer');
 
     return (
         <>
@@ -168,6 +177,11 @@ export default function RootAccount() {
                                 <TabsTrigger value="overview">
                                     Overview
                                 </TabsTrigger>
+                                {isProductionStaff && (
+                                    <TabsTrigger value="production">
+                                        Production
+                                    </TabsTrigger>
+                                )}
                                 <TabsTrigger value="attendance">
                                     Attendance
                                 </TabsTrigger>
@@ -333,6 +347,26 @@ export default function RootAccount() {
                                         </CardContent>
                                     </Card>
                                 </TabsContent>
+
+                                {isProductionStaff && (
+                                    <TabsContent value="production">
+                                        <Card>
+                                            <CardHeader>
+                                                <CardTitle>
+                                                    Production &amp; Work History
+                                                </CardTitle>
+                                                <CardDescription>
+                                                    Overview of your edited images, work sessions and QC status
+                                                </CardDescription>
+                                            </CardHeader>
+                                            <CardContent>
+                                                <StaffProductionTab
+                                                    staffId={staff._id}
+                                                />
+                                            </CardContent>
+                                        </Card>
+                                    </TabsContent>
+                                )}
 
                                 <TabsContent value="attendance">
                                     <Card>
