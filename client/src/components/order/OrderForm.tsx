@@ -343,27 +343,101 @@ export function OrderForm({
         });
 
         let totalPerImagePrice = 0;
+        let hasAnyConfiguredPrice = false;
+
         newSelectedServices.forEach((id) => {
             let priceToAdd = 0;
-            if (selectedClient?.assignedServicesDetails) {
-                const assignedServiceDetails = selectedClient.assignedServicesDetails.find(
-                    (s: any) => s._id === id
+            let foundPrice = false;
+
+            // 1. Check from assignedServices query (RTK Query result for this client)
+            if (assignedServices && assignedServices.length > 0) {
+                const assigned = assignedServices.find(
+                    (s: any) =>
+                        s.service === id ||
+                        s.serviceDetails?._id === id ||
+                        s._id === id
                 );
-                if (assignedServiceDetails && assignedServiceDetails.price !== undefined && assignedServiceDetails.price !== null) {
-                    priceToAdd = assignedServiceDetails.price;
+                if (
+                    assigned &&
+                    assigned.price !== undefined &&
+                    assigned.price !== null
+                ) {
+                    priceToAdd = Number(assigned.price);
+                    foundPrice = true;
                 }
             }
-            if (priceToAdd === 0) {
-                const defaultService = allServices.find((s: any) => s._id === id);
-                if (defaultService && defaultService.price !== undefined && defaultService.price !== null) {
-                    priceToAdd = defaultService.price;
+
+            // 2. Check from selectedClient.assignedServicesDetails
+            if (!foundPrice && selectedClient?.assignedServicesDetails) {
+                const assignedServiceDetails =
+                    selectedClient.assignedServicesDetails.find(
+                        (s: any) =>
+                            s.service === id ||
+                            s.serviceDetails?._id === id ||
+                            s._id === id
+                    );
+                if (
+                    assignedServiceDetails &&
+                    assignedServiceDetails.price !== undefined &&
+                    assignedServiceDetails.price !== null
+                ) {
+                    priceToAdd = Number(assignedServiceDetails.price);
+                    foundPrice = true;
                 }
+            }
+
+            // 3. Check from selectedClient.assignedServices
+            if (!foundPrice && selectedClient?.assignedServices) {
+                const assigned = (selectedClient.assignedServices as any[]).find(
+                    (s: any) => {
+                        const svcId =
+                            typeof s.service === 'object' && s.service !== null
+                                ? s.service._id
+                                : s.service;
+                        return svcId === id || s._id === id;
+                    }
+                );
+                if (
+                    assigned &&
+                    assigned.price !== undefined &&
+                    assigned.price !== null
+                ) {
+                    priceToAdd = Number(assigned.price);
+                    foundPrice = true;
+                }
+            }
+
+            // 4. Fallback to global catalog service price
+            if (!foundPrice) {
+                const defaultService = allServices.find(
+                    (s: any) => s._id === id
+                );
+                if (
+                    defaultService &&
+                    defaultService.price !== undefined &&
+                    defaultService.price !== null
+                ) {
+                    priceToAdd = Number(defaultService.price);
+                    if (priceToAdd > 0) {
+                        foundPrice = true;
+                    }
+                }
+            }
+
+            if (foundPrice || priceToAdd > 0) {
+                hasAnyConfiguredPrice = true;
             }
             totalPerImagePrice += priceToAdd;
         });
 
         if (showPrices) {
-            handlePerImagePriceChange(totalPerImagePrice);
+            if (newSelectedServices.length === 0) {
+                handlePerImagePriceChange(0);
+            } else if (hasAnyConfiguredPrice || totalPerImagePrice > 0) {
+                handlePerImagePriceChange(totalPerImagePrice);
+            }
+            // Note: If no price is configured (price is 0) and user had already entered a custom price,
+            // we preserve their manually entered price instead of wiping it out.
         }
 
         setSelectedServices(newSelectedServices);

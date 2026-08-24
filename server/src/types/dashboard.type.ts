@@ -58,9 +58,53 @@ export interface IFinancialStats {
     thisMonthEarnings: number;
     totalExpenses: number;
     thisMonthExpenses: number;
+    thisMonthProfit: number;
     totalRevenue: number;
     unpaidRevenue: number;
+    unpaidRevenueUSD: number;
+    totalRevenueUSD: number;
     profit: number;
+}
+
+export interface IOrderDashboardStats {
+    totalThisMonth: number;
+    totalToday: number;
+    inProgress: number;
+    pending: number;
+    completedThisMonth: number;
+    deliveredThisMonth: number;
+    urgentCount: number;
+    totalImagesThisMonth: number;
+    statusBreakdown: {
+        status: string;
+        count: number;
+        label: string;
+    }[];
+    urgentOrdersList?: {
+        _id: string;
+        orderName: string;
+        clientName: string;
+        deadline: string;
+        status: string;
+        priority: string;
+        imageQuantity: number;
+    }[];
+}
+
+export interface ILeaveDashboardStats {
+    pending: number;
+    onLeaveToday: number;
+    approvedThisMonth: number;
+}
+
+export interface IMonthlyTrend {
+    month: string;
+    shortMonth: string;
+    year: number;
+    earnings: number;
+    expenses: number;
+    profit: number;
+    orders: number;
 }
 
 export interface IDashboardStats {
@@ -69,5 +113,8 @@ export interface IDashboardStats {
     monthlyAttendanceStats: IMonthlyAttendanceStats;
     overtimeSummary: IOvertimeSummary;
     recentActivities: IRecentActivity[];
-    financialStats?: IFinancialStats;
+    financialStats: IFinancialStats;
+    orderStats: IOrderDashboardStats;
+    leaveStats: ILeaveDashboardStats;
+    monthlyTrends: IMonthlyTrend[];
 }

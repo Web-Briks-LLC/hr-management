@@ -5,6 +5,7 @@ import { Spinner } from '../ui/spinner';
 import { Role } from '@/constants/role';
 import StaffDashboard from './staff-dashboard/staff-dashboard';
 import AdminDashboard from './admin-dashboard/admin-dashboard';
+import TeamLeaderDashboard from './team-leader-dashboard/team-leader-dashboard';
 
 export default function RootDashboard() {
     const { data: session, isPending } = useSession();
@@ -30,8 +31,13 @@ export default function RootDashboard() {
         return <AdminDashboard />;
     }
 
-    // Staff Dashboard for Staff and Team Leader
-    if ([Role.STAFF, Role.TEAM_LEADER].includes(userRole)) {
+    // Team Leader Dashboard
+    if (userRole === Role.TEAM_LEADER) {
+        return <TeamLeaderDashboard />;
+    }
+
+    // Staff Dashboard for Staff
+    if (userRole === Role.STAFF) {
         return <StaffDashboard />;
     }
 

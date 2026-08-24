@@ -12,28 +12,21 @@ import {
 import {
     Play,
     Clock,
-    Layers,
     ArrowRight,
-    Sparkles,
-    CheckCircle2,
     UploadCloud,
-    FileImage,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import type IStaff from '@/types/staff.type';
 
-export function ProductionQuickWidget({ staff }: { staff?: any }) {
+interface ProductionQuickWidgetProps {
+    staff?: IStaff;
+}
+
+export function ProductionQuickWidget({ staff }: ProductionQuickWidgetProps) {
     const { data: activeSessionData } = useGetActiveSessionQuery();
     const { data: analyticsData } = useGetStaffPerformanceAnalyticsQuery({ filterType: 'today' });
 
     const activeSession = activeSessionData?.data;
     const todaySummary = analyticsData?.data?.summary;
-
-    const isProductionStaff =
-        staff?.department?.toLowerCase()?.includes('production') ||
-        staff?.designation?.toLowerCase()?.includes('editor') ||
-        staff?.designation?.toLowerCase()?.includes('designer') ||
-        staff?.designation?.toLowerCase()?.includes('retoucher') ||
-        staff?.designation?.toLowerCase()?.includes('artist');
 
     // If telemarketer, do not render
     if (staff?.designation?.toLowerCase()?.includes('telemarketer')) {
@@ -41,6 +34,11 @@ export function ProductionQuickWidget({ staff }: { staff?: any }) {
     }
 
     if (activeSession) {
+        const orderName =
+            typeof activeSession.orderId === 'object' && activeSession.orderId !== null
+                ? (activeSession.orderId as { orderName?: string }).orderName || 'Active Order'
+                : 'Active Order';
+
         return (
             <Card className="border-2 border-emerald-500/40 bg-linear-to-r from-emerald-500/10 via-emerald-500/5 to-card shadow-lg shadow-emerald-500/5">
                 <CardContent className="p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -59,7 +57,7 @@ export function ProductionQuickWidget({ staff }: { staff?: any }) {
                                 </span>
                             </div>
                             <h4 className="text-base font-bold text-foreground mt-0.5">
-                                Order: {(activeSession.orderId as any)?.orderName || 'Active Order'}
+                                Order: {orderName}
                             </h4>
                             <p className="text-xs text-muted-foreground">
                                 {activeSession.imageCount} image(s) locked in this batch
@@ -93,7 +91,7 @@ export function ProductionQuickWidget({ staff }: { staff?: any }) {
                             </Badge>
                             {todaySummary?.totalImages ? (
                                 <span className="text-xs text-muted-foreground font-mono">
-                                    Today's Done: <strong className="text-foreground">{todaySummary.totalImages} imgs</strong>
+                                    Today&apos;s Done: <strong className="text-foreground">{todaySummary.totalImages} imgs</strong>
                                 </span>
                             ) : null}
                         </div>
@@ -112,7 +110,6 @@ export function ProductionQuickWidget({ staff }: { staff?: any }) {
                         Launch Workstation
                     </Link>
                 </Button>
-
             </CardContent>
         </Card>
     );
