@@ -5,6 +5,7 @@ export type OrderStatus =
     | 'in_progress'
     | 'quality_check'
     | 'revision'
+    | 'ready_to_deliver'
     | 'completed'
     | 'delivered'
     | 'cancelled';

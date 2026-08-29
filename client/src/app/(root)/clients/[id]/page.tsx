@@ -46,11 +46,19 @@ import { ClientOrderStats } from '@/components/client/ClientOrderStats';
 import { OrderHistoryTable } from '@/components/client/OrderHistoryTable';
 import { AssignedServicesTab } from '@/components/client/AssignedServicesTab';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useSession } from '@/lib/auth-client';
+import { Role } from '@/constants/role';
 
 export default function ClientDetailsPage() {
     const params = useParams();
     const router = useRouter();
     const clientId = params.id as string;
+
+    const { data: session } = useSession();
+    // Only admin / super_admin may see the final completed / delivered statuses
+    const canSeeFinalStatus =
+        session?.user?.role === Role.SUPER_ADMIN ||
+        session?.user?.role === Role.ADMIN;
 
     // Filter states
     const [page, setPage] = useState(1);
@@ -300,11 +308,18 @@ export default function ClientDetailsPage() {
                                         <SelectValue placeholder="Status" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {Object.entries(ORDER_STATUS_LABELS).map(([value, label]) => (
-                                            <SelectItem key={value} value={value} className="text-xs">
-                                                {label}
-                                            </SelectItem>
-                                        ))}
+                                        {Object.entries(ORDER_STATUS_LABELS)
+                                            .filter(
+                                                ([value]) =>
+                                                    canSeeFinalStatus ||
+                                                    (value !== 'completed' &&
+                                                        value !== 'delivered'),
+                                            )
+                                            .map(([value, label]) => (
+                                                <SelectItem key={value} value={value} className="text-xs">
+                                                    {label}
+                                                </SelectItem>
+                                            ))}
                                     </SelectContent>
                                 </Select>
 

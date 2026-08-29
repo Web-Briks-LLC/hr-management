@@ -117,6 +117,7 @@ const statusColors: Record<OrderStatus, string> = {
     in_progress: "bg-blue-500/20 text-blue-700 dark:text-blue-400",
     quality_check: "bg-purple-500/20 text-purple-700 dark:text-purple-400",
     revision: "bg-orange-500/20 text-orange-700 dark:text-orange-400",
+    ready_to_deliver: "bg-teal-500/20 text-teal-700 dark:text-teal-400",
     completed: "bg-green-500/20 text-green-700 dark:text-green-400",
     delivered: "bg-emerald-500/20 text-emerald-700 dark:text-emerald-400",
     cancelled: "bg-red-500/20 text-red-700 dark:text-red-400",
@@ -134,8 +135,9 @@ const priorityColors: Record<OrderPriority, string> = {
 const statusWorkflow: Record<OrderStatus, OrderStatus[]> = {
     pending: ["in_progress", "cancelled"],
     in_progress: ["quality_check", "revision", "cancelled"],
-    quality_check: ["completed", "revision", "in_progress"],
+    quality_check: ["ready_to_deliver", "revision", "in_progress"],
     revision: ["in_progress", "cancelled"],
+    ready_to_deliver: ["completed", "revision"],
     completed: ["delivered", "revision"],
     delivered: [], // Final state - no transitions allowed
     cancelled: [], // Final state - no transitions allowed
@@ -174,6 +176,14 @@ export default function OrdersPage() {
             session?.user?.role === Role.HR_MANAGER
         );
     }, [session]);
+    // Only admin / super_admin may see & set the final completed/delivered statuses
+    const canSeeFinalStatus = useMemo(() => {
+        return (
+            session?.user?.role === Role.SUPER_ADMIN ||
+            session?.user?.role === Role.ADMIN
+        );
+    }, [session]);
+    const isHrManager = session?.user?.role === Role.HR_MANAGER;
     const [page, setPage] = useState(1);
     const [filters, setFilters] = useState<OrderFilters>({
         search: "",
@@ -501,10 +511,12 @@ export default function OrdersPage() {
             return;
         }
 
-        // Feature: send emails on specific status changes
+        // Feature: send emails on specific status changes.
+        // Team leaders and HR managers cannot send status updates to the client.
         if (
             ["cancelled", "completed", "delivered"].includes(newStatus) &&
-            session?.user?.role !== Role.TEAM_LEADER
+            session?.user?.role !== Role.TEAM_LEADER &&
+            !isHrManager
         ) {
             const orderObj = orderData?.data.find((o) => o._id === orderId);
             if (orderObj) {
@@ -765,19 +777,24 @@ export default function OrdersPage() {
                                     <CheckCircle className="h-5 w-5" />
                                 </div>
                                 <Badge variant="outline" className="text-[10px] font-medium bg-green-500/5 text-green-500 border-green-500/20">
-                                    Completed
+                                    {canSeeFinalStatus ? "Completed" : "Ready to Deliver"}
                                 </Badge>
                             </div>
                             <h3 className="text-3xl font-bold tracking-tight text-green-600 dark:text-green-400">
-                                {stats?.completed || 0}
+                                {(canSeeFinalStatus
+                                    ? stats?.completed
+                                    : stats?.readyToDeliver) || 0}
                             </h3>
                             <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-green-500/10 font-medium">
-                                Completed Orders
+                                {canSeeFinalStatus
+                                    ? "Completed Orders"
+                                    : "Ready to Deliver"}
                             </p>
                         </div>
                     </div>
 
-                    {/* Delivered Card */}
+                    {/* Delivered Card - admin / super_admin only */}
+                    {canSeeFinalStatus && (
                     <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-emerald-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-emerald-500/5 hover:border-emerald-500/30">
                         <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-emerald-500/10 blur-2xl transition-all duration-300 group-hover:bg-emerald-500/20" />
                         <div className="relative">
@@ -797,6 +814,7 @@ export default function OrdersPage() {
                             </p>
                         </div>
                     </div>
+                    )}
 
                     {/* Overdue Card */}
                     <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-red-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-red-500/5 hover:border-red-500/30">
@@ -1007,8 +1025,14 @@ export default function OrdersPage() {
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="all" className="text-xs">All Status</SelectItem>
-                                        {Object.entries(ORDER_STATUS_LABELS).map(
-                                            ([value, label]) => (
+                                        {Object.entries(ORDER_STATUS_LABELS)
+                                            .filter(
+                                                ([value]) =>
+                                                    canSeeFinalStatus ||
+                                                    (value !== "completed" &&
+                                                        value !== "delivered"),
+                                            )
+                                            .map(([value, label]) => (
                                                 <SelectItem
                                                     key={value}
                                                     value={value}
@@ -1016,8 +1040,7 @@ export default function OrdersPage() {
                                                 >
                                                     {label}
                                                 </SelectItem>
-                                            ),
-                                        )}
+                                            ))}
                                     </SelectContent>
                                 </Select>
 
@@ -1401,7 +1424,16 @@ export default function OrdersPage() {
                                                         <SelectContent>
                                                             {Object.entries(
                                                                 ORDER_STATUS_LABELS,
-                                                            ).map(
+                                                            )
+                                                                .filter(
+                                                                    ([value]) =>
+                                                                        canSeeFinalStatus ||
+                                                                        (value !==
+                                                                            "completed" &&
+                                                                            value !==
+                                                                                "delivered"),
+                                                                )
+                                                                .map(
                                                                 ([
                                                                     value,
                                                                     label,

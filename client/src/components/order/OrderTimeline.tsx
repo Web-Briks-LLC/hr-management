@@ -33,6 +33,7 @@ const statusColors: Record<string, string> = {
     in_progress: 'border-blue-500 bg-blue-500/20',
     quality_check: 'border-purple-500 bg-purple-500/20',
     revision: 'border-orange-500 bg-orange-500/20',
+    ready_to_deliver: 'border-teal-500 bg-teal-500/20',
     completed: 'border-green-500 bg-green-500/20',
     delivered: 'border-emerald-500 bg-emerald-500/20',
     cancelled: 'border-red-500 bg-red-500/20',

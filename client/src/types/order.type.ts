@@ -3,6 +3,7 @@ export type OrderStatus =
     | "in_progress"
     | "quality_check"
     | "revision"
+    | "ready_to_deliver"
     | "completed"
     | "delivered"
     | "cancelled";
@@ -123,6 +124,7 @@ export interface IOrderStats {
     inProgress: number;
     qualityCheck: number;
     revision: number;
+    readyToDeliver: number;
     completed: number;
     delivered: number;
     overdue: number;

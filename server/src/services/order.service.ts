@@ -732,6 +732,7 @@ async function getOrderStatsFromDB(clientIds?: string[]): Promise<{
     inProgress: number;
     qualityCheck: number;
     revision: number;
+    readyToDeliver: number;
     completed: number;
     delivered: number;
     overdue: number;
@@ -748,6 +749,7 @@ async function getOrderStatsFromDB(clientIds?: string[]): Promise<{
         inProgress,
         qualityCheck,
         revision,
+        readyToDeliver,
         completed,
         delivered,
         overdue,
@@ -757,6 +759,7 @@ async function getOrderStatsFromDB(clientIds?: string[]): Promise<{
         OrderModel.countDocuments({ ...filter, status: 'in_progress' }),
         OrderModel.countDocuments({ ...filter, status: 'quality_check' }),
         OrderModel.countDocuments({ ...filter, status: 'revision' }),
+        OrderModel.countDocuments({ ...filter, status: 'ready_to_deliver' }),
         OrderModel.countDocuments({ ...filter, status: 'completed' }),
         OrderModel.countDocuments({ ...filter, status: 'delivered' }),
         OrderModel.countDocuments({
@@ -772,6 +775,7 @@ async function getOrderStatsFromDB(clientIds?: string[]): Promise<{
         inProgress,
         qualityCheck,
         revision,
+        readyToDeliver,
         completed,
         delivered,
         overdue,

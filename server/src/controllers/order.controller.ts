@@ -7,6 +7,10 @@ import { Role } from '../constants/role.js';
 import mongoose from 'mongoose';
 import ClientModel from '../models/client.model.js';
 import { maskClientData } from '../utils/clientMask.util.js';
+import {
+    canSeeFinalOrderStatus,
+    maskFinalOrderStatus,
+} from '../utils/orderStatusMask.util.js';
 
 function isTelemarketerOrderOwner(order: any, userId: string): boolean {
     if (!order) return false;
@@ -72,11 +76,9 @@ async function createOrder(req: Request, res: Response) {
                     });
                 }
             } else if (req.user.role === Role.TEAM_LEADER) {
-                const client = await ClientModel.findById(clientId).lean();
-                if (client && client.clientId !== 'WB_1003_50') {
-                    finalPerImagePrice = 0;
-                    finalTotalPrice = 0;
-                }
+                // Team leaders can never set prices for any client
+                finalPerImagePrice = 0;
+                finalTotalPrice = 0;
             }
         }
 
@@ -190,16 +192,20 @@ async function getAllOrders(req: Request, res: Response) {
             if (!isTM) {
                 result.orders.forEach((order) => {
                     const clientObj = order.clientId as any;
-                    const isExempted = clientObj && clientObj.clientId === 'WB_1003_50';
                     if (clientObj) {
                         order.clientId = maskClientData(clientObj) as any;
                     }
-                    if (!isExempted) {
-                        order.perImagePrice = 0;
-                        order.totalPrice = 0;
-                    }
+                    order.perImagePrice = 0;
+                    order.totalPrice = 0;
                 });
             }
+        }
+
+        // Hide final `completed` / `delivered` statuses from non-admin roles
+        if (!canSeeFinalOrderStatus(req.user?.role)) {
+            result.orders.forEach((order) =>
+                maskFinalOrderStatus(order as { status?: string }, req.user?.role)
+            );
         }
 
         return res.status(200).json({
@@ -254,14 +260,15 @@ async function getOrderById(req: Request, res: Response) {
             const isTM = await isTelemarketer(userId);
             if (!isTM && order.clientId && typeof order.clientId === 'object') {
                 const clientObj = order.clientId as any;
-                const isExempted = clientObj.clientId === 'WB_1003_50';
                 order.clientId = maskClientData(clientObj) as any;
-                
-                if (!isExempted) {
-                    order.perImagePrice = 0;
-                    order.totalPrice = 0;
-                }
+                order.perImagePrice = 0;
+                order.totalPrice = 0;
             }
+        }
+
+        // Hide final `completed` / `delivered` statuses from non-admin roles
+        if (!canSeeFinalOrderStatus(req.user?.role)) {
+            maskFinalOrderStatus(order as { status?: string }, req.user?.role);
         }
 
         return res.status(200).json({
@@ -323,12 +330,9 @@ async function updateOrder(req: Request, res: Response) {
                     });
                 }
             } else if (req.user.role === Role.TEAM_LEADER) {
-                const clientIdToUse = clientId || (existingOrder.clientId as any)?._id;
-                const client = await ClientModel.findById(clientIdToUse).lean();
-                if (client && client.clientId !== 'WB_1003_50') {
-                    finalPerImagePrice = 0;
-                    finalTotalPrice = 0;
-                }
+                // Team leaders can never set prices for any client
+                finalPerImagePrice = 0;
+                finalTotalPrice = 0;
             }
         }
 
@@ -452,6 +456,17 @@ async function updateOrderStatus(req: Request, res: Response) {
             return res.status(400).json({ message: 'Status is required' });
         }
 
+        // Only admin / super_admin may set the final `completed` / `delivered` statuses
+        if (
+            (status === 'completed' || status === 'delivered') &&
+            !canSeeFinalOrderStatus(req.user?.role)
+        ) {
+            return res.status(403).json({
+                message:
+                    'Forbidden: Only admin can mark an order as completed or delivered',
+            });
+        }
+
         const order = await orderService.updateOrderStatusWithTimeline(
             id,
             status,
@@ -463,8 +478,13 @@ async function updateOrderStatus(req: Request, res: Response) {
             return res.status(404).json({ message: 'Order not found' });
         }
 
-        // Send email notification if requested
-        if (sendEmail && customEmailMessage) {
+        // Send email notification if requested.
+        // HR managers are not allowed to send status updates to the client.
+        if (
+            sendEmail &&
+            customEmailMessage &&
+            req.user?.role !== Role.HR_MANAGER
+        ) {
             try {
                 const client = order.clientId as any;
                 if (client?.emails?.length > 0) {
@@ -658,6 +678,14 @@ async function getOrderStats(req: Request, res: Response) {
 
         const stats = await orderService.getOrderStatsFromDB(clientIds);
 
+        // Non-admin roles must not see `completed` / `delivered` counts:
+        // fold them into the `readyToDeliver` bucket.
+        if (!canSeeFinalOrderStatus(req.user?.role)) {
+            stats.readyToDeliver += stats.completed + stats.delivered;
+            stats.completed = 0;
+            stats.delivered = 0;
+        }
+
         return res.status(200).json({
             message: 'Order stats retrieved successfully',
             data: stats,
@@ -709,6 +737,13 @@ async function getOrdersByClient(req: Request, res: Response) {
             clientId,
             limit ? parseInt(limit as string) : 10,
         );
+
+        // Hide final `completed` / `delivered` statuses from non-admin roles
+        if (!canSeeFinalOrderStatus(req.user?.role)) {
+            (orders as Array<{ status?: string }>).forEach((order) =>
+                maskFinalOrderStatus(order, req.user?.role)
+            );
+        }
 
         return res.status(200).json({
             message: 'Client orders retrieved successfully',
