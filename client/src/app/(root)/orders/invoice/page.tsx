@@ -10,14 +10,8 @@ import {
     useSendInvoiceEmailMutation,
     useRecordInvoiceMutation,
 } from "@/redux/features/invoice/invoiceApi";
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import {
     Select,
     SelectContent,
@@ -26,9 +20,14 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import {
+    Combobox,
+    type ComboboxOption,
+} from "@/components/ui/combobox";
+import {
     Table,
     TableBody,
     TableCell,
+    TableFooter,
     TableHead,
     TableHeader,
     TableRow,
@@ -36,7 +35,19 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, FileText, Mail, Loader } from "lucide-react";
+import {
+    ArrowLeft,
+    FileText,
+    Mail,
+    Loader,
+    Package,
+    CalendarDays,
+    Building2,
+    CheckSquare,
+    ImageIcon,
+    Wallet,
+    Filter,
+} from "lucide-react";
 import { format } from "date-fns";
 import Link from "next/link";
 import type { IOrder } from "@/types/order.type";
@@ -45,7 +56,8 @@ import { pdf } from "@react-pdf/renderer";
 import { InvoiceDocument } from "@/components/invoice/InvoicePDF";
 import { toast } from "sonner";
 import { InvoiceEmailDialog } from "@/components/invoice/InvoiceEmailDialog";
-import { MONTH_OPTIONS } from "@/lib/constants";
+import { MONTH_OPTIONS, ORDER_STATUS_COLORS } from "@/lib/constants";
+import { cn } from "@/lib/utils";
 
 // Dynamically import the PDF component to avoid SSR issues
 const InvoicePDF = dynamic(() => import("@/components/invoice/InvoicePDF"), {
@@ -181,6 +193,16 @@ export default function InvoicePage() {
         });
         return { totalImages, totalAmount };
     }, [selectedOrdersList]);
+
+    const clientOptions = useMemo<ComboboxOption[]>(
+        () =>
+            availableClients.map((c) => ({
+                value: c._id,
+                label: c.name,
+                description: c.clientId,
+            })),
+        [availableClients],
+    );
 
     const resetGeneratedInvoice = () => {
         setInvoiceNumber("");
@@ -368,123 +390,524 @@ export default function InvoicePage() {
         }).format(amount);
     };
 
+    const monthLabel =
+        months.find((m) => m.value === selectedMonth)?.label || "";
+    const allSelected =
+        orders.length > 0 && selectedOrders.size === orders.length;
+    const showStats = Boolean(selectedClientId);
+
     return (
-        <div className="p-6 space-y-6">
-            <div className="flex items-center gap-4">
-                <Button variant="outline" size="icon" asChild>
-                    <Link href="/orders">
-                        <ArrowLeft className="h-4 w-4" />
-                    </Link>
-                </Button>
-                <div>
-                    <h1 className="text-2xl font-bold font-heading">Generate Invoice</h1>
-                    <p className="text-muted-foreground">
-                        Select year, month, and client to generate an invoice
-                    </p>
+        <div className="space-y-8 p-1">
+            {/* Header & Stats Overview */}
+            <div className="flex flex-col gap-6">
+                <div className="flex items-start gap-4">
+                    <Button
+                        variant="outline"
+                        size="icon"
+                        asChild
+                        className="mt-1 shrink-0 shadow-xs"
+                    >
+                        <Link href="/orders">
+                            <ArrowLeft className="h-4 w-4" />
+                        </Link>
+                    </Button>
+                    <div>
+                        <h2 className="text-3xl font-bold tracking-tight bg-linear-to-r from-foreground to-foreground/70 bg-clip-text">
+                            Generate Invoice
+                        </h2>
+                        <p className="text-muted-foreground mt-1">
+                            Select a period and client, choose billable orders,
+                            then preview or email the invoice.
+                        </p>
+                    </div>
+                </div>
+
+                {showStats && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        {/* Selected Orders */}
+                        <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-violet-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-violet-500/5 hover:border-violet-500/30">
+                            <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-violet-500/10 blur-2xl transition-all duration-300 group-hover:bg-violet-500/20" />
+                            <div className="relative">
+                                <div className="flex items-center justify-between mb-3">
+                                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/10 text-violet-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-violet-500/20">
+                                        <CheckSquare className="h-5 w-5" />
+                                    </div>
+                                </div>
+                                {isLoadingAllOrders ? (
+                                    <Skeleton className="h-8 w-24" />
+                                ) : (
+                                    <div>
+                                        <h3 className="text-3xl font-bold tracking-tight text-violet-600 dark:text-violet-400">
+                                            {selectedOrders.size}
+                                            <span className="text-base font-medium text-muted-foreground">
+                                                {" / "}
+                                                {orders.length}
+                                            </span>
+                                        </h3>
+                                        <p className="text-xs font-medium text-muted-foreground mt-1">
+                                            Orders Selected
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Total Images */}
+                        <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-blue-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/5 hover:border-blue-500/30">
+                            <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-blue-500/10 blur-2xl transition-all duration-300 group-hover:bg-blue-500/20" />
+                            <div className="relative">
+                                <div className="flex items-center justify-between mb-3">
+                                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/10 text-blue-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-blue-500/20">
+                                        <ImageIcon className="h-5 w-5" />
+                                    </div>
+                                </div>
+                                {isLoadingAllOrders ? (
+                                    <Skeleton className="h-8 w-24" />
+                                ) : (
+                                    <div>
+                                        <h3 className="text-3xl font-bold tracking-tight text-blue-600 dark:text-blue-400">
+                                            {totals.totalImages}
+                                        </h3>
+                                        <p className="text-xs font-medium text-muted-foreground mt-1">
+                                            Total Images
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Invoice Total */}
+                        <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-green-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-green-500/5 hover:border-green-500/30">
+                            <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-green-500/10 blur-2xl transition-all duration-300 group-hover:bg-green-500/20" />
+                            <div className="relative">
+                                <div className="flex items-center justify-between mb-3">
+                                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-500/10 text-green-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-green-500/20">
+                                        <Wallet className="h-5 w-5" />
+                                    </div>
+                                    <Badge
+                                        variant="outline"
+                                        className="text-[10px] font-medium bg-green-500/5 text-green-600 dark:text-green-400 border-green-500/20"
+                                    >
+                                        {selectedClient?.currency || "USD"}
+                                    </Badge>
+                                </div>
+                                {isLoadingAllOrders ? (
+                                    <Skeleton className="h-8 w-28" />
+                                ) : (
+                                    <div>
+                                        <h3 className="text-3xl font-bold tracking-tight text-green-600 dark:text-green-400">
+                                            {formatCurrency(totals.totalAmount)}
+                                        </h3>
+                                        <p className="text-xs font-medium text-muted-foreground mt-1">
+                                            Invoice Total
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Period */}
+                        <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-amber-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-amber-500/5 hover:border-amber-500/30">
+                            <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-amber-500/10 blur-2xl transition-all duration-300 group-hover:bg-amber-500/20" />
+                            <div className="relative">
+                                <div className="flex items-center justify-between mb-3">
+                                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/10 text-amber-500 transition-all duration-300 group-hover:scale-110 group-hover:bg-amber-500/20">
+                                        <CalendarDays className="h-5 w-5" />
+                                    </div>
+                                </div>
+                                {isLoadingAllOrders ? (
+                                    <Skeleton className="h-8 w-28" />
+                                ) : (
+                                    <div>
+                                        <h3 className="text-xl font-bold tracking-tight text-amber-600 dark:text-amber-400 truncate">
+                                            {monthLabel} {selectedYear}
+                                        </h3>
+                                        <p className="text-xs font-medium text-muted-foreground mt-1 truncate">
+                                            {selectedClient?.name} ·{" "}
+                                            {selectedClient?.clientId}
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* Selection Toolbar */}
+            <div className="flex flex-col gap-4 p-4 bg-muted/30 rounded-lg border border-border/50 xl:flex-row xl:items-end">
+                <div className="flex items-center gap-2 xl:mb-2 xl:self-center">
+                    <div className="bg-primary/10 p-2 rounded-full">
+                        <Filter className="h-4 w-4 text-primary" />
+                    </div>
+                    <span className="text-sm font-medium">Filters:</span>
+                </div>
+
+                <div className="grid flex-1 grid-cols-1 gap-4 sm:grid-cols-3">
+                    <div className="space-y-1.5">
+                        <Label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <CalendarDays className="h-3.5 w-3.5" />
+                            Year
+                        </Label>
+                        {isLoadingYears ? (
+                            <Skeleton className="h-9 w-full" />
+                        ) : (
+                            <Select
+                                value={selectedYear}
+                                onValueChange={(val) => {
+                                    setSelectedYear(val);
+                                    setSelectedClientId("");
+                                    setSelectedOrders(new Set());
+                                    resetGeneratedInvoice();
+                                }}
+                            >
+                                <SelectTrigger className="h-9 bg-background/60">
+                                    <SelectValue placeholder="Select year" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {years.map((y) => (
+                                        <SelectItem key={y} value={y}>
+                                            {y}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        )}
+                    </div>
+
+                    <div className="space-y-1.5">
+                        <Label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <CalendarDays className="h-3.5 w-3.5" />
+                            Month
+                        </Label>
+                        <Select
+                            value={selectedMonth}
+                            onValueChange={(val) => {
+                                setSelectedMonth(val);
+                                setSelectedClientId("");
+                                setSelectedOrders(new Set());
+                                resetGeneratedInvoice();
+                            }}
+                        >
+                            <SelectTrigger className="h-9 bg-background/60">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {months.map((m) => (
+                                    <SelectItem key={m.value} value={m.value}>
+                                        {m.label}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <div className="space-y-1.5">
+                        <Label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <Building2 className="h-3.5 w-3.5" />
+                            Client
+                        </Label>
+                        <Combobox
+                            options={clientOptions}
+                            value={selectedClientId}
+                            onChange={(val) => {
+                                setSelectedClientId(val);
+                                setSelectedOrders(new Set());
+                                resetGeneratedInvoice();
+                            }}
+                            placeholder="Select a client"
+                            searchPlaceholder="Search clients..."
+                            emptyText="No clients found."
+                            isLoading={isLoadingAllOrders}
+                            disabled={
+                                isLoadingAllOrders ||
+                                clientOptions.length === 0
+                            }
+                            className="h-9 bg-background/60"
+                        />
+                    </div>
+                </div>
+
+                <div className="flex gap-2">
+                    <Button
+                        variant="outline"
+                        onClick={handleOpenEmailDialog}
+                        disabled={selectedOrders.size === 0 || isSending}
+                        className="flex-1 border-primary text-primary hover:bg-accent hover:text-accent-foreground shadow-xs xl:flex-none"
+                    >
+                        {isSending ? (
+                            <Loader className="h-4 w-4 animate-spin" />
+                        ) : (
+                            <Mail className="h-4 w-4" />
+                        )}
+                        Send
+                    </Button>
+                    <Button
+                        onClick={handleGenerateInvoice}
+                        disabled={
+                            selectedOrders.size === 0 ||
+                            isGeneratingInvoice ||
+                            isRecording
+                        }
+                        className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground shadow-xs xl:flex-none"
+                    >
+                        {isGeneratingInvoice || isRecording ? (
+                            <Loader className="h-4 w-4 animate-spin" />
+                        ) : (
+                            <FileText className="h-4 w-4" />
+                        )}
+                        Preview
+                    </Button>
                 </div>
             </div>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>Select Orders</CardTitle>
-                    <CardDescription>Choose period and client to view available orders</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Year</label>
-                            {isLoadingYears ? <Skeleton className="h-10 w-full" /> : (
-                                <Select value={selectedYear} onValueChange={(val) => { setSelectedYear(val); setSelectedClientId(""); setSelectedOrders(new Set()); resetGeneratedInvoice(); }}>
-                                    <SelectTrigger><SelectValue placeholder="Select year" /></SelectTrigger>
-                                    <SelectContent>{years.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}</SelectContent>
-                                </Select>
-                            )}
-                        </div>
-
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Month</label>
-                            <Select value={selectedMonth} onValueChange={(val) => { setSelectedMonth(val); setSelectedClientId(""); setSelectedOrders(new Set()); resetGeneratedInvoice(); }}>
-                                <SelectTrigger><SelectValue /></SelectTrigger>
-                                <SelectContent>{months.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent>
-                            </Select>
-                        </div>
-
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Client</label>
-                            {isLoadingAllOrders ? <Skeleton className="h-10 w-full" /> : (
-                                <Select value={selectedClientId} onValueChange={(val) => { setSelectedClientId(val); setSelectedOrders(new Set()); resetGeneratedInvoice(); }}>
-                                    <SelectTrigger><SelectValue placeholder={availableClients.length === 0 ? "No clients found" : "Select a client"} /></SelectTrigger>
-                                    <SelectContent>{availableClients.map(c => <SelectItem key={c._id} value={c._id}>{c.name} ({c.clientId})</SelectItem>)}</SelectContent>
-                                </Select>
-                            )}
-                        </div>
-
-                        <div className="flex items-end gap-2">
-                            <Button onClick={handleOpenEmailDialog} disabled={selectedOrders.size === 0 || isSending} className="flex-1 bg-orange-500 hover:bg-orange-600">
-                                {isSending ? <Loader className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
-                                Send
-                            </Button>
-                            <Button onClick={handleGenerateInvoice} disabled={selectedOrders.size === 0 || isGeneratingInvoice || isRecording} className="flex-1 bg-teal-500 hover:bg-teal-600">
-                                {isGeneratingInvoice ? <Loader className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
-                                Preview
-                            </Button>
-                        </div>
+            {/* Orders */}
+            <div className="space-y-3">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <h3 className="flex items-center gap-2 text-lg font-semibold">
+                            <Package className="h-5 w-5 text-primary" />
+                            {selectedClient
+                                ? `Orders for ${selectedClient.name}`
+                                : "Orders"}
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                            {monthLabel} {selectedYear}
+                            {selectedClientId
+                                ? ` · ${orders.length} available`
+                                : ""}
+                        </p>
                     </div>
-                </CardContent>
-            </Card>
+                    {selectedOrders.size > 0 && (
+                        <Badge
+                            variant="secondary"
+                            className="h-7 gap-1.5 px-3 text-sm font-semibold"
+                        >
+                            {selectedOrders.size} selected
+                            <span className="text-primary">
+                                {formatCurrency(totals.totalAmount)}
+                            </span>
+                        </Badge>
+                    )}
+                </div>
 
-            {selectedClientId && (
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between">
-                        <div>
-                            <CardTitle>Orders for {selectedClient?.name}</CardTitle>
-                            <CardDescription>{months.find(m => m.value === selectedMonth)?.label} {selectedYear}</CardDescription>
-                        </div>
-                        {selectedOrders.size > 0 && (
-                            <div className="text-right">
-                                <p className="text-sm text-muted-foreground">{selectedOrders.size} orders selected</p>
-                                <p className="text-lg font-bold text-primary">{formatCurrency(totals.totalAmount)}</p>
-                            </div>
-                        )}
-                    </CardHeader>
-                    <CardContent>
-                        <div className="border rounded-md">
-                            {orders.length === 0 ? <div className="p-8 text-center text-muted-foreground">No orders found</div> : (
-                                <Table>
-                                    <TableHeader><TableRow>
-                                        <TableHead className="w-12"><Checkbox checked={orders.length > 0 && selectedOrders.size === orders.length} onCheckedChange={handleSelectAll} /></TableHead>
-                                        <TableHead>Order Name</TableHead>
-                                        <TableHead>Date</TableHead>
-                                        <TableHead className="text-center">Images</TableHead>
-                                        <TableHead className="text-right">Price</TableHead>
-                                        <TableHead className="text-center">Status</TableHead>
-                                    </TableRow></TableHeader>
-                                    <TableBody>{orders.map(order => (
-                                        <TableRow key={order._id} className={selectedOrders.has(order._id) ? "bg-muted/50" : ""}>
-                                            <TableCell><Checkbox checked={selectedOrders.has(order._id)} onCheckedChange={(val) => handleSelectOrder(order._id, !!val)} /></TableCell>
-                                            <TableCell>
-                                                <div className="flex flex-col">
-                                                    <span className="font-medium">{order.orderName}</span>
-                                                    <div className="flex gap-1 mt-1">
-                                                        {order.isPaid && <Badge className="text-[9px] bg-green-100 text-green-700">PAID</Badge>}
-                                                        {order.invoiceNumber && <Badge className="text-[9px] bg-blue-100 text-blue-700">INV #{order.invoiceNumber}</Badge>}
+                <div className="rounded-md border border-border/60 overflow-hidden bg-background">
+                    <Table>
+                        <TableHeader className="bg-muted/40">
+                            <TableRow className="hover:bg-muted/40 border-b-border/60">
+                                <TableHead className="w-12">
+                                    <Checkbox
+                                        checked={allSelected}
+                                        disabled={
+                                            !selectedClientId ||
+                                            orders.length === 0
+                                        }
+                                        onCheckedChange={(val) =>
+                                            handleSelectAll(!!val)
+                                        }
+                                        aria-label="Select all orders"
+                                    />
+                                </TableHead>
+                                <TableHead className="font-semibold">
+                                    Order Name
+                                </TableHead>
+                                <TableHead className="font-semibold">
+                                    Date
+                                </TableHead>
+                                <TableHead className="font-semibold text-center">
+                                    Images
+                                </TableHead>
+                                <TableHead className="font-semibold text-right">
+                                    Price
+                                </TableHead>
+                                <TableHead className="font-semibold text-center">
+                                    Status
+                                </TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {!selectedClientId ? (
+                                <TableRow>
+                                    <TableCell
+                                        colSpan={6}
+                                        className="h-48 text-center"
+                                    >
+                                        <div className="flex flex-col items-center justify-center gap-2 text-muted-foreground">
+                                            <div className="bg-muted/50 p-3 rounded-full">
+                                                <Building2 className="h-6 w-6 opacity-30" />
+                                            </div>
+                                            <p className="text-lg font-medium">
+                                                Select a client
+                                            </p>
+                                            <p className="text-sm">
+                                                Choose a period and client above
+                                                to view billable orders.
+                                            </p>
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                            ) : isLoadingAllOrders ? (
+                                [...Array(5)].map((_, i) => (
+                                    <TableRow key={i}>
+                                        <TableCell>
+                                            <Skeleton className="h-4 w-4 rounded" />
+                                        </TableCell>
+                                        <TableCell>
+                                            <Skeleton className="h-4 w-40" />
+                                        </TableCell>
+                                        <TableCell>
+                                            <Skeleton className="h-4 w-24" />
+                                        </TableCell>
+                                        <TableCell>
+                                            <Skeleton className="h-4 w-10 mx-auto" />
+                                        </TableCell>
+                                        <TableCell>
+                                            <Skeleton className="h-4 w-16 ml-auto" />
+                                        </TableCell>
+                                        <TableCell>
+                                            <Skeleton className="h-6 w-20 mx-auto rounded-full" />
+                                        </TableCell>
+                                    </TableRow>
+                                ))
+                            ) : orders.length === 0 ? (
+                                <TableRow>
+                                    <TableCell
+                                        colSpan={6}
+                                        className="h-48 text-center"
+                                    >
+                                        <div className="flex flex-col items-center justify-center gap-2 text-muted-foreground">
+                                            <div className="bg-muted/50 p-3 rounded-full">
+                                                <Package className="h-6 w-6 opacity-30" />
+                                            </div>
+                                            <p className="text-lg font-medium">
+                                                No orders found
+                                            </p>
+                                            <p className="text-sm">
+                                                This client has no billable
+                                                orders in {monthLabel}{" "}
+                                                {selectedYear}.
+                                            </p>
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                            ) : (
+                                orders.map((order) => (
+                                    <TableRow
+                                        key={order._id}
+                                        onClick={() =>
+                                            handleSelectOrder(
+                                                order._id,
+                                                !selectedOrders.has(order._id),
+                                            )
+                                        }
+                                        className={cn(
+                                            "cursor-pointer transition-colors hover:bg-muted/20",
+                                            selectedOrders.has(order._id) &&
+                                                "bg-muted/50",
+                                        )}
+                                    >
+                                        <TableCell
+                                            onClick={(e) => e.stopPropagation()}
+                                        >
+                                            <Checkbox
+                                                checked={selectedOrders.has(
+                                                    order._id,
+                                                )}
+                                                onCheckedChange={(val) =>
+                                                    handleSelectOrder(
+                                                        order._id,
+                                                        !!val,
+                                                    )
+                                                }
+                                                aria-label={`Select ${order.orderName}`}
+                                            />
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="flex flex-col gap-1">
+                                                <span className="font-medium text-foreground">
+                                                    {order.orderName}
+                                                </span>
+                                                {(order.isPaid ||
+                                                    order.invoiceNumber) && (
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {order.isPaid && (
+                                                            <Badge
+                                                                variant="outline"
+                                                                className="text-[9px] font-medium bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20"
+                                                            >
+                                                                PAID
+                                                            </Badge>
+                                                        )}
+                                                        {order.invoiceNumber && (
+                                                            <Badge
+                                                                variant="outline"
+                                                                className="text-[9px] font-medium bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20"
+                                                            >
+                                                                INV #
+                                                                {
+                                                                    order.invoiceNumber
+                                                                }
+                                                            </Badge>
+                                                        )}
                                                     </div>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell className="text-xs">{format(new Date(order.orderDate), "MMM dd, yyyy")}</TableCell>
-                                            <TableCell className="text-center font-bold">{order.imageQuantity}</TableCell>
-                                            <TableCell className="text-right font-semibold">{formatCurrency(order.totalPrice)}</TableCell>
-                                            <TableCell className="text-center">
-                                                <Badge variant="outline" className="capitalize text-[10px]">{order.status.replace('_', ' ')}</Badge>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}</TableBody>
-                                </Table>
+                                                )}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="text-sm text-muted-foreground">
+                                            {format(
+                                                new Date(order.orderDate),
+                                                "MMM dd, yyyy",
+                                            )}
+                                        </TableCell>
+                                        <TableCell className="text-center font-bold">
+                                            {order.imageQuantity}
+                                        </TableCell>
+                                        <TableCell className="text-right font-semibold">
+                                            {formatCurrency(order.totalPrice)}
+                                        </TableCell>
+                                        <TableCell className="text-center">
+                                            <Badge
+                                                variant="outline"
+                                                className={cn(
+                                                    "text-[10px] font-medium capitalize",
+                                                    ORDER_STATUS_COLORS[
+                                                        order.status
+                                                    ],
+                                                )}
+                                            >
+                                                {order.status.replace(
+                                                    /_/g,
+                                                    " ",
+                                                )}
+                                            </Badge>
+                                        </TableCell>
+                                    </TableRow>
+                                ))
                             )}
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
+                        </TableBody>
+                        {selectedOrders.size > 0 && (
+                            <TableFooter className="bg-muted/40">
+                                <TableRow className="hover:bg-muted/40">
+                                    <TableCell />
+                                    <TableCell className="font-semibold">
+                                        {selectedOrders.size} order
+                                        {selectedOrders.size !== 1 ? "s" : ""}{" "}
+                                        selected
+                                    </TableCell>
+                                    <TableCell />
+                                    <TableCell className="text-center font-bold">
+                                        {totals.totalImages}
+                                    </TableCell>
+                                    <TableCell className="text-right font-bold text-primary">
+                                        {formatCurrency(totals.totalAmount)}
+                                    </TableCell>
+                                    <TableCell />
+                                </TableRow>
+                            </TableFooter>
+                        )}
+                    </Table>
+                </div>
+            </div>
 
             <InvoiceEmailDialog
                 isOpen={isEmailDialogOpen}
@@ -496,12 +919,30 @@ export default function InvoicePage() {
             />
 
             {showPDF && (
-                <div ref={pdfSectionRef} className="pt-8 border-t space-y-4">
+                <div
+                    ref={pdfSectionRef}
+                    className="space-y-4 border-t pt-8"
+                >
                     <div className="flex items-center justify-between">
-                        <h2 className="text-xl font-bold font-heading">Invoice Preview</h2>
-                        <Button variant="outline" onClick={() => setShowPDF(false)}>Close Preview</Button>
+                        <div>
+                            <h3 className="flex items-center gap-2 text-lg font-semibold">
+                                <FileText className="h-5 w-5 text-primary" />
+                                Invoice Preview
+                            </h3>
+                            {invoiceNumber && (
+                                <p className="mt-0.5 text-sm text-muted-foreground">
+                                    Invoice #{invoiceNumber}
+                                </p>
+                            )}
+                        </div>
+                        <Button
+                            variant="outline"
+                            onClick={() => setShowPDF(false)}
+                        >
+                            Close Preview
+                        </Button>
                     </div>
-                    <Card><CardContent className="p-0 bg-muted/20 min-h-[600px] flex items-center justify-center">
+                    <div className="rounded-md border border-border/60 bg-muted/20 p-3 sm:p-4">
                         {selectedClient && (
                             <InvoicePDF
                                 client={selectedClient}
@@ -509,14 +950,11 @@ export default function InvoicePage() {
                                 invoiceNumber={invoiceNumber}
                                 paymentToken={paymentToken}
                                 totals={totals}
-                                month={
-                                    months.find((m) => m.value === selectedMonth)
-                                        ?.label || ""
-                                }
+                                month={monthLabel}
                                 year={selectedYear}
                             />
                         )}
-                    </CardContent></Card>
+                    </div>
                 </div>
             )}
         </div>
