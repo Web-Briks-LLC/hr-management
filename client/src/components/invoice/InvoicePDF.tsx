@@ -35,9 +35,15 @@ export default function InvoicePDF(props: InvoicePDFProps) {
     const [sendInvoiceEmail, { isLoading: isSending }] =
         useSendInvoiceEmailMutation();
     const [recordInvoice] = useRecordInvoiceMutation();
-    const [selectedEmail, setSelectedEmail] = React.useState<string>(
-        (props.client.emails && props.client.emails[0]) || ""
+    const clientEmails = React.useMemo(
+        () => props.client.emails ?? [],
+        [props.client.emails],
     );
+    // Pure user selection — no seeding from props, so a previous client's
+    // address can never linger. Only a value that belongs to the current
+    // client is treated as valid.
+    const [pickedEmail, setPickedEmail] = React.useState<string>("");
+    const validPick = clientEmails.includes(pickedEmail) ? pickedEmail : "";
     const [isDialogOpen, setIsDialogOpen] = React.useState(false);
 
     const performEmailSend = async (email: string) => {
@@ -112,16 +118,16 @@ export default function InvoicePDF(props: InvoicePDFProps) {
     };
 
     const handleSendEmail = async () => {
-        if ((!props.client.emails || props.client.emails.length === 0) && !props.client.officeAddress) {
+        if (clientEmails.length === 0 && !props.client.officeAddress) {
             toast.error("Client email not found");
             return;
         }
 
-        if (props.client.emails && props.client.emails.length > 1) {
+        if (clientEmails.length > 1) {
+            setPickedEmail("");
             setIsDialogOpen(true);
         } else {
-            const email = selectedEmail || (props.client.emails && props.client.emails[0]) || "";
-            await performEmailSend(email);
+            await performEmailSend(clientEmails[0] || "");
         }
     };
 
@@ -147,14 +153,14 @@ export default function InvoicePDF(props: InvoicePDFProps) {
                         </DialogHeader>
                         <div className="flex items-center space-x-2 py-4">
                             <Select
-                                value={selectedEmail}
-                                onValueChange={setSelectedEmail}
+                                value={validPick}
+                                onValueChange={setPickedEmail}
                             >
                                 <SelectTrigger className="w-full">
                                     <SelectValue placeholder="Select email..." />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {props.client.emails?.map((email) => (
+                                    {clientEmails.map((email) => (
                                         <SelectItem key={email} value={email}>
                                             {email}
                                         </SelectItem>
@@ -172,8 +178,8 @@ export default function InvoicePDF(props: InvoicePDFProps) {
                             </Button>
                             <Button
                                 className="bg-orange-500 hover:bg-orange-600"
-                                disabled={isSending}
-                                onClick={() => performEmailSend(selectedEmail)}
+                                disabled={isSending || !validPick}
+                                onClick={() => performEmailSend(validPick)}
                             >
                                 {isSending ? "Sending..." : "Send Invoice"}
                             </Button>

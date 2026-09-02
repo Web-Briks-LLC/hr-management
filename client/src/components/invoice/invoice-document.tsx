@@ -49,6 +49,17 @@ const styles = StyleSheet.create({
         color: palette.body,
     },
 
+    /* ===== Centred watermark (painted first, sits behind all content) ===== */
+    watermark: {
+        position: "absolute",
+        top: 300,
+        left: 0,
+        right: 0,
+        alignItems: "center",
+        opacity: 0.05,
+    },
+    watermarkImg: { width: 236, height: 236, objectFit: "contain" },
+
     /* ===== Masthead ===== */
     masthead: {
         flexDirection: "row",
@@ -352,6 +363,8 @@ export const InvoiceDocument = ({
     );
     const logoUrl =
         "https://res.cloudinary.com/dny7zfbg9/image/upload/v1777996436/q83auvamwih8u8ftw5zu.png";
+    const watermarkUrl =
+        "https://res.cloudinary.com/dny7zfbg9/image/upload/v1780327707/lnb5suhev8hzgixi0bbp.png";
 
     const invoiceLabel = `#${String(invoiceNumber).replace(/^#/, "")}`;
 
@@ -371,6 +384,12 @@ export const InvoiceDocument = ({
     return (
         <Document>
             <Page size="A4" style={styles.page}>
+                {/* Centred watermark — rendered first so all content paints over it */}
+                <View style={styles.watermark} fixed>
+                    {/* eslint-disable-next-line jsx-a11y/alt-text */}
+                    <Image src={watermarkUrl} style={styles.watermarkImg} />
+                </View>
+
                 {/* ===== Masthead ===== */}
                 <View style={styles.masthead}>
                     <View style={styles.mastheadLeft}>

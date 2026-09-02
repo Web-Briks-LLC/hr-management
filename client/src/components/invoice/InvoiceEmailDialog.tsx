@@ -32,6 +32,22 @@ export function InvoiceEmailDialog({
 }: InvoiceEmailDialogProps) {
     const [selectedEmailRecipients, setSelectedEmailRecipients] = useState<string[]>(defaultEmails);
 
+    const defaultKey = defaultEmails.join(",");
+
+    // Re-seed the recipient list whenever the dialog opens or the client changes.
+    // The component stays mounted across invoices, so without this reset it would
+    // keep the previous client's address selected and send that invoice to both.
+    // (React's recommended "reset state on prop change" pattern — no effect.)
+    const [seededFor, setSeededFor] = useState<string | null>(null);
+    const openSignature = isOpen ? `${clientId}::${defaultKey}` : null;
+    if (isOpen && openSignature !== seededFor) {
+        setSeededFor(openSignature);
+        setSelectedEmailRecipients(defaultKey ? defaultKey.split(",") : []);
+    } else if (!isOpen && seededFor !== null) {
+        // Forget the seed on close so every open starts fresh.
+        setSeededFor(null);
+    }
+
     const { data: clientEmails, isLoading: isLoadingEmails } = useGetClientEmailsQuery(clientId, {
         skip: !clientId || !isOpen,
     });
@@ -46,8 +62,17 @@ export function InvoiceEmailDialog({
     }, [clientEmails]);
 
     const handleSend = () => {
-        if (selectedEmailRecipients.length > 0) {
-            onSend(selectedEmailRecipients);
+        // Guard: only ever send to the current client's addresses — the default
+        // recipient plus whatever this client's email list actually contains.
+        const allowed = new Set<string>([
+            ...defaultEmails,
+            ...emailOptions.map((option) => option.value),
+        ]);
+        const recipients = selectedEmailRecipients.filter((email) =>
+            allowed.has(email),
+        );
+        if (recipients.length > 0) {
+            onSend(recipients);
         }
     };
 
