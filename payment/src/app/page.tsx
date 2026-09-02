@@ -1,14 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from "@/components/ui/card";
+import { motion } from "framer-motion";
 import { ShieldAlert } from "lucide-react";
+import { BRAND_GRADIENT } from "@/lib/brand";
 
 export default function Home() {
     const [countdown, setCountdown] = useState(4);
@@ -29,33 +24,39 @@ export default function Home() {
     }, []);
 
     return (
-        <div className="flex items-center justify-center min-h-[60vh] animate-in fade-in zoom-in duration-500">
-            <Card className="w-full max-w-md border-destructive/20 shadow-lg relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-full h-1 bg-destructive"></div>
-                <CardHeader className="text-center pt-8">
-                    <div className="flex justify-center mb-6">
-                        <div className="bg-destructive/10 p-4 rounded-full">
-                            <ShieldAlert className="w-12 h-12 text-destructive" />
-                        </div>
-                    </div>
-                    <CardTitle className="text-2xl text-foreground font-semibold">
-                        Access Denied
-                    </CardTitle>
-                    <CardDescription className="text-base mt-2">
-                        You are not eligible to view this page. A valid payment
-                        token is required.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="text-center pb-8">
-                    <p className="text-sm text-muted-foreground bg-muted p-3 rounded-md inline-block">
-                        Redirecting securely to Web Briks homepage in{" "}
-                        <span className="font-bold text-foreground">
-                            {countdown}s
-                        </span>
-                        ...
-                    </p>
-                </CardContent>
-            </Card>
-        </div>
+        <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.45, ease: "easeOut" }}
+            className="mx-auto flex max-w-md flex-col items-center gap-4 py-16 text-center"
+        >
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-red-400/20 bg-red-400/10 text-red-400">
+                <ShieldAlert className="h-8 w-8" />
+            </div>
+
+            <h1 className="text-[24px] font-bold text-white">
+                Invalid payment link
+            </h1>
+            <p className="max-w-[340px] text-[14px] leading-relaxed text-[#9CA3AF]">
+                This page can only be opened from a valid Web Briks invoice link.
+                Please use the &ldquo;Pay Invoice&rdquo; button in your invoice
+                email.
+            </p>
+
+            <p className="mt-2 rounded-xl border border-white/10 bg-white/[0.02] px-4 py-2.5 text-[13px] text-[#9CA3AF]">
+                Redirecting to webbriks.com in{" "}
+                <span className="font-semibold text-[#9C46F4]">
+                    {countdown}s
+                </span>
+            </p>
+
+            <a
+                href="https://webbriks.com"
+                className="mt-3 rounded-xl px-6 py-3 text-[14px] font-bold text-white shadow-[0_0_20px_0_rgba(26,79,255,0.30)]"
+                style={{ background: BRAND_GRADIENT }}
+            >
+                Go to Web Briks
+            </a>
+        </motion.div>
     );
 }

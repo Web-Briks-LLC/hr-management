@@ -6,8 +6,8 @@ import {
     useStripe,
     useElements,
 } from "@stripe/react-stripe-js";
-import { Button } from "@/components/ui/button";
-import { Loader2, CreditCard } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import { BRAND_GRADIENT } from "@/lib/brand";
 
 export default function CheckoutForm({
     amount,
@@ -26,7 +26,6 @@ export default function CheckoutForm({
         e.preventDefault();
 
         if (!stripe || !elements) {
-            // Stripe.js hasn't yet loaded.
             return;
         }
 
@@ -35,7 +34,6 @@ export default function CheckoutForm({
         const { error } = await stripe.confirmPayment({
             elements,
             confirmParams: {
-                // Make sure to change this to your payment completion page
                 return_url: `${window.location.origin}/success?invoice=${invoiceNumber}`,
             },
         });
@@ -50,31 +48,26 @@ export default function CheckoutForm({
     };
 
     return (
-        <form onSubmit={handleSubmit} className="w-full relative">
-            <PaymentElement
-                options={{
-                    layout: "tabs",
-                }}
-            />
+        <form onSubmit={handleSubmit} className="w-full">
+            <PaymentElement options={{ layout: "tabs" }} />
+
             {message && (
-                <div className="text-red-500 bg-red-500/10 p-3 rounded-md text-sm mt-4 border border-red-500/20 text-center font-medium">
-                    {message}
-                </div>
+                <p className="mt-4 text-[12.5px] text-red-400">{message}</p>
             )}
-            <Button
+
+            <button
+                type="submit"
                 disabled={isLoading || !stripe || !elements}
-                id="submit"
-                className="w-full bg-teal-600 hover:bg-teal-700 text-white h-14 text-lg font-semibold transition-all shadow-lg rounded-xl flex items-center justify-center gap-3 border border-teal-500/20 mt-6"
+                className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl py-3.5 text-[15px] font-bold tracking-[0.4px] text-white shadow-[0_0_20px_0_rgba(26,79,255,0.30)] transition-all disabled:cursor-not-allowed disabled:opacity-60"
+                style={{ background: BRAND_GRADIENT }}
             >
-                {isLoading ? (
-                    <Loader2 className="w-6 h-6 animate-spin" />
-                ) : (
-                    <>
-                        <CreditCard className="h-6 w-6 opacity-90" />
-                        Pay {amount} securely
-                    </>
-                )}
-            </Button>
+                {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+                Pay {amount}
+            </button>
+
+            <p className="mt-3 text-center text-[12px] text-[#4B5563]">
+                Payments are securely processed by Stripe.
+            </p>
         </form>
     );
 }

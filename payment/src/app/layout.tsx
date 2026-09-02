@@ -1,8 +1,16 @@
 import type { Metadata } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import { Red_Rose, Inter, JetBrains_Mono } from "next/font/google";
 import Image from "next/image";
+import Link from "next/link";
 import "./globals.css";
-import { AnimatedBackground } from "@/components/layout/AnimatedBackground";
+import StarOverlay from "@/components/layout/StarOverlay";
+import MouseMoving from "@/components/layout/MouseMoving";
+
+const redRose = Red_Rose({
+    subsets: ["latin"],
+    weight: ["400", "500", "600", "700"],
+    variable: "--font-red-rose",
+});
 
 const inter = Inter({
     variable: "--font-inter",
@@ -15,7 +23,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-    title: "Payment | Web Briks",
+    title: "Payment · Web Briks",
     description: "Secure payment portal for Web Briks invoices",
 };
 
@@ -25,25 +33,63 @@ export default function RootLayout({
     children: React.ReactNode;
 }>) {
     return (
-        <html lang="en" className="light">
+        <html lang="en" suppressHydrationWarning>
             <body
-                className={`${inter.variable} ${jetbrainsMono.variable} antialiased min-h-screen flex flex-col`}
+                className={`${redRose.className} ${redRose.variable} ${inter.variable} ${jetbrainsMono.variable} antialiased`}
             >
-                <AnimatedBackground />
-                <header className="w-full p-4 md:p-6">
-                    <div className="mx-auto flex h-16 max-w-7xl items-center">
-                        <Image
-                            src="https://res.cloudinary.com/dny7zfbg9/image/upload/v1777996436/q83auvamwih8u8ftw5zu.png"
-                            alt="Web Briks Logo"
-                            width={150}
-                            height={32}
-                            priority
-                        />
-                    </div>
-                </header>
-                <main className="mx-auto max-w-7xl px-4 md:px-8 py-8 md:py-12 w-full flex-1">
-                    {children}
-                </main>
+                <div className="relative flex min-h-screen w-full flex-col overflow-hidden bg-[#02040A] text-white">
+                    <StarOverlay />
+                    <MouseMoving />
+                    <div
+                        className="pointer-events-none absolute"
+                        style={{
+                            width: "600px",
+                            height: "400px",
+                            right: "-92px",
+                            top: "-71px",
+                            borderRadius: "9999px",
+                            background:
+                                "linear-gradient(180deg, rgba(76, 117, 255, 0.06) 0%, rgba(26, 79, 255, 0.06) 100%)",
+                            filter: "blur(60px)",
+                        }}
+                    />
+
+                    <header className="sticky top-0 z-20 w-full border-b border-white/5 bg-[#01050A]/80 backdrop-blur-md">
+                        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-5 sm:px-6">
+                            <Link
+                                href="https://webbriks.com"
+                                className="flex items-center"
+                            >
+                                <Image
+                                    src="/wb-logo.png"
+                                    alt="Web Briks"
+                                    width={110}
+                                    height={32}
+                                    priority
+                                />
+                            </Link>
+                            <Link
+                                href="https://webbriks.com"
+                                className="text-[13px] text-white/50 transition-colors hover:text-white"
+                            >
+                                &larr; Back to site
+                            </Link>
+                        </div>
+                    </header>
+
+                    <main className="relative z-10 mx-auto w-full max-w-6xl flex-1 px-4 py-10 sm:px-6 sm:py-14">
+                        {children}
+                    </main>
+
+                    <footer className="relative z-10 w-full px-4 pb-8 sm:px-6">
+                        <div className="mx-auto max-w-6xl border-t border-white/5 pt-6 text-center">
+                            <p className="text-[12px] text-white/40">
+                                © {new Date().getFullYear()} Web Briks LLC ·
+                                Payments securely processed by Stripe &amp; PayPal
+                            </p>
+                        </div>
+                    </footer>
+                </div>
             </body>
         </html>
     );

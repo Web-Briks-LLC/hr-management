@@ -2,19 +2,10 @@
 
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { CheckCircle2, Home, Loader2, AlertCircle } from "lucide-react";
+import { CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import {
-    Card,
-    CardHeader,
-    CardTitle,
-    CardContent,
-    CardDescription,
-    CardFooter,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { BRAND_GRADIENT } from "@/lib/brand";
 
 function SuccessContent() {
     const searchParams = useSearchParams();
@@ -112,128 +103,83 @@ function SuccessContent() {
 
     if (status === "loading") {
         return (
-            <div className="min-h-[calc(100vh-80px)] w-full flex flex-col items-center justify-center p-4">
-                <Loader2 className="w-10 h-10 text-teal-600 animate-spin mb-4" />
-                <h2 className="text-lg font-medium text-muted-foreground tracking-tight">
-                    Verifying payment...
-                </h2>
+            <div className="mx-auto flex max-w-md flex-col items-center gap-3 py-16 text-center">
+                <Loader2 className="h-8 w-8 animate-spin text-[#9C46F4]" />
+                <p className="text-[14px] text-[#9CA3AF]">
+                    Verifying your payment…
+                </p>
             </div>
         );
     }
 
     if (status === "error") {
         return (
-            <div className="min-h-[calc(100vh-80px)] w-full flex flex-col items-center justify-center p-4 relative z-10">
-                <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5 }}
-                    className="w-full max-w-[460px] z-10"
+            <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.45, ease: "easeOut" }}
+                className="mx-auto flex max-w-md flex-col items-center gap-4 py-14 text-center"
+            >
+                <XCircle className="h-14 w-14 text-red-400" />
+                <h1 className="text-[24px] font-bold text-white">
+                    Payment incomplete
+                </h1>
+                <p className="max-w-[320px] text-[14px] text-[#9CA3AF]">
+                    We couldn&apos;t verify your transaction, or it was
+                    cancelled. You have not been charged.
+                </p>
+                <Link
+                    href="https://webbriks.com"
+                    className="mt-2 rounded-xl px-6 py-3 text-[14px] font-bold text-white shadow-[0_0_20px_0_rgba(26,79,255,0.30)]"
+                    style={{ background: BRAND_GRADIENT }}
                 >
-                    <Card className="border-border shadow-xl rounded-3xl overflow-hidden relative">
-                        <div className="h-1.5 w-full bg-destructive" />
-                        <CardHeader className="pt-12 pb-6 text-center flex flex-col items-center gap-4">
-                            <div className="w-20 h-20 bg-destructive/10 rounded-full flex items-center justify-center ring-4 ring-destructive/10 text-destructive">
-                                <AlertCircle size={40} />
-                            </div>
-                            <CardTitle className="text-3xl font-bold tracking-tight">
-                                Payment Incomplete
-                            </CardTitle>
-                            <CardDescription className="text-base">
-                                We couldn&apos;t verify your transaction or it
-                                was cancelled.
-                            </CardDescription>
-                        </CardHeader>
-                        <CardFooter className="px-10 pb-10">
-                            <Button
-                                asChild
-                                variant="outline"
-                                className="w-full h-14 text-sm font-semibold rounded-2xl shadow-xs"
-                            >
-                                <Link href="https://webbriks.com">
-                                    <Home className="w-4 h-4 mr-2" />
-                                    Return to Web Briks
-                                </Link>
-                            </Button>
-                        </CardFooter>
-                    </Card>
-                </motion.div>
-            </div>
+                    Return to Web Briks
+                </Link>
+            </motion.div>
         );
     }
 
     return (
-        <div className="min-h-[calc(100vh-200px)] w-full flex flex-col items-center justify-center p-4 relative z-10">
+        <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, ease: "easeOut" }}
+            className="mx-auto flex max-w-md flex-col items-center gap-4 py-14 text-center"
+        >
             <motion.div
-                initial={{ opacity: 0, scale: 0.95, y: 10 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                transition={{ duration: 0.5, ease: "easeOut" }}
-                className="w-full max-w-[460px] z-10"
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: "spring", stiffness: 210, delay: 0.15 }}
             >
-                <Card className="bg-card border-border shadow-xl rounded-3xl overflow-hidden relative">
-                    <div className="h-1.5 w-full bg-teal-500" />
-
-                    <CardHeader className="pt-12 pb-6 text-center flex flex-col items-center gap-4">
-                        <motion.div
-                            initial={{ scale: 0 }}
-                            animate={{ scale: 1 }}
-                            transition={{
-                                type: "spring",
-                                stiffness: 200,
-                                delay: 0.2,
-                            }}
-                            className="bg-teal-500/10 text-teal-600 dark:text-teal-400 rounded-full w-20 h-20 flex items-center justify-center shadow-sm ring-4 ring-teal-500/10"
-                        >
-                            <CheckCircle2 size={36} strokeWidth={2.5} />
-                        </motion.div>
-
-                        <Badge
-                            variant="secondary"
-                            className="bg-teal-500/10 text-teal-600 dark:text-teal-400 hover:bg-teal-500/10 border-none font-semibold px-4 py-1.5"
-                        >
-                            {alreadyPaid
-                                ? "Already Paid"
-                                : "Transaction Successful"}
-                        </Badge>
-
-                        <div className="space-y-2">
-                            <CardTitle className="text-3xl font-bold tracking-tight">
-                                {alreadyPaid ? "Invoice Paid" : "Thank You!"}
-                            </CardTitle>
-                            <CardDescription className="text-base max-w-[300px] mx-auto">
-                                {alreadyPaid
-                                    ? "You have already securely paid this invoice."
-                                    : "Your payment has been securely processed. A receipt has been sent to your email address."}
-                            </CardDescription>
-                        </div>
-                    </CardHeader>
-
-                    <CardContent className="px-10 pb-6">
-                        <div className="w-full flex items-center justify-between border-t border-b border-border py-4">
-                            <span className="text-sm font-medium text-muted-foreground">
-                                Reference ID
-                            </span>
-                            <span className="font-mono text-sm font-semibold text-teal-600 dark:text-teal-400">
-                                {paymentIntent || orderId || "WB-PAY-SUCCESS"}
-                            </span>
-                        </div>
-                    </CardContent>
-
-                    <CardFooter className="px-10 pb-10">
-                        <Button
-                            asChild
-                            variant="outline"
-                            className="w-full h-14 text-sm font-semibold rounded-2xl shadow-xs"
-                        >
-                            <Link href="https://webbriks.com">
-                                <Home className="w-4 h-4 mr-2" />
-                                Return to Web Briks
-                            </Link>
-                        </Button>
-                    </CardFooter>
-                </Card>
+                <CheckCircle2 className="h-14 w-14 text-[#4ADE80]" />
             </motion.div>
-        </div>
+
+            <h1 className="text-[26px] font-bold text-white">
+                {alreadyPaid ? "Invoice already paid" : "Payment successful"}
+            </h1>
+            <p className="max-w-[320px] text-[14px] text-[#9CA3AF]">
+                {alreadyPaid
+                    ? "This invoice has already been paid securely. No further action is needed."
+                    : "Thank you! Your payment has been securely processed and a receipt is on its way to your email."}
+            </p>
+
+            <div className="mt-2 flex w-full max-w-[340px] items-center justify-between rounded-xl border border-white/10 bg-white/[0.02] px-4 py-3 text-[13px]">
+                <span className="text-[#9CA3AF]">Reference</span>
+                <span className="font-mono font-semibold text-[#C9A9F9]">
+                    {paymentIntent ||
+                        orderId ||
+                        (invoiceNumber ? `INV-${invoiceNumber}` : "WB-PAY")}
+                </span>
+            </div>
+
+            <Link
+                href="https://webbriks.com"
+                className="mt-3 rounded-xl px-6 py-3 text-[14px] font-bold text-white shadow-[0_0_20px_0_rgba(26,79,255,0.30)]"
+                style={{ background: BRAND_GRADIENT }}
+            >
+                Return to Web Briks
+            </Link>
+        </motion.div>
     );
 }
 
@@ -241,11 +187,9 @@ export default function SuccessPage() {
     return (
         <Suspense
             fallback={
-                <div className="min-h-screen flex flex-col items-center justify-center p-4">
-                    <Loader2 className="w-12 h-12 text-teal-600 animate-spin mb-4" />
-                    <h2 className="text-xl font-medium text-muted-foreground tracking-tight">
-                        Loading...
-                    </h2>
+                <div className="mx-auto flex max-w-md flex-col items-center gap-3 py-16 text-center">
+                    <Loader2 className="h-8 w-8 animate-spin text-[#9C46F4]" />
+                    <p className="text-[14px] text-[#9CA3AF]">Loading…</p>
                 </div>
             }
         >

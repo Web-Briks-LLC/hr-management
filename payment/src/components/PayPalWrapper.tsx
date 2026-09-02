@@ -29,11 +29,11 @@ export default function PayPalWrapper({
     };
 
     return (
-        <div className="w-full mt-4 border-t border-white/10">
+        <div className="w-full">
             {error && (
-                <div className="text-red-500 bg-red-500/10 p-3 rounded-md text-sm mb-4 border border-red-500/20 text-center font-medium">
+                <p className="mb-4 text-center text-[12.5px] text-red-400">
                     {error}
-                </div>
+                </p>
             )}
 
             <PayPalScriptProvider options={initialOptions}>

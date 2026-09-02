@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { loadStripe } from "@stripe/stripe-js";
+import type { StripeElementsOptions } from "@stripe/stripe-js";
 import { Elements } from "@stripe/react-stripe-js";
 import CheckoutForm from "./CheckoutForm";
 import { Loader2 } from "lucide-react";
@@ -10,6 +11,50 @@ import { Loader2 } from "lucide-react";
 const stripePromise = loadStripe(
     process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "",
 );
+
+// Matches web-briks-client's Stripe theme exactly.
+const fonts: StripeElementsOptions["fonts"] = [
+    {
+        cssSrc: "https://fonts.googleapis.com/css2?family=Red+Rose:wght@400;500;600;700&display=swap",
+    },
+];
+
+const appearance: StripeElementsOptions["appearance"] = {
+    theme: "night",
+    variables: {
+        colorPrimary: "#9C46F4",
+        colorBackground: "#050611",
+        colorText: "#ffffff",
+        colorTextSecondary: "#9CA3AF",
+        colorDanger: "#f87171",
+        fontFamily: "'Red Rose', sans-serif",
+        borderRadius: "12px",
+        spacingUnit: "4px",
+    },
+    rules: {
+        ".Input": {
+            border: "1px solid rgba(255, 255, 255, 0.1)",
+            boxShadow: "none",
+        },
+        ".Input:focus": {
+            border: "1px solid rgba(156, 70, 244, 0.5)",
+            boxShadow: "none",
+        },
+        ".Label": {
+            color: "#D1D5DB",
+            fontWeight: "600",
+            fontSize: "13px",
+        },
+        ".Tab": {
+            border: "1px solid rgba(255, 255, 255, 0.1)",
+            backgroundColor: "transparent",
+        },
+        ".Tab--selected": {
+            border: "1px solid #9C46F4",
+            backgroundColor: "rgba(156, 70, 244, 0.1)",
+        },
+    },
+};
 
 export default function PaymentWrapper({
     invoiceNumber,
@@ -71,43 +116,21 @@ export default function PaymentWrapper({
 
     if (loading) {
         return (
-            <div className="flex flex-col items-center justify-center p-8 text-teal-600/70">
-                <Loader2 className="w-8 h-8 animate-spin mb-4" />
-                <p className="text-sm font-medium">
-                    Securing payment session...
-                </p>
+            <div className="flex items-center justify-center py-10">
+                <Loader2 className="h-6 w-6 animate-spin text-[#9C46F4]" />
             </div>
         );
     }
 
     if (error) {
-        return (
-            <div className="p-4 bg-red-500/10 text-red-600 text-sm rounded-xl border border-red-500/20 text-center font-medium">
-                {error}
-            </div>
-        );
+        return <p className="py-2 text-[13px] text-red-400">{error}</p>;
     }
 
     return (
         <div className="w-full">
             {clientSecret && (
                 <Elements
-                    options={{
-                        clientSecret,
-                        appearance: {
-                            theme: "stripe",
-                            variables: {
-                                colorPrimary: "#0d9488", // teal-600
-                                colorBackground: "rgba(255, 255, 255, 0.4)",
-                                colorText: "#1f2937", // gray-800
-                                colorDanger: "#df1b41",
-                                fontFamily:
-                                    'Inter, "JetBrains Mono", system-ui, sans-serif',
-                                spacingUnit: "4px",
-                                borderRadius: "12px",
-                            },
-                        },
-                    }}
+                    options={{ clientSecret, appearance, fonts }}
                     stripe={stripePromise}
                 >
                     <CheckoutForm
