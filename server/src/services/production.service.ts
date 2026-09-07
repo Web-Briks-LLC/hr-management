@@ -1494,7 +1494,7 @@ const getActiveWorkSession = async (userId: string) => {
         .sort({ status: 1, startTime: 1 }) // 'active' sorts before 'paused'
         .populate({
             path: 'orderId',
-            select: 'orderName deadline requiredSteps instruction notes priority',
+            select: 'orderName deadline requiredSteps instruction notes priority imageQuantity status',
             populate: {
                 path: 'services',
                 select: 'name description',
@@ -1522,7 +1522,7 @@ const getHeldWorkSessions = async (userId: string) => {
         .sort({ pausedAt: 1 })
         .populate({
             path: 'orderId',
-            select: 'orderName deadline requiredSteps instruction notes priority',
+            select: 'orderName deadline requiredSteps instruction notes priority imageQuantity status',
             populate: { path: 'services', select: 'name description' },
         })
         .lean();

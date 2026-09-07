@@ -136,13 +136,24 @@ export function ProductionWorkstation() {
     }, [ordersData]);
 
 
-    // Selected order details
+    // Selected order details.
+    // While a session is actively RUNNING, the workstation is pinned to that
+    // order. When it's only on hold (or there's no session), the order picker
+    // wins — otherwise a held session would block choosing a new order to work
+    // on. The session's own order is used as a fallback when nothing is picked.
     const activeOrder = useMemo(() => {
-        if (activeSession && typeof activeSession.orderId === 'object') {
-            return activeSession.orderId;
+        const sessionOrder =
+            activeSession && typeof activeSession.orderId === 'object'
+                ? activeSession.orderId
+                : null;
+
+        if (hasLiveActive && sessionOrder) {
+            return sessionOrder;
         }
-        return orders.find((o) => o._id === selectedOrderId) || null;
-    }, [activeSession, orders, selectedOrderId]);
+
+        const picked = orders.find((o) => o._id === selectedOrderId);
+        return picked || sessionOrder || null;
+    }, [activeSession, hasLiveActive, orders, selectedOrderId]);
 
     // Query images for the selected order to show progress & revisions
     const { data: orderImagesData, refetch: refetchOrderImages } = useGetOrderImagesQuery(
