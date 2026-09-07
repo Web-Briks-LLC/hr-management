@@ -843,26 +843,18 @@ export function ProductionWorkstation() {
                                         Required Core Steps:
                                     </span>
                                     <div className="flex flex-wrap gap-1.5">
-                                        {((activeOrder as any).requiredSteps || []).map(
-                                            (step: any, idx: number) => (
-                                                <Badge
-                                                    key={idx}
-                                                    variant="secondary"
-                                                    className="text-xs font-medium bg-primary/10 text-primary border border-primary/20"
-                                                >
-                                                    <span className="text-[9px] opacity-60 mr-1 font-mono">
-                                                        {idx + 1}.
-                                                    </span>
-                                                    {step.name}
-                                                </Badge>
-                                            )
-                                        )}
-                                        {(!((activeOrder as any).requiredSteps) ||
-                                            (activeOrder as any).requiredSteps.length === 0) && (
-                                            <span className="text-xs text-muted-foreground italic">
-                                                Standard Editing &amp; Retouching
-                                            </span>
-                                        )}
+                                        {finishStepOptions.map((step, idx: number) => (
+                                            <Badge
+                                                key={idx}
+                                                variant="secondary"
+                                                className="text-xs font-medium bg-primary/10 text-primary border border-primary/20"
+                                            >
+                                                <span className="text-[9px] opacity-60 mr-1 font-mono">
+                                                    {idx + 1}.
+                                                </span>
+                                                {step.name}
+                                            </Badge>
+                                        ))}
                                     </div>
                                 </div>
 
