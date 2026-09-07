@@ -142,9 +142,16 @@ export function FloorMonitor() {
         return () => events.forEach((e) => socket.off(e, handle));
     }, [socket, refetch]);
 
+    // Orders can have no `requiredSteps` recorded — fall back to the same default
+    // the server uses in finalizeSessionCompletion so the checklist is never blank.
+    const stepOptionsFor = (s?: ILiveWorkSession | null) =>
+        s?.order.requiredSteps && s.order.requiredSteps.length > 0
+            ? s.order.requiredSteps
+            : [{ name: 'Editing & Retouching' }];
+
     const openFinish = (s: ILiveWorkSession) => {
         setTarget(s);
-        setFinishSteps((s.order.requiredSteps || []).map((st) => st.name));
+        setFinishSteps(stepOptionsFor(s).map((st) => st.name));
         setFinishNotes('');
         setDialog('finish');
     };
@@ -495,7 +502,7 @@ export function FloorMonitor() {
                         Completed steps
                     </Label>
                     <div className="space-y-2 rounded-xl border p-3 bg-muted/10">
-                        {(target?.order.requiredSteps || [{ name: 'Editing & Retouching' }]).map(
+                        {stepOptionsFor(target).map(
                             (step, idx) => {
                                 const checked = finishSteps.includes(step.name);
                                 return (
