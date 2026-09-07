@@ -45,9 +45,12 @@ import { toast } from 'sonner';
 import {
     useGetSanitizedOrdersQuery,
     useGetActiveSessionQuery,
+    useGetHeldWorkSessionsQuery,
     useStartWorkSessionMutation,
     useFinishWorkSessionMutation,
     useCancelWorkSessionMutation,
+    usePauseWorkSessionMutation,
+    useResumeWorkSessionMutation,
     useGetOrderImagesQuery,
 } from '@/redux/features/production/productionApi';
 import { useSocket } from '@/contexts/SocketContext';
@@ -68,6 +71,8 @@ import {
     ShieldAlert,
     RefreshCw,
     Sparkles,
+    Pause,
+    PlayCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow, format } from 'date-fns';
@@ -90,9 +95,14 @@ export function ProductionWorkstation() {
         refetch: refetchActiveSession,
     } = useGetActiveSessionQuery();
 
+    const { data: heldSessionsData, refetch: refetchHeldSessions } =
+        useGetHeldWorkSessionsQuery();
+
     const [startWork, { isLoading: isStarting }] = useStartWorkSessionMutation();
     const [finishWork, { isLoading: isFinishing }] = useFinishWorkSessionMutation();
     const [cancelWork, { isLoading: isCancelling }] = useCancelWorkSessionMutation();
+    const [pauseWork, { isLoading: isPausing }] = usePauseWorkSessionMutation();
+    const [resumeWork, { isLoading: isResuming }] = useResumeWorkSessionMutation();
 
     // Local states
     const [selectedOrderId, setSelectedOrderId] = useState<string>('');
@@ -109,6 +119,16 @@ export function ProductionWorkstation() {
     const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     const activeSession = activeSessionData?.data;
+    const isSessionOnHold = activeSession?.status === 'paused';
+    const hasLiveActive = activeSession?.status === 'active';
+    const heldSessions = useMemo(
+        () =>
+            (heldSessionsData?.data || []).filter(
+                (s) => s._id !== activeSession?._id
+            ),
+        [heldSessionsData, activeSession?._id]
+    );
+
     const orders = useMemo(() => {
         return [...(ordersData?.data || [])].sort(
             (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
@@ -137,7 +157,9 @@ export function ProductionWorkstation() {
         );
     }, [orderImagesData]);
 
-    // Stopwatch timer for active session
+    // Stopwatch timer for active session — hold-aware. Every completed hold
+    // interval (totalPausedSeconds) plus the currently-open hold is subtracted,
+    // so "held time never counts", and the interval only ticks while running.
     useEffect(() => {
         if (!activeSession?.startTime) {
             setElapsedSeconds(0);
@@ -145,13 +167,26 @@ export function ProductionWorkstation() {
         }
 
         const startTimestamp = new Date(activeSession.startTime).getTime();
+        const pausedAccum = activeSession.totalPausedSeconds || 0;
+
         const updateTimer = () => {
             const now = Date.now();
-            const diff = Math.max(0, Math.floor((now - startTimestamp) / 1000));
-            setElapsedSeconds(diff);
+            let diff = Math.floor((now - startTimestamp) / 1000) - pausedAccum;
+            if (activeSession.status === 'paused' && activeSession.pausedAt) {
+                diff -= Math.floor(
+                    (now - new Date(activeSession.pausedAt).getTime()) / 1000
+                );
+            }
+            setElapsedSeconds(Math.max(0, diff));
         };
 
         updateTimer();
+
+        // Frozen while on hold — show the value but don't advance it.
+        if (activeSession.status !== 'active') {
+            return;
+        }
+
         const interval = setInterval(updateTimer, 1000);
         timerIntervalRef.current = interval;
         return () => {
@@ -160,7 +195,12 @@ export function ProductionWorkstation() {
                 timerIntervalRef.current = null;
             }
         };
-    }, [activeSession?.startTime]);
+    }, [
+        activeSession?.startTime,
+        activeSession?.status,
+        activeSession?.pausedAt,
+        activeSession?.totalPausedSeconds,
+    ]);
 
     // Stops the stopwatch immediately (rather than waiting on the
     // finish/cancel mutation's cache invalidation to round-trip and re-run
@@ -181,41 +221,97 @@ export function ProductionWorkstation() {
         const handleUpdate = () => {
             refetchOrders();
             refetchActiveSession();
+            refetchHeldSessions();
             if (activeOrder?._id) {
                 refetchOrderImages();
             }
         };
 
-        socket.on('production:session_started', handleUpdate);
-        socket.on('production:session_finished', handleUpdate);
-        socket.on('production:session_cancelled', handleUpdate);
-        socket.on('production:images_locked', handleUpdate);
-        socket.on('production:images_updated', handleUpdate);
+        const events = [
+            'production:session_started',
+            'production:session_finished',
+            'production:session_cancelled',
+            'production:session_paused',
+            'production:session_resumed',
+            'production:session_reassigned',
+            'production:images_locked',
+            'production:images_updated',
+        ];
+        events.forEach((e) => socket.on(e, handleUpdate));
 
         return () => {
-            socket.off('production:session_started', handleUpdate);
-            socket.off('production:session_finished', handleUpdate);
-            socket.off('production:session_cancelled', handleUpdate);
-            socket.off('production:images_locked', handleUpdate);
-            socket.off('production:images_updated', handleUpdate);
+            events.forEach((e) => socket.off(e, handleUpdate));
         };
-    }, [socket, refetchOrders, refetchActiveSession, refetchOrderImages, activeOrder?._id]);
+    }, [
+        socket,
+        refetchOrders,
+        refetchActiveSession,
+        refetchHeldSessions,
+        refetchOrderImages,
+        activeOrder?._id,
+    ]);
 
-    // Drag & Drop Handler (Zero file upload, extracts filenames instantly)
-    const onDrop = useCallback((acceptedFiles: File[]) => {
-        if (!acceptedFiles || acceptedFiles.length === 0) return;
+    // Drag & Drop Handler (Zero file upload, extracts filenames instantly).
+    // Enforces the order's image quantity: the staged batch can never push the
+    // order past `imageQuantity` total registered images. The server re-checks
+    // this hard limit on Start Work.
+    const onDrop = useCallback(
+        (acceptedFiles: File[]) => {
+            if (!acceptedFiles || acceptedFiles.length === 0) return;
 
-        const extractedNames = acceptedFiles
-            .map((f) => f.name.trim())
-            .filter(Boolean);
+            if (!activeOrder?._id) {
+                toast.error('Select an order first, then drop the images to work on.');
+                return;
+            }
 
-        setStagedFiles((prev) => {
-            const set = new Set([...prev, ...extractedNames]);
-            return Array.from(set);
-        });
+            const extractedNames = acceptedFiles
+                .map((f) => f.name.trim())
+                .filter(Boolean);
 
-        toast.success(`Extracted ${extractedNames.length} image filename(s)`);
-    }, []);
+            const maxImages = Number((activeOrder as any).imageQuantity) || 0;
+            const alreadyRegistered = orderImagesSummary?.totalRegistered ?? 0;
+
+            setStagedFiles((prev) => {
+                const prevSet = new Set(prev);
+                const fresh = Array.from(new Set(extractedNames)).filter(
+                    (n) => !prevSet.has(n)
+                );
+
+                if (fresh.length === 0) {
+                    toast.info('Those filenames are already in your batch.');
+                    return prev;
+                }
+
+                // Slots left = order quantity − images already registered on the
+                // server − names already staged in this batch.
+                const remainingSlots = Math.max(
+                    0,
+                    maxImages - alreadyRegistered - prev.length
+                );
+
+                if (remainingSlots <= 0) {
+                    toast.error(
+                        `This order is limited to ${maxImages} image(s) and is already full. Nothing added.`
+                    );
+                    return prev;
+                }
+
+                if (fresh.length > remainingSlots) {
+                    const trimmed = fresh.slice(0, remainingSlots);
+                    toast.warning(
+                        `Only ${remainingSlots} more image(s) allowed on this ${maxImages}-image order. Added ${trimmed.length}, skipped ${
+                            fresh.length - remainingSlots
+                        }.`
+                    );
+                    return [...prev, ...trimmed];
+                }
+
+                toast.success(`Extracted ${fresh.length} image filename(s)`);
+                return [...prev, ...fresh];
+            });
+        },
+        [activeOrder, orderImagesSummary]
+    );
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
         onDrop,
@@ -317,6 +413,34 @@ export function ProductionWorkstation() {
         }
     };
 
+    // Hold (pause) the active session — freezes the timer and frees the editor
+    // to start / resume another batch. Images stay locked to this session.
+    const handleHold = async () => {
+        if (!activeSession?._id) return;
+        try {
+            await pauseWork({ sessionId: activeSession._id }).unwrap();
+            toast.success('Session on hold. Timer frozen — you can start another batch now.');
+            refetchActiveSession();
+            refetchHeldSessions();
+        } catch (error: any) {
+            toast.error(error?.data?.message || 'Failed to hold work session');
+        }
+    };
+
+    // Resume a held session. Server rejects this if another session is already
+    // running, so the editor must hold/finish that one first.
+    const handleResume = async (sessionId: string) => {
+        try {
+            await resumeWork({ sessionId }).unwrap();
+            toast.success('Session resumed. Your timer is running again.');
+            refetchActiveSession();
+            refetchHeldSessions();
+            refetchOrderImages();
+        } catch (error: any) {
+            toast.error(error?.data?.message || 'Failed to resume work session');
+        }
+    };
+
     // Confirm Cancel Work
     const handleCancelConfirm = async () => {
         if (!activeSession?._id) return;
@@ -362,17 +486,44 @@ export function ProductionWorkstation() {
                     </Button>
                 </div>
             ) : activeSession ? (
-                <div className="group relative overflow-hidden rounded-2xl border border-emerald-500/30 bg-linear-to-br from-emerald-500/10 via-card to-card p-6 shadow-xl shadow-emerald-500/5 transition-all duration-300">
-                    <div className="absolute -right-6 -top-6 h-32 w-32 rounded-full bg-emerald-500/10 blur-3xl transition-all duration-300 group-hover:bg-emerald-500/20" />
+                <div
+                    className={cn(
+                        'group relative overflow-hidden rounded-2xl border p-6 shadow-xl transition-all duration-300 bg-linear-to-br via-card to-card',
+                        isSessionOnHold
+                            ? 'border-amber-500/40 from-amber-500/10 shadow-amber-500/5'
+                            : 'border-emerald-500/30 from-emerald-500/10 shadow-emerald-500/5'
+                    )}
+                >
+                    <div
+                        className={cn(
+                            'absolute -right-6 -top-6 h-32 w-32 rounded-full blur-3xl transition-all duration-300',
+                            isSessionOnHold
+                                ? 'bg-amber-500/10 group-hover:bg-amber-500/20'
+                                : 'bg-emerald-500/10 group-hover:bg-emerald-500/20'
+                        )}
+                    />
                     <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
                         <div className="space-y-2">
                             <div className="flex items-center gap-2">
-                                <span className="relative flex h-3 w-3">
-                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                    <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
-                                </span>
-                                <Badge className="bg-emerald-500 text-white font-bold text-xs px-2.5 py-0.5 shadow-xs">
-                                    LIVE WORK SESSION RUNNING
+                                {isSessionOnHold ? (
+                                    <span className="relative flex h-3 w-3">
+                                        <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
+                                    </span>
+                                ) : (
+                                    <span className="relative flex h-3 w-3">
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                        <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                                    </span>
+                                )}
+                                <Badge
+                                    className={cn(
+                                        'text-white font-bold text-xs px-2.5 py-0.5 shadow-xs',
+                                        isSessionOnHold ? 'bg-amber-500' : 'bg-emerald-500'
+                                    )}
+                                >
+                                    {isSessionOnHold
+                                        ? 'SESSION ON HOLD'
+                                        : 'LIVE WORK SESSION RUNNING'}
                                 </Badge>
                                 <span className="text-xs text-muted-foreground font-mono">
                                     Session ID: {activeSession._id.slice(-6)}
@@ -407,17 +558,51 @@ export function ProductionWorkstation() {
                         </div>
 
                         {/* Stopwatch & Action Buttons */}
-                        <div className="flex flex-col sm:flex-row items-center gap-4 bg-background/80 backdrop-blur-md p-4 rounded-xl border border-emerald-500/30 shadow-xs">
+                        <div
+                            className={cn(
+                                'flex flex-col sm:flex-row items-center gap-4 bg-background/80 backdrop-blur-md p-4 rounded-xl border shadow-xs',
+                                isSessionOnHold
+                                    ? 'border-amber-500/40'
+                                    : 'border-emerald-500/30'
+                            )}
+                        >
                             <div className="text-center sm:text-right pr-2">
                                 <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block">
-                                    Elapsed Work Time
+                                    {isSessionOnHold ? 'Work Time (Frozen)' : 'Elapsed Work Time'}
                                 </span>
-                                <span className="text-3xl font-black font-mono text-emerald-600 dark:text-emerald-400">
+                                <span
+                                    className={cn(
+                                        'text-3xl font-black font-mono',
+                                        isSessionOnHold
+                                            ? 'text-amber-600 dark:text-amber-400'
+                                            : 'text-emerald-600 dark:text-emerald-400'
+                                    )}
+                                >
                                     {formatTimer(elapsedSeconds)}
                                 </span>
                             </div>
 
                             <div className="flex items-center gap-2">
+                                {isSessionOnHold ? (
+                                    <Button
+                                        onClick={() => handleResume(activeSession._id)}
+                                        disabled={isResuming}
+                                        className="bg-amber-600 hover:bg-amber-700 text-white font-bold shadow-xs h-10 px-4"
+                                    >
+                                        <PlayCircle className="h-4 w-4 mr-1" />
+                                        Resume
+                                    </Button>
+                                ) : (
+                                    <Button
+                                        variant="outline"
+                                        onClick={handleHold}
+                                        disabled={isPausing}
+                                        className="border-amber-500/40 text-amber-700 dark:text-amber-300 hover:bg-amber-500/10 h-10 px-4 text-xs font-semibold"
+                                    >
+                                        <Pause className="h-4 w-4 mr-1" />
+                                        Hold
+                                    </Button>
+                                )}
                                 <Button
                                     onClick={handleOpenFinishDialog}
                                     disabled={isFinishing}
@@ -459,6 +644,59 @@ export function ProductionWorkstation() {
                 </div>
             ) : null}
 
+            {/* 1b. HELD (PAUSED) SESSIONS — resumable, timers frozen */}
+            {heldSessions.length > 0 && (
+                <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                        <Pause className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                        <span className="text-xs font-bold uppercase tracking-wider text-amber-700 dark:text-amber-300">
+                            On Hold ({heldSessions.length})
+                        </span>
+                        <span className="text-[11px] text-muted-foreground">
+                            Timers frozen · images still locked to you
+                        </span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                        {heldSessions.map((s) => (
+                            <div
+                                key={s._id}
+                                className="rounded-xl border border-amber-500/20 bg-background/70 p-3 space-y-2"
+                            >
+                                <div className="flex items-center justify-between gap-2">
+                                    <span className="text-xs font-bold text-foreground truncate">
+                                        {(s.orderId as any)?.orderName || 'Order'}
+                                    </span>
+                                    <Badge
+                                        variant="outline"
+                                        className="text-[10px] font-mono border-amber-500/30 text-amber-700 dark:text-amber-300 shrink-0"
+                                    >
+                                        {s.imageCount} imgs
+                                    </Badge>
+                                </div>
+                                <div className="flex items-center justify-between text-[11px] text-muted-foreground font-mono">
+                                    <span>Frozen at {formatTimer(s.effectiveSeconds || 0)}</span>
+                                    <span>#{s._id.slice(-6)}</span>
+                                </div>
+                                <Button
+                                    size="sm"
+                                    onClick={() => handleResume(s._id)}
+                                    disabled={isResuming || hasLiveActive}
+                                    title={
+                                        hasLiveActive
+                                            ? 'Hold or finish your running session first'
+                                            : undefined
+                                    }
+                                    className="w-full h-8 text-xs bg-amber-600 hover:bg-amber-700 text-white font-bold"
+                                >
+                                    <PlayCircle className="h-3.5 w-3.5 mr-1" />
+                                    Resume
+                                </Button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
 
             {/* 2. MAIN WORKSTATION WORKSPACE */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -483,7 +721,7 @@ export function ProductionWorkstation() {
                                     <Button
                                         variant="outline"
                                         role="combobox"
-                                        disabled={!!activeSession}
+                                        disabled={hasLiveActive}
                                         className="w-full justify-between h-10 text-xs font-mono font-medium bg-background/60"
                                     >
                                         {selectedOrderId ? (
@@ -636,7 +874,7 @@ export function ProductionWorkstation() {
                                         <Button
                                             size="sm"
                                             variant="outline"
-                                            disabled={!!activeSession}
+                                            disabled={hasLiveActive}
                                             onClick={handleAddRevisionImagesToStaging}
                                             className="w-full h-7 text-xs border-amber-500/40 text-amber-700 dark:text-amber-300 hover:bg-amber-500/10 font-bold"
                                         >
@@ -688,7 +926,7 @@ export function ProductionWorkstation() {
                                 isDragActive
                                     ? 'border-primary bg-primary/10 scale-[1.01]'
                                     : 'border-border/80 hover:border-primary/50 hover:bg-muted/30 bg-muted/10',
-                                activeSession ? 'opacity-50 pointer-events-none cursor-not-allowed' : ''
+                                hasLiveActive ? 'opacity-50 pointer-events-none cursor-not-allowed' : ''
                             )}
                         >
                             <input {...getInputProps()} />
@@ -756,7 +994,7 @@ export function ProductionWorkstation() {
                                         onClick={handleStartWork}
                                         disabled={
                                             isStarting ||
-                                            !!activeSession ||
+                                            hasLiveActive ||
                                             !activeOrder ||
                                             isSessionError
                                         }

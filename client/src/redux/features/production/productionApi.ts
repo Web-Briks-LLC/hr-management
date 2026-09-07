@@ -19,6 +19,11 @@ import type {
     IQcApproveImagesInput,
     IStaffEditedImagesResponse,
     IStaffEditedImagesFilters,
+    ILiveWorkSessionsResponse,
+    IProductionEditor,
+    IPauseResumeSessionInput,
+    IAdminFinishWorkSessionInput,
+    IReassignWorkSessionInput,
 } from '@/types/production.type';
 
 interface ProductionLogsResponse {
@@ -98,6 +103,30 @@ interface ActiveSessionResponse {
     data: IProductionWorkSession | null;
 }
 
+interface HeldSessionsResponse {
+    success: boolean;
+    data: IProductionWorkSession[];
+}
+
+interface ProductionEditorsResponse {
+    success: boolean;
+    data: IProductionEditor[];
+}
+
+const SESSION_MUTATION_TAGS = [
+    'ActiveWorkSession',
+    'HeldWorkSessions',
+    'LiveWorkSessions',
+    'ProductionImages',
+    'ProductionOrders',
+    'Production',
+    'ProductionStats',
+    'StaffPerformance',
+    { type: 'ActiveWorkSession', id: 'CURRENT' },
+    { type: 'ProductionOrders', id: 'SANITIZED' },
+    { type: 'ProductionOrders', id: 'LIST' },
+] as const;
+
 interface StaffAnalyticsResponse {
     success: boolean;
     data: IStaffPerformanceAnalytics;
@@ -147,6 +176,8 @@ export const productionApi = apiSlice.injectEndpoints({
             }),
             invalidatesTags: [
                 'ActiveWorkSession',
+                'HeldWorkSessions',
+                'LiveWorkSessions',
                 'ProductionImages',
                 'ProductionOrders',
                 { type: 'ActiveWorkSession', id: 'CURRENT' },
@@ -166,10 +197,13 @@ export const productionApi = apiSlice.injectEndpoints({
             }),
             invalidatesTags: [
                 'ActiveWorkSession',
+                'HeldWorkSessions',
+                'LiveWorkSessions',
                 'ProductionImages',
                 'ProductionOrders',
                 'Production',
                 'ProductionStats',
+                'StaffPerformance',
                 { type: 'ActiveWorkSession', id: 'CURRENT' },
                 { type: 'ProductionOrders', id: 'SANITIZED' },
                 { type: 'ProductionOrders', id: 'LIST' },
@@ -189,11 +223,88 @@ export const productionApi = apiSlice.injectEndpoints({
             }),
             invalidatesTags: [
                 'ActiveWorkSession',
+                'HeldWorkSessions',
+                'LiveWorkSessions',
                 'ProductionImages',
                 'ProductionOrders',
                 { type: 'ActiveWorkSession', id: 'CURRENT' },
                 { type: 'ProductionOrders', id: 'SANITIZED' },
             ],
+        }),
+
+        getHeldWorkSessions: builder.query<HeldSessionsResponse, void>({
+            query: () => '/production/session/held',
+            providesTags: ['HeldWorkSessions'],
+        }),
+
+        pauseWorkSession: builder.mutation<
+            { success: boolean; message: string; data: IProductionWorkSession },
+            IPauseResumeSessionInput
+        >({
+            query: (body) => ({
+                url: '/production/session/pause',
+                method: 'POST',
+                body,
+            }),
+            invalidatesTags: [...SESSION_MUTATION_TAGS],
+        }),
+
+        resumeWorkSession: builder.mutation<
+            { success: boolean; message: string; data: IProductionWorkSession },
+            IPauseResumeSessionInput
+        >({
+            query: (body) => ({
+                url: '/production/session/resume',
+                method: 'POST',
+                body,
+            }),
+            invalidatesTags: [...SESSION_MUTATION_TAGS],
+        }),
+
+        getLiveWorkSessions: builder.query<ILiveWorkSessionsResponse, void>({
+            query: () => '/production/sessions/live',
+            providesTags: ['LiveWorkSessions'],
+        }),
+
+        getProductionEditors: builder.query<ProductionEditorsResponse, void>({
+            query: () => '/production/editors',
+            providesTags: ['ProductionEditors'],
+        }),
+
+        adminCancelWorkSession: builder.mutation<
+            { success: boolean; message: string },
+            ICancelWorkSessionInput
+        >({
+            query: (body) => ({
+                url: '/production/session/admin-cancel',
+                method: 'POST',
+                body,
+            }),
+            invalidatesTags: [...SESSION_MUTATION_TAGS],
+        }),
+
+        adminFinishWorkSession: builder.mutation<
+            { success: boolean; message: string; data: any },
+            IAdminFinishWorkSessionInput
+        >({
+            query: (body) => ({
+                url: '/production/session/admin-finish',
+                method: 'POST',
+                body,
+            }),
+            invalidatesTags: [...SESSION_MUTATION_TAGS],
+        }),
+
+        reassignWorkSession: builder.mutation<
+            { success: boolean; message: string; data: any; previousDurationSeconds: number },
+            IReassignWorkSessionInput
+        >({
+            query: (body) => ({
+                url: '/production/session/reassign',
+                method: 'POST',
+                body,
+            }),
+            invalidatesTags: [...SESSION_MUTATION_TAGS],
         }),
 
         flagImageRevision: builder.mutation<
@@ -401,9 +512,17 @@ export const {
     useGetSanitizedOrdersQuery,
     useGetOrderImagesQuery,
     useGetActiveSessionQuery,
+    useGetHeldWorkSessionsQuery,
     useStartWorkSessionMutation,
     useFinishWorkSessionMutation,
     useCancelWorkSessionMutation,
+    usePauseWorkSessionMutation,
+    useResumeWorkSessionMutation,
+    useGetLiveWorkSessionsQuery,
+    useGetProductionEditorsQuery,
+    useAdminCancelWorkSessionMutation,
+    useAdminFinishWorkSessionMutation,
+    useReassignWorkSessionMutation,
     useFlagImageRevisionMutation,
     useQcApproveImagesMutation,
     useGetStaffPerformanceAnalyticsQuery,

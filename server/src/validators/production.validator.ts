@@ -97,6 +97,24 @@ export const cancelWorkSessionSchema = z.object({
     reason: z.string().max(500).optional(),
 });
 
+export const sessionIdOnlySchema = z.object({
+    sessionId: z.string({ message: 'Session ID is required' }),
+});
+
+export const adminFinishWorkSessionSchema = z.object({
+    sessionId: z.string({ message: 'Session ID is required' }),
+    completedSteps: z
+        .array(z.string().min(1, 'Step name cannot be empty'))
+        .min(1, 'Select at least one completed step'),
+    notes: z.string().max(1000).optional(),
+});
+
+export const reassignWorkSessionSchema = z.object({
+    sessionId: z.string({ message: 'Session ID is required' }),
+    newStaffId: z.string({ message: 'Target editor is required' }),
+    note: z.string().max(500).optional(),
+});
+
 export const flagImageRevisionSchema = z.object({
     orderId: z.string({ message: 'Order ID is required' }),
     imageNames: z
@@ -119,6 +137,8 @@ export type ShiftHandoverInput = z.infer<typeof shiftHandoverSchema>;
 export type StartWorkSessionInput = z.infer<typeof startWorkSessionSchema>;
 export type FinishWorkSessionInput = z.infer<typeof finishWorkSessionSchema>;
 export type CancelWorkSessionInput = z.infer<typeof cancelWorkSessionSchema>;
+export type AdminFinishWorkSessionInput = z.infer<typeof adminFinishWorkSessionSchema>;
+export type ReassignWorkSessionInput = z.infer<typeof reassignWorkSessionSchema>;
 export type FlagImageRevisionInput = z.infer<typeof flagImageRevisionSchema>;
 export type QcApproveImagesInput = z.infer<typeof qcApproveImagesSchema>;
 

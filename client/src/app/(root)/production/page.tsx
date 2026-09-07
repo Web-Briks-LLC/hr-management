@@ -14,6 +14,7 @@ import {
 } from '@/redux/features/production/productionApi';
 import { ProductionWorkstation } from '@/components/production/production-workstation';
 import { ImageStatusGrid } from '@/components/production/image-status-grid';
+import { FloorMonitor } from '@/components/production/floor-monitor';
 import { StaffPerformanceAnalytics } from '@/components/production/staff-performance-analytics';
 import { ProductionStatsView } from '@/components/production/production-stats-view';
 import { useSocket } from '@/contexts/SocketContext';
@@ -35,7 +36,12 @@ function ProductionContent() {
     const searchParams = useSearchParams();
     const pathname = usePathname();
 
-    const { isAdmin, isTelemarketer, isLoading: isAccessLoading } = useProductionAccess();
+    const {
+        isAdmin,
+        canDoQC: canMonitor,
+        isTelemarketer,
+        isLoading: isAccessLoading,
+    } = useProductionAccess();
     const { socket } = useSocket();
 
     // Queries
@@ -76,10 +82,12 @@ function ProductionContent() {
     // Read active tab from URL query params (default to 'workstation')
     const rawTab = searchParams.get('tab') || 'workstation';
 
-    // If non-admin attempts to access admin tabs, fallback to 'workstation'
-    const activeTab = !isAdmin && ['staff_analytics', 'analytics'].includes(rawTab)
-        ? 'workstation'
-        : rawTab;
+    // If a user hits a tab they can't see, fall back to 'workstation'
+    const activeTab =
+        (!isAdmin && ['staff_analytics', 'analytics'].includes(rawTab)) ||
+        (!canMonitor && rawTab === 'live_sessions')
+            ? 'workstation'
+            : rawTab;
 
     const handleTabChange = (newTab: string) => {
         const params = new URLSearchParams(searchParams.toString());
@@ -270,6 +278,16 @@ function ProductionContent() {
                                     Image Tracking
                                 </TabsTrigger>
 
+                                {canMonitor && (
+                                    <TabsTrigger
+                                        value="live_sessions"
+                                        className="text-xs font-bold gap-1.5 rounded-lg data-[state=active]:shadow-xs py-1.5 px-3"
+                                    >
+                                        <Clock className="h-3.5 w-3.5 text-emerald-500" />
+                                        Floor Monitor
+                                    </TabsTrigger>
+                                )}
+
                                 {isAdmin && (
                                     <>
                                         <TabsTrigger
@@ -305,6 +323,13 @@ function ProductionContent() {
                         <TabsContent value="images" className="space-y-6 focus-visible:outline-hidden mt-0">
                             <ImageStatusGrid isAdmin={isAdmin} />
                         </TabsContent>
+
+                        {/* TAB: Live Floor Monitor (Admin / HR / Team Leader) */}
+                        {canMonitor && (
+                            <TabsContent value="live_sessions" className="space-y-6 focus-visible:outline-hidden mt-0">
+                                <FloorMonitor />
+                            </TabsContent>
+                        )}
 
                         {/* TAB 3: Staff Performance Analytics (Admin/HR Only) */}
                         {isAdmin && (

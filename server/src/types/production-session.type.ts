@@ -1,6 +1,17 @@
 import type { Document, Types } from 'mongoose';
 
-export type SessionStatus = 'active' | 'completed' | 'cancelled' | 'paused';
+export type SessionStatus =
+    | 'active'
+    | 'completed'
+    | 'cancelled'
+    | 'paused'
+    | 'reassigned';
+
+export interface IProductionSessionPauseEntry {
+    pausedAt: Date;
+    resumedAt?: Date | null;
+    byUserId?: Types.ObjectId | null;
+}
 
 export interface IProductionWorkSession extends Document {
     _id: Types.ObjectId;
@@ -16,6 +27,14 @@ export interface IProductionWorkSession extends Document {
     status: SessionStatus;
     completedSteps: string[];
     notes?: string | null;
+    pausedAt?: Date | null;
+    totalPausedSeconds: number;
+    pauseHistory: IProductionSessionPauseEntry[];
+    priorAccumulatedSeconds: number;
+    reassignedFromSessionId?: Types.ObjectId | null;
+    reassignedToSessionId?: Types.ObjectId | null;
+    closedBy?: Types.ObjectId | null;
+    closeReason?: string | null;
     createdAt: Date;
     updatedAt: Date;
 }

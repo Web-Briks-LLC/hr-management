@@ -31,6 +31,63 @@ const notifyProductionUpdate = (event: string, payload: any) => {
 };
 
 /**
+ * Effective (billable) work seconds for a session, excluding every hold interval.
+ *
+ *   effective = (end | now - start) - totalPausedSeconds - openHold
+ *
+ * `openHold` is the currently-running hold (only when status === 'paused').
+ * Used everywhere a session's real work time matters: finishing, reassigning,
+ * analytics and the live floor monitor — so "held time never counts".
+ */
+const computeEffectiveSeconds = (
+    session: {
+        startTime: Date;
+        endTime?: Date | null;
+        status: string;
+        pausedAt?: Date | null;
+        totalPausedSeconds?: number | null;
+    },
+    now: Date = new Date()
+): number => {
+    const endBase = session.endTime ? session.endTime.getTime() : now.getTime();
+    const rawSeconds = Math.floor((endBase - session.startTime.getTime()) / 1000);
+    let pausedSeconds = session.totalPausedSeconds || 0;
+    if (session.status === 'paused' && session.pausedAt) {
+        pausedSeconds += Math.floor((now.getTime() - session.pausedAt.getTime()) / 1000);
+    }
+    return Math.max(0, rawSeconds - pausedSeconds);
+};
+
+/**
+ * Release the concurrency locks held by a session's images. Mirrors the
+ * behaviour of the editor cancel path: images that had partial step progress
+ * fall back to `partially_completed`, everything else to `unassigned`.
+ */
+const unlockSessionImages = async (session: {
+    _id: Types.ObjectId;
+    orderId: Types.ObjectId;
+    imageNames: string[];
+}) => {
+    const images = await OrderImageModel.find({
+        orderId: session.orderId,
+        imageName: { $in: session.imageNames },
+        currentSessionId: session._id,
+    });
+
+    for (const img of images) {
+        img.currentAssignedStaffId = null as any;
+        img.currentSessionId = null as any;
+        img.lockedAt = null as any;
+        if (img.completedSteps && img.completedSteps.length > 0) {
+            img.status = 'partially_completed';
+        } else {
+            img.status = 'unassigned';
+        }
+        await img.save();
+    }
+};
+
+/**
  * Create a new shift production log
  */
 const createProductionLog = async (
@@ -1292,6 +1349,39 @@ const startWorkSession = async (
         );
     }
 
+    // Guard: an editor with a held (paused) session must not pull the same
+    // images into a second session — those images stay locked to the held one.
+    const ownHeldLocked = await OrderImageModel.find({
+        orderId: new Types.ObjectId(payload.orderId),
+        imageName: { $in: cleanImageNames },
+        currentAssignedStaffId: staff._id,
+        currentSessionId: { $ne: null },
+    })
+        .select('imageName')
+        .lean();
+
+    if (ownHeldLocked.length > 0) {
+        const names = ownHeldLocked.map((i) => `"${i.imageName}"`).join(', ');
+        throw new Error(
+            `These image(s) are still locked to your held session: ${names}. Resume that session to continue them, or pick different images.`
+        );
+    }
+
+    // Quantity validation: the number of distinct images registered against an
+    // order can never exceed the order's ordered image quantity. Counts images
+    // already registered (any non-cancelled state) plus the new batch.
+    const alreadyRegisteredCount = await OrderImageModel.countDocuments({
+        orderId: new Types.ObjectId(payload.orderId),
+        imageName: { $nin: cleanImageNames },
+    });
+
+    if (alreadyRegisteredCount + cleanImageNames.length > (order.imageQuantity || 0)) {
+        const remaining = Math.max(0, (order.imageQuantity || 0) - alreadyRegisteredCount);
+        throw new Error(
+            `This order is for ${order.imageQuantity} image(s). ${alreadyRegisteredCount} are already registered, so you can add at most ${remaining} more — you tried to add ${cleanImageNames.length}.`
+        );
+    }
+
     // Determine shift ID (from payload, or first active shift in staff's branch)
     let shiftId: Types.ObjectId | undefined = payload.shiftId ? new Types.ObjectId(payload.shiftId) : undefined;
     if (!shiftId && staff.branchId) {
@@ -1395,10 +1485,13 @@ const getActiveWorkSession = async (userId: string) => {
         return null;
     }
 
+    // Primary session for the banner: the live `active` one if there is one,
+    // otherwise the oldest held session so the editor can still see/resume it.
     const session = await ProductionWorkSessionModel.findOne({
         staffId: staff._id,
-        status: 'active',
+        status: { $in: ['active', 'paused'] },
     })
+        .sort({ status: 1, startTime: 1 }) // 'active' sorts before 'paused'
         .populate({
             path: 'orderId',
             select: 'orderName deadline requiredSteps instruction notes priority',
@@ -1413,6 +1506,140 @@ const getActiveWorkSession = async (userId: string) => {
 };
 
 /**
+ * Every held (paused) session for the current editor — powers the "On hold"
+ * list in the workstation so multiple parked sessions stay visible/resumable.
+ */
+const getHeldWorkSessions = async (userId: string) => {
+    const staff = await StaffModel.findOne({ userId }).lean();
+    if (!staff) {
+        return [];
+    }
+
+    const sessions = await ProductionWorkSessionModel.find({
+        staffId: staff._id,
+        status: 'paused',
+    })
+        .sort({ pausedAt: 1 })
+        .populate({
+            path: 'orderId',
+            select: 'orderName deadline requiredSteps instruction notes priority',
+            populate: { path: 'services', select: 'name description' },
+        })
+        .lean();
+
+    return sessions.map((s) => ({
+        ...s,
+        effectiveSeconds: computeEffectiveSeconds(s as any),
+        cumulativeSeconds:
+            computeEffectiveSeconds(s as any) + (s.priorAccumulatedSeconds || 0),
+    }));
+};
+
+/**
+ * Put an active session on hold. While held its timer is frozen (the elapsed
+ * hold time is later subtracted) and the editor is free to start / resume a
+ * different session. Images stay locked to the held session.
+ */
+const pauseWorkSession = async (sessionId: string, userId: string) => {
+    const staff = await StaffModel.findOne({ userId }).lean();
+    if (!staff) {
+        throw new Error('Staff profile not found');
+    }
+
+    const session = await ProductionWorkSessionModel.findById(sessionId);
+    if (!session) {
+        throw new Error('Work session not found');
+    }
+    if (session.staffId.toString() !== staff._id.toString()) {
+        throw new Error('You can only hold your own work session');
+    }
+    if (session.status !== 'active') {
+        throw new Error('Only an active session can be put on hold');
+    }
+
+    const now = new Date();
+    session.status = 'paused';
+    session.pausedAt = now;
+    session.pauseHistory.push({
+        pausedAt: now,
+        resumedAt: null,
+        byUserId: new Types.ObjectId(userId),
+    });
+    await session.save();
+
+    notifyProductionUpdate('production:session_paused', {
+        sessionId: session._id,
+        orderId: session.orderId,
+        staffId: staff._id,
+    });
+
+    return session.toObject();
+};
+
+/**
+ * Resume a held session. Blocked if the editor already has another active
+ * session — they must hold or finish that one first (one live timer per editor).
+ */
+const resumeWorkSession = async (sessionId: string, userId: string) => {
+    const staff = await StaffModel.findOne({ userId }).lean();
+    if (!staff) {
+        throw new Error('Staff profile not found');
+    }
+
+    const session = await ProductionWorkSessionModel.findById(sessionId);
+    if (!session) {
+        throw new Error('Work session not found');
+    }
+    if (session.staffId.toString() !== staff._id.toString()) {
+        throw new Error('You can only resume your own work session');
+    }
+    if (session.status !== 'paused') {
+        throw new Error('This session is not on hold');
+    }
+
+    const otherActive = await ProductionWorkSessionModel.findOne({
+        staffId: staff._id,
+        status: 'active',
+        _id: { $ne: session._id },
+    })
+        .populate('orderId', 'orderName')
+        .lean();
+
+    if (otherActive) {
+        throw new Error(
+            `You have an active session on "${
+                (otherActive.orderId as any)?.orderName || 'another order'
+            }". Hold or finish it before resuming this one.`
+        );
+    }
+
+    const now = new Date();
+    if (session.pausedAt) {
+        const heldSeconds = Math.floor(
+            (now.getTime() - session.pausedAt.getTime()) / 1000
+        );
+        session.totalPausedSeconds = (session.totalPausedSeconds || 0) + Math.max(0, heldSeconds);
+        const openEntry = [...session.pauseHistory]
+            .reverse()
+            .find((p) => !p.resumedAt);
+        if (openEntry) {
+            openEntry.resumedAt = now;
+        }
+    }
+    session.status = 'active';
+    session.pausedAt = null;
+    await session.save();
+
+    notifyProductionUpdate('production:session_resumed', {
+        sessionId: session._id,
+        orderId: session.orderId,
+        staffId: staff._id,
+    });
+
+    return session.toObject();
+};
+
+/**
  * Finish a work session, record completed steps per image, release locks, and update shift production
  */
 const finishWorkSession = async (
@@ -1423,7 +1650,6 @@ const finishWorkSession = async (
     },
     userId: string
 ) => {
-
     const staff = await StaffModel.findOne({ userId }).lean();
     if (!staff) {
         throw new Error('Staff profile not found');
@@ -1438,15 +1664,53 @@ const finishWorkSession = async (
         throw new Error('You are not authorized to finish this work session');
     }
 
-    if (session.status !== 'active') {
+    if (session.status !== 'active' && session.status !== 'paused') {
         throw new Error('This work session is already closed or cancelled');
     }
 
+    return finalizeSessionCompletion(session, {
+        completedSteps: payload.completedSteps,
+        notes: payload.notes,
+    });
+};
+
+/**
+ * Shared close-out for a work session (owner finish + supervisor force-finish).
+ * Records effective work time (holds excluded), stamps completed steps on every
+ * image in the batch, releases locks, syncs the daily shift log and rolls the
+ * order up to Quality Check when every image is done.
+ */
+const finalizeSessionCompletion = async (
+    session: any,
+    opts: {
+        completedSteps: string[];
+        notes?: string | undefined;
+        closedByUserId?: string | null | undefined;
+    }
+) => {
+    const staff = await StaffModel.findById(session.staffId).lean();
+    if (!staff) {
+        throw new Error('Editor profile for this session was not found');
+    }
+
     const now = new Date();
-    const durationSeconds = Math.max(
-        1,
-        Math.floor((now.getTime() - session.startTime.getTime()) / 1000)
-    );
+
+    // Close any open hold so its elapsed time is excluded from the total.
+    if (session.status === 'paused' && session.pausedAt) {
+        const heldSeconds = Math.floor(
+            (now.getTime() - session.pausedAt.getTime()) / 1000
+        );
+        session.totalPausedSeconds =
+            (session.totalPausedSeconds || 0) + Math.max(0, heldSeconds);
+        const openEntry = [...session.pauseHistory]
+            .reverse()
+            .find((p: any) => !p.resumedAt);
+        if (openEntry) openEntry.resumedAt = now;
+        session.pausedAt = null;
+        session.status = 'active';
+    }
+
+    const durationSeconds = Math.max(1, computeEffectiveSeconds(session, now));
 
     const order = await OrderModel.findById(session.orderId).lean();
     const orderRequiredSteps =
@@ -1463,7 +1727,7 @@ const finishWorkSession = async (
     // Dedupe defensively against the same step name being submitted twice in
     // one request (e.g. a double-click), which used to create duplicate
     // completedSteps entries and skew per-step duration stats.
-    const uniqueCompletedSteps = Array.from(new Set(payload.completedSteps));
+    const uniqueCompletedSteps = Array.from(new Set(opts.completedSteps));
 
     for (const image of images) {
         // A step already recorded for this image (from a previous session)
@@ -1528,7 +1792,11 @@ const finishWorkSession = async (
     session.endTime = now;
     session.durationSeconds = durationSeconds;
     session.completedSteps = uniqueCompletedSteps;
-    if (payload.notes) session.notes = payload.notes;
+    if (opts.notes) session.notes = opts.notes;
+    if (opts.closedByUserId) {
+        session.closedBy = new Types.ObjectId(opts.closedByUserId);
+        session.closeReason = opts.notes || 'Force-finished by supervisor';
+    }
     await session.save();
 
     // Auto-sync into daily shift production record for seamless supervisor reporting
@@ -1633,53 +1901,49 @@ const finishWorkSession = async (
 };
 
 /**
- * Cancel an active work session and release locks
+ * Cancel an active/held work session and release locks.
+ * `actingUserId` differs from the session owner only on the supervisor
+ * (force-cancel) path, in which case it is stamped on `closedBy`.
  */
 const cancelWorkSession = async (
     sessionId: string,
     userId: string,
-    reason?: string
+    reason?: string,
+    options?: { isSupervisor?: boolean }
 ) => {
-    const staff = await StaffModel.findOne({ userId }).lean();
-    if (!staff) {
-        throw new Error('Staff profile not found');
-    }
-
     const session = await ProductionWorkSessionModel.findById(sessionId);
     if (!session) {
         throw new Error('Work session not found');
     }
 
-    if (session.staffId.toString() !== staff._id.toString()) {
-        throw new Error('You are not authorized to cancel this session');
-    }
+    const isSupervisor = options?.isSupervisor === true;
 
-    if (session.status !== 'active') {
-        throw new Error('Session is not currently active');
-    }
-
-    // Unlock images in OrderImage
-    const images = await OrderImageModel.find({
-        orderId: session.orderId,
-        imageName: { $in: session.imageNames },
-        currentSessionId: session._id,
-    });
-
-    for (const img of images) {
-        img.currentAssignedStaffId = null as any;
-        img.currentSessionId = null as any;
-        img.lockedAt = null as any;
-        if (img.completedSteps && img.completedSteps.length > 0) {
-            img.status = 'partially_completed';
-        } else {
-            img.status = 'unassigned';
+    if (!isSupervisor) {
+        const staff = await StaffModel.findOne({ userId }).lean();
+        if (!staff) {
+            throw new Error('Staff profile not found');
         }
-        await img.save();
+        if (session.staffId.toString() !== staff._id.toString()) {
+            throw new Error('You are not authorized to cancel this session');
+        }
     }
 
+    if (session.status !== 'active' && session.status !== 'paused') {
+        throw new Error('Session is not currently active or on hold');
+    }
+
+    await unlockSessionImages(session as any);
+
+    const now = new Date();
+    session.durationSeconds = computeEffectiveSeconds(session as any, now);
     session.status = 'cancelled';
-    session.endTime = new Date();
+    session.endTime = now;
+    session.pausedAt = null;
     if (reason) session.notes = reason;
+    if (isSupervisor) {
+        session.closedBy = new Types.ObjectId(userId);
+        session.closeReason = reason || 'Force-cancelled by supervisor';
+    }
     await session.save();
 
     notifyProductionUpdate('production:session_cancelled', {
@@ -1692,6 +1956,296 @@ const cancelWorkSession = async (
     });
 
     return { success: true, message: 'Work session cancelled and images unlocked' };
+};
+
+/**
+ * Supervisor (Admin / HR / Team Leader) force-finish of another editor's
+ * session. Delegates to the shared completion path with `closedBy` stamped.
+ */
+const adminFinishWorkSession = async (
+    payload: { sessionId: string; completedSteps: string[]; notes?: string | undefined },
+    actingUserId: string
+) => {
+    const session = await ProductionWorkSessionModel.findById(payload.sessionId);
+    if (!session) {
+        throw new Error('Work session not found');
+    }
+    if (session.status !== 'active' && session.status !== 'paused') {
+        throw new Error('This work session is already closed');
+    }
+
+    return finalizeSessionCompletion(session, {
+        completedSteps: payload.completedSteps,
+        notes: payload.notes,
+        closedByUserId: actingUserId,
+    });
+};
+
+/**
+ * Reassign a live/held session to a different editor.
+ *
+ * The outgoing session is closed with status `reassigned` — its effective
+ * work time is frozen into `durationSeconds` and STILL counts in analytics.
+ * A brand-new session is created for the incoming editor with a fresh
+ * `startTime` (new countdown) but carrying `priorAccumulatedSeconds` so the
+ * cumulative time across everyone who touched this batch stays visible.
+ * Image locks (and all completed-step progress) transfer as-is.
+ */
+const reassignWorkSession = async (
+    payload: { sessionId: string; newStaffId: string; note?: string | undefined },
+    actingUserId: string
+) => {
+    const oldSession = await ProductionWorkSessionModel.findById(payload.sessionId);
+    if (!oldSession) {
+        throw new Error('Work session not found');
+    }
+    if (oldSession.status !== 'active' && oldSession.status !== 'paused') {
+        throw new Error('Only an active or held session can be reassigned');
+    }
+
+    const newStaff = await StaffModel.findById(payload.newStaffId)
+        .populate('userId', 'name email')
+        .lean();
+    if (!newStaff) {
+        throw new Error('Target editor not found');
+    }
+    if (newStaff._id.toString() === oldSession.staffId.toString()) {
+        throw new Error('Session is already assigned to this editor');
+    }
+
+    const newStaffActive = await ProductionWorkSessionModel.findOne({
+        staffId: newStaff._id,
+        status: 'active',
+    })
+        .populate('orderId', 'orderName')
+        .lean();
+    if (newStaffActive) {
+        throw new Error(
+            `${
+                (newStaff.userId as any)?.name || 'That editor'
+            } already has an active session on "${
+                (newStaffActive.orderId as any)?.orderName || 'another order'
+            }". They must hold or finish it first.`
+        );
+    }
+
+    const now = new Date();
+
+    // Freeze the outgoing session's effective time.
+    if (oldSession.status === 'paused' && oldSession.pausedAt) {
+        const heldSeconds = Math.floor(
+            (now.getTime() - oldSession.pausedAt.getTime()) / 1000
+        );
+        oldSession.totalPausedSeconds =
+            (oldSession.totalPausedSeconds || 0) + Math.max(0, heldSeconds);
+        const openEntry = [...oldSession.pauseHistory]
+            .reverse()
+            .find((p: any) => !p.resumedAt);
+        if (openEntry) openEntry.resumedAt = now;
+        oldSession.pausedAt = null;
+    }
+    const frozenSeconds = computeEffectiveSeconds(
+        { ...oldSession.toObject(), status: 'active', endTime: now } as any,
+        now
+    );
+    oldSession.status = 'reassigned';
+    oldSession.endTime = now;
+    oldSession.durationSeconds = frozenSeconds;
+    oldSession.closedBy = new Types.ObjectId(actingUserId);
+    oldSession.closeReason =
+        payload.note || `Reassigned to ${(newStaff.userId as any)?.name || 'another editor'}`;
+
+    let shiftId: Types.ObjectId | null = oldSession.shiftId || null;
+    if (newStaff.branchId) {
+        const branchShift = await ShiftModel.findOne({
+            branchId: newStaff.branchId as Types.ObjectId,
+        }).lean();
+        if (branchShift) shiftId = branchShift._id as Types.ObjectId;
+    }
+
+    const newSession = (await (ProductionWorkSessionModel as any).create({
+        staffId: newStaff._id,
+        orderId: oldSession.orderId,
+        shiftId,
+        branchId: (newStaff.branchId as Types.ObjectId) || oldSession.branchId || null,
+        imageNames: oldSession.imageNames,
+        imageCount: oldSession.imageCount,
+        startTime: now,
+        status: 'active',
+        completedSteps: [],
+        priorAccumulatedSeconds:
+            (oldSession.priorAccumulatedSeconds || 0) + frozenSeconds,
+        reassignedFromSessionId: oldSession._id,
+    })) as any;
+
+    oldSession.reassignedToSessionId = newSession._id;
+    await oldSession.save();
+
+    // Transfer the image locks to the incoming editor / session.
+    await OrderImageModel.updateMany(
+        {
+            orderId: oldSession.orderId,
+            imageName: { $in: oldSession.imageNames },
+            currentSessionId: oldSession._id,
+        },
+        {
+            $set: {
+                status: 'in_progress',
+                currentAssignedStaffId: newStaff._id,
+                currentSessionId: newSession._id,
+                lockedAt: now,
+            },
+        }
+    );
+
+    notifyProductionUpdate('production:session_reassigned', {
+        fromSessionId: oldSession._id,
+        toSessionId: newSession._id,
+        orderId: oldSession.orderId,
+        fromStaffId: oldSession.staffId,
+        toStaffId: newStaff._id,
+    });
+    notifyProductionUpdate('production:images_locked', {
+        orderId: oldSession.orderId,
+        imageNames: oldSession.imageNames,
+        lockedBy: { _id: newStaff._id, name: (newStaff.userId as any)?.name || 'Editor' },
+    });
+    notifyProductionUpdate('production:images_updated', { orderId: oldSession.orderId });
+
+    const populated = await ProductionWorkSessionModel.findById(newSession._id)
+        .populate({
+            path: 'staffId',
+            select: 'staffId designation userId',
+            populate: { path: 'userId', select: 'name email' },
+        })
+        .populate('orderId', 'orderName deadline requiredSteps priority imageQuantity')
+        .lean();
+
+    return {
+        success: true,
+        message: `Reassigned to ${(newStaff.userId as any)?.name || 'the selected editor'}. A fresh countdown has started; the previous editor's ${Math.round(
+            frozenSeconds / 60
+        )} min still counts.`,
+        session: populated,
+        previousDurationSeconds: frozenSeconds,
+    };
+};
+
+/**
+ * Live floor monitor feed for Admin / HR / Team Leader: every active + held
+ * session with computed live timers, plus a per-editor rollup.
+ */
+const getLiveWorkSessions = async () => {
+    const sessions = await ProductionWorkSessionModel.find({
+        status: { $in: ['active', 'paused'] },
+    })
+        .sort({ status: 1, startTime: 1 })
+        .populate({
+            path: 'staffId',
+            select: 'staffId designation branchId userId',
+            populate: { path: 'userId', select: 'name email' },
+        })
+        .populate('orderId', 'orderName deadline priority imageQuantity requiredSteps status')
+        .populate('shiftId', 'name code')
+        .lean();
+
+    const now = new Date();
+
+    const mapped = sessions.map((s: any) => {
+        const effectiveSeconds = computeEffectiveSeconds(s, now);
+        return {
+            _id: s._id,
+            status: s.status,
+            isOnHold: s.status === 'paused',
+            staff: {
+                _id: s.staffId?._id,
+                staffId: s.staffId?.staffId,
+                name: s.staffId?.userId?.name || s.staffId?.staffId || 'Editor',
+                designation: s.staffId?.designation,
+            },
+            order: {
+                _id: s.orderId?._id,
+                orderName: s.orderId?.orderName,
+                deadline: s.orderId?.deadline,
+                priority: s.orderId?.priority,
+                imageQuantity: s.orderId?.imageQuantity,
+                requiredSteps: s.orderId?.requiredSteps || [],
+                status: s.orderId?.status,
+            },
+            shiftName: s.shiftId?.name || null,
+            imageNames: s.imageNames,
+            imageCount: s.imageCount,
+            startTime: s.startTime,
+            pausedAt: s.pausedAt || null,
+            totalPausedSeconds: s.totalPausedSeconds || 0,
+            priorAccumulatedSeconds: s.priorAccumulatedSeconds || 0,
+            effectiveSeconds,
+            cumulativeSeconds: effectiveSeconds + (s.priorAccumulatedSeconds || 0),
+            isReassignment: !!s.reassignedFromSessionId,
+        };
+    });
+
+    const byStaffMap = new Map<string, any>();
+    for (const s of mapped) {
+        const key = String(s.staff._id);
+        if (!byStaffMap.has(key)) {
+            byStaffMap.set(key, {
+                staffId: s.staff._id,
+                name: s.staff.name,
+                designation: s.staff.designation,
+                activeCount: 0,
+                heldCount: 0,
+                totalImages: 0,
+                orders: [] as string[],
+            });
+        }
+        const row = byStaffMap.get(key);
+        if (s.isOnHold) row.heldCount += 1;
+        else row.activeCount += 1;
+        row.totalImages += s.imageCount;
+        if (s.order.orderName && !row.orders.includes(s.order.orderName)) {
+            row.orders.push(s.order.orderName);
+        }
+    }
+
+    return {
+        sessions: mapped,
+        byStaff: Array.from(byStaffMap.values()).sort(
+            (a, b) => b.totalImages - a.totalImages
+        ),
+        summary: {
+            editorsWorking: byStaffMap.size,
+            activeSessions: mapped.filter((s) => !s.isOnHold).length,
+            heldSessions: mapped.filter((s) => s.isOnHold).length,
+            imagesInProgress: mapped
+                .filter((s) => !s.isOnHold)
+                .reduce((acc, s) => acc + s.imageCount, 0),
+        },
+    };
+};
+
+/**
+ * Lightweight editor directory for the reassignment picker — production-eligible
+ * (non-telemarketer, active) staff only.
+ */
+const getProductionEditors = async () => {
+    const staff = await StaffModel.find({ status: 'active' })
+        .select('staffId designation userId')
+        .populate('userId', 'name email')
+        .lean();
+
+    return staff
+        .filter(
+            (s: any) =>
+                (s.designation || '').toLowerCase() !== 'telemarketer' && s.userId
+        )
+        .map((s: any) => ({
+            _id: s._id,
+            staffId: s.staffId,
+            name: s.userId?.name || s.staffId,
+            designation: s.designation,
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name));
 };
 
 /**
@@ -1855,8 +2409,10 @@ const getStaffPerformanceAnalytics = async (filters: {
     filterType?: string | undefined;
 }) => {
 
+    // `reassigned` sessions are included so a handed-off editor's logged time
+    // still counts towards their output for the period.
     const query: any = {
-        status: 'completed',
+        status: { $in: ['completed', 'reassigned'] },
     };
 
     if (filters.staffId && filters.staffId !== 'all') {
@@ -2188,7 +2744,12 @@ const getStaffEditedImages = async (
                 'revisionHistory.0': { $exists: true },
             }),
             ProductionWorkSessionModel.aggregate([
-                { $match: { staffId: staffObjId, status: 'completed' } },
+                {
+                    $match: {
+                        staffId: staffObjId,
+                        status: { $in: ['completed', 'reassigned'] },
+                    },
+                },
                 {
                     $group: {
                         _id: null,
@@ -2243,8 +2804,15 @@ const productionService = {
     getOrderImageStatus,
     startWorkSession,
     getActiveWorkSession,
+    getHeldWorkSessions,
+    pauseWorkSession,
+    resumeWorkSession,
     finishWorkSession,
     cancelWorkSession,
+    adminFinishWorkSession,
+    reassignWorkSession,
+    getLiveWorkSessions,
+    getProductionEditors,
     flagImageRevision,
     qcApproveImages,
     getStaffPerformanceAnalytics,

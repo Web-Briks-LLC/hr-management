@@ -52,6 +52,9 @@ export const apiSlice = createApi({
         "ProductionOrders",
         "ProductionImages",
         "ActiveWorkSession",
+        "HeldWorkSessions",
+        "LiveWorkSessions",
+        "ProductionEditors",
         "StaffPerformance",
     ],
 

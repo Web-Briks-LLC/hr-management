@@ -12,8 +12,16 @@ import {
     getOrderImageStatus,
     startWorkSession,
     getActiveWorkSession,
+    getHeldWorkSessions,
+    pauseWorkSession,
+    resumeWorkSession,
     finishWorkSession,
     cancelWorkSession,
+    adminCancelWorkSession,
+    adminFinishWorkSession,
+    reassignWorkSession,
+    getLiveWorkSessions,
+    getProductionEditors,
     flagImageRevision,
     qcApproveImages,
     getStaffPerformanceAnalytics,
@@ -37,8 +45,19 @@ router.get('/orders/:orderId/images', getOrderImageStatus);
 router.get('/staff-images', getStaffEditedImages);
 router.post('/session/start', startWorkSession);
 router.get('/session/active', getActiveWorkSession);
+router.get('/session/held', getHeldWorkSessions);
+router.post('/session/pause', pauseWorkSession);
+router.post('/session/resume', resumeWorkSession);
 router.post('/session/finish', finishWorkSession);
 router.post('/session/cancel', cancelWorkSession);
+
+// Supervisor floor-monitor endpoints (Admin / HR / Team Leader)
+router.get('/sessions/live', authorize(...qcRoles), getLiveWorkSessions);
+router.get('/editors', authorize(...qcRoles), getProductionEditors);
+router.post('/session/admin-cancel', authorize(...qcRoles), adminCancelWorkSession);
+router.post('/session/admin-finish', authorize(...qcRoles), adminFinishWorkSession);
+router.post('/session/reassign', authorize(...qcRoles), reassignWorkSession);
+
 router.post('/images/revision', authorize(...qcRoles), flagImageRevision);
 router.post('/images/qc-approve', authorize(...qcRoles), qcApproveImages);
 router.get('/analytics/staff', getStaffPerformanceAnalytics);

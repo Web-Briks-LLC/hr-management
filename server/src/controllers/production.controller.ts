@@ -9,6 +9,9 @@ import {
     startWorkSessionSchema,
     finishWorkSessionSchema,
     cancelWorkSessionSchema,
+    sessionIdOnlySchema,
+    adminFinishWorkSessionSchema,
+    reassignWorkSessionSchema,
     flagImageRevisionSchema,
     qcApproveImagesSchema,
 } from '../validators/production.validator.js';
@@ -401,6 +404,151 @@ export const cancelWorkSession = async (req: Request, res: Response) => {
         return res.status(error.name === 'ZodError' ? 400 : 400).json({
             success: false,
             message: error.message || 'Failed to cancel work session',
+            errors: error.errors || undefined,
+        });
+    }
+};
+
+export const getHeldWorkSessions = async (req: Request, res: Response) => {
+    try {
+        const result = await productionService.getHeldWorkSessions(req.user!.id);
+        return res.status(200).json({ success: true, data: result });
+    } catch (error: any) {
+        console.error('getHeldWorkSessions error:', error);
+        return res.status(500).json({
+            success: false,
+            message: error.message || 'Failed to retrieve held sessions',
+        });
+    }
+};
+
+export const pauseWorkSession = async (req: Request, res: Response) => {
+    try {
+        const { sessionId } = sessionIdOnlySchema.parse(req.body);
+        const result = await productionService.pauseWorkSession(sessionId, req.user!.id);
+        return res.status(200).json({
+            success: true,
+            message: 'Work session put on hold. Your timer is frozen.',
+            data: result,
+        });
+    } catch (error: any) {
+        console.error('pauseWorkSession error:', error);
+        return res.status(error.name === 'ZodError' ? 400 : 400).json({
+            success: false,
+            message: error.message || 'Failed to hold work session',
+            errors: error.errors || undefined,
+        });
+    }
+};
+
+export const resumeWorkSession = async (req: Request, res: Response) => {
+    try {
+        const { sessionId } = sessionIdOnlySchema.parse(req.body);
+        const result = await productionService.resumeWorkSession(sessionId, req.user!.id);
+        return res.status(200).json({
+            success: true,
+            message: 'Work session resumed. Timer is running again.',
+            data: result,
+        });
+    } catch (error: any) {
+        console.error('resumeWorkSession error:', error);
+        return res.status(error.name === 'ZodError' ? 400 : 400).json({
+            success: false,
+            message: error.message || 'Failed to resume work session',
+            errors: error.errors || undefined,
+        });
+    }
+};
+
+export const getLiveWorkSessions = async (_req: Request, res: Response) => {
+    try {
+        const result = await productionService.getLiveWorkSessions();
+        return res.status(200).json({ success: true, data: result });
+    } catch (error: any) {
+        console.error('getLiveWorkSessions error:', error);
+        return res.status(500).json({
+            success: false,
+            message: error.message || 'Failed to retrieve live work sessions',
+        });
+    }
+};
+
+export const getProductionEditors = async (_req: Request, res: Response) => {
+    try {
+        const result = await productionService.getProductionEditors();
+        return res.status(200).json({ success: true, data: result });
+    } catch (error: any) {
+        console.error('getProductionEditors error:', error);
+        return res.status(500).json({
+            success: false,
+            message: error.message || 'Failed to retrieve editors',
+        });
+    }
+};
+
+export const adminCancelWorkSession = async (req: Request, res: Response) => {
+    try {
+        const validatedData = cancelWorkSessionSchema.parse(req.body);
+        const result = await productionService.cancelWorkSession(
+            validatedData.sessionId,
+            req.user!.id,
+            validatedData.reason,
+            { isSupervisor: true }
+        );
+        return res.status(200).json({
+            success: true,
+            message: result.message,
+            data: result,
+        });
+    } catch (error: any) {
+        console.error('adminCancelWorkSession error:', error);
+        return res.status(error.name === 'ZodError' ? 400 : 400).json({
+            success: false,
+            message: error.message || 'Failed to cancel work session',
+            errors: error.errors || undefined,
+        });
+    }
+};
+
+export const adminFinishWorkSession = async (req: Request, res: Response) => {
+    try {
+        const validatedData = adminFinishWorkSessionSchema.parse(req.body);
+        const result = await productionService.adminFinishWorkSession(
+            validatedData,
+            req.user!.id
+        );
+        return res.status(200).json({
+            success: true,
+            message: `Session force-finished. ${result.imagesCompleted} image(s) updated.`,
+            data: result,
+        });
+    } catch (error: any) {
+        console.error('adminFinishWorkSession error:', error);
+        return res.status(error.name === 'ZodError' ? 400 : 400).json({
+            success: false,
+            message: error.message || 'Failed to finish work session',
+            errors: error.errors || undefined,
+        });
+    }
+};
+
+export const reassignWorkSession = async (req: Request, res: Response) => {
+    try {
+        const validatedData = reassignWorkSessionSchema.parse(req.body);
+        const result = await productionService.reassignWorkSession(
+            validatedData,
+            req.user!.id
+        );
+        return res.status(200).json({
+            success: true,
+            message: result.message,
+            data: result,
+        });
+    } catch (error: any) {
+        console.error('reassignWorkSession error:', error);
+        return res.status(error.name === 'ZodError' ? 400 : 400).json({
+            success: false,
+            message: error.message || 'Failed to reassign work session',
             errors: error.errors || undefined,
         });
     }

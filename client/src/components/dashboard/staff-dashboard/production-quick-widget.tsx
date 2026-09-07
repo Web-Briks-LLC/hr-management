@@ -38,22 +38,25 @@ export function ProductionQuickWidget({ staff }: ProductionQuickWidgetProps) {
             typeof activeSession.orderId === 'object' && activeSession.orderId !== null
                 ? (activeSession.orderId as { orderName?: string }).orderName || 'Active Order'
                 : 'Active Order';
+        const onHold = activeSession.status === 'paused';
 
         return (
-            <Card className="border-2 border-emerald-500/40 bg-linear-to-r from-emerald-500/10 via-emerald-500/5 to-card shadow-lg shadow-emerald-500/5">
+            <Card className={`border-2 bg-linear-to-r to-card shadow-lg ${onHold ? 'border-amber-500/40 from-amber-500/10 via-amber-500/5 shadow-amber-500/5' : 'border-emerald-500/40 from-emerald-500/10 via-emerald-500/5 shadow-emerald-500/5'}`}>
                 <CardContent className="p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
                     <div className="flex items-center gap-4">
-                        <div className="p-3 rounded-2xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400">
-                            <Clock className="h-6 w-6 animate-spin duration-3000" />
+                        <div className={`p-3 rounded-2xl ${onHold ? 'bg-amber-500/20 text-amber-600 dark:text-amber-400' : 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'}`}>
+                            <Clock className={`h-6 w-6 ${onHold ? '' : 'animate-spin duration-3000'}`} />
                         </div>
                         <div>
                             <div className="flex items-center gap-2">
-                                <span className="relative flex h-2.5 w-2.5">
-                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-                                </span>
-                                <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
-                                    Active Editing Session
+                                {!onHold && (
+                                    <span className="relative flex h-2.5 w-2.5">
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                                    </span>
+                                )}
+                                <span className={`text-xs font-bold uppercase tracking-wider ${onHold ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                                    {onHold ? 'Session On Hold' : 'Active Editing Session'}
                                 </span>
                             </div>
                             <h4 className="text-base font-bold text-foreground mt-0.5">

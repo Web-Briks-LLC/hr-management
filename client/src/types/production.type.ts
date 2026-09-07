@@ -454,11 +454,94 @@ export interface IProductionWorkSession {
     startTime: string;
     endTime?: string | null;
     durationSeconds: number;
-    status: 'active' | 'completed' | 'cancelled' | 'paused';
+    status: 'active' | 'completed' | 'cancelled' | 'paused' | 'reassigned';
     completedSteps: string[];
     notes?: string | null;
+    pausedAt?: string | null;
+    totalPausedSeconds?: number;
+    priorAccumulatedSeconds?: number;
+    reassignedFromSessionId?: string | null;
+    reassignedToSessionId?: string | null;
+    effectiveSeconds?: number;
+    cumulativeSeconds?: number;
     createdAt: string;
     updatedAt: string;
+}
+
+export interface ILiveWorkSession {
+    _id: string;
+    status: 'active' | 'paused';
+    isOnHold: boolean;
+    staff: {
+        _id: string;
+        staffId?: string;
+        name: string;
+        designation?: string;
+    };
+    order: {
+        _id: string;
+        orderName: string;
+        deadline?: string;
+        priority?: string;
+        imageQuantity?: number;
+        requiredSteps?: { name: string; code?: string }[];
+        status?: string;
+    };
+    shiftName?: string | null;
+    imageNames: string[];
+    imageCount: number;
+    startTime: string;
+    pausedAt?: string | null;
+    totalPausedSeconds: number;
+    priorAccumulatedSeconds: number;
+    effectiveSeconds: number;
+    cumulativeSeconds: number;
+    isReassignment: boolean;
+}
+
+export interface ILiveWorkSessionsResponse {
+    success: boolean;
+    data: {
+        sessions: ILiveWorkSession[];
+        byStaff: {
+            staffId: string;
+            name: string;
+            designation?: string;
+            activeCount: number;
+            heldCount: number;
+            totalImages: number;
+            orders: string[];
+        }[];
+        summary: {
+            editorsWorking: number;
+            activeSessions: number;
+            heldSessions: number;
+            imagesInProgress: number;
+        };
+    };
+}
+
+export interface IProductionEditor {
+    _id: string;
+    staffId: string;
+    name: string;
+    designation?: string;
+}
+
+export interface IPauseResumeSessionInput {
+    sessionId: string;
+}
+
+export interface IAdminFinishWorkSessionInput {
+    sessionId: string;
+    completedSteps: string[];
+    notes?: string;
+}
+
+export interface IReassignWorkSessionInput {
+    sessionId: string;
+    newStaffId: string;
+    note?: string;
 }
 
 export interface IStaffPerformanceAnalytics {
