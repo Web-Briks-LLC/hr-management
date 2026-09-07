@@ -53,6 +53,7 @@ import {
     useResumeWorkSessionMutation,
     useGetOrderImagesQuery,
 } from '@/redux/features/production/productionApi';
+import { resolveOrderSteps } from '@/types/production.type';
 import { useSocket } from '@/contexts/SocketContext';
 import {
     Play,
@@ -387,13 +388,18 @@ export function ProductionWorkstation() {
         }
     };
 
+    // The completed-steps checklist options for the active order — the order's
+    // own requiredSteps, or the shared default when it has none. Same helper
+    // the Floor Monitor uses, so both dialogs always agree for a given order.
+    const finishStepOptions = useMemo(
+        () => resolveOrderSteps((activeOrder as any)?.requiredSteps),
+        [activeOrder]
+    );
+
     // Open Finish Dialog
     const handleOpenFinishDialog = () => {
-        // Pre-select all required steps by default for convenience
-        const reqStepNames = (activeOrder as any)?.requiredSteps?.map((s: any) => s.name) || [
-            'Editing & Retouching',
-        ];
-        setSelectedCompletedSteps(reqStepNames);
+        // Pre-select all steps by default for convenience
+        setSelectedCompletedSteps(finishStepOptions.map((s) => s.name));
         setFinishNotes('');
         setIsFinishDialogOpen(true);
     };
@@ -1058,11 +1064,7 @@ export function ProductionWorkstation() {
                                 Completed Sub-Services / Steps:
                             </Label>
                             <div className="space-y-2 rounded-xl border p-3 bg-muted/10">
-                                {((activeOrder as any)?.requiredSteps || [
-                                    { name: 'Clipping Path', code: 'clipping_path' },
-                                    { name: 'Skin Retouching', code: 'skin_retouch' },
-                                    { name: 'Background Removal', code: 'bg_removal' },
-                                ]).map((step: any, idx: number) => {
+                                {finishStepOptions.map((step, idx: number) => {
                                     const isChecked = selectedCompletedSteps.includes(step.name);
                                     return (
                                         <div

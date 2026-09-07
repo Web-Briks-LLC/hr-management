@@ -16,6 +16,22 @@ export type ProductionStage =
     | 'vector_conversion'
     | 'other';
 
+/**
+ * Canonical fallback when an order has no `requiredSteps` recorded. Must match
+ * the server default in production.service.ts (startWorkSession /
+ * finalizeSessionCompletion) so every "completed steps" checklist — the
+ * workstation Finish dialog and the Floor Monitor force-finish dialog — offers
+ * exactly the same options for the same order.
+ */
+export const DEFAULT_PRODUCTION_STEP = 'Editing & Retouching';
+
+export const resolveOrderSteps = (
+    requiredSteps?: { name: string; code?: string }[] | null
+): { name: string; code?: string }[] =>
+    requiredSteps && requiredSteps.length > 0
+        ? requiredSteps
+        : [{ name: DEFAULT_PRODUCTION_STEP }];
+
 export const STAGE_LABELS: Record<ProductionStage, string> = {
     clipping_path: 'Clipping Path',
     masking: 'Masking',
