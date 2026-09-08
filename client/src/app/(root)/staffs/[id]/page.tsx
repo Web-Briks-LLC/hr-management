@@ -592,9 +592,18 @@ export default function StaffDetailsPage() {
                                                     Weekly Work Days ({currentShift.workDays?.length || 0} days active)
                                                 </span>
                                                 <div className="grid grid-cols-7 gap-1.5">
-                                                    {DAYS_OF_WEEK.map((day) => {
+                                                    {DAYS_OF_WEEK.map((day, idx) => {
+                                                        // workDays is a numeric array (0=Sun … 6=Sat).
+                                                        // Tolerate legacy string values just in case.
                                                         const isWorkDay = currentShift.workDays?.some(
-                                                            (d: string) => d.toLowerCase().startsWith(day.toLowerCase())
+                                                            (d: number | string) => {
+                                                                if (typeof d === "number") return d === idx;
+                                                                const s = String(d).toLowerCase();
+                                                                return (
+                                                                    s === String(idx) ||
+                                                                    s.startsWith(day.toLowerCase())
+                                                                );
+                                                            }
                                                         );
                                                         return (
                                                             <div

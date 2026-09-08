@@ -528,6 +528,7 @@ async function getAllAttendanceFromDB({
   startDate,
   endDate,
   staffId,
+  staffIds,
   status,
   branchId,
   page = 1,
@@ -537,6 +538,7 @@ async function getAllAttendanceFromDB({
   startDate?: string;
   endDate?: string;
   staffId?: string;
+  staffIds?: string[] | undefined;
   status?: string;
   branchId?: string;
   page?: number;
@@ -545,6 +547,12 @@ async function getAllAttendanceFromDB({
 }) {
   const query: any = {};
   const { default: UserModel } = await import("../models/user.model.js");
+
+  // Optional hard scope to a fixed set of staff (e.g. a team leader limited to
+  // their own branch). Applied to the main query, the stats aggregation and the
+  // total count alike, so pagination stays correct.
+  const scopeIds =
+    staffIds && staffIds.length ? staffIds.map((id) => id.toString()) : null;
 
   // Search filter: Find users matching name, then find staff, then filter attendance
   if (search) {
@@ -560,19 +568,22 @@ async function getAllAttendanceFromDB({
       userId: { $in: matchingUserIds },
     }).select("_id");
 
-    const matchingStaffIds = matchingStaff.map((s) => s._id);
+    let matchingStaffIds = matchingStaff.map((s) => s._id.toString());
 
     // If staffId is also provided, intersect the lists
     if (staffId) {
-      query.staffId = {
-        $in: matchingStaffIds.filter((id) => id.toString() === staffId),
-      };
-    } else {
-      query.staffId = { $in: matchingStaffIds };
+      matchingStaffIds = matchingStaffIds.filter((id) => id === staffId);
     }
+    if (scopeIds) {
+      matchingStaffIds = matchingStaffIds.filter((id) => scopeIds.includes(id));
+    }
+    query.staffId = { $in: matchingStaffIds };
   } else if (staffId) {
     // Staff filter (if no search)
-    query.staffId = staffId;
+    query.staffId =
+      scopeIds && !scopeIds.includes(staffId) ? { $in: [] } : staffId;
+  } else if (scopeIds) {
+    query.staffId = { $in: scopeIds };
   }
 
   // Date filter

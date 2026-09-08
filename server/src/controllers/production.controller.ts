@@ -460,9 +460,12 @@ export const resumeWorkSession = async (req: Request, res: Response) => {
     }
 };
 
-export const getLiveWorkSessions = async (_req: Request, res: Response) => {
+export const getLiveWorkSessions = async (req: Request, res: Response) => {
     try {
-        const result = await productionService.getLiveWorkSessions();
+        const result = await productionService.getLiveWorkSessions(
+            req.user!.id,
+            req.user!.role
+        );
         return res.status(200).json({ success: true, data: result });
     } catch (error: any) {
         console.error('getLiveWorkSessions error:', error);
@@ -473,9 +476,12 @@ export const getLiveWorkSessions = async (_req: Request, res: Response) => {
     }
 };
 
-export const getProductionEditors = async (_req: Request, res: Response) => {
+export const getProductionEditors = async (req: Request, res: Response) => {
     try {
-        const result = await productionService.getProductionEditors();
+        const result = await productionService.getProductionEditors(
+            req.user!.id,
+            req.user!.role
+        );
         return res.status(200).json({ success: true, data: result });
     } catch (error: any) {
         console.error('getProductionEditors error:', error);

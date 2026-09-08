@@ -156,14 +156,31 @@ const getAllAttendance = async (req: Request, res: Response) => {
         if (!userId) throw new Error("Unauthorized");
 
         let queryStaffId = req.query.staffId as string;
+        let scopedStaffIds: string[] | undefined;
 
-        // If the user is just a STAFF or TEAM_LEADER, enforce their own staffId
-        if (userRole === "staff" || userRole === "team_leader") {
+        if (userRole === "staff") {
+            // Plain staff only ever see their own attendance.
             const StaffModel = (await import("../models/staff.model.js"))
                 .default;
             const staff = await StaffModel.findOne({ userId });
             if (!staff) throw new Error("Staff record not found");
             queryStaffId = (staff as any)._id.toString();
+        } else if (userRole === "team_leader") {
+            // Team leaders see every staff member in their own branch.
+            const StaffModel = (await import("../models/staff.model.js"))
+                .default;
+            const me = await StaffModel.findOne({ userId }).select("branchId");
+            if (!me) throw new Error("Staff record not found");
+
+            if ((me as any).branchId) {
+                const branchStaff = await StaffModel.find({
+                    branchId: (me as any).branchId,
+                }).select("_id");
+                scopedStaffIds = branchStaff.map((s) => (s as any)._id.toString());
+            } else {
+                // No branch on the profile → fall back to own record only.
+                scopedStaffIds = [(me as any)._id.toString()];
+            }
         }
 
         const {
@@ -179,6 +196,7 @@ const getAllAttendance = async (req: Request, res: Response) => {
             startDate: startDate as string,
             endDate: endDate as string,
             staffId: queryStaffId,
+            staffIds: scopedStaffIds,
             status: status as string,
             branchId: branchId as string,
             page: parseInt(page as string) || 1,

@@ -2135,8 +2135,21 @@ const reassignWorkSession = async (
  * Live floor monitor feed for Admin / HR / Team Leader: every active + held
  * session with computed live timers, plus a per-editor rollup.
  */
-const getLiveWorkSessions = async () => {
-    const sessions = await ProductionWorkSessionModel.find({
+const getLiveWorkSessions = async (userId?: string, userRole?: string) => {
+    // Branch scoping for the supervisor floor monitor: every supervisor except
+    // super_admin only sees sessions from their own branch. Super admins — and
+    // anyone whose staff profile has no branch — see every branch.
+    let viewerBranchId: Types.ObjectId | null = null;
+    if (userId && userRole !== Role.SUPER_ADMIN) {
+        const me = await StaffModel.findOne({ userId })
+            .select('branchId')
+            .lean();
+        if (me?.branchId) {
+            viewerBranchId = me.branchId as Types.ObjectId;
+        }
+    }
+
+    let sessions = await ProductionWorkSessionModel.find({
         status: { $in: ['active', 'paused'] },
     })
         .sort({ status: 1, startTime: 1 })
@@ -2148,6 +2161,19 @@ const getLiveWorkSessions = async () => {
         .populate('orderId', 'orderName deadline priority imageQuantity requiredSteps status')
         .populate('shiftId', 'name code')
         .lean();
+
+    // Scope by the assigned editor's branch — that is the source of truth for
+    // who a supervisor manages. A session's own `branchId` can be stale or
+    // derived from a shift in another branch, so only fall back to it when the
+    // staff record has no branch.
+    if (viewerBranchId) {
+        const target = viewerBranchId.toString();
+        sessions = sessions.filter((s: any) => {
+            const staffBranch = s.staffId?.branchId?.toString();
+            const sessionBranch = s.branchId?.toString();
+            return (staffBranch || sessionBranch) === target;
+        });
+    }
 
     const now = new Date();
 
@@ -2228,8 +2254,22 @@ const getLiveWorkSessions = async () => {
  * Lightweight editor directory for the reassignment picker — production-eligible
  * (non-telemarketer, active) staff only.
  */
-const getProductionEditors = async () => {
-    const staff = await StaffModel.find({ status: 'active' })
+const getProductionEditors = async (userId?: string, userRole?: string) => {
+    const query: Record<string, unknown> = { status: 'active' };
+
+    // Branch scoping for the reassignment picker: every supervisor except
+    // super_admin only sees editors from their own branch. Super admins — and
+    // anyone whose staff profile has no branch — fall back to all branches.
+    if (userId && userRole !== Role.SUPER_ADMIN) {
+        const me = await StaffModel.findOne({ userId })
+            .select('branchId')
+            .lean();
+        if (me?.branchId) {
+            query.branchId = me.branchId;
+        }
+    }
+
+    const staff = await StaffModel.find(query)
         .select('staffId designation userId')
         .populate('userId', 'name email')
         .lean();

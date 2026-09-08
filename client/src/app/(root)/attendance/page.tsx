@@ -205,6 +205,12 @@ export default function AttendancePage() {
 
     const { data: session } = useSession();
     const role = session?.user?.role;
+    // Only these roles may edit attendance status; team leaders get a
+    // read-only, branch-scoped view.
+    const canEditAttendance =
+        role === Role.ADMIN ||
+        role === Role.SUPER_ADMIN ||
+        role === Role.HR_MANAGER;
 
     const updateUrl = (key: string, value: string) => {
         const params = new URLSearchParams(searchParams.toString());
@@ -749,9 +755,11 @@ export default function AttendancePage() {
                                             <TableHead className="font-semibold">
                                                 Status
                                             </TableHead>
-                                            <TableHead className="text-right font-semibold">
-                                                Action
-                                            </TableHead>
+                                            {canEditAttendance && (
+                                                <TableHead className="text-right font-semibold">
+                                                    Action
+                                                </TableHead>
+                                            )}
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -786,16 +794,18 @@ export default function AttendancePage() {
                                                         <TableCell>
                                                             <Skeleton className="h-6 w-[80px] rounded-full" />
                                                         </TableCell>
-                                                        <TableCell className="text-right">
-                                                            <Skeleton className="h-8 w-[100px] ml-auto" />
-                                                        </TableCell>
+                                                        {canEditAttendance && (
+                                                            <TableCell className="text-right">
+                                                                <Skeleton className="h-8 w-[100px] ml-auto" />
+                                                            </TableCell>
+                                                        )}
                                                     </TableRow>
                                                 ),
                                             )
                                         ) : records.length === 0 ? (
                                             <TableRow>
                                                 <TableCell
-                                                    colSpan={9}
+                                                    colSpan={canEditAttendance ? 9 : 8}
                                                     className="text-center py-16 text-muted-foreground"
                                                 >
                                                     <div className="flex flex-col items-center gap-3">
@@ -890,6 +900,7 @@ export default function AttendancePage() {
                                                             )}
                                                         </Badge>
                                                     </TableCell>
+                                                    {canEditAttendance && (
                                                     <TableCell className="text-right">
                                                         <Select
                                                             value={
@@ -938,6 +949,7 @@ export default function AttendancePage() {
                                                             </SelectContent>
                                                         </Select>
                                                     </TableCell>
+                                                    )}
                                                 </TableRow>
                                             ))
                                         )}

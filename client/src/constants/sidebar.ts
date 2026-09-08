@@ -178,7 +178,12 @@ export const sidebarGroups: SidebarGroup[] = [
                 title: "Attendance",
                 url: "/attendance",
                 icon: IconCalendarStats,
-                access: [Role.SUPER_ADMIN, Role.ADMIN, Role.HR_MANAGER],
+                access: [
+                    Role.SUPER_ADMIN,
+                    Role.ADMIN,
+                    Role.HR_MANAGER,
+                    Role.TEAM_LEADER,
+                ],
             },
             {
                 title: "Careers",
