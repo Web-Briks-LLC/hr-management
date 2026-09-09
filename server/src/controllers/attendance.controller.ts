@@ -222,12 +222,57 @@ const updateAttendanceStatus = async (req: Request, res: Response) => {
         const { id } = req.params;
         const { status, notes } = req.body;
         const updatedBy = req.user?.id;
+        const userRole = req.user?.role;
 
         if (!updatedBy) {
             return res.status(401).json({
                 success: false,
                 message: "Unauthorized",
             });
+        }
+
+        // Team leaders may only edit attendance for staff in their own branch.
+        if (userRole === "team_leader") {
+            const StaffModel = (await import("../models/staff.model.js"))
+                .default;
+            const AttendanceDayModel = (
+                await import("../models/attendance-day.model.js")
+            ).default;
+
+            const me = await StaffModel.findOne({ userId: updatedBy }).select(
+                "branchId",
+            );
+            if (!me || !(me as any).branchId) {
+                return res.status(403).json({
+                    success: false,
+                    message: "You are not assigned to a branch",
+                });
+            }
+
+            const record = await AttendanceDayModel.findById(id).select(
+                "staffId",
+            );
+            if (!record) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Attendance record not found",
+                });
+            }
+
+            const targetStaff = await StaffModel.findById(
+                (record as any).staffId,
+            ).select("branchId");
+            if (
+                !targetStaff ||
+                String((targetStaff as any).branchId) !==
+                    String((me as any).branchId)
+            ) {
+                return res.status(403).json({
+                    success: false,
+                    message:
+                        "You can only update attendance for staff in your own branch",
+                });
+            }
         }
 
         const result = await AttendanceServices.updateAttendanceStatusInDB({

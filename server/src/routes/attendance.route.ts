@@ -33,7 +33,12 @@ router.patch(
 
 router.patch(
     "/admin/:id",
-    authorize(Role.SUPER_ADMIN, Role.ADMIN, Role.HR_MANAGER),
+    authorize(
+        Role.SUPER_ADMIN,
+        Role.ADMIN,
+        Role.HR_MANAGER,
+        Role.TEAM_LEADER,
+    ),
     AttendanceController.updateAttendanceStatus,
 );
 

@@ -205,12 +205,13 @@ export default function AttendancePage() {
 
     const { data: session } = useSession();
     const role = session?.user?.role;
-    // Only these roles may edit attendance status; team leaders get a
-    // read-only, branch-scoped view.
+    // These roles may edit attendance status. Team leaders can edit too, but
+    // the server restricts them to staff in their own branch.
     const canEditAttendance =
         role === Role.ADMIN ||
         role === Role.SUPER_ADMIN ||
-        role === Role.HR_MANAGER;
+        role === Role.HR_MANAGER ||
+        role === Role.TEAM_LEADER;
 
     const updateUrl = (key: string, value: string) => {
         const params = new URLSearchParams(searchParams.toString());
