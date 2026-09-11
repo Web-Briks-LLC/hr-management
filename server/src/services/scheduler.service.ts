@@ -263,6 +263,99 @@ async function processAttendanceCheck() {
 }
 
 // ============================================
+// MISSED CHECKOUT AUTO-CLOSE (Every 10 minutes)
+// ============================================
+// If staff forget to check out, their attendance day stays open (checkOutAt:
+// null) forever, which makes the app show a stale "Check Out" prompt the next
+// day even though they never checked in that day. Once a record's shift has
+// clearly ended (past its end time + grace window) and it's from a previous
+// day, close it out at the shift's official end time so it stops dangling.
+
+const MISSED_CHECKOUT_GRACE_HOURS = 4;
+
+async function processMissedCheckoutAutoClose() {
+    const now = getBDNow();
+    const todayStart = getBDStartOfDay(now);
+    let closedCount = 0;
+
+    try {
+        const openRecords = await AttendanceDayModel.find({
+            checkOutAt: null,
+            checkInAt: { $ne: null },
+            date: { $lt: todayStart },
+        }).populate('shiftId');
+
+        for (const record of openRecords) {
+            try {
+                const shift = record.shiftId as unknown as {
+                    startTime?: string;
+                    endTime?: string;
+                } | null;
+                if (!shift?.startTime || !shift?.endTime) continue;
+
+                const [shStr, smStr] = shift.startTime.split(':');
+                const [ehStr, emStr] = shift.endTime.split(':');
+                const sh = Number(shStr);
+                const sm = Number(smStr);
+                const eh = Number(ehStr);
+                const em = Number(emStr);
+
+                const shiftEnd = new Date(record.date);
+                shiftEnd.setHours(eh, em, 0, 0);
+                if (eh * 60 + em <= sh * 60 + sm) {
+                    // Overnight shift - end time falls on the next day
+                    shiftEnd.setDate(shiftEnd.getDate() + 1);
+                }
+
+                const cutoff = new Date(
+                    shiftEnd.getTime() + MISSED_CHECKOUT_GRACE_HOURS * 60 * 60 * 1000,
+                );
+                if (now < cutoff) continue; // Still within grace window - may still be a legit ongoing shift
+
+                record.checkOutAt = shiftEnd;
+                record.totalMinutes = Math.max(
+                    0,
+                    Math.round(
+                        (shiftEnd.getTime() - record.checkInAt!.getTime()) / 60000,
+                    ),
+                );
+                record.notes = `${record.notes || ''} | [System] Auto-checked-out: staff forgot to check out`.trim();
+                await record.save();
+                closedCount++;
+
+                const staff = await StaffModel.findById(record.staffId).lean();
+                if (staff?.userId) {
+                    await notificationService.createNotification({
+                        userId: staff.userId,
+                        title: 'Auto Checked-Out',
+                        message: `You forgot to check out on ${new Date(record.date).toLocaleDateString('en-GB')}. The system automatically closed your attendance at your shift's end time.`,
+                        type: 'attendance',
+                        priority: 'medium',
+                        resourceType: 'attendance',
+                    });
+                }
+            } catch (recordError) {
+                console.error(
+                    `[Scheduler] Error auto-closing attendance ${record._id}:`,
+                    recordError,
+                );
+            }
+        }
+
+        if (closedCount > 0) {
+            console.log(
+                `[Scheduler] Missed checkout auto-close: ${closedCount} records closed.`,
+            );
+        }
+
+        return { closedCount };
+    } catch (error) {
+        console.error('[Scheduler] Error in missed checkout auto-close:', error);
+        throw error;
+    }
+}
+
+// ============================================
 // OVERTIME AUTO-STOP (Every 1 minute)
 // ============================================
 
@@ -560,6 +653,7 @@ const TEN_MINUTES = 10 * 60 * 1000;
 const ONE_MINUTE = 60 * 1000;
 
 let attendanceInterval: NodeJS.Timeout | null = null;
+let missedCheckoutInterval: NodeJS.Timeout | null = null;
 let overtimeInterval: NodeJS.Timeout | null = null;
 let monthlySMSInterval: NodeJS.Timeout | null = null;
 
@@ -572,6 +666,13 @@ function startAllSchedulers() {
         processAttendanceCheck().catch(console.error);
     }, TEN_MINUTES);
     console.log('[Scheduler] Attendance check: Running every 10 minutes');
+
+    // Missed checkout auto-close - every 10 minutes
+    processMissedCheckoutAutoClose().catch(console.error);
+    missedCheckoutInterval = setInterval(() => {
+        processMissedCheckoutAutoClose().catch(console.error);
+    }, TEN_MINUTES);
+    console.log('[Scheduler] Missed checkout auto-close: Running every 10 minutes');
 
     // Overtime auto-stop - every 1 minute
     processOvertimeAutoStop().catch(console.error);
@@ -628,6 +729,10 @@ function stopAllSchedulers() {
         clearInterval(attendanceInterval);
         attendanceInterval = null;
     }
+    if (missedCheckoutInterval) {
+        clearInterval(missedCheckoutInterval);
+        missedCheckoutInterval = null;
+    }
     if (overtimeInterval) {
         clearInterval(overtimeInterval);
         overtimeInterval = null;
@@ -641,6 +746,7 @@ function stopAllSchedulers() {
 
 export default {
     processAttendanceCheck,
+    processMissedCheckoutAutoClose,
     processOvertimeAutoStop,
     processLeaveExpiry,
     processMonthlyFinanceSMSReport,

@@ -1,3 +1,4 @@
+import { Types } from "mongoose";
 import AttendanceEventModel from "../models/attendance-event.model.js";
 import ShiftAssignmentModel from "../models/shift-assignment.model.js";
 import AttendanceDayModel from "../models/attendance-day.model.js";
@@ -23,6 +24,62 @@ function requireShiftTimes<T extends IShift>(
   }
 
   return shift as T & { startTime: string; endTime: string };
+}
+
+// Only treat a staff member's leftover open attendance day from "yesterday" as
+// still active if they are actually on a shift that crosses midnight, and only
+// within a bounded grace window after that shift ends. Without this guard, any
+// staff who simply forgets to check out gets stuck showing "Check Out" the next
+// day even though they never checked in — because the app would otherwise trust
+// a stale, unrelated open record indefinitely.
+const OVERNIGHT_FALLBACK_GRACE_HOURS = 4;
+
+async function findOvernightFallbackAttendanceDay(
+  staffId: Types.ObjectId,
+  now: Date,
+) {
+  const shiftAssignment = await ShiftAssignmentModel.findOne({
+    staffId,
+    startDate: { $lte: now },
+    $or: [{ endDate: null }, { endDate: { $gte: now } }],
+    isActive: true,
+  })
+    .populate("shiftId")
+    .lean();
+
+  const shift = shiftAssignment?.shiftId as unknown as IShift | undefined;
+  if (!shift?.startTime || !shift?.endTime) return null;
+
+  const [shStr, smStr] = shift.startTime.split(":");
+  const [ehStr, emStr] = shift.endTime.split(":");
+  const sh = Number(shStr);
+  const sm = Number(smStr);
+  const eh = Number(ehStr);
+  const em = Number(emStr);
+  const isOvernight = eh * 60 + em <= sh * 60 + sm;
+  if (!isOvernight) return null;
+
+  const dayStart = getBDStartOfDay(now);
+  const yesterdayStart = new Date(dayStart);
+  yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+
+  const candidate = await AttendanceDayModel.findOne({
+    staffId,
+    date: yesterdayStart,
+    checkOutAt: null,
+  }).lean();
+
+  if (!candidate) return null;
+
+  const shiftEnd = new Date(yesterdayStart);
+  shiftEnd.setHours(eh, em, 0, 0);
+  shiftEnd.setDate(shiftEnd.getDate() + 1);
+
+  const cutoff = new Date(
+    shiftEnd.getTime() + OVERNIGHT_FALLBACK_GRACE_HOURS * 3600000,
+  );
+
+  return now <= cutoff ? candidate : null;
 }
 
 const checkInInDB = async ({
@@ -238,17 +295,6 @@ async function checkOutInDB({
 
   const staffId = staff._id;
 
-  const lastEvent = await AttendanceEventModel.findOne({
-    staffId,
-    at: { $gte: dayStart, $lte: dayEnd },
-  })
-    .sort({ at: -1 })
-    .lean();
-
-  if (!lastEvent || lastEvent.type !== "check_in") {
-    throw new Error("You must check in before checking out.");
-  }
-
   let attendanceDay = await AttendanceDayModel.findOne({
     staffId,
     date: dayStart,
@@ -256,14 +302,10 @@ async function checkOutInDB({
 
   // Handle Overnight Shift: If checking out in the morning (e.g. 7:30 AM) for a shift started yesterday (e.g. 10 PM)
   if (!attendanceDay) {
-    const yesterdayStart = new Date(dayStart);
-    yesterdayStart.setDate(yesterdayStart.getDate() - 1);
-
-    attendanceDay = await AttendanceDayModel.findOne({
-      staffId,
-      date: yesterdayStart,
-      checkOutAt: null, // Look for open session
-    });
+    const fallback = await findOvernightFallbackAttendanceDay(staffId, now);
+    if (fallback) {
+      attendanceDay = await AttendanceDayModel.findById(fallback._id);
+    }
   }
 
   if (!attendanceDay) {
@@ -272,6 +314,21 @@ async function checkOutInDB({
 
   if (!attendanceDay.checkInAt) {
     throw new Error("No valid check-in found for today.");
+  }
+
+  // Scope the "did they actually check in" lookup to the attendance day's own
+  // date (not just "today"), so an overnight shift's check-in event — which
+  // happened yesterday, before midnight — is still found when they check out
+  // after midnight.
+  const lastEvent = await AttendanceEventModel.findOne({
+    staffId,
+    at: { $gte: attendanceDay.date, $lte: dayEnd },
+  })
+    .sort({ at: -1 })
+    .lean();
+
+  if (!lastEvent || lastEvent.type !== "check_in") {
+    throw new Error("You must check in before checking out.");
   }
 
   const event = await AttendanceEventModel.create({
@@ -374,14 +431,7 @@ async function getTodayAttendanceFromDB(userId: string) {
 
   // Handle Overnight Shift: If checking status in the morning for a shift started yesterday (e.g. 10 PM to 6 AM)
   if (!attendanceDay) {
-    const yesterdayStart = new Date(dayStart);
-    yesterdayStart.setDate(yesterdayStart.getDate() - 1);
-
-    attendanceDay = await AttendanceDayModel.findOne({
-      staffId,
-      date: yesterdayStart,
-      checkOutAt: null,
-    }).lean();
+    attendanceDay = await findOvernightFallbackAttendanceDay(staffId, now);
   }
 
   const startDateForEvents = attendanceDay ? attendanceDay.date : dayStart;
