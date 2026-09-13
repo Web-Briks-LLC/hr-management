@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback } from 'react';
-import { useForm, useWatch } from 'react-hook-form';
-import { format } from 'date-fns';
+import { useState, useEffect, useCallback } from "react";
+import { useForm, useWatch } from "react-hook-form";
+import { format } from "date-fns";
 import {
     Calendar as CalendarIcon,
     Loader,
@@ -16,37 +16,45 @@ import {
     CalendarDays,
     Briefcase,
     ThermometerSun,
-} from 'lucide-react';
-import { toast } from 'sonner';
-import { useSession } from '@/lib/auth-client';
+} from "lucide-react";
+import {
+    Combobox,
+    ComboboxContent,
+    ComboboxEmpty,
+    ComboboxInput,
+    ComboboxItem,
+    ComboboxList,
+} from "@/components/ui/combobox";
+import { toast } from "sonner";
+import { useSession } from "@/lib/auth-client";
 import {
     Card,
     CardContent,
     CardDescription,
     CardHeader,
     CardTitle,
-} from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
-import { Calendar } from '@/components/ui/calendar';
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Calendar } from "@/components/ui/calendar";
 import {
     Popover,
     PopoverContent,
     PopoverTrigger,
-} from '@/components/ui/popover';
+} from "@/components/ui/popover";
 import {
     Select,
     SelectContent,
     SelectItem,
     SelectTrigger,
     SelectValue,
-} from '@/components/ui/select';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Progress } from '@/components/ui/progress';
-import { cn } from '@/lib/utils';
-import { useDropzone } from 'react-dropzone';
+} from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Progress } from "@/components/ui/progress";
+import { cn } from "@/lib/utils";
+import { useDropzone } from "react-dropzone";
 import {
     useApplyForLeaveMutation,
     useGetLeaveBalanceQuery,
@@ -54,11 +62,15 @@ import {
     useLazyCalculateWorkingDaysQuery,
     useCancelLeaveApplicationMutation,
     useUploadMedicalDocumentMutation,
-} from '@/redux/features/leave/leaveApi';
-import { useGetStaffsQuery } from '@/redux/features/staff/staffApi';
-import type { LeaveType, ILeaveApplication, ApplyLeaveInput } from '@/types/leave.type';
-import { LEAVE_TYPE_LABELS, LEAVE_STATUS_LABELS } from '@/types/leave.type';
-import IStaff from '@/types/staff.type';
+} from "@/redux/features/leave/leaveApi";
+import { useGetStaffsQuery } from "@/redux/features/staff/staffApi";
+import type {
+    LeaveType,
+    ILeaveApplication,
+    ApplyLeaveInput,
+} from "@/types/leave.type";
+import { LEAVE_TYPE_LABELS, LEAVE_STATUS_LABELS } from "@/types/leave.type";
+import IStaff from "@/types/staff.type";
 
 interface ApiError {
     data?: {
@@ -71,17 +83,18 @@ interface FormData {
     reason: string;
 }
 
-const ADMIN_ROLES = ['admin', 'super_admin', 'hr_admin'];
+const ADMIN_ROLES = ["admin", "super_admin", "hr_admin"];
 
 export default function LeaveApplyPage() {
     const { data: session } = useSession();
-    const isAdmin = !!session?.user?.role && ADMIN_ROLES.includes(session.user.role);
+    const isAdmin =
+        !!session?.user?.role && ADMIN_ROLES.includes(session.user.role);
 
     const [startDate, setStartDate] = useState<Date | undefined>();
     const [endDate, setEndDate] = useState<Date | undefined>();
     const [workingDaysCount, setWorkingDaysCount] = useState(0);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
-    const [selectedStaffId, setSelectedStaffId] = useState<string>('');
+    const [selectedStaffId, setSelectedStaffId] = useState<string>("");
 
     const {
         register,
@@ -92,19 +105,19 @@ export default function LeaveApplyPage() {
         formState: { errors },
     } = useForm<FormData>({
         defaultValues: {
-            leaveType: 'annual',
-            reason: '',
+            leaveType: "annual",
+            reason: "",
         },
     });
 
-    const leaveType = useWatch({ control, name: 'leaveType' });
+    const leaveType = useWatch({ control, name: "leaveType" });
 
     // Fetch staff list for admin
     const { data: staffsData } = useGetStaffsQuery(
-        { limit: 200 },
+        { limit: 999 },
         { skip: !isAdmin },
     );
-    const staffs = staffsData?.data || [];
+    const staffs = staffsData?.staffs || [];
 
     const { data: balanceData, isLoading: isLoadingBalance } =
         useGetLeaveBalanceQuery();
@@ -127,12 +140,12 @@ export default function LeaveApplyPage() {
             if (startDate && endDate) {
                 try {
                     const result = await calculateWorkingDays({
-                        startDate: format(startDate, 'yyyy-MM-dd'),
-                        endDate: format(endDate, 'yyyy-MM-dd'),
+                        startDate: format(startDate, "yyyy-MM-dd"),
+                        endDate: format(endDate, "yyyy-MM-dd"),
                     }).unwrap();
                     setWorkingDaysCount(result.data.count);
                 } catch (error) {
-                    console.error('Error calculating working days:', error);
+                    console.error("Error calculating working days:", error);
                 }
             } else {
                 setWorkingDaysCount(0);
@@ -163,9 +176,9 @@ export default function LeaveApplyPage() {
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
         onDrop,
         accept: {
-            'application/pdf': ['.pdf'],
-            'image/jpeg': ['.jpg', '.jpeg'],
-            'image/png': ['.png'],
+            "application/pdf": [".pdf"],
+            "image/jpeg": [".jpg", ".jpeg"],
+            "image/png": [".png"],
         },
         maxFiles: 1,
         maxSize: 5 * 1024 * 1024, // 5MB
@@ -173,25 +186,25 @@ export default function LeaveApplyPage() {
 
     const onSubmit = async (data: FormData) => {
         if (!startDate || !endDate) {
-            toast.error('Please select start and end dates');
+            toast.error("Please select start and end dates");
             return;
         }
 
         if (workingDaysCount === 0) {
-            toast.error('No working days in the selected range');
+            toast.error("No working days in the selected range");
             return;
         }
 
         // Admin must select a staff member
         if (isAdmin && !selectedStaffId) {
-            toast.error('Please select a staff member');
+            toast.error("Please select a staff member");
             return;
         }
 
         // Check balance (only for non-admin applying for themselves)
         if (!isAdmin) {
             if (
-                data.leaveType === 'annual' &&
+                data.leaveType === "annual" &&
                 balance &&
                 workingDaysCount > balance.annualLeaveRemaining
             ) {
@@ -202,7 +215,7 @@ export default function LeaveApplyPage() {
             }
 
             if (
-                data.leaveType === 'sick' &&
+                data.leaveType === "sick" &&
                 balance &&
                 workingDaysCount > balance.sickLeaveRemaining
             ) {
@@ -216,8 +229,8 @@ export default function LeaveApplyPage() {
         try {
             const payload: ApplyLeaveInput = {
                 leaveType: data.leaveType,
-                startDate: format(startDate, 'yyyy-MM-dd'),
-                endDate: format(endDate, 'yyyy-MM-dd'),
+                startDate: format(startDate, "yyyy-MM-dd"),
+                endDate: format(endDate, "yyyy-MM-dd"),
                 reason: data.reason,
             };
 
@@ -229,58 +242,58 @@ export default function LeaveApplyPage() {
             const result = await applyForLeave(payload).unwrap();
 
             // If sick leave and file selected, upload document
-            if (data.leaveType === 'sick' && selectedFile && result.data._id) {
+            if (data.leaveType === "sick" && selectedFile && result.data._id) {
                 try {
                     await uploadDocument({
                         id: result.data._id,
                         file: selectedFile,
                     }).unwrap();
-                    toast.success('Medical document uploaded successfully');
+                    toast.success("Medical document uploaded successfully");
                 } catch (uploadError) {
                     const err = uploadError as ApiError;
-                    console.error('Document upload failed:', err);
+                    console.error("Document upload failed:", err);
                     toast.error(
                         err.data?.message ||
-                        'Application submitted but document upload failed. Please contact HR.',
+                            "Application submitted but document upload failed. Please contact HR.",
                     );
                 }
             }
 
             toast.success(
-                'Leave application submitted! Admin will review it shortly.',
+                "Leave application submitted! Admin will review it shortly.",
             );
             reset();
             setStartDate(undefined);
             setEndDate(undefined);
             setSelectedFile(null);
-            setSelectedStaffId('');
+            setSelectedStaffId("");
         } catch (error) {
             const err = error as ApiError;
-            toast.error(err.data?.message || 'Failed to submit application');
+            toast.error(err.data?.message || "Failed to submit application");
         }
     };
 
     const handleCancel = async (id: string) => {
         try {
             await cancelApplication(id).unwrap();
-            toast.success('Leave application cancelled');
+            toast.success("Leave application cancelled");
         } catch (error) {
             const err = error as ApiError;
-            toast.error(err.data?.message || 'Failed to cancel application');
+            toast.error(err.data?.message || "Failed to cancel application");
         }
     };
 
     const getStatusIcon = (status: string) => {
         switch (status) {
-            case 'approved':
+            case "approved":
                 return <CheckCircle2 className="h-4 w-4 text-green-500" />;
-            case 'partially_approved':
+            case "partially_approved":
                 return <CheckCircle2 className="h-4 w-4 text-yellow-500" />;
-            case 'pending':
+            case "pending":
                 return <Clock className="h-4 w-4 text-blue-500" />;
-            case 'rejected':
-            case 'expired':
-            case 'revoked':
+            case "rejected":
+            case "expired":
+            case "revoked":
                 return <XCircle className="h-4 w-4 text-red-500" />;
             default:
                 return <AlertCircle className="h-4 w-4" />;
@@ -289,18 +302,18 @@ export default function LeaveApplyPage() {
 
     const getStatusBadgeVariant = (status: string) => {
         switch (status) {
-            case 'approved':
-                return 'default';
-            case 'partially_approved':
-                return 'secondary';
-            case 'pending':
-                return 'outline';
-            case 'rejected':
-            case 'expired':
-            case 'revoked':
-                return 'destructive';
+            case "approved":
+                return "default";
+            case "partially_approved":
+                return "secondary";
+            case "pending":
+                return "outline";
+            case "rejected":
+            case "expired":
+            case "revoked":
+                return "destructive";
             default:
-                return 'outline';
+                return "outline";
         }
     };
 
@@ -321,8 +334,8 @@ export default function LeaveApplyPage() {
                 </h1>
                 <p className="text-muted-foreground mt-1">
                     {isAdmin
-                        ? 'Apply for leave on behalf of staff members'
-                        : 'Request time off and track your applications'}
+                        ? "Apply for leave on behalf of staff members"
+                        : "Request time off and track your applications"}
                 </p>
             </div>
 
@@ -356,9 +369,9 @@ export default function LeaveApplyPage() {
                                                                 0}
                                                         </span>
                                                         <span className="text-muted-foreground text-sm">
-                                                            /{' '}
+                                                            /{" "}
                                                             {balance?.annualLeaveTotal ||
-                                                                12}{' '}
+                                                                12}{" "}
                                                             days left
                                                         </span>
                                                     </div>
@@ -371,7 +384,7 @@ export default function LeaveApplyPage() {
                                                         />
                                                         <p className="text-xs text-muted-foreground">
                                                             {balance?.annualLeaveUsed ||
-                                                                0}{' '}
+                                                                0}{" "}
                                                             days used this year
                                                         </p>
                                                     </div>
@@ -406,9 +419,9 @@ export default function LeaveApplyPage() {
                                                                 0}
                                                         </span>
                                                         <span className="text-muted-foreground text-sm">
-                                                            /{' '}
+                                                            /{" "}
                                                             {balance?.sickLeaveTotal ||
-                                                                14}{' '}
+                                                                14}{" "}
                                                             days left
                                                         </span>
                                                     </div>
@@ -419,7 +432,7 @@ export default function LeaveApplyPage() {
                                                         />
                                                         <p className="text-xs text-muted-foreground">
                                                             {balance?.sickLeaveUsed ||
-                                                                0}{' '}
+                                                                0}{" "}
                                                             days used this year
                                                         </p>
                                                     </div>
@@ -443,8 +456,8 @@ export default function LeaveApplyPage() {
                                     <CardTitle>Request Leave</CardTitle>
                                     <CardDescription>
                                         {isAdmin
-                                            ? 'Select a staff member and submit leave application on their behalf'
-                                            : 'Fill in the details below to submit your leave request'}
+                                            ? "Select a staff member and submit leave application on their behalf"
+                                            : "Fill in the details below to submit your leave request"}
                                     </CardDescription>
                                 </div>
                             </div>
@@ -460,25 +473,32 @@ export default function LeaveApplyPage() {
                                         <Label className="text-base">
                                             Staff Member
                                         </Label>
-                                        <Select
+                                        <Combobox
                                             value={selectedStaffId}
-                                            onValueChange={setSelectedStaffId}
+                                            onInputValueChange={
+                                                setSelectedStaffId
+                                            }
+                                            items={staffs}
                                         >
-                                            <SelectTrigger className="h-12">
-                                                <SelectValue placeholder="Select a staff member" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {staffs.map((staff: IStaff) => (
-                                                    <SelectItem
-                                                        key={staff._id}
-                                                        value={staff._id}
-                                                    >
-                                                        {staff.user?.name} (
-                                                        {staff.staffId})
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
+                                            <ComboboxInput placeholder="Select a staff" />
+                                            <ComboboxContent>
+                                                <ComboboxEmpty>
+                                                    No staffs found.
+                                                </ComboboxEmpty>
+                                                <ComboboxList>
+                                                    {(item) => (
+                                                        <ComboboxItem
+                                                            key={item._id}
+                                                            value={
+                                                                item.user?.name
+                                                            }
+                                                        >
+                                                            {item.user?.name}
+                                                        </ComboboxItem>
+                                                    )}
+                                                </ComboboxList>
+                                            </ComboboxContent>
+                                        </Combobox>
                                     </div>
                                 )}
 
@@ -491,31 +511,31 @@ export default function LeaveApplyPage() {
                                         <button
                                             type="button"
                                             onClick={() =>
-                                                setValue('leaveType', 'annual')
+                                                setValue("leaveType", "annual")
                                             }
                                             className={cn(
-                                                'p-4 rounded-xl border-2 transition-all duration-200 text-left',
-                                                leaveType === 'annual'
-                                                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                                                    : 'border-border hover:border-blue-300 hover:bg-muted/50',
+                                                "p-4 rounded-xl border-2 transition-all duration-200 text-left",
+                                                leaveType === "annual"
+                                                    ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
+                                                    : "border-border hover:border-blue-300 hover:bg-muted/50",
                                             )}
                                         >
                                             <div className="flex items-center gap-3">
                                                 <div
                                                     className={cn(
-                                                        'p-2 rounded-lg',
-                                                        leaveType === 'annual'
-                                                            ? 'bg-blue-100 dark:bg-blue-800'
-                                                            : 'bg-muted',
+                                                        "p-2 rounded-lg",
+                                                        leaveType === "annual"
+                                                            ? "bg-blue-100 dark:bg-blue-800"
+                                                            : "bg-muted",
                                                     )}
                                                 >
                                                     <Briefcase
                                                         className={cn(
-                                                            'h-5 w-5',
+                                                            "h-5 w-5",
                                                             leaveType ===
-                                                                'annual'
-                                                                ? 'text-blue-600'
-                                                                : 'text-muted-foreground',
+                                                                "annual"
+                                                                ? "text-blue-600"
+                                                                : "text-muted-foreground",
                                                         )}
                                                     />
                                                 </div>
@@ -533,30 +553,30 @@ export default function LeaveApplyPage() {
                                         <button
                                             type="button"
                                             onClick={() =>
-                                                setValue('leaveType', 'sick')
+                                                setValue("leaveType", "sick")
                                             }
                                             className={cn(
-                                                'p-4 rounded-xl border-2 transition-all duration-200 text-left',
-                                                leaveType === 'sick'
-                                                    ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20'
-                                                    : 'border-border hover:border-orange-300 hover:bg-muted/50',
+                                                "p-4 rounded-xl border-2 transition-all duration-200 text-left",
+                                                leaveType === "sick"
+                                                    ? "border-orange-500 bg-orange-50 dark:bg-orange-900/20"
+                                                    : "border-border hover:border-orange-300 hover:bg-muted/50",
                                             )}
                                         >
                                             <div className="flex items-center gap-3">
                                                 <div
                                                     className={cn(
-                                                        'p-2 rounded-lg',
-                                                        leaveType === 'sick'
-                                                            ? 'bg-orange-100 dark:bg-orange-800'
-                                                            : 'bg-muted',
+                                                        "p-2 rounded-lg",
+                                                        leaveType === "sick"
+                                                            ? "bg-orange-100 dark:bg-orange-800"
+                                                            : "bg-muted",
                                                     )}
                                                 >
                                                     <ThermometerSun
                                                         className={cn(
-                                                            'h-5 w-5',
-                                                            leaveType === 'sick'
-                                                                ? 'text-orange-600'
-                                                                : 'text-muted-foreground',
+                                                            "h-5 w-5",
+                                                            leaveType === "sick"
+                                                                ? "text-orange-600"
+                                                                : "text-muted-foreground",
                                                         )}
                                                     />
                                                 </div>
@@ -584,18 +604,18 @@ export default function LeaveApplyPage() {
                                                 <Button
                                                     variant="outline"
                                                     className={cn(
-                                                        'w-full h-12 justify-start text-left font-normal',
+                                                        "w-full h-12 justify-start text-left font-normal",
                                                         !startDate &&
-                                                            'text-muted-foreground',
+                                                            "text-muted-foreground",
                                                     )}
                                                 >
                                                     <CalendarIcon className=" h-4 w-4" />
                                                     {startDate
                                                         ? format(
                                                               startDate,
-                                                              'PPP',
+                                                              "PPP",
                                                           )
-                                                        : 'Select start date'}
+                                                        : "Select start date"}
                                                 </Button>
                                             </PopoverTrigger>
                                             <PopoverContent
@@ -621,15 +641,15 @@ export default function LeaveApplyPage() {
                                                 <Button
                                                     variant="outline"
                                                     className={cn(
-                                                        'w-full h-12 justify-start text-left font-normal',
+                                                        "w-full h-12 justify-start text-left font-normal",
                                                         !endDate &&
-                                                            'text-muted-foreground',
+                                                            "text-muted-foreground",
                                                     )}
                                                 >
                                                     <CalendarIcon className=" h-4 w-4" />
                                                     {endDate
-                                                        ? format(endDate, 'PPP')
-                                                        : 'Select end date'}
+                                                        ? format(endDate, "PPP")
+                                                        : "Select end date"}
                                                 </Button>
                                             </PopoverTrigger>
                                             <PopoverContent
@@ -661,10 +681,10 @@ export default function LeaveApplyPage() {
                                         </div>
                                         <div>
                                             <p className="font-semibold text-lg">
-                                                {workingDaysCount} Working{' '}
+                                                {workingDaysCount} Working{" "}
                                                 {workingDaysCount === 1
-                                                    ? 'Day'
-                                                    : 'Days'}
+                                                    ? "Day"
+                                                    : "Days"}
                                             </p>
                                             <p className="text-sm text-muted-foreground">
                                                 Weekends based on your shift are
@@ -675,7 +695,7 @@ export default function LeaveApplyPage() {
                                 )}
 
                                 {/* Document Upload for Sick Leave */}
-                                {leaveType === 'sick' && (
+                                {leaveType === "sick" && (
                                     <div className="space-y-3">
                                         <Label className="text-base">
                                             Medical Document (Optional)
@@ -683,10 +703,10 @@ export default function LeaveApplyPage() {
                                         <div
                                             {...getRootProps()}
                                             className={cn(
-                                                'border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-200',
+                                                "border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-200",
                                                 isDragActive
-                                                    ? 'border-primary bg-primary/5 scale-[1.02]'
-                                                    : 'border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/30',
+                                                    ? "border-primary bg-primary/5 scale-[1.02]"
+                                                    : "border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/30",
                                             )}
                                         >
                                             <input {...getInputProps()} />
@@ -703,7 +723,7 @@ export default function LeaveApplyPage() {
                                                             {(
                                                                 selectedFile.size /
                                                                 1024
-                                                            ).toFixed(1)}{' '}
+                                                            ).toFixed(1)}{" "}
                                                             KB
                                                         </p>
                                                     </div>
@@ -729,8 +749,8 @@ export default function LeaveApplyPage() {
                                                     </div>
                                                     <p className="font-medium">
                                                         {isDragActive
-                                                            ? 'Drop the file here'
-                                                            : 'Drop file here or click to upload'}
+                                                            ? "Drop the file here"
+                                                            : "Drop file here or click to upload"}
                                                     </p>
                                                     <p className="text-sm text-muted-foreground mt-1">
                                                         PDF, JPG, PNG (Max 5MB)
@@ -745,9 +765,9 @@ export default function LeaveApplyPage() {
                                 <div className="space-y-2">
                                     <Label className="text-base">Reason</Label>
                                     <Textarea
-                                        {...register('reason', {
+                                        {...register("reason", {
                                             required:
-                                                'Please provide a reason for your leave',
+                                                "Please provide a reason for your leave",
                                         })}
                                         placeholder="Please describe the reason for your leave request..."
                                         className="min-h-[120px] resize-none"
@@ -775,8 +795,8 @@ export default function LeaveApplyPage() {
                                         <>
                                             <Loader className=" h-5 w-5 animate-spin" />
                                             {isApplying
-                                                ? 'Submitting...'
-                                                : 'Uploading...'}
+                                                ? "Submitting..."
+                                                : "Uploading..."}
                                         </>
                                     ) : (
                                         <>
@@ -876,14 +896,14 @@ export default function LeaveApplyPage() {
                                                                     new Date(
                                                                         app.startDate,
                                                                     ),
-                                                                    'MMM dd',
-                                                                )}{' '}
-                                                                -{' '}
+                                                                    "MMM dd",
+                                                                )}{" "}
+                                                                -{" "}
                                                                 {format(
                                                                     new Date(
                                                                         app.endDate,
                                                                     ),
-                                                                    'MMM dd, yyyy',
+                                                                    "MMM dd, yyyy",
                                                                 )}
                                                             </span>
                                                         </div>
@@ -892,21 +912,21 @@ export default function LeaveApplyPage() {
                                                                 app
                                                                     .requestedDates
                                                                     .length
-                                                            }{' '}
+                                                            }{" "}
                                                             day
                                                             {app.requestedDates
                                                                 .length > 1
-                                                                ? 's'
-                                                                : ''}
+                                                                ? "s"
+                                                                : ""}
                                                         </p>
                                                     </div>
 
                                                     {/* Status specific info */}
                                                     {app.status ===
-                                                        'rejected' &&
+                                                        "rejected" &&
                                                         app.commentByApprover && (
                                                             <p className="text-xs text-destructive mt-2 p-2 bg-destructive/10 rounded-lg">
-                                                                Reason:{' '}
+                                                                Reason:{" "}
                                                                 {
                                                                     app.commentByApprover
                                                                 }
@@ -914,7 +934,7 @@ export default function LeaveApplyPage() {
                                                         )}
 
                                                     {app.status ===
-                                                        'pending' && (
+                                                        "pending" && (
                                                         <Button
                                                             variant="ghost"
                                                             size="sm"
@@ -933,12 +953,12 @@ export default function LeaveApplyPage() {
                                                     )}
 
                                                     <p className="text-xs text-muted-foreground mt-2">
-                                                        Applied{' '}
+                                                        Applied{" "}
                                                         {format(
                                                             new Date(
                                                                 app.createdAt,
                                                             ),
-                                                            'MMM dd, yyyy',
+                                                            "MMM dd, yyyy",
                                                         )}
                                                     </p>
                                                 </div>
