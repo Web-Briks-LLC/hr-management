@@ -21,7 +21,11 @@ import {
 } from "@/components/ui/select";
 import {
     Combobox,
-    type ComboboxOption,
+    ComboboxContent,
+    ComboboxEmpty,
+    ComboboxInput,
+    ComboboxItem,
+    ComboboxList,
 } from "@/components/ui/combobox";
 import {
     Table,
@@ -58,6 +62,7 @@ import { toast } from "sonner";
 import { InvoiceEmailDialog } from "@/components/invoice/InvoiceEmailDialog";
 import { MONTH_OPTIONS, ORDER_STATUS_COLORS } from "@/lib/constants";
 import { cn } from "@/lib/utils";
+import { useSession } from "@/lib/auth-client";
 
 // Dynamically import the PDF component to avoid SSR issues
 const InvoicePDF = dynamic(() => import("@/components/invoice/InvoicePDF"), {
@@ -82,6 +87,10 @@ export default function InvoicePage() {
     const [showPDF, setShowPDF] = useState(false);
     const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
     const [initialRecipients, setInitialRecipients] = useState<string[]>([]);
+    const { data: session } = useSession();
+    const isAdmin =
+        !!session?.user?.role &&
+        ["admin", "super_admin"].includes(session.user.role);
 
     const [sendInvoiceEmail, { isLoading: isSending }] =
         useSendInvoiceEmailMutation();
@@ -115,10 +124,10 @@ export default function InvoicePage() {
         useGetOrdersQuery(
             selectedYear
                 ? {
-                    month: parseInt(selectedMonth),
-                    year: parseInt(selectedYear),
-                    limit: 1000,
-                }
+                      month: parseInt(selectedMonth),
+                      year: parseInt(selectedYear),
+                      limit: 1000,
+                  }
                 : undefined,
             { skip: !selectedYear },
         );
@@ -166,9 +175,7 @@ export default function InvoicePage() {
     const orders = useMemo(() => {
         if (!selectedClientId) return [];
         return allOrders
-            .filter(
-                (order: IOrder) => order.clientId?._id === selectedClientId,
-            )
+            .filter((order: IOrder) => order.clientId?._id === selectedClientId)
             .sort(
                 (a: IOrder, b: IOrder) =>
                     new Date(a.orderDate).getTime() -
@@ -194,7 +201,7 @@ export default function InvoicePage() {
         return { totalImages, totalAmount };
     }, [selectedOrdersList]);
 
-    const clientOptions = useMemo<ComboboxOption[]>(
+    const clientOptions = useMemo(
         () =>
             availableClients.map((c) => ({
                 value: c._id,
@@ -248,11 +255,16 @@ export default function InvoicePage() {
                     invoiceNumber: generatedNumber,
                     clientName: selectedClient.name,
                     clientId: selectedClient.clientId,
-                    clientAddress: selectedClient.address || selectedClient.officeAddress || "N/A",
+                    clientAddress:
+                        selectedClient.address ||
+                        selectedClient.officeAddress ||
+                        "N/A",
                     companyName: selectedClient.officeAddress || "N/A",
                     totalAmount: totals.totalAmount,
                     currency: selectedClient.currency || "USD",
-                    dueDate: new Date(new Date().getTime() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+                    dueDate: new Date(
+                        new Date().getTime() + 7 * 24 * 60 * 60 * 1000,
+                    ).toISOString(),
                     month: Number(selectedMonth),
                     year: Number(selectedYear),
                     totalImages: totals.totalImages,
@@ -269,7 +281,9 @@ export default function InvoicePage() {
                 }).unwrap();
 
                 if (recordResult.success && recordResult.invoice) {
-                    const invoiceData = recordResult.invoice as { paymentToken: string };
+                    const invoiceData = recordResult.invoice as {
+                        paymentToken: string;
+                    };
                     setInvoiceNumber(generatedNumber);
                     setPaymentToken(invoiceData.paymentToken);
                     setShowPDF(true);
@@ -289,7 +303,8 @@ export default function InvoicePage() {
     };
 
     const performEmailSend = async (emails: string[]) => {
-        if (selectedOrders.size === 0 || !selectedClient || emails.length === 0) return;
+        if (selectedOrders.size === 0 || !selectedClient || emails.length === 0)
+            return;
 
         try {
             let currentInvoiceNumber = invoiceNumber;
@@ -300,19 +315,30 @@ export default function InvoicePage() {
                 if (result.success) {
                     currentInvoiceNumber = result.formattedInvoiceNumber;
 
-                    const orderDates = selectedOrdersList.map((o) => new Date(o.orderDate).getTime());
-                    const minDate = new Date(Math.min(...orderDates)).toISOString();
-                    const maxDate = new Date(Math.max(...orderDates)).toISOString();
+                    const orderDates = selectedOrdersList.map((o) =>
+                        new Date(o.orderDate).getTime(),
+                    );
+                    const minDate = new Date(
+                        Math.min(...orderDates),
+                    ).toISOString();
+                    const maxDate = new Date(
+                        Math.max(...orderDates),
+                    ).toISOString();
 
                     const recordResult = await recordInvoice({
                         invoiceNumber: currentInvoiceNumber,
                         clientName: selectedClient.name,
                         clientId: selectedClient.clientId,
-                        clientAddress: selectedClient.address || selectedClient.officeAddress || "N/A",
+                        clientAddress:
+                            selectedClient.address ||
+                            selectedClient.officeAddress ||
+                            "N/A",
                         companyName: selectedClient.officeAddress || "N/A",
                         totalAmount: totals.totalAmount,
                         currency: selectedClient.currency || "USD",
-                        dueDate: new Date(new Date().getTime() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+                        dueDate: new Date(
+                            new Date().getTime() + 7 * 24 * 60 * 60 * 1000,
+                        ).toISOString(),
                         month: Number(selectedMonth),
                         year: Number(selectedYear),
                         totalImages: totals.totalImages,
@@ -328,7 +354,9 @@ export default function InvoicePage() {
                         orderIds: Array.from(selectedOrders),
                     }).unwrap();
 
-                    const invoiceData = recordResult.invoice as { paymentToken: string };
+                    const invoiceData = recordResult.invoice as {
+                        paymentToken: string;
+                    };
                     currentToken = invoiceData.paymentToken;
 
                     setInvoiceNumber(currentInvoiceNumber);
@@ -343,7 +371,10 @@ export default function InvoicePage() {
                 <InvoiceDocument
                     client={selectedClient}
                     orders={selectedOrdersList}
-                    month={months.find((m) => m.value === selectedMonth)?.label || ""}
+                    month={
+                        months.find((m) => m.value === selectedMonth)?.label ||
+                        ""
+                    }
                     year={selectedYear}
                     invoiceNumber={currentInvoiceNumber}
                     paymentToken={currentToken}
@@ -353,16 +384,24 @@ export default function InvoicePage() {
 
             const formData = new FormData();
             formData.append("file", blob, fileName);
-            formData.append("to", emails.join(', '));
-            emails.forEach(email => formData.append("selectedEmails[]", email));
+            formData.append("to", emails.join(", "));
+            emails.forEach((email) =>
+                formData.append("selectedEmails[]", email),
+            );
             formData.append("clientName", selectedClient.name);
-            formData.append("month", months.find((m) => m.value === selectedMonth)?.label || "");
+            formData.append(
+                "month",
+                months.find((m) => m.value === selectedMonth)?.label || "",
+            );
             formData.append("year", selectedYear);
 
             const result = await sendInvoiceEmail(formData).unwrap();
 
             if (result.success !== false) {
-                toast.success(result.message || `Invoice sent successfully to ${emails.length} recipient(s)`);
+                toast.success(
+                    result.message ||
+                        `Invoice sent successfully to ${emails.length} recipient(s)`,
+                );
                 setIsEmailDialogOpen(false);
             } else {
                 throw new Error(result.message || "Failed to send email");
@@ -608,23 +647,35 @@ export default function InvoicePage() {
                             Client
                         </Label>
                         <Combobox
-                            options={clientOptions}
                             value={selectedClientId}
-                            onChange={(val) => {
+                            onInputValueChange={(val) => {
                                 setSelectedClientId(val);
                                 setSelectedOrders(new Set());
                                 resetGeneratedInvoice();
                             }}
-                            placeholder="Select a client"
-                            searchPlaceholder="Search clients..."
-                            emptyText="No clients found."
-                            isLoading={isLoadingAllOrders}
-                            disabled={
-                                isLoadingAllOrders ||
-                                clientOptions.length === 0
-                            }
-                            className="h-9 bg-background/60"
-                        />
+                            items={clientOptions}
+                        >
+                            <ComboboxInput placeholder="Select a client" />
+                            <ComboboxContent>
+                                <ComboboxEmpty>No clients found.</ComboboxEmpty>
+                                <ComboboxList>
+                                    {(item) => {
+                                        console.log(item);
+
+                                        return (
+                                            <ComboboxItem
+                                                key={item.value}
+                                                value={item.label}
+                                            >
+                                                {isAdmin
+                                                    ? item.label
+                                                    : item.description}
+                                            </ComboboxItem>
+                                        );
+                                    }}
+                                </ComboboxList>
+                            </ComboboxContent>
+                        </Combobox>
                     </div>
                 </div>
 
@@ -891,7 +942,9 @@ export default function InvoicePage() {
                                     <TableCell />
                                     <TableCell className="font-semibold">
                                         {selectedOrders.size} order
-                                        {selectedOrders.size !== 1 ? "s" : ""}{" "}
+                                        {selectedOrders.size !== 1
+                                            ? "s"
+                                            : ""}{" "}
                                         selected
                                     </TableCell>
                                     <TableCell />
@@ -919,10 +972,7 @@ export default function InvoicePage() {
             />
 
             {showPDF && (
-                <div
-                    ref={pdfSectionRef}
-                    className="space-y-4 border-t pt-8"
-                >
+                <div ref={pdfSectionRef} className="space-y-4 border-t pt-8">
                     <div className="flex items-center justify-between">
                         <div>
                             <h3 className="flex items-center gap-2 text-lg font-semibold">

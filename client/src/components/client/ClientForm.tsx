@@ -28,7 +28,14 @@ import { useGetStaffsQuery } from '@/redux/features/staff/staffApi';
 import { cn } from '@/lib/utils';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { Card, CardContent } from '@/components/ui/card';
-import { Combobox } from '@/components/ui/combobox';
+import {
+    Combobox,
+    ComboboxContent,
+    ComboboxEmpty,
+    ComboboxInput,
+    ComboboxItem,
+    ComboboxList,
+} from '@/components/ui/combobox';
 
 // Zod schema for client form validation
 // Team member schema needs _id to correctly handle existing records from the API
@@ -445,13 +452,22 @@ export function ClientForm({
                     <div className="space-y-2 col-span-1 md:col-span-2">
                         <Label>Assigned Telemarketer (Handover)</Label>
                         <Combobox
-                            options={telemarketerOptions}
                             value={assignedTelemarketer || ''}
-                            onChange={(val) => setValue('assignedTelemarketer', val)}
-                            placeholder="Select telemarketer to hand over..."
-                            searchPlaceholder="Search telemarketer by name or email..."
-                            emptyText="No telemarketer found"
-                        />
+                            onValueChange={(val) => setValue('assignedTelemarketer', (val as string) ?? '')}
+                            items={telemarketerOptions}
+                        >
+                            <ComboboxInput placeholder="Select telemarketer to hand over..." />
+                            <ComboboxContent>
+                                <ComboboxEmpty>No telemarketer found</ComboboxEmpty>
+                                <ComboboxList>
+                                    {(item) => (
+                                        <ComboboxItem key={item.value} value={item.value}>
+                                            {item.label}
+                                        </ComboboxItem>
+                                    )}
+                                </ComboboxList>
+                            </ComboboxContent>
+                        </Combobox>
                         <p className="text-xs text-muted-foreground">
                             Hand over client ownership to a telemarketer. The assigned telemarketer will see all orders for this client.
                         </p>

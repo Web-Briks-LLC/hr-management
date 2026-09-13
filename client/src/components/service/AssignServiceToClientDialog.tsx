@@ -13,7 +13,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Combobox } from "@/components/ui/combobox";
+import {
+    Combobox,
+    ComboboxContent,
+    ComboboxEmpty,
+    ComboboxInput,
+    ComboboxItem,
+    ComboboxList,
+} from "@/components/ui/combobox";
 import { useGetAllClientsQuery, useUpdateClientMutation } from "@/redux/features/client/clientApi";
 import { useGetServicesQuery } from "@/redux/features/service/serviceApi";
 import { useSession } from "@/lib/auth-client";
@@ -227,14 +234,24 @@ export function AssignServiceToClientDialog({
                                 </div>
                             ) : (
                                 <Combobox
-                                    options={serviceOptions}
-                                    value={selectedServiceId}
-                                    onChange={(val) => setSelectedServiceId(val)}
-                                    placeholder="Select a service..."
-                                    searchPlaceholder="Search service..."
-                                    emptyText="No service found."
-                                    isLoading={isLoadingServices}
-                                />
+                                    value={selectedServiceId || null}
+                                    onValueChange={(val) => setSelectedServiceId((val as string) ?? "")}
+                                    items={serviceOptions}
+                                >
+                                    <ComboboxInput placeholder="Select a service..." />
+                                    <ComboboxContent>
+                                        <ComboboxEmpty>
+                                            {isLoadingServices ? "Loading..." : "No service found."}
+                                        </ComboboxEmpty>
+                                        <ComboboxList>
+                                            {(item) => (
+                                                <ComboboxItem key={item.value} value={item.value}>
+                                                    {item.label}
+                                                </ComboboxItem>
+                                            )}
+                                        </ComboboxList>
+                                    </ComboboxContent>
+                                </Combobox>
                             )}
                         </div>
 
@@ -244,18 +261,28 @@ export function AssignServiceToClientDialog({
                                 Client {isHRManager ? "(Client ID)" : ""}
                             </Label>
                             <Combobox
-                                options={clientOptions}
-                                value={selectedClientId}
-                                onChange={(val) => setSelectedClientId(val)}
-                                placeholder="Select a client..."
-                                searchPlaceholder={
-                                    isHRManager
-                                        ? "Search client ID..."
-                                        : "Search client by name or ID..."
-                                }
-                                emptyText="No active client found."
-                                isLoading={isLoadingClients}
-                            />
+                                value={selectedClientId || null}
+                                onValueChange={(val) => setSelectedClientId((val as string) ?? "")}
+                                items={clientOptions}
+                            >
+                                <ComboboxInput
+                                    placeholder="Select a client..."
+                                />
+                                <ComboboxContent>
+                                    <ComboboxEmpty>
+                                        {isLoadingClients
+                                            ? "Loading..."
+                                            : "No active client found."}
+                                    </ComboboxEmpty>
+                                    <ComboboxList>
+                                        {(item) => (
+                                            <ComboboxItem key={item.value} value={item.value}>
+                                                {item.label}
+                                            </ComboboxItem>
+                                        )}
+                                    </ComboboxList>
+                                </ComboboxContent>
+                            </Combobox>
                         </div>
 
                         {/* Custom Price Input */}

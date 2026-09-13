@@ -70,7 +70,14 @@ import { toast } from "sonner";
 import { IService } from "@/types/order.type";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { Combobox } from "@/components/ui/combobox";
+import {
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+} from "@/components/ui/combobox";
 import { AssignServiceToClientDialog } from "@/components/service/AssignServiceToClientDialog";
 import { UserPlus } from "lucide-react";
 
@@ -807,7 +814,9 @@ export default function ServicesPage() {
             <div className="space-y-2">
               <Label>Target Service</Label>
               <Combobox
-                options={
+                value={migrationTargetId || null}
+                onValueChange={(val) => setMigrationTargetId((val as string) ?? "")}
+                items={
                   servicesData?.data
                     .filter((s) => s._id !== selectedService?._id)
                     .map((s) => ({
@@ -815,12 +824,19 @@ export default function ServicesPage() {
                       label: s.name,
                     })) || []
                 }
-                value={migrationTargetId}
-                onChange={setMigrationTargetId}
-                placeholder="Select target service..."
-                searchPlaceholder="Search service..."
-                emptyText="No service found."
-              />
+              >
+                <ComboboxInput placeholder="Select target service..." />
+                <ComboboxContent>
+                  <ComboboxEmpty>No service found.</ComboboxEmpty>
+                  <ComboboxList>
+                    {(item) => (
+                      <ComboboxItem key={item.value} value={item.value}>
+                        {item.label}
+                      </ComboboxItem>
+                    )}
+                  </ComboboxList>
+                </ComboboxContent>
+              </Combobox>
             </div>
           </div>
           <DialogFooter>

@@ -64,7 +64,16 @@ import {
 } from '@/redux/features/asset/assetApi';
 import { useGetAllBranchesQuery } from '@/redux/features/branch/branchApi';
 import { useGetStaffsQuery } from '@/redux/features/staff/staffApi';
-import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
+import {
+    Combobox,
+    ComboboxContent,
+    ComboboxEmpty,
+    ComboboxInput,
+    ComboboxItem,
+    ComboboxList,
+} from '@/components/ui/combobox';
+
+type ComboboxOption = { value: string; label: string; description?: string };
 import type {
     IAsset,
     AssetCategory,
@@ -1201,15 +1210,27 @@ export function AssetFormDialog({
                                                     Assigned To (Staff Member)
                                                 </Label>
                                                 <Combobox
-                                                    options={staffOptions}
-                                                    value={assignedTo}
-                                                    onChange={(val) => setAssignedTo(val)}
-                                                    placeholder="Select Staff Member (Optional)"
-                                                    searchPlaceholder="Search staff by name..."
-                                                    emptyText="No staff member found."
-                                                    isLoading={isLoadingStaffs}
-                                                    className="h-10 text-sm w-full"
-                                                />
+                                                    value={assignedTo || null}
+                                                    onValueChange={(val) => setAssignedTo((val as string) ?? '')}
+                                                    items={staffOptions}
+                                                >
+                                                    <ComboboxInput
+                                                        placeholder="Select Staff Member (Optional)"
+                                                        className="h-10 text-sm w-full"
+                                                    />
+                                                    <ComboboxContent>
+                                                        <ComboboxEmpty>
+                                                            {isLoadingStaffs ? 'Loading...' : 'No staff member found.'}
+                                                        </ComboboxEmpty>
+                                                        <ComboboxList>
+                                                            {(item) => (
+                                                                <ComboboxItem key={item.value} value={item.value}>
+                                                                    {item.label}
+                                                                </ComboboxItem>
+                                                            )}
+                                                        </ComboboxList>
+                                                    </ComboboxContent>
+                                                </Combobox>
                                             </div>
 
                                             {/* Department */}
