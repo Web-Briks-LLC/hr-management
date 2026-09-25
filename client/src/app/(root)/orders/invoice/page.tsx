@@ -654,6 +654,10 @@ export default function InvoicePage() {
                                 resetGeneratedInvoice();
                             }}
                             items={clientOptions}
+                            itemToStringLabel={(value) =>
+                                clientOptions.find((o) => o.value === value)
+                                    ?.[isAdmin ? "label" : "description"] ?? ""
+                            }
                         >
                             <ComboboxInput placeholder="Select a client" />
                             <ComboboxContent>
