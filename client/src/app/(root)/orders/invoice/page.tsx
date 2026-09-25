@@ -647,9 +647,9 @@ export default function InvoicePage() {
                             Client
                         </Label>
                         <Combobox
-                            value={selectedClientId}
-                            onInputValueChange={(val) => {
-                                setSelectedClientId(val);
+                            value={selectedClientId || null}
+                            onValueChange={(val) => {
+                                setSelectedClientId((val as string) ?? "");
                                 setSelectedOrders(new Set());
                                 resetGeneratedInvoice();
                             }}
@@ -659,20 +659,16 @@ export default function InvoicePage() {
                             <ComboboxContent>
                                 <ComboboxEmpty>No clients found.</ComboboxEmpty>
                                 <ComboboxList>
-                                    {(item) => {
-                                        console.log(item);
-
-                                        return (
-                                            <ComboboxItem
-                                                key={item.value}
-                                                value={item.label}
-                                            >
-                                                {isAdmin
-                                                    ? item.label
-                                                    : item.description}
-                                            </ComboboxItem>
-                                        );
-                                    }}
+                                    {(item) => (
+                                        <ComboboxItem
+                                            key={item.value}
+                                            value={item.value}
+                                        >
+                                            {isAdmin
+                                                ? item.label
+                                                : item.description}
+                                        </ComboboxItem>
+                                    )}
                                 </ComboboxList>
                             </ComboboxContent>
                         </Combobox>
