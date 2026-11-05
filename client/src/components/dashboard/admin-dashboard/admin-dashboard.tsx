@@ -37,6 +37,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
+import type { FinancialStats } from '@/types/dashboard.type';
 
 export default function AdminDashboard() {
     const { data: session } = useSession();
@@ -434,14 +435,33 @@ export default function AdminDashboard() {
                     />
 
                     <StatCard
-                        title="Staff on Leave Today"
-                        value={attendanceOverview?.onLeave || 0}
-                        suffix=" on leave"
-                        icon={FileText}
-                        description={`${leaveStats?.pending || 0} applications awaiting approval`}
-                        variant="default"
-                        href="/leave/manage"
-                    />
+                        title="Unpaid Earnings"
+                        value={(financialStats?.unpaidEarningsByCurrency || []).reduce(
+                            (total: number, item: FinancialStats['unpaidEarningsByCurrency'][number]) => total + item.count,
+                            0,
+                        )}
+                        suffix=" unpaid"
+                        icon={Wallet}
+                        description="All-time outstanding earnings"
+                        variant="warning"
+                        href="/earnings"
+                    >
+                        <div className="mt-3 space-y-1.5 text-xs">
+                            {(financialStats?.unpaidEarningsByCurrency || []).map(
+                                (item: FinancialStats['unpaidEarningsByCurrency'][number]) => (
+                                    <div key={item.currency} className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+                                        <span className="text-muted-foreground">{item.currency} ({item.count})</span>
+                                        <span className="font-mono font-semibold tabular-nums">
+                                            {item.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {item.currency}
+                                        </span>
+                                    </div>
+                                ),
+                            )}
+                            {!financialStats?.unpaidEarningsByCurrency?.length && (
+                                <p className="text-muted-foreground">No unpaid earnings</p>
+                            )}
+                        </div>
+                    </StatCard>
 
                     <StatCard
                         title="Total Staff Workforce"

@@ -71,3 +71,8 @@ npm run dev
 
 ## ❤️ Credits
 Developed as a robust solution for production MongoDB deployments.
+
+## Development and deployment commands
+
+See [scripts/README.md](scripts/README.md) for `make dev`, `make install` and
+`make prod`, including one-time PM2 configuration and changed-app deployments.

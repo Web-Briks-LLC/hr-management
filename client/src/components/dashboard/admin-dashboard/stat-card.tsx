@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
 import { AnimatedCounter } from './animated-counter';
 import Link from 'next/link';
+import type { ReactNode } from 'react';
 
 interface StatCardProps {
     title: string;
@@ -16,6 +17,7 @@ interface StatCardProps {
     decimals?: number;
     icon: LucideIcon;
     description?: string;
+    children?: ReactNode;
     trend?: {
         value: number;
         isPositive: boolean;
@@ -34,6 +36,7 @@ export function StatCard({
     decimals = 0,
     icon: Icon,
     description,
+    children,
     trend,
     badge,
     variant = 'default',
@@ -121,6 +124,8 @@ export function StatCard({
                             decimals={decimals}
                         />
                     </div>
+
+                    {children}
 
                     <div className="mt-2 flex items-center justify-between text-xs">
                         {description && (

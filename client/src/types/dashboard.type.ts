@@ -60,6 +60,11 @@ export interface FinancialStats {
     totalRevenue: number;
     unpaidRevenue: number;
     unpaidRevenueUSD: number;
+    unpaidEarningsByCurrency: {
+        currency: string;
+        amount: number;
+        count: number;
+    }[];
     totalRevenueUSD: number;
     profit: number;
 }
