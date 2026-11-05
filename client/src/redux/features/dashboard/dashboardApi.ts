@@ -8,7 +8,7 @@ export const dashboardApi = apiSlice.injectEndpoints({
                 method: 'GET',
             }),
             transformResponse: (response: { data: any }) => response.data,
-            providesTags: ['Staff', 'Attendance', 'Overtime'],
+            providesTags: ['Staff', 'Attendance', 'Overtime', 'Earning'],
             // Refetch every 30 seconds
             keepUnusedDataFor: 30,
         }),

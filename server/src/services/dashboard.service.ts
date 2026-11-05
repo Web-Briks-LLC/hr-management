@@ -348,6 +348,7 @@ const getFinancialStats = async (): Promise<IFinancialStats> => {
         expensesThisMonth,
         deliveredRevenueResult,
         unpaidOrdersResult,
+        unpaidEarningsByCurrency,
     ] = await Promise.all([
         // Total earnings (all time, BDT)
         EarningModel.aggregate([
@@ -393,6 +394,33 @@ const getFinancialStats = async (): Promise<IFinancialStats> => {
             },
             { $group: { _id: null, total: { $sum: '$totalPrice' } } },
         ]),
+        // Outstanding earnings in their original currencies, including partial payments.
+        EarningModel.aggregate<IFinancialStats['unpaidEarningsByCurrency'][number]>([
+            { $match: { status: 'unpaid' } },
+            {
+                $group: {
+                    _id: '$currency',
+                    amount: {
+                        $sum: {
+                            $max: [
+                                0,
+                                { $subtract: ['$totalAmount', { $ifNull: ['$paidAmount', 0] }] },
+                            ],
+                        },
+                    },
+                    count: { $sum: 1 },
+                },
+            },
+            { $sort: { _id: 1 } },
+            {
+                $project: {
+                    _id: 0,
+                    currency: '$_id',
+                    amount: { $round: ['$amount', 2] },
+                    count: 1,
+                },
+            },
+        ]),
     ]);
 
     const totalEarnings = earningsTotal[0]?.total || 0;
@@ -416,6 +444,7 @@ const getFinancialStats = async (): Promise<IFinancialStats> => {
         totalRevenue: Math.round(totalRevenue * 100) / 100,
         unpaidRevenue: Math.round(unpaidRevenue * 100) / 100,
         unpaidRevenueUSD: Math.round(unpaidRevenueUSD * 100) / 100,
+        unpaidEarningsByCurrency,
         totalRevenueUSD: Math.round(totalRevenueUSD * 100) / 100,
         profit: Math.round(profit * 100) / 100,
     };
