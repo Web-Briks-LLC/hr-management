@@ -18,6 +18,7 @@ interface StatCardProps {
     icon: LucideIcon;
     description?: string;
     children?: ReactNode;
+    compact?: boolean;
     trend?: {
         value: number;
         isPositive: boolean;
@@ -37,6 +38,7 @@ export function StatCard({
     icon: Icon,
     description,
     children,
+    compact = false,
     trend,
     badge,
     variant = 'default',
@@ -89,8 +91,9 @@ export function StatCard({
 
     const cardContent = (
         <Card className={cn(
-            'relative overflow-hidden transition-all duration-300 shadow-xs hover:shadow-md group',
-            style.card
+            'relative h-full overflow-hidden transition-all duration-300 shadow-xs hover:shadow-md group',
+            style.card,
+            compact && 'py-0'
         )}>
             {/* Ambient Corner Glow */}
             <div className={cn(
@@ -98,7 +101,7 @@ export function StatCard({
                 style.glow
             )} />
 
-            <CardContent className="p-5">
+            <CardContent className={cn('p-5', compact && 'py-3')}>
                 <div className="flex items-center justify-between gap-2">
                     <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground truncate">
                         {title}
@@ -115,7 +118,7 @@ export function StatCard({
                     </div>
                 </div>
 
-                <div className="mt-3">
+                <div className={compact ? 'mt-2' : 'mt-3'}>
                     <div className="text-2xl lg:text-3xl font-bold tracking-tight text-foreground font-mono">
                         <AnimatedCounter
                             value={value}
@@ -160,10 +163,11 @@ export function StatCard({
     if (href) {
         return (
             <motion.div
+                className="h-full"
                 whileHover={{ y: -3 }}
                 transition={{ duration: 0.2 }}
             >
-                <Link href={href} className="block cursor-pointer focus:outline-hidden">
+                <Link href={href} className="block h-full cursor-pointer focus:outline-hidden">
                     {cardContent}
                 </Link>
             </motion.div>
@@ -172,6 +176,7 @@ export function StatCard({
 
     return (
         <motion.div
+            className="h-full"
             whileHover={{ y: -2 }}
             transition={{ duration: 0.2 }}
         >
