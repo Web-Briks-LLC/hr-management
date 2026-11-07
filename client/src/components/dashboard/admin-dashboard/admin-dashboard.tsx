@@ -333,6 +333,36 @@ export default function AdminDashboard() {
                     />
 
                     <StatCard
+                        title="Unpaid Earnings"
+                        value={(financialStats?.unpaidEarningsByCurrency || []).reduce(
+                            (total: number, item: FinancialStats['unpaidEarningsByCurrency'][number]) => total + item.count,
+                            0,
+                        )}
+                        suffix=" unpaid"
+                        icon={Wallet}
+                        description="All-time outstanding earnings"
+                        compact
+                        variant="warning"
+                        href="/earnings"
+                    >
+                        <div className="mt-2 max-h-12 space-y-1 overflow-y-auto pr-1 text-xs">
+                            {(financialStats?.unpaidEarningsByCurrency || []).map(
+                                (item: FinancialStats['unpaidEarningsByCurrency'][number]) => (
+                                    <div key={item.currency} className="flex items-center justify-between gap-2">
+                                        <span className="text-muted-foreground">{item.currency} ({item.count})</span>
+                                        <span className="shrink-0 font-mono font-semibold tabular-nums">
+                                            {item.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {item.currency}
+                                        </span>
+                                    </div>
+                                ),
+                            )}
+                            {!financialStats?.unpaidEarningsByCurrency?.length && (
+                                <p className="text-muted-foreground">No unpaid earnings</p>
+                            )}
+                        </div>
+                    </StatCard>
+
+                    <StatCard
                         title="Net Operating Profit"
                         value={financialStats?.thisMonthProfit || 0}
                         prefix="৳"
@@ -351,17 +381,6 @@ export default function AdminDashboard() {
                         variant="indigo"
                         badge={orderStats?.urgentCount ? `${orderStats.urgentCount} urgent` : undefined}
                         href="/orders"
-                    />
-
-                    <StatCard
-                        title="Today's Attendance Rate"
-                        value={attendanceOverview?.presentPercentage || 0}
-                        suffix="%"
-                        decimals={1}
-                        icon={UserCheck}
-                        description={`${attendanceOverview?.present || 0} present of ${staffStats?.active || staffStats?.total || 0} active staff`}
-                        variant="cyan"
-                        href="/attendance"
                     />
                 </div>
             )}
@@ -435,33 +454,15 @@ export default function AdminDashboard() {
                     />
 
                     <StatCard
-                        title="Unpaid Earnings"
-                        value={(financialStats?.unpaidEarningsByCurrency || []).reduce(
-                            (total: number, item: FinancialStats['unpaidEarningsByCurrency'][number]) => total + item.count,
-                            0,
-                        )}
-                        suffix=" unpaid"
-                        icon={Wallet}
-                        description="All-time outstanding earnings"
-                        variant="warning"
-                        href="/earnings"
-                    >
-                        <div className="mt-3 space-y-1.5 text-xs">
-                            {(financialStats?.unpaidEarningsByCurrency || []).map(
-                                (item: FinancialStats['unpaidEarningsByCurrency'][number]) => (
-                                    <div key={item.currency} className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
-                                        <span className="text-muted-foreground">{item.currency} ({item.count})</span>
-                                        <span className="font-mono font-semibold tabular-nums">
-                                            {item.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {item.currency}
-                                        </span>
-                                    </div>
-                                ),
-                            )}
-                            {!financialStats?.unpaidEarningsByCurrency?.length && (
-                                <p className="text-muted-foreground">No unpaid earnings</p>
-                            )}
-                        </div>
-                    </StatCard>
+                        title="Today's Attendance Rate"
+                        value={attendanceOverview?.presentPercentage || 0}
+                        suffix="%"
+                        decimals={1}
+                        icon={UserCheck}
+                        description={`${attendanceOverview?.present || 0} present of ${staffStats?.active || staffStats?.total || 0} active staff`}
+                        variant="cyan"
+                        href="/attendance"
+                    />
 
                     <StatCard
                         title="Total Staff Workforce"
