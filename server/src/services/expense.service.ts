@@ -151,7 +151,16 @@ const buildMatchStage = (params: ExpenseQueryParams): any => {
     }
 
     if (params.staffId && Types.ObjectId.isValid(params.staffId)) {
-        match.staffId = new Types.ObjectId(params.staffId);
+        // Single payments carry staffId; bulk payments (staffId: null) keep
+        // the staff share inside the note as "Bulk: <staffId>:<amount>,...".
+        const staffObjectId = new Types.ObjectId(params.staffId);
+        match.$or = [
+            { staffId: staffObjectId },
+            {
+                staffId: null,
+                note: new RegExp(`Bulk:[^|]*${staffObjectId.toString()}:\\d`),
+            },
+        ];
     }
 
     if (params.status && params.status !== "all") {
@@ -163,6 +172,24 @@ const buildMatchStage = (params: ExpenseQueryParams): any => {
     Object.assign(match, dateFilter);
 
     return match;
+};
+
+// Mark single/bulk payments and swap a bulk total for the staff's own share
+const withStaffShare = (expense: any, staffId: string) => {
+    if (expense.staffId) return { ...expense, paymentType: "single" };
+
+    const match = String(expense.note || "").match(/Bulk:\s*([0-9a-fA-F:,]+)/);
+    const pair = match?.[1]
+        ?.split(",")
+        .find((p: string) => p.startsWith(`${staffId}:`));
+    const share = pair ? parseFloat(pair.split(":")[1] as string) : NaN;
+
+    return {
+        ...expense,
+        paymentType: "bulk",
+        bulkTotal: expense.amount,
+        amount: Number.isNaN(share) ? expense.amount : share,
+    };
 };
 
 // Get all expenses with pagination and filtering
@@ -184,8 +211,13 @@ const getAllExpensesFromDB = async (params: ExpenseQueryParams) => {
         ExpenseModel.countDocuments(matchStage),
     ]);
 
+    // For a staff-specific list, show this staff's own share of bulk payments
+    const staffExpenses = params.staffId
+        ? expenses.map((e: any) => withStaffShare(e, params.staffId as string))
+        : expenses;
+
     return {
-        expenses,
+        expenses: staffExpenses,
         pagination: {
             page,
             limit,
