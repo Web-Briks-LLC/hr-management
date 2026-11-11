@@ -179,6 +179,21 @@ export function PaymentHistoryTab({
                                 },
                             ).format(payment.amount);
                             const isBulk = payment.paymentType === "bulk";
+                            // Hide raw staff id from titles
+                            const cleanTitle = payment.title
+                                .replace(/\s-\s[0-9a-f]{24}/i, "")
+                                .trim();
+                            const forMonth =
+                                payment.billingMonth && payment.billingYear
+                                    ? format(
+                                          new Date(
+                                              payment.billingYear,
+                                              payment.billingMonth - 1,
+                                              1,
+                                          ),
+                                          "MMMM yyyy",
+                                      )
+                                    : null;
 
                             return (
                                 <TableRow
@@ -186,17 +201,26 @@ export function PaymentHistoryTab({
                                     className="hover:bg-muted/50 transition-colors"
                                 >
                                     <TableCell className="font-medium whitespace-nowrap">
-                                        {format(
-                                            new Date(payment.date),
-                                            "MMM dd, yyyy",
-                                        )}
+                                        <div className="flex flex-col gap-0.5">
+                                            <span>
+                                                {format(
+                                                    new Date(payment.date),
+                                                    "MMM dd, yyyy",
+                                                )}
+                                            </span>
+                                            {forMonth && (
+                                                <span className="text-xs font-normal text-muted-foreground">
+                                                    For {forMonth}
+                                                </span>
+                                            )}
+                                        </div>
                                     </TableCell>
                                     <TableCell>
                                         <span
                                             className="block font-medium text-foreground truncate max-w-[280px]"
-                                            title={payment.title}
+                                            title={cleanTitle}
                                         >
-                                            {payment.title}
+                                            {cleanTitle}
                                         </span>
                                     </TableCell>
                                     <TableCell className="text-muted-foreground">

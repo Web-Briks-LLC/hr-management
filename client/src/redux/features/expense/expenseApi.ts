@@ -18,6 +18,9 @@ export interface Expense {
     paymentMethod?: string;
     /** Only set on staff-specific lists: single or part of a bulk payout */
     paymentType?: "single" | "bulk";
+    /** Month/year this payment is for (may differ from `date`) */
+    billingMonth?: number;
+    billingYear?: number;
     /** Bulk payments: the whole bulk total (`amount` is the staff's share) */
     bulkTotal?: number;
     note?: string;
