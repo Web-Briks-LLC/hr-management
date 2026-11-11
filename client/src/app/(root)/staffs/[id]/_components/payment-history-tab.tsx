@@ -152,7 +152,8 @@ export function PaymentHistoryTab({
                     <TableHeader className="bg-muted/50">
                         <TableRow>
                             <TableHead className="w-[150px]">Date</TableHead>
-                            <TableHead>Category / Title</TableHead>
+                            <TableHead>Title</TableHead>
+                            <TableHead>Category</TableHead>
                             <TableHead>Method</TableHead>
                             <TableHead className="text-right">Amount</TableHead>
                             <TableHead className="text-right">Status</TableHead>
@@ -166,15 +167,18 @@ export function PaymentHistoryTab({
                                 className,
                             } = getStatusStyles(payment.status);
 
-                            // Format amount nicely (e.g., ৳ 1,000)
+                            // English format, e.g. BDT 25,000.00
                             const formattedAmount = new Intl.NumberFormat(
-                                "bn-BD",
+                                "en-US",
                                 {
                                     style: "currency",
                                     currency: "BDT",
-                                    minimumFractionDigits: 0,
+                                    currencyDisplay: "code",
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
                                 },
                             ).format(payment.amount);
+                            const isBulk = payment.paymentType === "bulk";
 
                             return (
                                 <TableRow
@@ -188,21 +192,27 @@ export function PaymentHistoryTab({
                                         )}
                                     </TableCell>
                                     <TableCell>
-                                        <div className="flex flex-col">
+                                        <span
+                                            className="block font-medium text-foreground truncate max-w-[280px]"
+                                            title={payment.title}
+                                        >
+                                            {payment.title}
+                                        </span>
+                                    </TableCell>
+                                    <TableCell className="text-muted-foreground">
+                                        {payment.category?.name ||
+                                            "Uncategorized"}
+                                    </TableCell>
+                                    <TableCell>
+                                        <div className="flex flex-col gap-0.5">
                                             <span className="font-medium text-foreground">
-                                                {payment.category?.name ||
-                                                    "Uncategorized"}
+                                                {isBulk ? "Bulk" : "Single"}
                                             </span>
-                                            <span
-                                                className="text-xs text-muted-foreground truncate max-w-[250px]"
-                                                title={payment.title}
-                                            >
-                                                {payment.title}
+                                            <span className="text-xs capitalize text-muted-foreground">
+                                                {payment.paymentMethod ||
+                                                    "cash"}
                                             </span>
                                         </div>
-                                    </TableCell>
-                                    <TableCell className="capitalize text-muted-foreground">
-                                        {payment.paymentMethod || "Cash"}
                                     </TableCell>
                                     <TableCell className="text-right font-semibold">
                                         <span

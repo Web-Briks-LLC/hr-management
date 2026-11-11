@@ -16,6 +16,10 @@ export interface Expense {
     amount: number;
     status: "pending" | "paid" | "partial_paid";
     paymentMethod?: string;
+    /** Only set on staff-specific lists: single or part of a bulk payout */
+    paymentType?: "single" | "bulk";
+    /** Bulk payments: the whole bulk total (`amount` is the staff's share) */
+    bulkTotal?: number;
     note?: string;
     createdBy: { _id: string; name: string };
     createdAt: string;
