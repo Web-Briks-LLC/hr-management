@@ -189,7 +189,12 @@ export default function ExportPdfDialog({
             return;
         }
 
-        // Export ALL staff, not just those with bank accounts
+        if (!payrollData.length) {
+            toast.error("Select at least one staff member to export");
+            return;
+        }
+
+        // The parent supplies only the staff selected for this export.
         const totalAmount = payrollData.reduce(
             (acc, curr) => acc + (curr.payableSalary || 0),
             0,
@@ -342,7 +347,7 @@ export default function ExportPdfDialog({
                     </DialogTitle>
                     <DialogDescription>
                         Select a bank account for the salary transfer request
-                        letter
+                        letter. Only the {payrollData.length} selected staff will be included.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -581,7 +586,7 @@ export default function ExportPdfDialog({
                     </Button>
                     <Button
                         onClick={handleExport}
-                        disabled={!selectedBank || showAddForm}
+                        disabled={!selectedBank || showAddForm || !payrollData.length}
                     >
                         <FileText className="h-4 w-4 mr-2" />
                         Generate PDF

@@ -4,6 +4,7 @@ import ShiftAssignmentModel from "../models/shift-assignment.model.js";
 import AttendanceDayModel from "../models/attendance-day.model.js";
 import type { IShift } from "../types/shift.type.js";
 import StaffModel from "../models/staff.model.js";
+import { assertEmployedOn, employmentExpr, employmentEnd, overtimeMinutesExpr } from '../utils/employment.util.js';
 import ShiftOffDateService from "./shift-off-date.service.js";
 import { escapeRegex } from "../lib/sanitize.js";
 import {
@@ -107,6 +108,7 @@ const checkInInDB = async ({
     throw new Error("Staff not found for the user.");
   }
 
+  assertEmployedOn(staff, now);
   const staffId = staff._id;
 
   const lastEvent = await AttendanceEventModel.findOne({
@@ -282,7 +284,7 @@ async function checkOutInDB({
   userAgent: string;
   source?: "web" | "mobile" | "manual";
 }) {
-  const now = getBDNow();
+  let now = getBDNow();
 
   const dayStart = getBDStartOfDay(now);
   const dayEnd = getBDEndOfDay(now);
@@ -311,6 +313,8 @@ async function checkOutInDB({
   if (!attendanceDay) {
     throw new Error("No check-in record found.");
   }
+  assertEmployedOn(staff, attendanceDay.date);
+  now = employmentEnd(staff, attendanceDay.checkInAt || attendanceDay.date, now);
 
   if (!attendanceDay.checkInAt) {
     throw new Error("No valid check-in found for today.");
@@ -471,6 +475,12 @@ async function getMonthlyStatsInDB(userId: string) {
   }
   const staffId = staff._id;
 
+  const eligibleRecordStages = [
+    { $lookup: { from: 'staffs', localField: 'staffId', foreignField: '_id', as: 'employmentStaff' } },
+    { $unwind: '$employmentStaff' },
+    { $match: { $expr: employmentExpr('$date', 'employmentStaff.') } },
+
+  ];
   // Get Attendance Stats
   const attendanceStats = await AttendanceDayModel.aggregate([
     {
@@ -479,6 +489,7 @@ async function getMonthlyStatsInDB(userId: string) {
         date: { $gte: startDate, $lte: endDate },
       },
     },
+    ...eligibleRecordStages,
     {
       $group: {
         _id: null,
@@ -507,10 +518,11 @@ async function getMonthlyStatsInDB(userId: string) {
         // Let's stick to simple sum of durationMinutes.
       },
     },
+    ...eligibleRecordStages,
     {
       $group: {
         _id: null,
-        totalMinutes: { $sum: "$durationMinutes" },
+        totalMinutes: { $sum: overtimeMinutesExpr() },
       },
     },
   ]);
@@ -658,30 +670,33 @@ async function getAllAttendanceFromDB({
     query.status = status;
   }
 
-  const skip = (page - 1) * limit;
-
-  // Get attendance records with populated staff and shift details
-  let attendanceRecords = await AttendanceDayModel.find(query)
-    .populate({
-      path: "staffId",
-      select: "staffId designation department branchId userId", // Include userId for manual population
-      populate: {
-        path: "branchId",
-        select: "name",
-      },
-    })
-    .populate("shiftId", "name startTime endTime")
-    .sort({ date: -1 })
-    .skip(skip)
-    .limit(limit)
-    .lean();
-
-  // Apply branch filter if needed (after population)
-  if (branchId) {
-    attendanceRecords = attendanceRecords.filter(
-      (record: any) => record.staffId?.branchId?.toString() === branchId,
-    );
+  const eligibilityQuery = { ...query };
+  delete eligibilityQuery.status;
+  if (query.staffId) {
+    eligibilityQuery.staffId = typeof query.staffId === 'string'
+      ? new Types.ObjectId(query.staffId)
+      : { $in: query.staffId.$in.map((id: string) => new Types.ObjectId(id)) };
   }
+  const skip = (page - 1) * limit;
+  const statusStages = status ? [{ $match: { status } }] : [];
+  // Apply employment and branch filters before pagination and every count.
+  const [result] = await AttendanceDayModel.aggregate([
+    { $match: eligibilityQuery },
+    { $lookup: { from: 'staffs', localField: 'staffId', foreignField: '_id', as: 'employmentStaff' } },
+    { $unwind: '$employmentStaff' },
+    { $match: { $expr: employmentExpr('$date', 'employmentStaff.'), ...(branchId ? { 'employmentStaff.branchId': new Types.ObjectId(branchId) } : {}) } },
+    { $project: { employmentStaff: 0 } },
+    { $facet: {
+      records: [...statusStages, { $sort: { date: -1 } }, { $skip: skip }, { $limit: limit }],
+      total: [...statusStages, { $count: 'count' }],
+      stats: [{ $group: { _id: '$status', count: { $sum: 1 } } }],
+    } },
+  ]);
+  const rawRecords: Record<string, unknown>[] = result?.records || [];
+  let attendanceRecords = await AttendanceDayModel.populate(rawRecords, [
+    { path: 'staffId', options: { lean: true }, select: 'staffId designation department branchId userId', populate: { path: 'branchId', select: 'name' } },
+    { path: 'shiftId', options: { lean: true }, select: 'name startTime endTime' },
+  ]);
 
   // Manual Population of User Names
   const userIdsToFetch = attendanceRecords
@@ -709,21 +724,7 @@ async function getAllAttendanceFromDB({
     });
   }
 
-  // --- Calculate Statistics (Ignoring the 'status' filter for tabs) ---
-  // We clone the query but remove 'status' so tabs show total available in that date/search range
-  const statsQuery = { ...query };
-  delete statsQuery.status;
-
-  // We can use an aggregation pipeline to get counts per status efficiently
-  const statsAggregation = await AttendanceDayModel.aggregate([
-    { $match: statsQuery },
-    {
-      $group: {
-        _id: "$status",
-        count: { $sum: 1 },
-      },
-    },
-  ]);
+  const statsAggregation: { _id: string; count: number }[] = result?.stats || [];
 
   // Format the stats array into a usable object mapping
   const statsMap: Record<string, number> = {
@@ -741,11 +742,11 @@ async function getAllAttendanceFromDB({
   statsAggregation.forEach((stat) => {
     const s = stat._id as string;
     statsMap[s] = stat.count;
-    statsMap.total += stat.count;
+    statsMap.total = (statsMap.total || 0) + stat.count;
   });
   // --- End Statistics Calculation ---
 
-  const total = await AttendanceDayModel.countDocuments(query);
+  const total = result?.total[0]?.count || 0;
 
   return {
     records: attendanceRecords,
@@ -797,6 +798,8 @@ async function updateAttendanceStatusInDB({
     throw new Error("Attendance record not found");
   }
 
+  const staff = await StaffModel.findById(attendanceDay.staffId).lean();
+  assertEmployedOn(staff, attendanceDay.date);
   const oldStatus = attendanceDay.status;
 
   // Update attendance
@@ -865,6 +868,9 @@ async function bulkUpdateAttendanceStatusInDB({
   const targetDate = new Date(date);
   const dayStart = getBDStartOfDay(targetDate);
 
+  const staffRecords = await StaffModel.find({ _id: { $in: staffIds } }).lean();
+  if (staffRecords.length !== new Set(staffIds).size) throw new Error('Invalid staff selection');
+  for (const staff of staffRecords) assertEmployedOn(staff, dayStart);
   const results = [];
 
   for (const staffId of staffIds) {

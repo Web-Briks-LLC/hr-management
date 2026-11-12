@@ -1,7 +1,0 @@
-# Copy to .make.local, then replace these examples with names from `pm2 list`.
-PM2_CLIENT := hr-client
-PM2_SERVER := hr-server
-PM2_PAYMENT := hr-payment
-
-# Optional: clean npm's shared cache after each changed app's npm ci.
-CLEAN_CACHE := 0

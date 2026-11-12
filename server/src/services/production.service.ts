@@ -3,6 +3,8 @@ import ShiftProductionModel from '../models/shift-production.model.js';
 import OrderModel from '../models/order.model.js';
 import ShiftModel from '../models/shift.model.js';
 import StaffModel from '../models/staff.model.js';
+import { assertEmployedOn, employmentExpr, employmentEnd } from '../utils/employment.util.js';
+import { freezeInactiveWorkSessions } from './employment-timers.service.js';
 import OrderImageModel from '../models/order-image.model.js';
 import ProductionWorkSessionModel from '../models/production-session.model.js';
 import { getIO } from '../socket.js';
@@ -120,6 +122,9 @@ const createProductionLog = async (
 
     const date = payload.date ? new Date(payload.date) : new Date();
 
+    const assignedPeople = await StaffModel.find({ _id: { $in: (payload.assignedStaffs || []).map(s => s.staffId) } }).lean();
+    if (assignedPeople.length !== new Set((payload.assignedStaffs || []).map(s => s.staffId)).size) throw new Error('Invalid staff selection');
+    for (const person of assignedPeople) assertEmployedOn(person, date);
     // Map assigned staffs
     const assignedStaffs = (payload.assignedStaffs || []).map((staff) => ({
         staffId: new Types.ObjectId(staff.staffId),
@@ -712,6 +717,9 @@ const updateProductionLog = async (
         log.bottlenecks = payload.bottlenecks;
     }
     if (payload.assignedStaffs) {
+        const people = await StaffModel.find({ _id: { $in: payload.assignedStaffs.map(s => s.staffId) } }).lean();
+        if (people.length !== new Set(payload.assignedStaffs.map(s => s.staffId)).size) throw new Error('Invalid staff selection');
+        for (const person of people) assertEmployedOn(person, payload.date || log.date);
         log.assignedStaffs = payload.assignedStaffs.map((s) => ({
             staffId: new Types.ObjectId(s.staffId),
             imageCount: Number(s.imageCount) || 0,
@@ -1265,6 +1273,7 @@ const startWorkSession = async (
     if (!staff) {
         throw new Error('Staff profile not found for this user');
     }
+    assertEmployedOn(staff, new Date());
     const staffName = (staff.userId as any)?.name || 'Editor';
 
     const order = await OrderModel.findById(payload.orderId).lean();
@@ -1480,6 +1489,7 @@ const startWorkSession = async (
  * Get current active work session for a staff user
  */
 const getActiveWorkSession = async (userId: string) => {
+    await freezeInactiveWorkSessions();
     const staff = await StaffModel.findOne({ userId }).lean();
     if (!staff) {
         return null;
@@ -1557,7 +1567,7 @@ const pauseWorkSession = async (sessionId: string, userId: string) => {
         throw new Error('Only an active session can be put on hold');
     }
 
-    const now = new Date();
+    const now = employmentEnd(staff, session.startTime, new Date());
     session.status = 'paused';
     session.pausedAt = now;
     session.pauseHistory.push({
@@ -1586,6 +1596,7 @@ const resumeWorkSession = async (sessionId: string, userId: string) => {
         throw new Error('Staff profile not found');
     }
 
+    assertEmployedOn(staff, new Date());
     const session = await ProductionWorkSessionModel.findById(sessionId);
     if (!session) {
         throw new Error('Work session not found');
@@ -1692,6 +1703,7 @@ const finalizeSessionCompletion = async (
     if (!staff) {
         throw new Error('Editor profile for this session was not found');
     }
+    assertEmployedOn(staff, new Date());
 
     const now = new Date();
 
@@ -1995,6 +2007,7 @@ const reassignWorkSession = async (
     payload: { sessionId: string; newStaffId: string; note?: string | undefined },
     actingUserId: string
 ) => {
+    await freezeInactiveWorkSessions();
     const oldSession = await ProductionWorkSessionModel.findById(payload.sessionId);
     if (!oldSession) {
         throw new Error('Work session not found');
@@ -2009,6 +2022,7 @@ const reassignWorkSession = async (
     if (!newStaff) {
         throw new Error('Target editor not found');
     }
+    assertEmployedOn(newStaff, new Date());
     if (newStaff._id.toString() === oldSession.staffId.toString()) {
         throw new Error('Session is already assigned to this editor');
     }
@@ -2136,6 +2150,7 @@ const reassignWorkSession = async (
  * session with computed live timers, plus a per-editor rollup.
  */
 const getLiveWorkSessions = async (userId?: string, userRole?: string) => {
+    await freezeInactiveWorkSessions();
     // Branch scoping for the supervisor floor monitor: every supervisor except
     // super_admin only sees sessions from their own branch. Super admins — and
     // anyone whose staff profile has no branch — see every branch.
@@ -2255,7 +2270,7 @@ const getLiveWorkSessions = async (userId?: string, userRole?: string) => {
  * (non-telemarketer, active) staff only.
  */
 const getProductionEditors = async (userId?: string, userRole?: string) => {
-    const query: Record<string, unknown> = { status: 'active' };
+    const query: Record<string, unknown> = { $expr: employmentExpr() };
 
     // Branch scoping for the reassignment picker: every supervisor except
     // super_admin only sees editors from their own branch. Super admins — and
@@ -2494,6 +2509,10 @@ const getStaffPerformanceAnalytics = async (filters: {
     // 1. Staff Leaderboard & Individual Output
     const staffSummary = await ProductionWorkSessionModel.aggregate([
         { $match: query },
+        { $lookup: { from: 'staffs', localField: 'staffId', foreignField: '_id', as: 'employmentStaff' } },
+        { $unwind: '$employmentStaff' },
+        { $match: { $expr: employmentExpr('$startTime', 'employmentStaff.') } },
+
         {
             $group: {
                 _id: '$staffId',
@@ -2540,6 +2559,10 @@ const getStaffPerformanceAnalytics = async (filters: {
     // 2. Shift-wise performance comparison
     const shiftOutput = await ProductionWorkSessionModel.aggregate([
         { $match: query },
+        { $lookup: { from: 'staffs', localField: 'staffId', foreignField: '_id', as: 'employmentStaff' } },
+        { $unwind: '$employmentStaff' },
+        { $match: { $expr: employmentExpr('$startTime', 'employmentStaff.') } },
+
         {
             $group: {
                 _id: '$shiftId',
@@ -2790,6 +2813,9 @@ const getStaffEditedImages = async (
                         status: { $in: ['completed', 'reassigned'] },
                     },
                 },
+                { $lookup: { from: 'staffs', localField: 'staffId', foreignField: '_id', as: 'employmentStaff' } },
+                { $unwind: '$employmentStaff' },
+                { $match: { $expr: employmentExpr('$startTime', 'employmentStaff.') } },
                 {
                     $group: {
                         _id: null,

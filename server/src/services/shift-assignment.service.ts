@@ -4,6 +4,7 @@ import StaffModel from '../models/staff.model.js';
 import ShiftModel from '../models/shift.model.js';
 import ShiftAssignmentModel from '../models/shift-assignment.model.js';
 import { sendBulkSMS } from '../utils/sms.util.js';
+import { assertEmployedOn } from '../utils/employment.util.js';
 
 const assignShift = async ({
     staffIds,
@@ -29,6 +30,7 @@ const assignShift = async ({
             throw new Error('One or more staff IDs are invalid');
         }
 
+        for (const staff of staffs) assertEmployedOn(staff, startDate);
         const shift = await ShiftModel.findById(shiftId)
             .session(session)
             .lean();

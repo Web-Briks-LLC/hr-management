@@ -18,6 +18,7 @@ import {
     getBDDateString,
 } from '../utils/date.util.js';
 import auditService from './audit.service.js';
+import { isEmployedOn, eligibleOvertimeMinutes } from '../utils/employment.util.js';
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
@@ -48,7 +49,6 @@ const getPayrollPreview = async ({
     const { startDate, endDate, year, monthNum } = parseMonthRange(month);
 
     const matchStage: any = {
-        status: 'active',
         joinDate: { $lte: endDate },
         $or: [
             { exitDate: { $exists: false } },
@@ -94,6 +94,8 @@ const getPayrollPreview = async ({
                 salary: 1,
                 joinDate: 1,
                 exitDate: 1,
+                status: 1,
+                inactivePeriods: 1,
                 branch: '$branch.name',
                 branchId: 1,
                 bank: 1,
@@ -211,7 +213,7 @@ const getPayrollPreview = async ({
     }
 
     // 3. Calculate stats for each staff
-    const stats = staffs.map((staff) => {
+    const stats = staffs.filter(staff => daysInMonthData.some(({ day }) => isEmployedOn(staff, day))).map((staff) => {
         const staffIdStr = staff._id.toString();
 
         const staffShiftAssignments = shiftAssignments.filter(
@@ -227,7 +229,7 @@ const getPayrollPreview = async ({
 
         // B. Attendance breakdown (O(1) Map)
         const staffAttendance = allAttendance.filter(
-            (a) => a.staffId.toString() === staffIdStr,
+            (a) => a.staffId.toString() === staffIdStr && isEmployedOn(staff, a.date),
         );
         const attendanceMap = new Map();
         
@@ -255,8 +257,6 @@ const getPayrollPreview = async ({
         let missingPunches = 0;
         let unemployedDays = 0;
 
-        const joinStr = staff.joinDate ? getBDDateString(staff.joinDate) : null;
-        const exitStr = staff.exitDate ? getBDDateString(staff.exitDate) : null;
 
         const staffShiftIdsSet = new Set(staffShiftAssignments.map(sa => sa.shiftId._id.toString()));
         const staffShiftOffDatesSet = new Set(
@@ -267,8 +267,7 @@ const getPayrollPreview = async ({
 
         const calendar = daysInMonthData.map(({ dayStr, weekDay }) => {
             // 1. Check if unemployed
-            const isBeforeJoin = joinStr && dayStr < joinStr;
-            const isAfterExit = exitStr && dayStr > exitStr;
+            const isOutsideEmployment = !isEmployedOn(staff, dayStr);
             
             // Resolve shift for this day
             const dayAssignment = assignmentsData.find(
@@ -278,7 +277,7 @@ const getPayrollPreview = async ({
             const shiftStart = shift?.startTime || null;
             const shiftEnd = shift?.endTime || null;
 
-            if (isBeforeJoin || isAfterExit) {
+            if (isOutsideEmployment) {
                 unemployedDays++;
                 return {
                     date: dayStr,
@@ -363,10 +362,10 @@ const getPayrollPreview = async ({
 
         // D. Overtime from approved records only
         const staffApprovedOvertime = approvedOvertime.filter(
-            (ot) => ot.staffId.toString() === staffIdStr,
+            (ot) => ot.staffId.toString() === staffIdStr && isEmployedOn(staff, ot.date),
         );
         const otMinutes = staffApprovedOvertime.reduce(
-            (sum, ot) => sum + (ot.durationMinutes || 0),
+            (sum, ot) => sum + eligibleOvertimeMinutes(staff, ot),
             0,
         );
         const hourlyRate = staffSalary / 30 / 8;
@@ -523,6 +522,9 @@ const processPayroll = async ({
     try {
         const staff = await StaffModel.findById(staffId).session(session);
         if (!staff) throw new Error('Staff not found');
+        if (!eachDayOfInterval({ start: startDate, end: endDate }).some(day => isEmployedOn(staff, day))) {
+            throw new Error('Staff has no active employment days in this payroll month');
+        }
 
         // Server-side amount verification for salary payments
         if (paymentType === 'salary') {
@@ -540,7 +542,7 @@ const processPayroll = async ({
             }).session(session);
 
             const literalAbsentDays = allAttendance.filter(
-                (a) => a.status === 'absent',
+                (a) => a.status === 'absent' && isEmployedOn(staff, a.date),
             ).length;
 
             const daysInMonth = eachDayOfInterval({
@@ -567,8 +569,6 @@ const processPayroll = async ({
             const staffSalary = staff.salary || 0;
             const perDaySalary = staffSalary / 30;
 
-            const joinDate = staff.joinDate ? new Date(staff.joinDate) : null;
-            const exitDate = staff.exitDate ? new Date(staff.exitDate) : null;
 
             let expectedWorkDates: Date[] = [];
             let workDaysCount = 0;
@@ -581,11 +581,7 @@ const processPayroll = async ({
                 const dayStr = getBDDateString(day);
 
                 // 1. Check unemployed
-                const isBeforeJoin =
-                    joinDate && dayStr < getBDDateString(joinDate);
-                const isAfterExit =
-                    exitDate && dayStr > getBDDateString(exitDate);
-                if (isBeforeJoin || isAfterExit) {
+                if (!isEmployedOn(staff, day)) {
                     unemployedDays++;
                     return;
                 }
@@ -661,8 +657,8 @@ const processPayroll = async ({
                 date: { $gte: startDate, $lte: endDate },
             }).session(session);
 
-            const otMinutes = staffApprovedOvertime.reduce(
-                (sum, ot) => sum + (ot.durationMinutes || 0),
+            const otMinutes = staffApprovedOvertime.filter(ot => isEmployedOn(staff, ot.date)).reduce(
+                (sum, ot) => sum + eligibleOvertimeMinutes(staff, ot),
                 0,
             );
 
@@ -907,6 +903,14 @@ const bulkProcessPayment = async ({
         const staffs = await StaffModel.find({
             _id: { $in: staffIds },
         }).session(session);
+
+        const payrollDays = eachDayOfInterval({ start: parseMonthRange(month).startDate, end: parseMonthRange(month).endDate });
+        for (const payment of payments) {
+            const staff = staffs.find(s => s._id.toString() === payment.staffId);
+            if (!staff || !payrollDays.some(day => isEmployedOn(staff, day))) {
+                throw new Error('One or more staff have no active employment days in this payroll month');
+            }
+        }
 
         // Calculate total amount
         const totalBulkAmount = payments.reduce(
@@ -1229,22 +1233,18 @@ const getAbsentDates = async (staffId: string, month: string) => {
     });
 
     const literalAbsents = allAttendance
-        .filter((a) => a.status === 'absent')
+        .filter((a) => a.status === 'absent' && isEmployedOn(staff, a.date))
         .map((a: any) => ({ date: a.date, status: 'absent' }));
 
     const missingPunches: { date: Date; status: string }[] = [];
     const todayBDStr = getBDDateString(getBDNow());
 
-    const joinStr = staff.joinDate ? getBDDateString(staff.joinDate) : null;
-    const exitStr = staff.exitDate ? getBDDateString(staff.exitDate) : null;
 
     expectedWorkDates.forEach((day: Date) => {
         const dayStr = getBDDateString(day);
         if (dayStr >= todayBDStr) return;
 
-        const isBeforeJoin = joinStr && dayStr < joinStr;
-        const isAfterExit = exitStr && dayStr > exitStr;
-        if (isBeforeJoin || isAfterExit) return;
+        if (!isEmployedOn(staff, day)) return;
 
         const hasRecord = allAttendance.some(
             (a: any) => getBDDateString(a.date) === dayStr,

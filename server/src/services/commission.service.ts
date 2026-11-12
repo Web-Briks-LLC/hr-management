@@ -1,3 +1,4 @@
+import { employmentExpr } from '../utils/employment.util.js';
 import mongoose, { type ClientSession } from "mongoose";
 import StaffModel from "../models/staff.model.js";
 import WalletTransactionModel, {
@@ -21,7 +22,7 @@ async function getBeneficiaryTelemarketer(client: any, session?: ClientSession) 
         const staff = await StaffModel.findOne({
             userId: assignedTMId,
             designation: { $regex: /^telemarketer$/i },
-            status: "active",
+            $expr: employmentExpr(),
         }).session(session || null);
         if (staff) return staff;
     }
@@ -32,7 +33,7 @@ async function getBeneficiaryTelemarketer(client: any, session?: ClientSession) 
         const staff = await StaffModel.findOne({
             userId: creatorId,
             designation: { $regex: /^telemarketer$/i },
-            status: "active",
+            $expr: employmentExpr(),
         }).session(session || null);
         if (staff) return staff;
     }
@@ -246,7 +247,7 @@ async function reverseEarningCommission(earningId: string, parentSession?: Clien
 async function syncAllCommissionsAndBalances() {
     const telemarketers = await StaffModel.find({
         designation: { $regex: /^telemarketer$/i },
-        status: "active",
+        $expr: employmentExpr(),
     });
 
     const summary: Array<{

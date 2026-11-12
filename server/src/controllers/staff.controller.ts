@@ -241,6 +241,8 @@ async function exportStaffs(_req: Request, res: Response) {
             'Salary',
             'Join Date',
             'Status',
+            'Last Active Date',
+            'Scheduled Status',
         ];
 
         const csvRows = staffs.map((staff: any) => [
@@ -255,6 +257,8 @@ async function exportStaffs(_req: Request, res: Response) {
             staff.salary || 0,
             staff.joinDate ? new Date(staff.joinDate).toLocaleDateString() : '',
             staff.status || '',
+            staff.exitDate ? new Date(staff.exitDate).toLocaleDateString('en-GB', { timeZone: 'Asia/Dhaka' }) : '',
+            staff.pendingStatus || '',
         ]);
 
         const csvContent = [

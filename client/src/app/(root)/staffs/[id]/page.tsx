@@ -228,6 +228,11 @@ export default function StaffDetailsPage() {
                                     >
                                         {staff.status}
                                     </Badge>
+                                    {staff.exitDate && (
+                                        <Badge variant="outline" className="text-xs">
+                                            {staff.pendingStatus ? `${staff.pendingStatus} scheduled · ` : ""}Last active: {new Date(staff.exitDate).toLocaleDateString("en-GB", { timeZone: "Asia/Dhaka" })}
+                                        </Badge>
+                                    )}
                                     {user?.role && (
                                         <Badge
                                             variant="secondary"

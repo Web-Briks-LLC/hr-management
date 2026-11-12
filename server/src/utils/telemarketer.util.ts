@@ -1,3 +1,4 @@
+import { employmentExpr } from './employment.util.js';
 import StaffModel from "../models/staff.model.js";
 
 /**
@@ -8,7 +9,7 @@ export async function getTelemarketerStaff(userId: string) {
     const staff = await StaffModel.findOne({
         userId,
         designation: { $regex: /^telemarketer$/i },
-        status: "active",
+        $expr: employmentExpr(),
     }).lean();
     return staff;
 }

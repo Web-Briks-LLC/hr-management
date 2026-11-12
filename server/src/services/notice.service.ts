@@ -1,3 +1,4 @@
+import { employmentExpr } from '../utils/employment.util.js';
 import NoticeModel from '../models/notice.model.js';
 import NotificationModel from '../models/notification.model.js';
 import StaffModel from '../models/staff.model.js';
@@ -133,7 +134,7 @@ const publishNotice = async (noticeId: string, publishedBy: string) => {
             .map((u: any) => u._id);
 
         const staffToNotify = await StaffModel.find({
-            status: 'active',
+            $expr: employmentExpr(),
             userId: { $in: nonAdminUserIds },
             phone: { $exists: true, $ne: '' },
         }).select('phone');

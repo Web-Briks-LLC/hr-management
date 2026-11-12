@@ -1,5 +1,7 @@
 import LeaveApplicationModel from '../models/leave_application.model.js';
 import LeaveBalanceModel from '../models/leave-balance.model.js';
+import StaffModel from '../models/staff.model.js';
+import { assertEmployedOn, assertEmployedDuring } from '../utils/employment.util.js';
 import ShiftAssignmentModel from '../models/shift-assignment.model.js';
 import ShiftModel from '../models/shift.model.js';
 import notificationService from './notification.service.js';
@@ -148,6 +150,8 @@ interface ApplyLeaveInput {
 async function applyForLeave(input: ApplyLeaveInput) {
     const { staffId, leaveType, startDate, endDate, reason, appliedBy } = input;
 
+    const staff = await StaffModel.findById(staffId).lean();
+    assertEmployedDuring(staff, startDate, endDate);
     // Calculate working days based on shift
     const requestedDates = await calculateWorkingDays(
         staffId,
@@ -288,6 +292,8 @@ async function approveLeave(input: ApproveLeaveInput) {
     );
     const finalApprovedDates = approvedDates || application.requestedDates;
     const finalPaidLeaveDates = paidLeaveDates || [];
+    const staff = await StaffModel.findById(application.staffId).lean();
+    for (const date of [...finalApprovedDates, ...finalPaidLeaveDates]) assertEmployedOn(staff, date);
 
     // Validate dates
     const approvedDateStrings = finalApprovedDates.map(

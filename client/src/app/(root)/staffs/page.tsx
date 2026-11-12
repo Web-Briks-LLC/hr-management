@@ -80,6 +80,8 @@ interface Staff {
     designation: string;
     joinDate: string;
     status: string;
+    exitDate?: string;
+    pendingStatus?: string;
     profileCompleted: boolean;
     user?: {
         _id: string;
@@ -388,6 +390,11 @@ export default function StaffsPage() {
                                         >
                                             <TableCell className="font-medium">
                                                 {staff.user?.name || "N/A"}
+                                                {staff.exitDate && (
+                                                    <p className="text-xs font-normal text-muted-foreground">
+                                                        {staff.pendingStatus ? `${staff.pendingStatus} scheduled · ` : ""}Last active: {new Date(staff.exitDate).toLocaleDateString("en-GB", { timeZone: "Asia/Dhaka" })}
+                                                    </p>
+                                                )}
                                             </TableCell>
                                             <TableCell className="font-mono text-xs text-muted-foreground">
                                                 {staff.staffId}
