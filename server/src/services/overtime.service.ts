@@ -5,6 +5,7 @@ import type { IOvertime } from "../types/overtime.type.js";
 import StaffModel from "../models/staff.model.js";
 import { escapeRegex } from "../lib/sanitize.js";
 import AuditService from "./audit.service.js";
+import { assertEmployedOn, employmentExpr, employmentEnd, overtimeMinutesExpr } from '../utils/employment.util.js';
 
 const getOvertimeAggregationPipeline = (
     matchStage: any,
@@ -21,6 +22,8 @@ const getOvertimeAggregationPipeline = (
         },
     },
     { $unwind: { path: "$staffId", preserveNullAndEmptyArrays: true } },
+    { $match: { $expr: employmentExpr('$date', 'staffId.') } },
+    { $addFields: { durationMinutes: overtimeMinutesExpr('staffId.'), actualDurationMinutes: overtimeMinutesExpr('staffId.', '$actualStartTime', '$actualDurationMinutes') } },
     // Lookup Staff User (for name & photo)
     {
         $lookup: {
@@ -84,6 +87,9 @@ const createOvertimeInDB = async (
 
     for (const staffId of staffIds) {
         try {
+            const staff = await StaffModel.findById(staffId).lean();
+            if (!rest.date) throw new Error('Overtime date is required');
+            assertEmployedOn(staff, rest.date);
             const result = await OvertimeModel.create({
                 ...rest,
                 staffId,
@@ -248,6 +254,9 @@ const updateOvertimeInDB = async (id: string, payload: Partial<IOvertime>, userI
     // Get the overtime record before update
     const overtime = await OvertimeModel.findById(id).populate("staffId");
 
+    if (!overtime) throw new Error('Overtime record not found');
+    const targetStaff = await StaffModel.findById(payload.staffId || (overtime.staffId as any)._id).lean();
+    assertEmployedOn(targetStaff, payload.date || overtime.date);
     const result = await OvertimeModel.findByIdAndUpdate(id, payload, {
         new: true,
     });
@@ -341,6 +350,7 @@ const startOvertimeInDB = async (userId: string) => {
     });
     if (!staff) throw new Error("Staff record not found");
 
+    assertEmployedOn(staff, new Date());
     // Check for scheduled OT today
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
@@ -405,7 +415,7 @@ const stopOvertimeInDB = async (userId: string) => {
         throw new Error("No active overtime session found");
     }
 
-    const endTime = new Date();
+    const endTime = employmentEnd(staff, activeOvertime.actualStartTime!, new Date());
 
     // Calculate actual duration from actualStartTime (when user checked in)
     const actualDurationMs =
@@ -438,6 +448,7 @@ const extendOvertimeInDB = async (overtimeId: string, additionalMinutes: number,
     const overtime = await OvertimeModel.findById(overtimeId).populate("staffId");
     if (!overtime) throw new Error("Overtime record not found");
 
+    assertEmployedOn(overtime.staffId as any, new Date());
     if (overtime.endTime) {
         throw new Error("Cannot extend an overtime that has already ended");
     }

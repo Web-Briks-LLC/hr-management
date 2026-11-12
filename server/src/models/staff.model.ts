@@ -114,6 +114,16 @@ const StaffSchema = new Schema<IStaff>(
             routingNumber: { type: String, required: false },
         },
 
+        inactivePeriods: {
+            type: [{
+                _id: false,
+                startDate: { type: Date, required: true },
+                endDate: { type: Date },
+                status: { type: String, enum: ['inactive', 'terminated'], required: true },
+            }],
+            default: [],
+        },
+
         exitDate: {
             type: Date,
         },

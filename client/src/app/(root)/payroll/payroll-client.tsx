@@ -34,6 +34,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import PayrollTable from "../../../components/payroll/payroll-table";
 import OvertimeTable from "../../../components/payroll/overtime-table";
 import ExportPdfDialog from "../../../components/payroll/export-pdf-dialog";
+import ExportStaffDialog from "@/components/payroll/export-staff-dialog";
 import {
     DollarSign,
     Users,
@@ -114,6 +115,8 @@ export default function PayrollPage() {
 
     const [isSelectMode, setIsSelectMode] = useState(false);
     const [showPdfDialog, setShowPdfDialog] = useState(false);
+    const [exportFormat, setExportFormat] = useState<"excel" | "pdf" | null>(null);
+    const [pdfStaff, setPdfStaff] = useState<IPayrollItem[]>([]);
 
     const { data: session } = useSession();
     const userRole = session?.user?.role;
@@ -123,6 +126,9 @@ export default function PayrollPage() {
 
     // Update URL Helper
     const updateUrl = (key: string, value: string) => {
+        setExportFormat(null);
+        setShowPdfDialog(false);
+        setPdfStaff([]);
         const params = new URLSearchParams(searchParams.toString());
         params.set(key, value);
         router.push(`${pathname}?${params.toString()}`);
@@ -135,7 +141,7 @@ export default function PayrollPage() {
     const { data: branchesData } = useGetAllBranchesQuery({});
     const branches: IBranch[] = branchesData?.branches || [];
 
-    const { data, isLoading } = useGetPayrollPreviewQuery({
+    const { data, isLoading, isFetching } = useGetPayrollPreviewQuery({
         month: formattedMonth,
         branchId,
     });
@@ -216,8 +222,12 @@ export default function PayrollPage() {
     };
 
     // --- Export Handlers ---
-    const handleExportExcel = () => {
-        if (!payrollData.length) return;
+    const exportableStaff = isOvertimeTab
+        ? payrollData.filter(row => row.otMinutes > 0)
+        : payrollData;
+
+    const handleExportExcel = (selectedStaff: IPayrollItem[]) => {
+        if (!selectedStaff.length) return;
 
         const [year, monthNum] = formattedMonth.split("-");
         const monthName = format(
@@ -230,7 +240,7 @@ export default function PayrollPage() {
 
         if (isOvertimeTab) {
             sheetName = "Overtime";
-            dataToExport = payrollData
+            dataToExport = selectedStaff
                 .filter((row) => row.otMinutes > 0) // Only export staff with OT
                 .map((row, index) => ({
                     "Sl No": index + 1,
@@ -253,7 +263,7 @@ export default function PayrollPage() {
                 }));
         } else {
             sheetName = "Salary";
-            dataToExport = payrollData.map((row, index) => ({
+            dataToExport = selectedStaff.map((row, index) => ({
                 "Sl No": index + 1,
                 Name: row.name || "",
                 Designation: row.designation || "",
@@ -296,10 +306,15 @@ export default function PayrollPage() {
         );
     };
 
-    const handleExportPDF = () => {
-        if (!payrollData.length) return;
-        // Currently only supports salary, could be extended later
-        setShowPdfDialog(true);
+    const confirmExport = (selectedStaff: IPayrollItem[]) => {
+        if (!selectedStaff.length) return;
+        if (exportFormat === "excel") {
+            handleExportExcel(selectedStaff);
+        } else if (exportFormat === "pdf") {
+            setPdfStaff(selectedStaff);
+            setShowPdfDialog(true);
+        }
+        setExportFormat(null);
     };
 
     const completionRate = displayTotal > 0 ? (displayPaid / displayTotal) * 100 : 0;
@@ -555,18 +570,19 @@ export default function PayrollPage() {
                                     <Button
                                         variant="outline"
                                         className="border-primary text-primary hover:bg-primary/10 shadow-xs"
+                                        disabled={isLoading || isFetching || !exportableStaff.length}
                                     >
                                         <Download className="h-4 w-4" />
                                         Export Reports
                                     </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end" className="w-48">
-                                    <DropdownMenuItem onClick={handleExportExcel} className="cursor-pointer gap-2">
+                                    <DropdownMenuItem onClick={() => setExportFormat("excel")} className="cursor-pointer gap-2">
                                         <FileSpreadsheet className="h-4 w-4 text-green-600" />
                                         Export to Excel
                                     </DropdownMenuItem>
                                     {!isOvertimeTab && (
-                                        <DropdownMenuItem onClick={handleExportPDF} className="cursor-pointer gap-2">
+                                        <DropdownMenuItem onClick={() => setExportFormat("pdf")} className="cursor-pointer gap-2">
                                             <FileText className="h-4 w-4 text-red-600" />
                                             Export to PDF
                                         </DropdownMenuItem>
@@ -701,10 +717,20 @@ export default function PayrollPage() {
                 </CardContent>
             </Card>
 
+            {exportFormat && (
+                <ExportStaffDialog
+                    key={`${formattedMonth}-${branchId}-${activeTab}-${exportFormat}`}
+                    data={exportableStaff}
+                    format={exportFormat}
+                    isOvertime={isOvertimeTab}
+                    onClose={() => setExportFormat(null)}
+                    onConfirm={confirmExport}
+                />
+            )}
             <ExportPdfDialog
                 open={showPdfDialog}
                 onOpenChange={setShowPdfDialog}
-                payrollData={payrollData}
+                payrollData={pdfStaff}
                 month={formattedMonth}
             />
         </div>

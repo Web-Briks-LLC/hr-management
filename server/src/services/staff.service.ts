@@ -4,6 +4,8 @@ import type IStaff from "../types/staff.type.js";
 import { startOfDay, endOfDay } from "date-fns";
 import { escapeRegex } from "../lib/sanitize.js";
 import auditService from "./audit.service.js";
+import { prepareEmploymentUpdate } from './employment.service.js';
+import { employmentStatusStage } from '../utils/employment.util.js';
 
 export type IStaffQueryParams = {
     page?: number;
@@ -50,12 +52,14 @@ async function getAllStaffsFromDB(query: IStaffQueryParams) {
 
     if (department) matchStage.department = department;
     if (designation) matchStage.designation = designation;
-    if (status) matchStage.status = status;
+
     if (hasBalance) matchStage.balance = { $gt: 0 };
     if (branchId) matchStage.branchId = new Types.ObjectId(branchId);
 
     const pipeline: any[] = [
         // 1. Initial Match (Basic fields)
+        employmentStatusStage(),
+        ...(status ? [{ $match: { status } }] : []),
         { $match: matchStage },
 
         // 2. Lookup User
@@ -389,7 +393,7 @@ async function getStaffByIdFromDB(id: string) {
         { $project: { shiftAssignment: 0 } },
     ];
 
-    const result = await StaffModel.aggregate(pipeline);
+    const result = await StaffModel.aggregate([...pipeline, employmentStatusStage()]);
     return result[0];
 }
 
@@ -460,7 +464,7 @@ async function getStaffFromDB(userId: string) {
         },
     ];
 
-    const result = await StaffModel.aggregate(pipeline);
+    const result = await StaffModel.aggregate([...pipeline, employmentStatusStage()]);
     return result[0];
 }
 
@@ -540,6 +544,10 @@ async function completeProfileInDB(payload: {
             throw new Error("Profile already completed. Use update instead.");
         }
 
+        delete staff.status;
+        delete staff.exitDate;
+        delete staff.inactivePeriods;
+        delete staff.pendingStatus;
         existingStaff.set({
             ...staff,
             profileCompleted: true,
@@ -570,6 +578,11 @@ async function updateProfileInDB(payload: {
         throw new Error("No staff record found for this user.");
     }
 
+    delete fields.joinDate;
+    delete fields.status;
+    delete fields.exitDate;
+    delete fields.inactivePeriods;
+    delete fields.pendingStatus;
     // Update the fields
     const updated = await StaffModel.findOneAndUpdate(
         { userId },
@@ -749,6 +762,9 @@ async function updateStaffInDB(payload: {
             throw new Error("Staff not found");
         }
 
+        const beforeEmployment = { status: staff.status, exitDate: staff.exitDate, inactivePeriods: staff.inactivePeriods };
+        const unsetEmployment = await prepareEmploymentUpdate(staff.toObject(), staffData, session);
+
         // If salary is being changed, we should probably log it (reusing logic or simplified)
         if (
             staffData.salary !== undefined &&
@@ -776,8 +792,8 @@ async function updateStaffInDB(payload: {
         // Update Staff
         const updatedStaff = await StaffModel.findOneAndUpdate(
             { staffId },
-            { $set: staffData },
-            { new: true, session },
+            { $set: staffData, ...(Object.keys(unsetEmployment).length ? { $unset: unsetEmployment } : {}) },
+            { new: true, session, runValidators: true },
         );
 
         // Update User Role if provided
@@ -803,6 +819,7 @@ async function updateStaffInDB(payload: {
                 userAgent,
                 details: {
                     updatedFields: Object.keys(staffData),
+                    employment: { before: beforeEmployment, after: { status: updatedStaff?.status, exitDate: updatedStaff?.exitDate, inactivePeriods: updatedStaff?.inactivePeriods } },
                     roleChanged: !!role
                 }
             });

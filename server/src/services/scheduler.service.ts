@@ -3,6 +3,8 @@ import OvertimeModel from '../models/overtime.model.js';
 import LeaveApplicationModel from '../models/leave_application.model.js';
 import ShiftAssignmentModel from '../models/shift-assignment.model.js';
 import StaffModel from '../models/staff.model.js';
+import { employmentExpr, employmentEnd } from '../utils/employment.util.js';
+import { freezeInactiveWorkSessions } from './employment-timers.service.js';
 import notificationService from './notification.service.js';
 import analyticsService from './analytics.service.js';
 import { sendBulkSMS } from '../utils/sms.util.js';
@@ -51,7 +53,7 @@ async function processAttendanceCheck() {
             { $unwind: '$staff' },
             {
                 $match: {
-                    'staff.status': 'active',
+                    $expr: employmentExpr(now, 'staff.'),
                 },
             },
             {
@@ -312,11 +314,13 @@ async function processMissedCheckoutAutoClose() {
                 );
                 if (now < cutoff) continue; // Still within grace window - may still be a legit ongoing shift
 
-                record.checkOutAt = shiftEnd;
+                const employmentStaff = await StaffModel.findById(record.staffId).lean();
+                const effectiveEnd = employmentStaff ? employmentEnd(employmentStaff, record.checkInAt!, shiftEnd) : shiftEnd;
+                record.checkOutAt = effectiveEnd;
                 record.totalMinutes = Math.max(
                     0,
                     Math.round(
-                        (shiftEnd.getTime() - record.checkInAt!.getTime()) / 60000,
+                        (effectiveEnd.getTime() - record.checkInAt!.getTime()) / 60000,
                     ),
                 );
                 record.notes = `${record.notes || ''} | [System] Auto-checked-out: staff forgot to check out`.trim();
@@ -364,6 +368,7 @@ async function processOvertimeAutoStop() {
     let closedCount = 0;
 
     try {
+        await freezeInactiveWorkSessions();
         // Find all active overtimes (checked in but not ended)
         const activeOvertimes = await OvertimeModel.find({
             actualStartTime: { $exists: true, $ne: null },
@@ -375,15 +380,15 @@ async function processOvertimeAutoStop() {
             try {
                 const actualStartTime = new Date(ot.actualStartTime!);
                 // Calculate when this OT should stop based on its allowed duration
-                const scheduledEndTime = new Date(actualStartTime.getTime() + (ot.durationMinutes * 60 * 1000));
+                const scheduledEndTime = employmentEnd(ot.staffId as any, actualStartTime, new Date(actualStartTime.getTime() + (ot.durationMinutes * 60 * 1000)));
 
                 if (now >= scheduledEndTime) {
                     // Time to auto-stop!
                     const actualDurationMinutes = Math.floor(
-                        (now.getTime() - actualStartTime.getTime()) / (1000 * 60)
+                        (scheduledEndTime.getTime() - actualStartTime.getTime()) / (1000 * 60)
                     );
 
-                    ot.endTime = now;
+                    ot.endTime = scheduledEndTime;
                     ot.actualDurationMinutes = actualDurationMinutes;
                     ot.isAutoStopped = true;
                     ot.reason = (ot.reason || '') + ' [Auto-stopped by system]';
@@ -583,7 +588,7 @@ async function processMonthlyFinanceSMSReport() {
         const adminStaff = await StaffModel.aggregate([
             {
                 $match: {
-                    status: 'active',
+                    $expr: employmentExpr(),
                     userId: { $exists: true, $ne: null },
                     phone: { $exists: true, $ne: '' }
                 }

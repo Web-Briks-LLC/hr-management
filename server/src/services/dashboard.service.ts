@@ -17,6 +17,7 @@ import CurrencyRateModel from '../models/currency-rate.model.js';
 import { client } from '../lib/db.js';
 import { Role } from '../constants/role.js';
 import envConfig from '../config/env.config.js';
+import { employmentExpr, isEmployedOn, eligibleOvertimeMinutes } from '../utils/employment.util.js';
 import type {
     IDashboardStats,
     IStaffStats,
@@ -50,7 +51,7 @@ const getStaffStats = async (): Promise<IStaffStats> => {
 
     const active = await StaffModel.countDocuments({
         userId: { $in: staffUserIds },
-        status: 'active',
+        $expr: employmentExpr(),
     });
 
     const inactive = total - active;
@@ -59,6 +60,7 @@ const getStaffStats = async (): Promise<IStaffStats> => {
         {
             $match: {
                 userId: { $in: staffUserIds },
+                $expr: employmentExpr(),
             },
         },
         {
@@ -92,11 +94,17 @@ const getTodayAttendanceOverview = async (): Promise<IAttendanceOverview> => {
     const startDate = startOfDay(today);
     const endDate = endOfDay(today);
 
-    const attendanceRecords = await AttendanceDayModel.find({
+    const rawAttendanceRecords = await AttendanceDayModel.find({
         date: {
             $gte: startDate,
             $lte: endDate,
         },
+    });
+    const attendanceStaff = await StaffModel.find({ _id: { $in: rawAttendanceRecords.map(r => r.staffId) } }).lean();
+    const staffById = new Map(attendanceStaff.map(s => [s._id.toString(), s]));
+    const attendanceRecords = rawAttendanceRecords.filter(r => {
+        const staff = staffById.get(r.staffId.toString());
+        return staff && isEmployedOn(staff, r.date);
     });
 
     const total = attendanceRecords.length;
@@ -129,11 +137,17 @@ const getMonthlyAttendanceStats = async (): Promise<IMonthlyAttendanceStats> => 
     const startDate = startOfMonth(now);
     const endDate = endOfMonth(now);
 
-    const attendanceRecords = await AttendanceDayModel.find({
+    const rawAttendanceRecords = await AttendanceDayModel.find({
         date: {
             $gte: startDate,
             $lte: endDate,
         },
+    });
+    const attendanceStaff = await StaffModel.find({ _id: { $in: rawAttendanceRecords.map(r => r.staffId) } }).lean();
+    const staffById = new Map(attendanceStaff.map(s => [s._id.toString(), s]));
+    const attendanceRecords = rawAttendanceRecords.filter(r => {
+        const staff = staffById.get(r.staffId.toString());
+        return staff && isEmployedOn(staff, r.date);
     });
 
     const totalWorkingDays = attendanceRecords.length;
@@ -162,8 +176,18 @@ const getMonthlyAttendanceStats = async (): Promise<IMonthlyAttendanceStats> => 
 };
 
 const getOvertimeSummary = async (): Promise<IOvertimeSummary> => {
-    const overtimeRecords = await OvertimeModel.find();
+    const rawOvertimeRecords = await OvertimeModel.find();
+    const overtimeStaff = await StaffModel.find({ _id: { $in: rawOvertimeRecords.map(r => r.staffId) } }).lean();
+    const staffById = new Map(overtimeStaff.map(s => [s._id.toString(), s]));
+    const overtimeRecords = rawOvertimeRecords.filter(r => {
+        const staff = staffById.get(r.staffId.toString());
+        return staff && isEmployedOn(staff, r.date);
+    });
 
+    for (const record of overtimeRecords) {
+        const staff = staffById.get(record.staffId.toString());
+        if (staff) record.durationMinutes = eligibleOvertimeMinutes(staff, record);
+    }
     const total = overtimeRecords.length;
     const pending = overtimeRecords.filter((r) => r.status === 'pending').length;
     const approved = overtimeRecords.filter((r) => r.status === 'approved').length;
@@ -305,10 +329,13 @@ const getLeaveDashboardStats = async (): Promise<ILeaveDashboardStats> => {
 
     const [pending, onLeaveToday, approvedThisMonth] = await Promise.all([
         LeaveApplicationModel.countDocuments({ status: 'pending' }),
-        AttendanceDayModel.countDocuments({
-            date: { $gte: todayStart, $lte: todayEnd },
-            status: 'on_leave',
-        }),
+        AttendanceDayModel.aggregate([
+            { $match: { date: { $gte: todayStart, $lte: todayEnd }, status: 'on_leave' } },
+            { $lookup: { from: 'staffs', localField: 'staffId', foreignField: '_id', as: 'employmentStaff' } },
+            { $unwind: '$employmentStaff' },
+            { $match: { $expr: employmentExpr('$date', 'employmentStaff.') } },
+            { $count: 'total' },
+        ]).then(rows => rows[0]?.total || 0),
         LeaveApplicationModel.countDocuments({
             status: 'approved',
             startDate: { $gte: monthStart, $lte: monthEnd },

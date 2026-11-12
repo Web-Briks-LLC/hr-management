@@ -68,6 +68,3 @@ payment/.env.*
 payment/node_modules/
 payment/.next/
 server/backup/
-
-# Local Make deployment settings
-.make.local

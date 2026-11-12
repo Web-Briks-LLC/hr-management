@@ -43,6 +43,9 @@ export default interface IStaff {
     profileCompleted: boolean;
 
     exitDate?: Date;
+    pendingStatus?: "inactive" | "terminated";
+    // Inclusive Bangladesh calendar dates; an omitted endDate means ongoing.
+    inactivePeriods?: { startDate: Date; endDate?: Date; status: "inactive" | "terminated" }[];
 
     salary: number;
     salaryVisibleToEmployee: boolean;

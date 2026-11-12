@@ -74,6 +74,8 @@ export const staffApi = apiSlice.injectEndpoints({
             invalidatesTags: (_result, _error, { id }) => [
                 "Staff",
                 { type: "Staff", id },
+                "Attendance", "Payroll", "Leave", "Overtime", "ShiftAssignment",
+                "ProductionEditors", "StaffPerformance", "ProductionStats",
             ],
         }),
         setSalaryPin: builder.mutation({

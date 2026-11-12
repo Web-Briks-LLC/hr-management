@@ -21,7 +21,7 @@ import IStaff from "@/types/staff.type";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { DESIGNATIONS, DEPARTMENTS } from "@/constants/metadata";
 import { CalendarIcon, Edit, Loader2 } from "lucide-react";
-import { format } from "date-fns";
+import { addDays, format, parseISO } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
 import {
     Popover,
@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -43,6 +43,7 @@ const formSchema = z.object({
     salary: z.number().min(0, "Salary must be positive"),
     salaryVisibleToEmployee: z.boolean(),
     joinDate: z.string().optional(),
+    exitDate: z.string().optional(),
     // Bank Account Fields
     bank: z.object({
         bankName: z.string().optional(),
@@ -51,7 +52,17 @@ const formSchema = z.object({
         branch: z.string().optional(),
         routingNumber: z.string().optional(),
     }),
+}).superRefine((values, ctx) => {
+    if (values.status !== "active" && !values.exitDate) {
+        ctx.addIssue({ code: "custom", path: ["exitDate"], message: "Select the last active date" });
+    }
+    if (values.status !== "active" && values.exitDate && values.joinDate && values.exitDate < values.joinDate) {
+        ctx.addIssue({ code: "custom", path: ["exitDate"], message: "Last active date must be on or after the join date" });
+    }
 });
+
+const toBDDate = (value: Date | string) =>
+    new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Dhaka" }).format(new Date(value));
 
 type FormData = z.infer<typeof formSchema>;
 
@@ -113,9 +124,10 @@ export function EditStaffDialog({ staff }: EditStaffDialogProps) {
             department: getResolvedDepartment(),
             designation: getResolvedDesignation(),
             role: staff.user?.role || Role.STAFF,
-            status: staff.status || "active",
+            status: staff.pendingStatus || staff.status || "active",
             salary: staff.salary || 0,
-            joinDate: staff.joinDate ? new Date(staff.joinDate).toISOString().split('T')[0] : "",
+            joinDate: staff.joinDate ? toBDDate(staff.joinDate) : "",
+            exitDate: staff.exitDate ? toBDDate(staff.exitDate) : "",
             salaryVisibleToEmployee: staff.salaryVisibleToEmployee !== false,
             bank: {
                 bankName: staff.bank?.bankName || "",
@@ -127,6 +139,9 @@ export function EditStaffDialog({ staff }: EditStaffDialogProps) {
         },
     });
 
+    const selectedStatus = useWatch({ control: form.control, name: "status" });
+    const selectedJoinDate = useWatch({ control: form.control, name: "joinDate" });
+
     useEffect(() => {
         if (open) {
             form.reset({
@@ -134,9 +149,10 @@ export function EditStaffDialog({ staff }: EditStaffDialogProps) {
                 department: getResolvedDepartment(),
                 designation: getResolvedDesignation(),
                 role: staff.user?.role || Role.STAFF,
-                status: staff.status || "active",
+                status: staff.pendingStatus || staff.status || "active",
                 salary: staff.salary || 0,
-                joinDate: staff.joinDate ? new Date(staff.joinDate).toISOString().split('T')[0] : "",
+                joinDate: staff.joinDate ? toBDDate(staff.joinDate) : "",
+                exitDate: staff.exitDate ? toBDDate(staff.exitDate) : "",
                 salaryVisibleToEmployee:
                     staff.salaryVisibleToEmployee !== false,
                 bank: {
@@ -154,6 +170,7 @@ export function EditStaffDialog({ staff }: EditStaffDialogProps) {
         try {
             const payload = {
                 ...values,
+                exitDate: values.status === "active" ? undefined : values.exitDate,
             };
 
             await updateStaff({
@@ -358,6 +375,55 @@ export function EditStaffDialog({ staff }: EditStaffDialogProps) {
                         </div>
                     </div>
 
+                    {selectedStatus !== "active" && (
+                        <div className="space-y-2">
+                            <Label htmlFor="exitDate">Last Active Date <span className="text-destructive">*</span></Label>
+                            <Controller
+                                control={form.control}
+                                name="exitDate"
+                                render={({ field }) => (
+                                    <Popover>
+                                        <PopoverTrigger asChild>
+                                            <Button
+                                                id="exitDate"
+                                                type="button"
+                                                variant="outline"
+                                                aria-invalid={!!form.formState.errors.exitDate}
+                                                aria-describedby="exitDate-help exitDate-error"
+                                                className={cn("w-full justify-start text-left font-normal", !field.value && "text-muted-foreground")}
+                                            >
+                                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                                {field.value ? format(parseISO(field.value), "PPP") : "Select last active date"}
+                                            </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-auto p-0" align="start">
+                                            <Calendar
+                                                mode="single"
+                                                captionLayout="dropdown"
+                                                selected={field.value ? parseISO(field.value) : undefined}
+                                                defaultMonth={field.value ? parseISO(field.value) : new Date()}
+                                                startMonth={selectedJoinDate ? parseISO(selectedJoinDate) : new Date(1900, 0)}
+                                                endMonth={addDays(new Date(), 3650)}
+                                                onSelect={(date) => field.onChange(date ? format(date, "yyyy-MM-dd") : "")}
+                                                disabled={(date) => !!selectedJoinDate && format(date, "yyyy-MM-dd") < selectedJoinDate}
+                                            />
+                                        </PopoverContent>
+                                    </Popover>
+                                )}
+                            />
+                            <p id="exitDate-help" className="text-sm text-muted-foreground">
+                                This date is included. Attendance, salary, leave and overtime stop counting from the next day (Bangladesh time).
+                                A future date keeps the staff active until that day ends.
+                            </p>
+                            {form.formState.errors.exitDate && (
+                                <p id="exitDate-error" className="text-sm text-destructive">{form.formState.errors.exitDate.message}</p>
+                            )}
+                        </div>
+                    )}
+                    {selectedStatus === "active" && (staff.pendingStatus || staff.status !== "active") && (
+                        <p className="text-sm text-muted-foreground">{staff.pendingStatus ? "This cancels the scheduled status change." : "Reactivation starts today. Previous inactive periods remain excluded from calculations."}</p>
+                    )}
+
                     <div className="border-t pt-4">
                         <h4 className="text-sm font-medium mb-4">
                             Employment Dates
@@ -371,6 +437,7 @@ export function EditStaffDialog({ staff }: EditStaffDialogProps) {
                                     <Popover>
                                         <PopoverTrigger asChild>
                                             <Button
+                                                type="button"
                                                 variant={"outline"}
                                                 className={cn(
                                                     "w-full pl-3 text-left font-normal",
