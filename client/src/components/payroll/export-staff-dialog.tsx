@@ -30,14 +30,18 @@ export default function ExportStaffDialog({
     const query = search.trim().toLowerCase();
     const visibleStaff = data.filter(row =>
         [row.name, row.staffId, row.designation, row.branch]
-            .some(value => value?.toLowerCase().includes(query)),
+            .some(value => typeof value === "string" && value.toLowerCase().includes(query)),
     );
     // Always derive the export from this report's rows, in report order.
     const selectedStaff = data.filter(row => selectedIds.has(row._id));
     const selectedVisibleCount = visibleStaff.filter(row => selectedIds.has(row._id)).length;
     const allVisibleSelected = visibleStaff.length > 0 && selectedVisibleCount === visibleStaff.length;
+    const getAmount = (row: IPayrollItem) => {
+        const amount = isOvertime ? row.otPayable : row.payableSalary;
+        return typeof amount === "number" && Number.isFinite(amount) ? amount : 0;
+    };
     const selectedAmount = selectedStaff.reduce(
-        (total, row) => total + (isOvertime ? row.otPayable : row.payableSalary), 0,
+        (total, row) => total + getAmount(row), 0,
     );
 
     const toggleStaff = (id: string, checked: boolean) => {
@@ -121,7 +125,7 @@ export default function ExportStaffDialog({
                                         <p className="text-xs text-muted-foreground">{row.staffId}</p>
                                     </TableCell>
                                     <TableCell>{row.designation || "—"}</TableCell>
-                                    <TableCell className="text-right tabular-nums">৳{(isOvertime ? row.otPayable : row.payableSalary).toLocaleString()}</TableCell>
+                                    <TableCell className="text-right tabular-nums">৳{getAmount(row).toLocaleString()}</TableCell>
                                 </TableRow>
                             )) : (
                                 <TableRow><TableCell colSpan={4} className="py-8 text-center text-muted-foreground">No staff found.</TableCell></TableRow>

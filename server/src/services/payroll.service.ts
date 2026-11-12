@@ -62,7 +62,7 @@ const getPayrollPreview = async ({
     }
 
     // 1. Get all eligible staff
-    const staffs = await StaffModel.aggregate([
+    const candidates = await StaffModel.aggregate([
         { $match: matchStage },
         {
             $lookup: {
@@ -102,6 +102,10 @@ const getPayrollPreview = async ({
             },
         },
     ]);
+
+    // Use the same eligible staff for calculations, response rows and alerts.
+    const monthDays = eachDayOfInterval({ start: startDate, end: endDate });
+    const staffs = candidates.filter(staff => monthDays.some(day => isEmployedOn(staff, day)));
 
     // 2. Batch fetch all related data
     const staffIds = staffs.map((s) => s._id);
@@ -213,7 +217,7 @@ const getPayrollPreview = async ({
     }
 
     // 3. Calculate stats for each staff
-    const stats = staffs.filter(staff => daysInMonthData.some(({ day }) => isEmployedOn(staff, day))).map((staff) => {
+    const stats = staffs.map((staff) => {
         const staffIdStr = staff._id.toString();
 
         const staffShiftAssignments = shiftAssignments.filter(
