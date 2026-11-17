@@ -1,4 +1,5 @@
 'use client';
+import { TablePagination } from '@/components/shared/table-pagination';
 
 import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -50,10 +51,6 @@ import {
     TrendingUp,
     Wallet,
     Loader,
-    ChevronLeft,
-    ChevronRight,
-    ChevronsLeft,
-    ChevronsRight,
     Eye,
     Clock,
     CheckCircle2,
@@ -113,7 +110,6 @@ const YEARS = Array.from({ length: 5 }, (_, i) => currentYear - i);
 export default function EarningsPage() {
     const [page, setPage] = useState(1);
     const [limit, setLimit] = useState(20);
-    const perPageOptions = [10, 20, 50, 100];
     const [filterType, setFilterType] = useState<FilterType>('year');
     const [statusFilter, setStatusFilter] = useState<EarningStatus | 'all'>(
         'all',
@@ -1386,165 +1382,7 @@ export default function EarningsPage() {
                         </Table>
                     </div>
 
-                    {/* Pagination */}
-                    {meta && (
-                        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t">
-                            <div className="flex items-center gap-2">
-                                <p className="text-sm text-muted-foreground">
-                                    Showing {(page - 1) * limit + 1} to{' '}
-                                    {Math.min(page * limit, meta.total)} of{' '}
-                                    {meta.total} entries
-                                </p>
-                                <Select
-                                    value={limit.toString()}
-                                    onValueChange={(value) => {
-                                        setLimit(parseInt(value));
-                                        setPage(1);
-                                    }}
-                                >
-                                    <SelectTrigger className="h-8 w-[70px]">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {perPageOptions.map((option) => (
-                                            <SelectItem
-                                                key={option}
-                                                value={option.toString()}
-                                            >
-                                                {option}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            {meta.totalPages > 1 && (
-                                <div className="flex items-center gap-1">
-                                    <Button
-                                        variant="outline"
-                                        size="icon"
-                                        className="h-8 w-8"
-                                        onClick={() => setPage(1)}
-                                        disabled={page === 1 || isFetching}
-                                    >
-                                        <ChevronsLeft className="h-4 w-4" />
-                                    </Button>
-                                    <Button
-                                        variant="outline"
-                                        size="icon"
-                                        className="h-8 w-8"
-                                        onClick={() =>
-                                            setPage((p) => Math.max(1, p - 1))
-                                        }
-                                        disabled={page === 1 || isFetching}
-                                    >
-                                        <ChevronLeft className="h-4 w-4" />
-                                    </Button>
-                                    {(() => {
-                                        const totalPages = meta.totalPages;
-                                        const pageNumbers: (number | string)[] =
-                                            [];
-                                        if (totalPages <= 7) {
-                                            for (
-                                                let i = 1;
-                                                i <= totalPages;
-                                                i++
-                                            ) {
-                                                pageNumbers.push(i);
-                                            }
-                                        } else {
-                                            if (page <= 3) {
-                                                pageNumbers.push(
-                                                    1,
-                                                    2,
-                                                    3,
-                                                    4,
-                                                    '...',
-                                                    totalPages,
-                                                );
-                                            } else if (page >= totalPages - 2) {
-                                                pageNumbers.push(
-                                                    1,
-                                                    '...',
-                                                    totalPages - 3,
-                                                    totalPages - 2,
-                                                    totalPages - 1,
-                                                    totalPages,
-                                                );
-                                            } else {
-                                                pageNumbers.push(
-                                                    1,
-                                                    '...',
-                                                    page - 1,
-                                                    page,
-                                                    page + 1,
-                                                    '...',
-                                                    totalPages,
-                                                );
-                                            }
-                                        }
-                                        return pageNumbers.map((num, idx) =>
-                                            num === '...' ? (
-                                                <span
-                                                    key={`ellipsis-${idx}`}
-                                                    className="px-2 text-muted-foreground"
-                                                >
-                                                    ...
-                                                </span>
-                                            ) : (
-                                                <Button
-                                                    key={num}
-                                                    variant={
-                                                        page === num
-                                                            ? 'default'
-                                                            : 'outline'
-                                                    }
-                                                    size="icon"
-                                                    className="h-8 w-8"
-                                                    onClick={() =>
-                                                        setPage(num as number)
-                                                    }
-                                                    disabled={isFetching}
-                                                >
-                                                    {num}
-                                                </Button>
-                                            ),
-                                        );
-                                    })()}
-                                    <Button
-                                        variant="outline"
-                                        size="icon"
-                                        className="h-8 w-8"
-                                        onClick={() =>
-                                            setPage((p) =>
-                                                Math.min(
-                                                    meta.totalPages,
-                                                    p + 1,
-                                                ),
-                                            )
-                                        }
-                                        disabled={
-                                            page === meta.totalPages ||
-                                            isFetching
-                                        }
-                                    >
-                                        <ChevronRight className="h-4 w-4" />
-                                    </Button>
-                                    <Button
-                                        variant="outline"
-                                        size="icon"
-                                        className="h-8 w-8"
-                                        onClick={() => setPage(meta.totalPages)}
-                                        disabled={
-                                            page === meta.totalPages ||
-                                            isFetching
-                                        }
-                                    >
-                                        <ChevronsRight className="h-4 w-4" />
-                                    </Button>
-                                </div>
-                            )}
-                        </div>
-                    )}
+                    {meta && <TablePagination page={page} limit={limit} total={meta.total} onPageChange={setPage} onLimitChange={setLimit} isFetching={isFetching} />}
                 </CardContent>
             </Card>
 

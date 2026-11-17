@@ -134,10 +134,19 @@ interface StaffAnalyticsResponse {
 
 export const productionApi = apiSlice.injectEndpoints({
     endpoints: (builder) => ({
+        getOrderActivity: builder.query<{ success: boolean; data: {
+            events: Array<{ _id: string; action: string; createdAt: string; imageNames: string[];
+                actorId?: { name?: string }; fromStaffId?: { staffId?: string; userId?: { name?: string } };
+                toStaffId?: { staffId?: string; userId?: { name?: string } }; note?: string; completedSteps: string[] }>;
+            total: number; page: number; totalPages: number; contributorCount: number;
+        } }, { orderId: string; page?: number; limit?: number; imageName?: string }>({
+            query: ({ orderId, ...params }) => ({ url: `/production/orders/${orderId}/activity`, params }),
+            providesTags: ['ProductionImages', 'Production'],
+        }),
         // --- Workstation Endpoints ---
         getSanitizedOrders: builder.query<
             SanitizedOrdersResponse,
-            { search?: string; includeCompleted?: boolean } | void
+            { search?: string; includeCompleted?: boolean; status?: string } | void
         >({
             query: (params) => ({
                 url: '/production/orders/sanitized',
@@ -509,6 +518,7 @@ export const productionApi = apiSlice.injectEndpoints({
 });
 
 export const {
+    useGetOrderActivityQuery,
     useGetSanitizedOrdersQuery,
     useGetOrderImagesQuery,
     useGetActiveSessionQuery,

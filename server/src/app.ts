@@ -44,6 +44,8 @@ app.use(globalLimiter);
 
 app.all("/api/auth/{*any}", toNodeHandler(auth));
 
+// Filename batches can exceed the default 100 KB without uploading image bytes.
+app.use("/api/production", express.json({ limit: "10mb" }));
 app.use(express.json());
 
 app.use(

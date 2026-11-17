@@ -265,10 +265,11 @@ export const getProductionStats = async (req: Request, res: Response) => {
 
 export const getSanitizedActiveOrders = async (req: Request, res: Response) => {
     try {
-        const { search, includeCompleted } = req.query;
+        const { search, includeCompleted, status } = req.query;
         const result = await productionService.getSanitizedActiveOrders(
             search as string | undefined,
-            includeCompleted === 'true'
+            includeCompleted === 'true',
+            status as string | undefined
         );
 
         return res.status(200).json({
@@ -698,3 +699,10 @@ export const getStaffEditedImages = async (req: Request, res: Response) => {
 };
 
 
+
+export const getOrderActivity = async (req: Request, res: Response) => {
+    try {
+        const data = await productionService.getOrderActivity(req.params.orderId!, Number(req.query.page) || 1, req.query.imageName as string | undefined, Number(req.query.limit) || 30);
+        return res.json({ success: true, data });
+    } catch (error: any) { return res.status(400).json({ success: false, message: error.message }); }
+};

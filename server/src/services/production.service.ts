@@ -1,4 +1,8 @@
 import { Types } from 'mongoose';
+import ClientModel from '../models/client.model.js';
+import UserModel from '../models/user.model.js';
+import ProductionEventModel from '../models/production-event.model.js';
+import { productionMutation, productionNotifications } from './production-transaction.js';
 import ShiftProductionModel from '../models/shift-production.model.js';
 import OrderModel from '../models/order.model.js';
 import ShiftModel from '../models/shift.model.js';
@@ -22,6 +26,11 @@ import { Role } from '../constants/role.js';
  * Emit real-time production updates safely
  */
 const notifyProductionUpdate = (event: string, payload: any) => {
+    const pending = productionNotifications.getStore();
+    if (pending) {
+        pending.push(() => productionNotifications.run(undefined as any, () => notifyProductionUpdate(event, payload)));
+        return;
+    }
     try {
         const io = getIO();
         if (io) {
@@ -67,6 +76,7 @@ const computeEffectiveSeconds = (
  */
 const unlockSessionImages = async (session: {
     _id: Types.ObjectId;
+    staffId: Types.ObjectId;
     orderId: Types.ObjectId;
     imageNames: string[];
 }) => {
@@ -74,18 +84,20 @@ const unlockSessionImages = async (session: {
         orderId: session.orderId,
         imageName: { $in: session.imageNames },
         currentSessionId: session._id,
+        currentAssignedStaffId: session.staffId,
     });
 
-    for (const img of images) {
-        img.currentAssignedStaffId = null as any;
-        img.currentSessionId = null as any;
-        img.lockedAt = null as any;
-        if (img.completedSteps && img.completedSteps.length > 0) {
-            img.status = 'partially_completed';
-        } else {
-            img.status = 'unassigned';
-        }
-        await img.save();
+    if (images.length) await OrderImageModel.bulkWrite(images.map(img => ({ updateOne: {
+        filter: { _id: img._id, currentSessionId: session._id },
+        update: { $set: { currentAssignedStaffId: null, currentSessionId: null, lockedAt: null,
+            status: ['completed', 'pending_qc'].includes(img.status) ? img.status : img.isRevision ? 'in_revision' : img.completedSteps?.length ? 'partially_completed' : 'unassigned' } },
+    } })));
+
+};
+
+const assertQCCounts = (passed: number, rejected: number, completed: number) => {
+    if (!Number.isInteger(passed) || !Number.isInteger(rejected) || passed < 0 || rejected < 0 || passed + rejected > completed) {
+        throw new Error('QC counts must be whole numbers and cannot exceed the submitted image quantity');
     }
 };
 
@@ -95,8 +107,12 @@ const unlockSessionImages = async (session: {
 const createProductionLog = async (
     payload: ICreateProductionLogDTO,
     userId: string,
-    _userRole: string
+    userRole: string
 ) => {
+    if (['quality_check', 'revision_required'].includes(payload.status || '') &&
+        ![Role.SUPER_ADMIN, Role.ADMIN, Role.HR_MANAGER, Role.TEAM_LEADER].includes(userRole as Role)) {
+        throw new Error('Only production supervisors can review quality or request revisions');
+    }
     const order = await OrderModel.findById(payload.orderId).lean();
     if (!order) {
         throw new Error('Order not found');
@@ -692,6 +708,11 @@ const updateProductionLog = async (
         }
     }
 
+    if ((payload.qc || payload.revision || payload.status === 'quality_check' || payload.status === 'revision_required') &&
+        ![Role.SUPER_ADMIN, Role.ADMIN, Role.HR_MANAGER, Role.TEAM_LEADER].includes(userRole as Role)) {
+        throw new Error('Only production supervisors can review quality or request revisions');
+    }
+
     if (payload.completedQuantity !== undefined) {
         log.completedQuantity = Number(payload.completedQuantity);
     }
@@ -727,6 +748,8 @@ const updateProductionLog = async (
         }));
     }
     if (payload.qc) {
+        assertQCCounts(payload.qc.passedCount ?? log.qc?.passedCount ?? 0,
+            payload.qc.rejectedCount ?? log.qc?.rejectedCount ?? 0, log.completedQuantity);
         log.qc = {
             checkedBy: payload.qc.checkedBy ? new Types.ObjectId(payload.qc.checkedBy) : new Types.ObjectId(userId),
             passedCount: payload.qc.passedCount ?? log.qc?.passedCount ?? 0,
@@ -780,11 +803,16 @@ const submitQCReview = async (
     },
     userId: string
 ) => {
+    const reviewer = await UserModel.findById(userId).select('role').lean();
+    if (!reviewer || ![Role.SUPER_ADMIN, Role.ADMIN, Role.HR_MANAGER, Role.TEAM_LEADER].includes(reviewer.role as Role)) {
+        throw new Error('Only production supervisors can review quality');
+    }
     const log = await ShiftProductionModel.findById(logId);
     if (!log) {
         throw new Error('Production log not found');
     }
 
+    assertQCCounts(qcData.passedCount, qcData.rejectedCount, log.completedQuantity);
     log.qc = {
         checkedBy: new Types.ObjectId(userId),
         passedCount: qcData.passedCount,
@@ -1041,7 +1069,7 @@ const getProductionStats = async (filters: {
 /**
  * Get sanitized active orders for photo editors (NO client or financial data)
  */
-const getSanitizedActiveOrders = async (search?: string, includeCompleted?: boolean) => {
+const getSanitizedActiveOrders = async (search?: string, includeCompleted?: boolean, status?: string) => {
     const activeStatuses = ['pending', 'in_progress', 'quality_check', 'revision'];
     const query: any = {
         // Completed orders are excluded by default (e.g. the editor's "pick an order
@@ -1050,10 +1078,18 @@ const getSanitizedActiveOrders = async (search?: string, includeCompleted?: bool
         status: { $in: includeCompleted ? [...activeStatuses, 'completed'] : activeStatuses },
     };
 
-    if (search) {
+    if (status && status !== 'all') {
+        const allowed = includeCompleted ? [...activeStatuses, 'completed'] : activeStatuses;
+        if (!allowed.includes(status)) throw new Error('Invalid production status');
+        query.status = status;
+    }
+    if (search?.trim()) {
+        const escaped = search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const clients = await ClientModel.find({ clientId: { $regex: escaped, $options: 'i' } }).select('_id').lean();
         query.$or = [
-            { orderName: { $regex: search, $options: 'i' } },
-            { instruction: { $regex: search, $options: 'i' } },
+            { orderName: { $regex: escaped, $options: 'i' } },
+            { clientId: { $in: clients.map(c => c._id) } },
+            ...(Types.ObjectId.isValid(search.trim()) ? [{ _id: new Types.ObjectId(search.trim()) }] : []),
         ];
     }
 
@@ -1158,7 +1194,7 @@ const getOrderImageStatus = async (
     search?: string
 ) => {
     const order = await OrderModel.findById(orderId)
-        .select('orderName deadline imageQuantity requiredSteps instruction')
+        .select('orderName clientId deadline imageQuantity requiredSteps instruction').populate('clientId', 'clientId')
         .lean();
 
     if (!order) {
@@ -1174,17 +1210,19 @@ const getOrderImageStatus = async (
     }
 
     if (search) {
-        query.imageName = { $regex: search, $options: 'i' };
+        query.imageName = { $regex: search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' };
     }
 
     const images = await OrderImageModel.find(query)
         .populate({
             path: 'currentAssignedStaffId',
-            select: 'name staffId employeeId designation branchId',
+            select: 'userId staffId employeeId designation branchId',
+            populate: { path: 'userId', select: 'name' },
         })
         .populate({
             path: 'completedSteps.completedBy',
-            select: 'name staffId designation',
+            select: 'userId staffId designation',
+            populate: { path: 'userId', select: 'name' },
         })
         .populate({
             path: 'revisionHistory.requestedBy',
@@ -1233,6 +1271,7 @@ const getOrderImageStatus = async (
         order: {
             _id: order._id,
             orderName: order.orderName,
+            clientId: order.clientId,
             deadline: order.deadline,
             imageQuantity: order.imageQuantity,
             requiredSteps: order.requiredSteps || [],
@@ -1281,6 +1320,10 @@ const startWorkSession = async (
         throw new Error('Order not found');
     }
 
+    if (!['pending', 'in_progress', 'quality_check', 'revision'].includes(order.status)) {
+        throw new Error('This order is closed. Ask a supervisor to reopen it for revision.');
+    }
+
     // Check if staff already has an active work session
     const existingActiveSession = await ProductionWorkSessionModel.findOne({
         staffId: staff._id,
@@ -1308,7 +1351,7 @@ const startWorkSession = async (
     const lockedImages = await OrderImageModel.find({
         orderId: new Types.ObjectId(payload.orderId),
         imageName: { $in: cleanImageNames },
-        status: 'in_progress',
+        currentSessionId: { $ne: null },
         currentAssignedStaffId: { $ne: null, $nin: [staff._id] },
     })
         .populate({
@@ -1426,6 +1469,9 @@ const startWorkSession = async (
             filter: {
                 orderId: order._id,
                 imageName: imgName,
+                currentSessionId: null,
+                currentAssignedStaffId: null,
+                status: { $nin: ['completed', 'pending_qc'] },
             },
             update: {
                 $setOnInsert: {
@@ -1545,6 +1591,13 @@ const getHeldWorkSessions = async (userId: string) => {
     }));
 };
 
+const assertSessionOwnership = async (session: any) => {
+    const count = await OrderImageModel.countDocuments({ orderId: session.orderId,
+        imageName: { $in: session.imageNames }, currentSessionId: session._id,
+        currentAssignedStaffId: session.staffId });
+    if (count !== session.imageNames.length) throw new Error('Image ownership has changed. Ask a supervisor to review this session.');
+};
+
 /**
  * Put an active session on hold. While held its timer is frozen (the elapsed
  * hold time is later subtracted) and the editor is free to start / resume a
@@ -1608,6 +1661,7 @@ const resumeWorkSession = async (sessionId: string, userId: string) => {
         throw new Error('This session is not on hold');
     }
 
+    await assertSessionOwnership(session);
     const otherActive = await ProductionWorkSessionModel.findOne({
         staffId: staff._id,
         status: 'active',
@@ -1730,17 +1784,23 @@ const finalizeSessionCompletion = async (
             ? order.requiredSteps.map((s) => s.name)
             : ['Editing & Retouching'];
 
-    // Update each image in this session
     const images = await OrderImageModel.find({
-        orderId: session.orderId,
-        imageName: { $in: session.imageNames },
+        orderId: session.orderId, imageName: { $in: session.imageNames },
+        currentSessionId: session._id, currentAssignedStaffId: session.staffId,
     });
+    if (images.length !== session.imageNames.length) {
+        throw new Error('Some images no longer belong to this session. Refresh and ask your supervisor to review the history.');
+    }
+    if (!opts.completedSteps.length || opts.completedSteps.some(step => !orderRequiredSteps.includes(step))) {
+        throw new Error('Choose valid work steps from this order.');
+    }
 
     // Dedupe defensively against the same step name being submitted twice in
     // one request (e.g. a double-click), which used to create duplicate
     // completedSteps entries and skew per-step duration stats.
     const uniqueCompletedSteps = Array.from(new Set(opts.completedSteps));
 
+    const imageUpdates = [];
     for (const image of images) {
         // A step already recorded for this image (from a previous session)
         // should not be re-appended — that inflated completedSteps with
@@ -1785,7 +1845,7 @@ const finalizeSessionCompletion = async (
         image.lockedAt = null as any;
 
         // If it was a revision, mark resolved
-        if (image.isRevision) {
+        if (image.isRevision && isAllDone) {
             image.isRevision = false;
             if (image.revisionHistory && image.revisionHistory.length > 0) {
                 const lastRev = image.revisionHistory[image.revisionHistory.length - 1];
@@ -1796,8 +1856,15 @@ const finalizeSessionCompletion = async (
             }
         }
 
-        await image.save();
+        imageUpdates.push({ updateOne: {
+            filter: { _id: image._id, currentSessionId: session._id },
+            update: { $set: { completedSteps: image.completedSteps, status: image.status,
+                currentAssignedStaffId: null, currentSessionId: null, lockedAt: null,
+                isRevision: image.isRevision, revisionHistory: image.revisionHistory } },
+        } });
     }
+
+    await OrderImageModel.bulkWrite(imageUpdates);
 
     // Update session record
     session.status = 'completed';
@@ -1865,7 +1932,7 @@ const finalizeSessionCompletion = async (
             }
         }
     } catch (shiftSyncErr) {
-        console.error('Failed to sync session with shift log:', shiftSyncErr);
+        throw shiftSyncErr;
     }
 
 
@@ -2023,6 +2090,7 @@ const reassignWorkSession = async (
         throw new Error('Target editor not found');
     }
     assertEmployedOn(newStaff, new Date());
+    if (newStaff.designation?.toLowerCase() === 'telemarketer') throw new Error('Choose a production editor.');
     if (newStaff._id.toString() === oldSession.staffId.toString()) {
         throw new Error('Session is already assigned to this editor');
     }
@@ -2077,6 +2145,7 @@ const reassignWorkSession = async (
         if (branchShift) shiftId = branchShift._id as Types.ObjectId;
     }
 
+    await assertSessionOwnership(oldSession);
     const newSession = (await (ProductionWorkSessionModel as any).create({
         staffId: newStaff._id,
         orderId: oldSession.orderId,
@@ -2320,36 +2389,23 @@ const flagImageRevision = async (
     }
 
     const now = new Date();
-
-    for (const imgName of payload.imageNames) {
-        let orderImage = await OrderImageModel.findOne({
-            orderId: order._id,
-            imageName: imgName.trim(),
-        });
-
-        if (!orderImage) {
-            orderImage = new OrderImageModel({
-                orderId: order._id,
-                imageName: imgName.trim(),
-                requiredSteps:
-                    order.requiredSteps?.map((s) => s.name) || ['Editing & Retouching'],
-                completedSteps: [],
-            });
-        }
-
+    const names = [...new Set(payload.imageNames.map(n => n.trim()).filter(Boolean))];
+    const images = await OrderImageModel.find({ orderId: order._id, imageName: { $in: names } });
+    if (!names.length || images.length !== names.length || images.some(img =>
+        img.currentSessionId || !['pending_qc', 'completed'].includes(img.status))) {
+        throw new Error('Only submitted or approved images can be returned for revision. Release active work first.');
+    }
+    for (const orderImage of images) {
         orderImage.status = 'in_revision';
         orderImage.isRevision = true;
-        orderImage.currentAssignedStaffId = null as any;
-        orderImage.currentSessionId = null as any;
-        orderImage.lockedAt = null as any;
-        orderImage.revisionHistory.push({
-            instruction: payload.instruction,
-            requestedBy: new Types.ObjectId(userId),
-            createdAt: now,
-        });
-
+        orderImage.completedSteps = [];
+        orderImage.qcApprovedAt = null;
+        orderImage.qcApprovedBy = null;
+        orderImage.revisionHistory.push({ instruction: payload.instruction,
+            requestedBy: new Types.ObjectId(userId), createdAt: now });
         await orderImage.save();
     }
+    order.completedAt = undefined as any;
 
     // Update order status to revision
     order.status = 'revision';
@@ -2390,10 +2446,16 @@ const qcApproveImages = async (
 
     const now = new Date();
 
+    const names = [...new Set(payload.imageNames.map(n => n.trim()).filter(Boolean))];
+    const eligible = await OrderImageModel.countDocuments({ orderId: order._id,
+        imageName: { $in: names }, status: 'pending_qc', currentSessionId: null });
+    if (!names.length || eligible !== names.length) throw new Error('Only images awaiting review can be approved. Refresh the image list.');
+
     const updateResult = await OrderImageModel.updateMany(
         {
             orderId: order._id,
-            imageName: { $in: payload.imageNames },
+            imageName: { $in: names },
+            currentSessionId: null,
             status: 'pending_qc',
         },
         {
@@ -2857,7 +2919,22 @@ const getStaffEditedImages = async (
     };
 };
 
+const getOrderActivity = async (orderId: string, page = 1, imageName?: string, limit = 30) => {
+    const filter = { orderId: new Types.ObjectId(orderId), ...(imageName ? { imageNames: imageName } : {}) };
+    const pageSize = [10, 20, 30, 50, 100].includes(limit) ? limit : 30;
+    const total = await ProductionEventModel.countDocuments(filter);
+    const totalPages = Math.ceil(total / pageSize);
+    const safePage = Math.min(Math.max(1, Math.floor(page) || 1), Math.max(1, totalPages));
+    const events = await ProductionEventModel.find(filter).select('-previousImages')
+        .populate('actorId', 'name').populate({ path: 'fromStaffId', select: 'staffId userId', populate: { path: 'userId', select: 'name' } })
+        .populate({ path: 'toStaffId', select: 'staffId userId', populate: { path: 'userId', select: 'name' } })
+        .sort({ createdAt: -1, _id: -1 }).skip((safePage - 1) * pageSize).limit(pageSize).lean();
+    const contributors = await ProductionWorkSessionModel.distinct('staffId', { orderId });
+    return { events, total, page: safePage, totalPages, limit: pageSize, contributorCount: contributors.length };
+};
+
 const productionService = {
+    getOrderActivity,
     createProductionLog,
     getAllProductionLogs,
     getActiveOrdersProgress,
@@ -2868,19 +2945,19 @@ const productionService = {
     getProductionStats,
     getSanitizedActiveOrders,
     getOrderImageStatus,
-    startWorkSession,
+    startWorkSession: productionMutation('taken', startWorkSession),
     getActiveWorkSession,
     getHeldWorkSessions,
-    pauseWorkSession,
-    resumeWorkSession,
-    finishWorkSession,
-    cancelWorkSession,
-    adminFinishWorkSession,
-    reassignWorkSession,
+    pauseWorkSession: productionMutation('held', pauseWorkSession),
+    resumeWorkSession: productionMutation('resumed', resumeWorkSession),
+    finishWorkSession: productionMutation('submitted', finishWorkSession),
+    cancelWorkSession: productionMutation('released', cancelWorkSession),
+    adminFinishWorkSession: productionMutation('supervisor_submitted', adminFinishWorkSession),
+    reassignWorkSession: productionMutation('reassigned', reassignWorkSession),
     getLiveWorkSessions,
     getProductionEditors,
-    flagImageRevision,
-    qcApproveImages,
+    flagImageRevision: productionMutation('revision_requested', flagImageRevision),
+    qcApproveImages: productionMutation('approved', qcApproveImages),
     getStaffPerformanceAnalytics,
     getStaffEditedImages,
 };

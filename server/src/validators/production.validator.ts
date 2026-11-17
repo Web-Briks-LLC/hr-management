@@ -120,7 +120,7 @@ export const flagImageRevisionSchema = z.object({
     imageNames: z
         .array(z.string().min(1, 'Image name cannot be empty'))
         .min(1, 'At least one image name is required'),
-    instruction: z.string().min(1, 'Revision instruction is required').max(2000),
+    instruction: z.string().trim().min(1, 'Revision instruction is required').max(2000),
 });
 
 export const qcApproveImagesSchema = z.object({

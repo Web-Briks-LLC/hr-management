@@ -362,6 +362,7 @@ export interface IImageCompletedStep {
     completedBy: {
         _id: string;
         name?: string;
+        userId?: { name?: string };
         staffId?: string;
         designation?: string;
     };
@@ -384,6 +385,7 @@ export interface IImageRevisionEntry {
     resolvedBy?: {
         _id: string;
         name?: string;
+        userId?: { name?: string };
         staffId?: string;
     } | null;
 }
@@ -398,6 +400,7 @@ export interface IOrderImage {
     currentAssignedStaffId?: {
         _id: string;
         name?: string;
+        userId?: { name?: string };
         staffId?: string;
         employeeId?: string;
         designation?: string;
@@ -418,6 +421,7 @@ export interface IOrderImage {
 
 export interface IOrderImageStatusResponse {
     order: {
+        clientId?: { clientId?: string };
         _id: string;
         orderName: string;
         deadline: string;

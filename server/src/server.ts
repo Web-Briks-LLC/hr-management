@@ -26,7 +26,9 @@ async function Server() {
         });
 
         // Start all schedulers (attendance, overtime, leave)
-        schedulerService.startAllSchedulers();
+        if (process.env.DISABLE_SCHEDULERS !== "true") {
+            schedulerService.startAllSchedulers();
+        }
     } catch (error) {
         console.error("Database connection error:", error);
         process.exit(1);

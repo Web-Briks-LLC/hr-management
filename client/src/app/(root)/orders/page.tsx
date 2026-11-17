@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { Suspense, useState, useMemo } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
     useGetOrdersQuery,
     useCreateOrderMutation,
@@ -160,6 +161,36 @@ interface ApiErrorResponse {
 }
 
 export default function OrdersPage() {
+    return (
+        <Suspense fallback={<div className="p-6 text-muted-foreground">Loading orders…</div>}>
+            <OrdersContent />
+        </Suspense>
+    );
+}
+
+function OrdersContent() {
+    const router = useRouter();
+    const pathname = usePathname();
+    const searchParams = useSearchParams();
+    const statusParam = searchParams.get("status")?.replaceAll("-", "_");
+    const status = statusParam && Object.hasOwn(ORDER_STATUS_LABELS, statusParam)
+        ? statusParam as OrderStatus
+        : undefined;
+    const setStatusFilter = (value?: OrderStatus) => {
+        const params = new URLSearchParams(searchParams.toString());
+        if (value) params.set("status", value.replaceAll("_", "-"));
+        else params.delete("status");
+        params.delete("page");
+        setPage(1);
+        setSelectedOrderIds(new Set());
+        const query = params.toString();
+        router.push(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    };
+    const statusCardProps = (value?: OrderStatus) => ({
+        type: "button" as const,
+        onClick: () => setStatusFilter(value),
+        "aria-pressed": status === value,
+    });
     const { data: session } = useSession();
     const { data: meData } = useGetMeQuery({});
     const isTelemarketer = useMemo(() => {
@@ -184,14 +215,19 @@ export default function OrdersPage() {
         );
     }, [session]);
     const isHrManager = session?.user?.role === Role.HR_MANAGER;
-    const [page, setPage] = useState(1);
-    const [filters, setFilters] = useState<OrderFilters>({
+    const [pagination, setPagination] = useState({ status, page: 1 });
+    const page = pagination.status === status ? pagination.page : 1;
+    const setPage = (value: number | ((previous: number) => number)) => {
+        setPagination({ status, page: typeof value === "function" ? value(page) : value });
+    };
+    const [localFilters, setFilters] = useState<OrderFilters>({
         search: "",
         status: undefined,
         priority: undefined,
         clientId: undefined,
         limit: 10,
     });
+    const filters: OrderFilters = { ...localFilters, status };
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -308,7 +344,7 @@ export default function OrdersPage() {
 
     // Queries
     const {
-        data: orderData,
+        currentData: orderData,
         isLoading,
         isFetching,
     } = useGetOrdersQuery({
@@ -406,6 +442,10 @@ export default function OrdersPage() {
         key: keyof OrderFilters,
         value: string | number | undefined,
     ) => {
+        if (key === "status") {
+            setStatusFilter(value as OrderStatus | undefined);
+            return;
+        }
         setFilters((prev) => ({ ...prev, [key]: value || undefined }));
         setPage(1);
     };
@@ -661,7 +701,7 @@ export default function OrdersPage() {
                 {/* Stats Cards - Row 1 */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     {/* Total Orders Card */}
-                    <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-slate-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-slate-500/5 hover:border-slate-500/30">
+                    <button {...statusCardProps(undefined)} className="text-left cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary aria-pressed:ring-2 aria-pressed:ring-primary group relative overflow-hidden rounded-2xl border bg-linear-to-br from-slate-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-slate-500/5 hover:border-slate-500/30">
                         <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-slate-500/10 blur-2xl transition-all duration-300 group-hover:bg-slate-500/20" />
                         <div className="relative">
                             <div className="flex items-center justify-between mb-3">
@@ -679,10 +719,10 @@ export default function OrdersPage() {
                                 Total Orders
                             </p>
                         </div>
-                    </div>
+                    </button>
 
                     {/* Pending Card */}
-                    <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-yellow-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-yellow-500/5 hover:border-yellow-500/30">
+                    <button {...statusCardProps("pending")} className="text-left cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary aria-pressed:ring-2 aria-pressed:ring-primary group relative overflow-hidden rounded-2xl border bg-linear-to-br from-yellow-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-yellow-500/5 hover:border-yellow-500/30">
                         <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-yellow-500/10 blur-2xl transition-all duration-300 group-hover:bg-yellow-500/20" />
                         <div className="relative">
                             <div className="flex items-center justify-between mb-3">
@@ -700,10 +740,10 @@ export default function OrdersPage() {
                                 Pending Orders
                             </p>
                         </div>
-                    </div>
+                    </button>
 
                     {/* In Progress Card */}
-                    <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-blue-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/5 hover:border-blue-500/30">
+                    <button {...statusCardProps("in_progress")} className="text-left cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary aria-pressed:ring-2 aria-pressed:ring-primary group relative overflow-hidden rounded-2xl border bg-linear-to-br from-blue-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/5 hover:border-blue-500/30">
                         <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-blue-500/10 blur-2xl transition-all duration-300 group-hover:bg-blue-500/20" />
                         <div className="relative">
                             <div className="flex items-center justify-between mb-3">
@@ -721,10 +761,10 @@ export default function OrdersPage() {
                                 In Progress
                             </p>
                         </div>
-                    </div>
+                    </button>
 
                     {/* Quality Check Card */}
-                    <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-purple-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-purple-500/5 hover:border-purple-500/30">
+                    <button {...statusCardProps("quality_check")} className="text-left cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary aria-pressed:ring-2 aria-pressed:ring-primary group relative overflow-hidden rounded-2xl border bg-linear-to-br from-purple-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-purple-500/5 hover:border-purple-500/30">
                         <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-purple-500/10 blur-2xl transition-all duration-300 group-hover:bg-purple-500/20" />
                         <div className="relative">
                             <div className="flex items-center justify-between mb-3">
@@ -742,13 +782,13 @@ export default function OrdersPage() {
                                 Quality Check
                             </p>
                         </div>
-                    </div>
+                    </button>
                 </div>
 
                 {/* Stats Cards - Row 2 */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     {/* Revision Card */}
-                    <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-orange-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-orange-500/5 hover:border-orange-500/30">
+                    <button {...statusCardProps("revision")} className="text-left cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary aria-pressed:ring-2 aria-pressed:ring-primary group relative overflow-hidden rounded-2xl border bg-linear-to-br from-orange-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-orange-500/5 hover:border-orange-500/30">
                         <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-orange-500/10 blur-2xl transition-all duration-300 group-hover:bg-orange-500/20" />
                         <div className="relative">
                             <div className="flex items-center justify-between mb-3">
@@ -766,10 +806,10 @@ export default function OrdersPage() {
                                 In Revision
                             </p>
                         </div>
-                    </div>
+                    </button>
 
                     {/* Completed Card */}
-                    <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-green-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-green-500/5 hover:border-green-500/30">
+                    <button {...statusCardProps(canSeeFinalStatus ? "completed" : "ready_to_deliver")} className="text-left cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary aria-pressed:ring-2 aria-pressed:ring-primary group relative overflow-hidden rounded-2xl border bg-linear-to-br from-green-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-green-500/5 hover:border-green-500/30">
                         <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-green-500/10 blur-2xl transition-all duration-300 group-hover:bg-green-500/20" />
                         <div className="relative">
                             <div className="flex items-center justify-between mb-3">
@@ -791,11 +831,11 @@ export default function OrdersPage() {
                                     : "Ready to Deliver"}
                             </p>
                         </div>
-                    </div>
+                    </button>
 
                     {/* Delivered Card - admin / super_admin only */}
                     {canSeeFinalStatus && (
-                    <div className="group relative overflow-hidden rounded-2xl border bg-linear-to-br from-emerald-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-emerald-500/5 hover:border-emerald-500/30">
+                    <button {...statusCardProps("delivered")} className="text-left cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary aria-pressed:ring-2 aria-pressed:ring-primary group relative overflow-hidden rounded-2xl border bg-linear-to-br from-emerald-500/10 via-card to-card p-5 transition-all duration-300 hover:shadow-xl hover:shadow-emerald-500/5 hover:border-emerald-500/30">
                         <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-emerald-500/10 blur-2xl transition-all duration-300 group-hover:bg-emerald-500/20" />
                         <div className="relative">
                             <div className="flex items-center justify-between mb-3">
@@ -813,7 +853,7 @@ export default function OrdersPage() {
                                 Delivered Orders
                             </p>
                         </div>
-                    </div>
+                    </button>
                     )}
 
                     {/* Overdue Card */}
@@ -1112,6 +1152,7 @@ export default function OrdersPage() {
                                                 clientId: undefined,
                                                 limit: 10,
                                             });
+                                            setStatusFilter(undefined);
                                             setSelectedMonth("");
                                             setSelectedYear("");
                                             setPage(1);
@@ -1199,7 +1240,7 @@ export default function OrdersPage() {
 
                     {/* Table Container */}
                     <div className="rounded-md border border-border/60 overflow-hidden">
-                        {isLoading ? (
+                        {isLoading || (isFetching && !orderData) ? (
                             <Table>
                                 <TableHeader className="bg-muted/40">
                                     <TableRow className="hover:bg-muted/40 border-b-border/60">

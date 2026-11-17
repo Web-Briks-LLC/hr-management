@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import {
+    getOrderActivity,
     createProductionLog,
     getAllProductionLogs,
     getActiveOrdersProgress,
@@ -42,6 +43,7 @@ router.use(authorizeProductionAccess);
 // Workstation & Editor Real-Time Endpoints
 router.get('/orders/sanitized', getSanitizedActiveOrders);
 router.get('/orders/:orderId/images', getOrderImageStatus);
+router.get('/orders/:orderId/activity', getOrderActivity);
 router.get('/staff-images', getStaffEditedImages);
 router.post('/session/start', startWorkSession);
 router.get('/session/active', getActiveWorkSession);
@@ -69,7 +71,7 @@ router.get('/active-orders', getActiveOrdersProgress);
 router.get('/stats', getProductionStats);
 router.get('/order/:orderId/timeline', getOrderTimelineLogs);
 router.patch('/:id', updateProductionLog);
-router.post('/:id/qc', submitQCReview);
+router.post('/:id/qc', authorize(...qcRoles), submitQCReview);
 router.delete('/:id', authorize(...adminRoles), deleteProductionLog);
 
 export { router as productionRoute };

@@ -82,6 +82,7 @@ export function NavUser() {
                 <Button
                     size="lg"
                     variant={'ghost'}
+                    aria-label="Account menu"
                     className="outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 px-0!"
                 >
                     <Avatar className="h-8 w-8 rounded-full">
@@ -101,7 +102,7 @@ export function NavUser() {
                     </Avatar>
                     <div
                         className={cn(
-                            'grid flex-1 text-left text-sm leading-tight',
+                            'hidden sm:grid min-w-0 max-w-48 flex-1 text-left text-sm leading-tight',
                             isLoading && 'gap-1'
                         )}
                     >
@@ -120,7 +121,7 @@ export function NavUser() {
                             )}
                         </span>
                     </div>
-                    <EllipsisVertical className="ml-auto size-4" />
+                    <EllipsisVertical className="ml-auto hidden size-4 sm:block" />
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent

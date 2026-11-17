@@ -71,3 +71,9 @@ server/backup/
 
 # Local Claude configuration
 /.claude/
+
+# Local development process socket
+/.runtime/
+
+# Private local database backups and credentials
+/.local/
