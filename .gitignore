@@ -68,3 +68,6 @@ payment/.env.*
 payment/node_modules/
 payment/.next/
 server/backup/
+
+# Local Claude configuration
+/.claude/
