@@ -496,6 +496,7 @@ export interface ILiveWorkSession {
         _id: string;
         staffId?: string;
         name: string;
+        image?: string | null;
         designation?: string;
     };
     order: {
@@ -506,6 +507,13 @@ export interface ILiveWorkSession {
         imageQuantity?: number;
         requiredSteps?: { name: string; code?: string }[];
         status?: string;
+        client?: { _id: string; clientId: string; name: string } | null;
+        progress?: {
+            registered: number;
+            completed: number;
+            pendingQc: number;
+            inProgress: number;
+        };
     };
     shiftName?: string | null;
     imageNames: string[];
@@ -523,6 +531,7 @@ export interface ILiveWorkSessionsResponse {
     success: boolean;
     data: {
         sessions: ILiveWorkSession[];
+        roster: ILiveRosterEntry[];
         byStaff: {
             staffId: string;
             name: string;
@@ -533,12 +542,64 @@ export interface ILiveWorkSessionsResponse {
             orders: string[];
         }[];
         summary: {
+            totalEditors: number;
+            workingEditors: number;
+            onHoldEditors: number;
+            idleEditors: number;
             editorsWorking: number;
             activeSessions: number;
             heldSessions: number;
             imagesInProgress: number;
         };
     };
+}
+
+export interface ILiveRosterEntry {
+    staffId: string;
+    employeeId?: string;
+    name: string;
+    image?: string | null;
+    designation?: string;
+    state: 'working' | 'on_hold' | 'idle';
+    sessionIds: string[];
+    todayImages: number;
+    todaySeconds: number;
+    lastActiveAt: string | null;
+}
+
+export interface IMonthlyEditorReport {
+    month: number;
+    year: number;
+    totals: { editors: number; sessions: number; images: number; workSeconds: number };
+    editors: {
+        staffId: string;
+        employeeId: string;
+        name: string;
+        image?: string | null;
+        sessions: number;
+        images: number;
+        workSeconds: number;
+        workingDays: number;
+        ordersCount: number;
+        clientsCount: number;
+        avgSecondsPerImage: number;
+    }[];
+    rows: {
+        sessionId: string;
+        date: string;
+        staffObjectId: string;
+        editorName: string;
+        editorImage?: string | null;
+        employeeId: string;
+        clientCode: string;
+        clientName: string;
+        orderName: string;
+        orderImages: number;
+        images: number;
+        workSeconds: number;
+        status: string;
+        steps: string;
+    }[];
 }
 
 export interface IProductionEditor {
@@ -574,6 +635,7 @@ export interface IStaffPerformanceAnalytics {
     staffPerformance: {
         staffId: string;
         staffName: string;
+        image?: string | null;
         employeeId: string;
         designation: string;
         totalSessions: number;

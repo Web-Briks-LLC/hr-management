@@ -1,4 +1,5 @@
 "use client";
+import { ScrollBox } from "@/components/shared/scroll-box";
 import { TablePagination } from "@/components/shared/table-pagination";
 import { useState } from "react";
 import { useGetOrderActivityQuery } from "@/redux/features/production/productionApi";
@@ -125,9 +126,9 @@ export function ProductionActivity({
                 <summary className="cursor-pointer text-muted-foreground">
                   View image names
                 </summary>
-                <p className="mt-2 max-h-32 overflow-auto break-all">
-                  {event.imageNames.join(", ")}
-                </p>
+                <ScrollBox maxHeight="8rem" className="mt-2">
+                  <p className="break-all">{event.imageNames.join(", ")}</p>
+                </ScrollBox>
               </details>
             </li>
           ))}

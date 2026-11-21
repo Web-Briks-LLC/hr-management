@@ -1,4 +1,5 @@
 'use client';
+import { ScrollBox } from '@/components/shared/scroll-box';
 import { useState, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { toast } from 'sonner';
@@ -376,9 +377,11 @@ export function ProductionWorkstation() {
                                 <summary className="cursor-pointer">
                                     View my {running.imageCount} image names
                                 </summary>
-                                <p className="mt-3 max-h-40 overflow-auto break-all text-muted-foreground">
-                                    {running.imageNames.join(', ')}
-                                </p>
+                                <ScrollBox maxHeight="10rem" className="mt-3">
+                                    <p className="break-all text-muted-foreground">
+                                        {running.imageNames.join(', ')}
+                                    </p>
+                                </ScrollBox>
                             </details>
                             <Button
                                 variant="ghost"
@@ -515,7 +518,7 @@ export function ProductionWorkstation() {
                                                     Select all matching
                                                 </Button>
                                             </div>
-                                            <div className="max-h-64 overflow-y-auto rounded-lg border">
+                                            <ScrollBox maxHeight="16rem" className="rounded-lg border">
                                                 {visibleAvailable.length ? (
                                                     visibleAvailable
                                                         .slice(0, visibleCount)
@@ -582,7 +585,7 @@ export function ProductionWorkstation() {
                                                             : 'No released images yet. Add filenames below to begin new work.'}
                                                     </p>
                                                 )}
-                                            </div>
+                                            </ScrollBox>
                                             {visibleAvailable.length >
                                                 visibleCount && (
                                                 <Button
@@ -664,7 +667,7 @@ export function ProductionWorkstation() {
                                             </p>
                                         </>
                                     )}
-                                    <div className="max-h-64 overflow-auto space-y-1">
+                                    <ScrollBox maxHeight="16rem" className="rounded-md"><div className="space-y-1">
                                         {staged.length ? (
                                             staged
                                                 .filter((name) =>
@@ -717,7 +720,7 @@ export function ProductionWorkstation() {
                                                 batch.
                                             </p>
                                         )}
-                                    </div>
+                                    </div></ScrollBox>
                                     {newCount > capacity && (
                                         <p
                                             role="alert"
@@ -970,7 +973,7 @@ export function ProductionWorkstation() {
                     if (!open) setHistory(null);
                 }}
             >
-                <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+                <DialogContent className="sm:max-w-2xl">
                     <DialogHeader>
                         <DialogTitle>Order activity</DialogTitle>
                         <DialogDescription>
@@ -978,7 +981,9 @@ export function ProductionWorkstation() {
                         </DialogDescription>
                     </DialogHeader>
                     {history && (
-                        <ProductionActivity key={history} orderId={history} />
+                        <ScrollBox maxHeight="65vh">
+                            <ProductionActivity key={history} orderId={history} />
+                        </ScrollBox>
                     )}
                 </DialogContent>
             </Dialog>

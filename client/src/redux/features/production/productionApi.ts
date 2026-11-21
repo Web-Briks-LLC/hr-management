@@ -24,6 +24,7 @@ import type {
     IPauseResumeSessionInput,
     IAdminFinishWorkSessionInput,
     IReassignWorkSessionInput,
+    IMonthlyEditorReport,
 } from '@/types/production.type';
 
 interface ProductionLogsResponse {
@@ -273,6 +274,14 @@ export const productionApi = apiSlice.injectEndpoints({
         getLiveWorkSessions: builder.query<ILiveWorkSessionsResponse, void>({
             query: () => '/production/sessions/live',
             providesTags: ['LiveWorkSessions'],
+        }),
+
+        getMonthlyEditorReport: builder.query<
+            { success: boolean; data: IMonthlyEditorReport },
+            { month: number; year: number; staffId?: string }
+        >({
+            query: (params) => ({ url: '/production/reports/monthly', params }),
+            providesTags: ['StaffPerformance'],
         }),
 
         getProductionEditors: builder.query<ProductionEditorsResponse, void>({
@@ -530,6 +539,7 @@ export const {
     useResumeWorkSessionMutation,
     useGetLiveWorkSessionsQuery,
     useGetProductionEditorsQuery,
+    useGetMonthlyEditorReportQuery,
     useAdminCancelWorkSessionMutation,
     useAdminFinishWorkSessionMutation,
     useReassignWorkSessionMutation,

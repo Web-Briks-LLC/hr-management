@@ -706,3 +706,31 @@ export const getOrderActivity = async (req: Request, res: Response) => {
         return res.json({ success: true, data });
     } catch (error: any) { return res.status(400).json({ success: false, message: error.message }); }
 };
+
+const resolveReportScope = async (req: Request) => {
+    const now = new Date();
+    const month = Math.min(12, Math.max(1, parseInt(req.query.month as string) || now.getMonth() + 1));
+    const year = parseInt(req.query.year as string) || now.getFullYear();
+    let staffId = req.query.staffId as string | undefined;
+    // Supervisors may report on anyone; editors only ever see their own data.
+    const supervisorRoles: string[] = [Role.SUPER_ADMIN, Role.ADMIN, Role.HR_MANAGER, Role.TEAM_LEADER];
+    if (!supervisorRoles.includes(req.user!.role)) {
+        const own = await StaffModel.findOne({ userId: req.user!.id }).select('_id').lean();
+        staffId = own ? String(own._id) : '000000000000000000000000';
+    }
+    return { month, year, staffId, branchId: req.query.branchId as string | undefined };
+};
+
+export const getMonthlyEditorReport = async (req: Request, res: Response) => {
+    try {
+        const scope = await resolveReportScope(req);
+        const result = await productionService.getMonthlyEditorReport(scope);
+        return res.status(200).json({ success: true, data: result });
+    } catch (error: any) {
+        console.error('getMonthlyEditorReport error:', error);
+        return res.status(500).json({
+            success: false,
+            message: error.message || 'Failed to build monthly report',
+        });
+    }
+};

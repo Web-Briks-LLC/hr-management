@@ -1,4 +1,5 @@
 'use client';
+import { ScrollBox } from '@/components/shared/scroll-box';
 import { TablePagination } from '@/components/shared/table-pagination';
 import { use, useState, useEffect } from 'react';
 import Link from 'next/link';
@@ -517,7 +518,7 @@ export default function ProductionOrderPage({
                     if (!open) setImageHistory(null);
                 }}
             >
-                <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-auto">
+                <DialogContent className="sm:max-w-2xl">
                     <DialogHeader>
                         <DialogTitle className="break-all">
                             {imageHistory}
@@ -527,11 +528,13 @@ export default function ProductionOrderPage({
                         </DialogDescription>
                     </DialogHeader>
                     {imageHistory && (
-                        <ProductionActivity
-                            key={imageHistory}
-                            orderId={orderId}
-                            initialImageName={imageHistory}
-                        />
+                        <ScrollBox maxHeight="65vh">
+                            <ProductionActivity
+                                key={imageHistory}
+                                orderId={orderId}
+                                initialImageName={imageHistory}
+                            />
+                        </ScrollBox>
                     )}
                 </DialogContent>
             </Dialog>

@@ -1,12 +1,12 @@
 "use client";
 import type { ComponentProps } from "react";
 import {
-  Table as BaseTable,
   TableHeader as BaseHeader,
   TableRow as BaseRow,
   TableHead as BaseHead,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 export {
   TableBody,
   TableCell,
@@ -14,8 +14,18 @@ export {
   TableCaption,
 } from "@/components/ui/table";
 
-export function Table(props: ComponentProps<typeof BaseTable>) {
-  return <BaseTable {...props} />;
+/** Table that scrolls sideways inside a shadcn ScrollArea on narrow screens. */
+export function Table({ className, ...props }: ComponentProps<"table">) {
+  return (
+    <ScrollArea className="w-full">
+      <table
+        data-slot="table"
+        className={cn("w-full caption-bottom text-sm", className)}
+        {...props}
+      />
+      <ScrollBar orientation="horizontal" />
+    </ScrollArea>
+  );
 }
 export function TableFrame({ className, ...props }: ComponentProps<"div">) {
   return (

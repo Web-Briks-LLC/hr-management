@@ -1,5 +1,6 @@
 'use client';
 
+import { ScrollBox } from '@/components/shared/scroll-box';
 import React from 'react';
 import {
     Dialog,
@@ -65,7 +66,7 @@ export function OrderWorkflowDrawer({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+            <DialogContent className="max-w-2xl">
                 <DialogHeader>
                     <div className="flex items-center gap-2">
                         <div className="p-2 rounded-lg bg-primary/10 text-primary">
@@ -82,6 +83,7 @@ export function OrderWorkflowDrawer({
                     </div>
                 </DialogHeader>
 
+                <ScrollBox maxHeight="65vh">
                 {isLoading ? (
                     <div className="space-y-4 py-4">
                         <Skeleton className="h-20 w-full rounded-xl" />
@@ -354,6 +356,7 @@ export function OrderWorkflowDrawer({
                         </div>
                     </div>
                 )}
+                </ScrollBox>
             </DialogContent>
         </Dialog>
     );

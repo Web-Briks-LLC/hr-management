@@ -1,8 +1,19 @@
 "use client";
 import { TablePagination } from "@/components/shared/table-pagination";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { StatTile } from "@/components/production/stat-tile";
+import { EditorCell } from "@/components/production/editor-cell";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -59,13 +70,14 @@ import {
   Users,
   Activity,
   Pause,
-  Layers,
   MoreVertical,
   CheckCircle2,
   XCircle,
   UserCog,
   Clock,
   RefreshCw,
+  UserX,
+  Search,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
@@ -116,21 +128,12 @@ export function FloorMonitor() {
     useReassignWorkSessionMutation();
 
   const sessions = data?.data?.sessions || [];
-  const byStaff = data?.data?.byStaff || [];
-  const [staffPage, setStaffPage] = useState(1);
-  const [staffLimit, setStaffLimit] = useState(10);
-  const [sessionPage, setSessionPage] = useState(1);
-  const [sessionLimit, setSessionLimit] = useState(10);
-  const safeStaffPage = Math.min(
-    staffPage,
-    Math.max(1, Math.ceil(byStaff.length / staffLimit)),
-  );
-  const safeSessionPage = Math.min(
-    sessionPage,
-    Math.max(1, Math.ceil(sessions.length / sessionLimit)),
-  );
 
   const summary = data?.data?.summary || {
+    totalEditors: 0,
+    workingEditors: 0,
+    onHoldEditors: 0,
+    idleEditors: 0,
     editorsWorking: 0,
     activeSessions: 0,
     heldSessions: 0,
@@ -238,329 +241,498 @@ export function FloorMonitor() {
     }
   };
 
-  const stats = useMemo(
-    () => [
-      {
-        label: "Editors Working",
-        value: summary.editorsWorking,
-        icon: Users,
-        tint: "blue",
-      },
-      {
-        label: "Active Sessions",
-        value: summary.activeSessions,
-        icon: Activity,
-        tint: "emerald",
-      },
-      {
-        label: "On Hold",
-        value: summary.heldSessions,
-        icon: Pause,
-        tint: "amber",
-      },
-      {
-        label: "Images In Progress",
-        value: summary.imagesInProgress,
-        icon: Layers,
-        tint: "purple",
-      },
-    ],
-    [summary],
-  );
+  type ViewTab = "working" | "idle" | "all";
+  const [view, setView] = useState<ViewTab>("working");
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
 
-  const tintMap: Record<string, string> = {
-    blue: "from-blue-500/10 text-blue-500",
-    emerald: "from-emerald-500/10 text-emerald-500",
-    amber: "from-amber-500/10 text-amber-500",
-    purple: "from-purple-500/10 text-purple-500",
-  };
+  const roster = data?.data?.roster || [];
+  const needle = search.trim().toLowerCase();
+  const matches = (...parts: (string | undefined | null)[]) =>
+    !needle || parts.some((p) => p?.toLowerCase().includes(needle));
+
+  const workingRows = sessions.filter((s) =>
+    matches(
+      s.staff.name,
+      s.staff.staffId,
+      s.order.client?.name,
+      s.order.client?.clientId,
+      s.order.orderName,
+    ),
+  );
+  const idleRows = roster.filter(
+    (r) => r.state === "idle" && matches(r.name, r.employeeId),
+  );
+  const allRows = roster.filter((r) => matches(r.name, r.employeeId));
+  const sessionById = new Map(sessions.map((x) => [x._id, x]));
+
+  const activeTotal =
+    view === "working"
+      ? workingRows.length
+      : view === "idle"
+        ? idleRows.length
+        : allRows.length;
+  const safePage = Math.min(page, Math.max(1, Math.ceil(activeTotal / limit)));
+  const from = (safePage - 1) * limit;
+  const to = safePage * limit;
+
+  const stateBadge = (state: "working" | "on_hold" | "idle") =>
+    state === "working" ? (
+      <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 text-xs font-bold">
+        Working
+      </Badge>
+    ) : state === "on_hold" ? (
+      <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30 text-xs font-bold">
+        On hold
+      </Badge>
+    ) : (
+      <Badge variant="outline" className="text-xs font-semibold text-muted-foreground">
+        Not started
+      </Badge>
+    );
+
+  const stats = [
+    {
+      label: "Total editors",
+      value: summary.totalEditors,
+      hint: "Available for production",
+      icon: Users,
+      tone: "slate" as const,
+    },
+    {
+      label: "Working now",
+      value: summary.workingEditors,
+      hint: "Have a batch in progress",
+      icon: Activity,
+      tone: "green" as const,
+    },
+    {
+      label: "On hold",
+      value: summary.onHoldEditors,
+      hint: "Only paused batches",
+      icon: Pause,
+      tone: "orange" as const,
+    },
+    {
+      label: "Not started",
+      value: summary.idleEditors,
+      hint: "No batch taken yet",
+      icon: UserX,
+      tone: "blue" as const,
+    },
+  ];
+
+  const skeletonRows = (cols: number) =>
+    [...Array(4)].map((_, i) => (
+      <TableRow key={i}>
+        <TableCell colSpan={cols}>
+          <Skeleton className="h-8 w-full" />
+        </TableCell>
+      </TableRow>
+    ));
+
+  const emptyRow = (cols: number, title: string, text: string) => (
+    <TableRow>
+      <TableCell colSpan={cols} className="h-48 text-center">
+        <div className="flex flex-col items-center justify-center gap-2 text-muted-foreground">
+          <div className="rounded-full bg-muted/50 p-3">
+            <Clock className="h-6 w-6 opacity-30" />
+          </div>
+          <p className="text-lg font-medium">{title}</p>
+          <p className="text-sm">{text}</p>
+        </div>
+      </TableCell>
+    </TableRow>
+  );
 
   return (
     <div className="space-y-6">
       {/* Summary cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {stats.map((s) => (
-          <div
-            key={s.label}
-            className={`rounded-xl border bg-card p-5 ${tintMap[s.tint]}`}
-          >
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-current/10">
-                <s.icon className="h-5 w-5" />
-              </div>
-            </div>
-            <h3 className="text-3xl font-bold tracking-tight text-foreground">
-              {isLoading ? <Skeleton className="h-8 w-12" /> : s.value}
-            </h3>
-            <p className="text-xs text-muted-foreground mt-2 font-medium">
-              {s.label}
-            </p>
-          </div>
+          <StatTile key={s.label} {...s} isLoading={isLoading} />
         ))}
       </div>
 
-      {/* Per-editor rollup */}
-      <div className="rounded-md border border-border/60 overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border/60 bg-muted/30">
-          <span className="text-sm font-bold flex items-center gap-2">
-            <Users className="h-4 w-4 text-primary" />
-            Who&apos;s Working On What
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => refetch()}
-            disabled={isFetching}
-            className="h-8 text-xs"
+      <Card className="border-border/60 shadow-md">
+        <CardHeader className="pb-3">
+          <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-xl">
+                <Users className="h-5 w-5 text-primary" />
+                Team activity
+              </CardTitle>
+              <CardDescription className="mt-1">
+                Who is editing, for which client and order, and who has not
+                picked up work yet. Updates live.
+              </CardDescription>
+            </div>
+            <Button
+              variant="outline"
+              className="border-primary text-primary shadow-sm hover:bg-primary/10"
+              onClick={() => refetch()}
+              disabled={isFetching}
+            >
+              <RefreshCw
+                className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`}
+              />
+              Refresh
+            </Button>
+          </div>
+        </CardHeader>
+
+        <CardContent className="space-y-6">
+          <Tabs
+            value={view}
+            onValueChange={(v) => {
+              setView(v as ViewTab);
+              setPage(1);
+            }}
           >
-            <RefreshCw
-              className={`h-3.5 w-3.5 mr-1.5 ${isFetching ? "animate-spin" : ""}`}
-            />
-            Refresh
-          </Button>
-        </div>
-        <Table>
-          <TableHeader className="bg-muted/40">
-            <TableRow className="text-sm">
-              <TableHead className="font-semibold">Editor</TableHead>
-              <TableHead className="font-semibold">Sessions</TableHead>
-              <TableHead className="font-semibold">Images</TableHead>
-              <TableHead className="font-semibold">Orders</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              [...Array(3)].map((_, i) => (
-                <TableRow key={i}>
-                  <TableCell colSpan={4}>
-                    <Skeleton className="h-5 w-full" />
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : byStaff.length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={4}
-                  className="h-24 text-center text-muted-foreground text-sm"
-                >
-                  No editors are working right now.
-                </TableCell>
-              </TableRow>
-            ) : (
-              byStaff
-                .slice(
-                  (safeStaffPage - 1) * staffLimit,
-                  safeStaffPage * staffLimit,
-                )
-                .map((row) => (
-                  <TableRow key={row.staffId} className="text-sm">
-                    <TableCell>
-                      <div className="font-bold text-foreground">
-                        {row.name}
-                      </div>
-                      {row.designation && (
-                        <div className="text-[11px] text-muted-foreground capitalize">
-                          {row.designation}
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-1.5">
-                        <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 text-xs">
-                          {row.activeCount} active
-                        </Badge>
-                        {row.heldCount > 0 && (
-                          <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30 text-xs">
-                            {row.heldCount} held
-                          </Badge>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="font-mono font-bold text-foreground">
-                      {row.totalImages}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {row.orders.join(", ") || "—"}
-                    </TableCell>
-                  </TableRow>
-                ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
-      <TablePagination
-        page={safeStaffPage}
-        limit={staffLimit}
-        total={byStaff.length}
-        onPageChange={setStaffPage}
-        onLimitChange={setStaffLimit}
-        isFetching={isFetching}
-      />
+            <ScrollArea className="mb-4 w-full">
+              <TabsList className="h-auto w-max gap-1 p-1">
+                <TabsTrigger value="working" className="gap-2 px-4 py-2">
+                  <Activity className="size-4" />
+                  Working now
+                  <Badge variant="secondary" className="ml-1">
+                    {sessions.length}
+                  </Badge>
+                </TabsTrigger>
+                <TabsTrigger value="idle" className="gap-2 px-4 py-2">
+                  <UserX className="size-4" />
+                  Not started
+                  <Badge variant="secondary" className="ml-1">
+                    {summary.idleEditors}
+                  </Badge>
+                </TabsTrigger>
+                <TabsTrigger value="all" className="gap-2 px-4 py-2">
+                  <Users className="size-4" />
+                  All editors
+                  <Badge variant="secondary" className="ml-1">
+                    {summary.totalEditors}
+                  </Badge>
+                </TabsTrigger>
+              </TabsList>
+              <ScrollBar orientation="horizontal" />
+            </ScrollArea>
 
-      {/* Live sessions */}
-      <div className="rounded-md border border-border/60 overflow-hidden">
-        <div className="px-4 py-3 border-b border-border/60 bg-muted/30">
-          <span className="text-sm font-bold flex items-center gap-2">
-            <Activity className="h-4 w-4 text-primary" />
-            Live &amp; Held Sessions ({sessions.length})
-          </span>
-        </div>
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader className="bg-muted/40">
-              <TableRow className="text-sm">
-                <TableHead className="font-semibold">Editor</TableHead>
-                <TableHead className="font-semibold">Order</TableHead>
-                <TableHead className="font-semibold">Batch</TableHead>
-                <TableHead className="font-semibold">Status</TableHead>
-                <TableHead className="font-semibold">Elapsed</TableHead>
-                <TableHead className="font-semibold">Cumulative</TableHead>
-                <TableHead className="font-semibold">Started</TableHead>
-                <TableHead className="font-semibold text-right">
-                  Actions
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                [...Array(4)].map((_, i) => (
-                  <TableRow key={i}>
-                    <TableCell colSpan={8}>
-                      <Skeleton className="h-5 w-full" />
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : sessions.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={8}
-                    className="h-28 text-center text-muted-foreground"
-                  >
-                    <div className="flex flex-col items-center gap-2">
-                      <Clock className="h-7 w-7 opacity-20" />
-                      <p className="text-sm font-medium">
-                        No live or held sessions
-                      </p>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                sessions
-                  .slice(
-                    (safeSessionPage - 1) * sessionLimit,
-                    safeSessionPage * sessionLimit,
-                  )
-                  .map((s) => {
-                    const elapsed = computeElapsed(s, nowTs);
-                    const cumulative =
-                      elapsed + (s.priorAccumulatedSeconds || 0);
-                    return (
-                      <TableRow key={s._id} className="text-sm">
-                        <TableCell>
-                          <div className="font-bold text-foreground">
-                            {s.staff.name}
-                          </div>
-                          {s.staff.staffId && (
-                            <div className="text-[11px] text-muted-foreground font-mono">
-                              {s.staff.staffId}
-                            </div>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <div className="font-mono font-semibold text-foreground">
-                            {s.order.orderName}
-                          </div>
-                          {s.isReassignment && (
-                            <Badge
-                              variant="outline"
-                              className="mt-1 text-[9px] border-blue-500/30 text-blue-600 dark:text-blue-400"
-                            >
-                              reassigned
-                            </Badge>
-                          )}
-                        </TableCell>
-                        <TableCell className="font-mono">
-                          {s.imageCount} img
-                        </TableCell>
-                        <TableCell>
-                          {s.isOnHold ? (
-                            <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30 text-xs font-bold">
-                              ON HOLD
-                            </Badge>
-                          ) : (
-                            <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 text-xs font-bold">
-                              LIVE
-                            </Badge>
-                          )}
-                        </TableCell>
-                        <TableCell className="font-mono font-bold text-foreground">
-                          {fmtDuration(elapsed)}
-                        </TableCell>
-                        <TableCell className="font-mono">
-                          {fmtDuration(cumulative)}
-                          {s.priorAccumulatedSeconds > 0 && (
-                            <span className="block text-xs text-muted-foreground">
-                              +{Math.round(s.priorAccumulatedSeconds / 60)}m
-                              prior
-                            </span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {formatDistanceToNow(new Date(s.startTime), {
-                            addSuffix: true,
-                          })}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                              >
-                                <MoreVertical className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent
-                              align="end"
-                              className="text-sm"
-                            >
-                              <DropdownMenuItem onClick={() => openFinish(s)}>
-                                <CheckCircle2 className="h-3.5 w-3.5 mr-2 text-emerald-600" />
-                                Submit completed steps
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => openReassign(s)}>
-                                <UserCog className="h-3.5 w-3.5 mr-2 text-blue-600" />
-                                Hand over to editor
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                onClick={() => openCancel(s)}
-                                className="text-destructive focus:text-destructive"
-                              >
-                                <XCircle className="h-3.5 w-3.5 mr-2" />
-                                Release for others
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
+            {/* Search toolbar */}
+            <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-border/50 bg-muted/30 p-4">
+              <div className="flex items-center gap-2">
+                <div className="rounded-full bg-primary/10 p-2">
+                  <Search className="h-4 w-4 text-primary" />
+                </div>
+                <span className="text-sm font-medium">Find:</span>
+              </div>
+              <Input
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setPage(1);
+                }}
+                placeholder="Editor, client or order…"
+                className="h-9 w-full max-w-xs bg-background/60"
+              />
+            </div>
+
+            <div className="overflow-hidden rounded-md border border-border/60">
+              {/* ---- Working now ---- */}
+              <TabsContent value="working" className="m-0">
+                <Table>
+                    <TableHeader className="bg-muted/40">
+                      <TableRow className="border-b-border/60 hover:bg-muted/40">
+                        <TableHead>Editor</TableHead>
+                        <TableHead>Client</TableHead>
+                        <TableHead>Order</TableHead>
+                        <TableHead>Images</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Time on batch</TableHead>
+                        <TableHead>Taken</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
-                    );
-                  })
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      </div>
+                    </TableHeader>
+                    <TableBody>
+                      {isLoading
+                        ? skeletonRows(8)
+                        : workingRows.length === 0
+                          ? emptyRow(
+                              8,
+                              "Nobody is working right now",
+                              needle
+                                ? "No batch matches your search."
+                                : "Batches show up here as soon as an editor takes work.",
+                            )
+                          : workingRows.slice(from, to).map((s) => {
+                              const elapsed = computeElapsed(s, nowTs);
+                              const progress = s.order.progress;
+                              return (
+                                <TableRow
+                                  key={s._id}
+                                  className="transition-colors hover:bg-muted/20"
+                                >
+                                  <TableCell>
+                                    <EditorCell
+                                      name={s.staff.name}
+                                      image={s.staff.image}
+                                      employeeId={s.staff.staffId}
+                                    />
+                                  </TableCell>
+                                  <TableCell>
+                                    {s.order.client ? (
+                                      <>
+                                        <div className="font-mono font-semibold">
+                                          {s.order.client.clientId}
+                                        </div>
+                                        <div className="text-[11px] text-muted-foreground">
+                                          {s.order.client.name}
+                                        </div>
+                                      </>
+                                    ) : (
+                                      "—"
+                                    )}
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="font-mono font-semibold">
+                                      {s.order.orderName}
+                                    </div>
+                                    {s.isReassignment && (
+                                      <Badge
+                                        variant="outline"
+                                        className="mt-1 border-blue-500/30 text-[10px] text-blue-600 dark:text-blue-400"
+                                      >
+                                        taken over
+                                      </Badge>
+                                    )}
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="font-semibold">
+                                      {s.imageCount} of{" "}
+                                      {s.order.imageQuantity ?? "?"}
+                                    </div>
+                                    {progress && (
+                                      <div className="text-[11px] text-muted-foreground">
+                                        {progress.registered} started ·{" "}
+                                        {progress.pendingQc} in review ·{" "}
+                                        {progress.completed} approved
+                                      </div>
+                                    )}
+                                  </TableCell>
+                                  <TableCell>
+                                    {stateBadge(
+                                      s.isOnHold ? "on_hold" : "working",
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="font-mono font-bold">
+                                    {fmtDuration(elapsed)}
+                                    {s.priorAccumulatedSeconds > 0 && (
+                                      <span className="block text-xs font-normal text-muted-foreground">
+                                        +
+                                        {Math.round(
+                                          s.priorAccumulatedSeconds / 60,
+                                        )}
+                                        m earlier
+                                      </span>
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="whitespace-nowrap text-muted-foreground">
+                                    {formatDistanceToNow(
+                                      new Date(s.startTime),
+                                      { addSuffix: true },
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger asChild>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-8 w-8"
+                                        >
+                                          <MoreVertical className="h-4 w-4" />
+                                        </Button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent
+                                        align="end"
+                                        className="text-sm"
+                                      >
+                                        <DropdownMenuItem
+                                          onClick={() => openFinish(s)}
+                                        >
+                                          <CheckCircle2 className="mr-2 h-3.5 w-3.5 text-emerald-600" />
+                                          Submit completed steps
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem
+                                          onClick={() => openReassign(s)}
+                                        >
+                                          <UserCog className="mr-2 h-3.5 w-3.5 text-blue-600" />
+                                          Hand over to editor
+                                        </DropdownMenuItem>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem
+                                          onClick={() => openCancel(s)}
+                                          className="text-destructive focus:text-destructive"
+                                        >
+                                          <XCircle className="mr-2 h-3.5 w-3.5" />
+                                          Release for others
+                                        </DropdownMenuItem>
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                    </TableBody>
+                  </Table>
+              </TabsContent>
 
-      <TablePagination
-        page={safeSessionPage}
-        limit={sessionLimit}
-        total={sessions.length}
-        onPageChange={setSessionPage}
-        onLimitChange={setSessionLimit}
-        isFetching={isFetching}
-      />
+              {/* ---- Not started ---- */}
+              <TabsContent value="idle" className="m-0">
+                <Table>
+                    <TableHeader className="bg-muted/40">
+                      <TableRow className="border-b-border/60 hover:bg-muted/40">
+                        <TableHead>Editor</TableHead>
+                        <TableHead>Images done today</TableHead>
+                        <TableHead>Work time today</TableHead>
+                        <TableHead>Last finished</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {isLoading
+                        ? skeletonRows(4)
+                        : idleRows.length === 0
+                          ? emptyRow(
+                              4,
+                              "Everyone has work in hand",
+                              needle
+                                ? "No editor matches your search."
+                                : "Editors without a batch will be listed here.",
+                            )
+                          : idleRows.slice(from, to).map((e) => (
+                              <TableRow
+                                key={e.staffId}
+                                className="transition-colors hover:bg-muted/20"
+                              >
+                                <TableCell>
+                                  <EditorCell
+                                    name={e.name}
+                                    image={e.image}
+                                    employeeId={e.employeeId}
+                                  />
+                                </TableCell>
+                                <TableCell className="font-mono">
+                                  {e.todayImages}
+                                </TableCell>
+                                <TableCell className="font-mono">
+                                  {e.todaySeconds
+                                    ? fmtDuration(e.todaySeconds)
+                                    : "—"}
+                                </TableCell>
+                                <TableCell className="text-muted-foreground">
+                                  {e.lastActiveAt
+                                    ? formatDistanceToNow(
+                                        new Date(e.lastActiveAt),
+                                        { addSuffix: true },
+                                      )
+                                    : "Nothing finished today"}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                    </TableBody>
+                  </Table>
+              </TabsContent>
+
+              {/* ---- All editors ---- */}
+              <TabsContent value="all" className="m-0">
+                <Table>
+                    <TableHeader className="bg-muted/40">
+                      <TableRow className="border-b-border/60 hover:bg-muted/40">
+                        <TableHead>Editor</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Working on</TableHead>
+                        <TableHead className="text-right">Images held</TableHead>
+                        <TableHead className="text-right">Done today</TableHead>
+                        <TableHead className="text-right">Time today</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {isLoading
+                        ? skeletonRows(6)
+                        : allRows.length === 0
+                          ? emptyRow(
+                              6,
+                              "No editors found",
+                              "Try a different search.",
+                            )
+                          : allRows.slice(from, to).map((e) => {
+                              const mine = e.sessionIds
+                                .map((id) => sessionById.get(id))
+                                .filter(
+                                  (x): x is ILiveWorkSession => Boolean(x),
+                                );
+                              const first = mine[0];
+                              return (
+                                <TableRow
+                                  key={e.staffId}
+                                  className="transition-colors hover:bg-muted/20"
+                                >
+                                  <TableCell>
+                                    <EditorCell
+                                      name={e.name}
+                                      image={e.image}
+                                      employeeId={e.employeeId}
+                                    />
+                                  </TableCell>
+                                  <TableCell>{stateBadge(e.state)}</TableCell>
+                                  <TableCell>
+                                    {first ? (
+                                      <>
+                                        <div className="font-mono font-semibold">
+                                          {first.order.orderName}
+                                        </div>
+                                        <div className="text-[11px] text-muted-foreground">
+                                          {first.order.client?.name ||
+                                            "No client"}
+                                          {mine.length > 1 &&
+                                            ` · +${mine.length - 1} more batch`}
+                                        </div>
+                                      </>
+                                    ) : (
+                                      <span className="text-muted-foreground">
+                                        —
+                                      </span>
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="text-right font-mono">
+                                    {mine.reduce((a, m) => a + m.imageCount, 0)}
+                                  </TableCell>
+                                  <TableCell className="text-right font-mono">
+                                    {e.todayImages}
+                                  </TableCell>
+                                  <TableCell className="text-right font-mono">
+                                    {e.todaySeconds
+                                      ? fmtDuration(e.todaySeconds)
+                                      : "—"}
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                    </TableBody>
+                  </Table>
+              </TabsContent>
+            </div>
+          </Tabs>
+
+          <TablePagination
+            page={safePage}
+            limit={limit}
+            total={activeTotal}
+            onPageChange={setPage}
+            onLimitChange={setLimit}
+            isFetching={isFetching}
+          />
+        </CardContent>
+      </Card>
 
       {/* Force Finish dialog */}
       <AppDialog

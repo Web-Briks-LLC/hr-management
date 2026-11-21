@@ -27,6 +27,7 @@ import {
     qcApproveImages,
     getStaffPerformanceAnalytics,
     getStaffEditedImages,
+    getMonthlyEditorReport,
 } from '../controllers/production.controller.js';
 import { authorizeProductionAccess } from '../middlewares/authorizeProductionAccess.js';
 import { authorize } from '../middlewares/authorize.js';
@@ -63,6 +64,7 @@ router.post('/session/reassign', authorize(...qcRoles), reassignWorkSession);
 router.post('/images/revision', authorize(...qcRoles), flagImageRevision);
 router.post('/images/qc-approve', authorize(...qcRoles), qcApproveImages);
 router.get('/analytics/staff', getStaffPerformanceAnalytics);
+router.get('/reports/monthly', getMonthlyEditorReport);
 
 // Existing Shift Logs & Overview Endpoints
 router.post('/', createProductionLog);

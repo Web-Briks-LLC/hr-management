@@ -2240,9 +2240,13 @@ const getLiveWorkSessions = async (userId?: string, userRole?: string) => {
         .populate({
             path: 'staffId',
             select: 'staffId designation branchId userId',
-            populate: { path: 'userId', select: 'name email' },
+            populate: { path: 'userId', select: 'name email image' },
         })
-        .populate('orderId', 'orderName deadline priority imageQuantity requiredSteps status')
+        .populate({
+            path: 'orderId',
+            select: 'orderName deadline priority imageQuantity requiredSteps status clientId',
+            populate: { path: 'clientId', select: 'clientId name' },
+        })
         .populate('shiftId', 'name code')
         .lean();
 
@@ -2261,8 +2265,36 @@ const getLiveWorkSessions = async (userId?: string, userRole?: string) => {
 
     const now = new Date();
 
+    // Order-level progress so a supervisor can read "this editor holds N of the
+    // order's M images, and K have been registered/finished so far".
+    const orderIds = Array.from(
+        new Set(sessions.map((s: any) => String(s.orderId?._id)).filter(Boolean))
+    ).map((id) => new Types.ObjectId(id));
+    const progressRows = orderIds.length
+        ? await OrderImageModel.aggregate([
+              { $match: { orderId: { $in: orderIds } } },
+              { $group: { _id: { orderId: '$orderId', status: '$status' }, count: { $sum: 1 } } },
+          ])
+        : [];
+    const orderProgress = new Map<string, { registered: number; completed: number; pendingQc: number; inProgress: number }>();
+    for (const row of progressRows) {
+        const key = String(row._id.orderId);
+        const entry = orderProgress.get(key) || { registered: 0, completed: 0, pendingQc: 0, inProgress: 0 };
+        entry.registered += row.count;
+        if (row._id.status === 'completed') entry.completed += row.count;
+        if (row._id.status === 'pending_qc') entry.pendingQc += row.count;
+        if (row._id.status === 'in_progress') entry.inProgress += row.count;
+        orderProgress.set(key, entry);
+    }
+
     const mapped = sessions.map((s: any) => {
         const effectiveSeconds = computeEffectiveSeconds(s, now);
+        const progress = orderProgress.get(String(s.orderId?._id)) || {
+            registered: 0,
+            completed: 0,
+            pendingQc: 0,
+            inProgress: 0,
+        };
         return {
             _id: s._id,
             status: s.status,
@@ -2271,6 +2303,7 @@ const getLiveWorkSessions = async (userId?: string, userRole?: string) => {
                 _id: s.staffId?._id,
                 staffId: s.staffId?.staffId,
                 name: s.staffId?.userId?.name || s.staffId?.staffId || 'Editor',
+                image: s.staffId?.userId?.image || null,
                 designation: s.staffId?.designation,
             },
             order: {
@@ -2281,6 +2314,14 @@ const getLiveWorkSessions = async (userId?: string, userRole?: string) => {
                 imageQuantity: s.orderId?.imageQuantity,
                 requiredSteps: s.orderId?.requiredSteps || [],
                 status: s.orderId?.status,
+                client: s.orderId?.clientId
+                    ? {
+                          _id: s.orderId.clientId._id,
+                          clientId: s.orderId.clientId.clientId,
+                          name: s.orderId.clientId.name,
+                      }
+                    : null,
+                progress,
             },
             shiftName: s.shiftId?.name || null,
             imageNames: s.imageNames,
@@ -2318,12 +2359,72 @@ const getLiveWorkSessions = async (userId?: string, userRole?: string) => {
         }
     }
 
+    // Full roster: every production-eligible editor in scope, marked as
+    // working / on_hold / idle, with today's finished output alongside.
+    const rosterQuery: Record<string, unknown> = { $expr: employmentExpr() };
+    if (viewerBranchId) rosterQuery.branchId = viewerBranchId;
+    const staffDocs = await StaffModel.find(rosterQuery)
+        .select('staffId designation userId')
+        .populate('userId', 'name image')
+        .lean();
+    const eligible = staffDocs.filter(
+        (st: any) => (st.designation || '').toLowerCase() !== 'telemarketer' && st.userId
+    );
+    const todayRows = eligible.length
+        ? await ProductionWorkSessionModel.aggregate([
+              {
+                  $match: {
+                      staffId: { $in: eligible.map((st: any) => st._id) },
+                      status: { $in: ['completed', 'reassigned'] },
+                      startTime: { $gte: startOfDay(now), $lte: endOfDay(now) },
+                  },
+              },
+              {
+                  $group: {
+                      _id: '$staffId',
+                      images: { $sum: '$imageCount' },
+                      seconds: { $sum: '$durationSeconds' },
+                      lastEndTime: { $max: '$endTime' },
+                  },
+              },
+          ])
+        : [];
+    const todayByStaff = new Map(todayRows.map((r: any) => [String(r._id), r]));
+    const roster = eligible
+        .map((st: any) => {
+            const mine = mapped.filter((m) => String(m.staff._id) === String(st._id));
+            const today = todayByStaff.get(String(st._id));
+            const state: 'working' | 'on_hold' | 'idle' = mine.some((m) => !m.isOnHold)
+                ? 'working'
+                : mine.length
+                  ? 'on_hold'
+                  : 'idle';
+            return {
+                staffId: st._id,
+                employeeId: st.staffId,
+                name: st.userId?.name || st.staffId,
+                image: st.userId?.image || null,
+                designation: st.designation,
+                state,
+                sessionIds: mine.map((m) => m._id),
+                todayImages: today?.images || 0,
+                todaySeconds: today?.seconds || 0,
+                lastActiveAt: today?.lastEndTime || null,
+            };
+        })
+        .sort((a, b) => a.name.localeCompare(b.name));
+
     return {
         sessions: mapped,
+        roster,
         byStaff: Array.from(byStaffMap.values()).sort(
             (a, b) => b.totalImages - a.totalImages
         ),
         summary: {
+            totalEditors: roster.length,
+            workingEditors: roster.filter((r) => r.state === 'working').length,
+            onHoldEditors: roster.filter((r) => r.state === 'on_hold').length,
+            idleEditors: roster.filter((r) => r.state === 'idle').length,
             editorsWorking: byStaffMap.size,
             activeSessions: mapped.filter((s) => !s.isOnHold).length,
             heldSessions: mapped.filter((s) => s.isOnHold).length,
@@ -2594,9 +2695,19 @@ const getStaffPerformanceAnalytics = async (filters: {
         },
         { $unwind: '$staffInfo' },
         {
+            $lookup: {
+                from: 'user',
+                localField: 'staffInfo.userId',
+                foreignField: '_id',
+                as: 'userInfo',
+            },
+        },
+        { $unwind: { path: '$userInfo', preserveNullAndEmptyArrays: true } },
+        {
             $project: {
                 staffId: '$_id',
-                staffName: '$staffInfo.name',
+                staffName: { $ifNull: ['$staffInfo.name', '$userInfo.name'] },
+                image: '$userInfo.image',
                 employeeId: '$staffInfo.staffId',
                 designation: '$staffInfo.designation',
                 totalSessions: 1,
@@ -2682,6 +2793,7 @@ const getStaffPerformanceAnalytics = async (filters: {
         staffPerformance: staffSummary.map((s) => ({
             staffId: s.staffId,
             staffName: s.staffName,
+            image: s.image || null,
             employeeId: s.employeeId,
             designation: s.designation,
             totalSessions: s.totalSessions,
@@ -2933,6 +3045,115 @@ const getOrderActivity = async (orderId: string, page = 1, imageName?: string, l
     return { events, total, page: safePage, totalPages, limit: pageSize, contributorCount: contributors.length };
 };
 
+/**
+ * Month-end report: one summary row per editor plus every work session behind
+ * it (client, order, images, work time). `staffId` limits it to one editor.
+ * Sessions are counted by the month they started, hold time excluded.
+ */
+const getMonthlyEditorReport = async (filters: {
+    month: number;
+    year: number;
+    staffId?: string | undefined;
+    branchId?: string | undefined;
+}) => {
+    const start = new Date(filters.year, filters.month - 1, 1);
+    const end = new Date(filters.year, filters.month, 0, 23, 59, 59, 999);
+
+    const query: any = {
+        status: { $in: ['completed', 'reassigned'] },
+        startTime: { $gte: start, $lte: end },
+    };
+    if (filters.staffId && filters.staffId !== 'all') {
+        query.staffId = new Types.ObjectId(filters.staffId);
+    }
+    if (filters.branchId && filters.branchId !== 'all') {
+        query.branchId = new Types.ObjectId(filters.branchId);
+    }
+
+    const sessions = await ProductionWorkSessionModel.find(query)
+        .sort({ startTime: 1 })
+        .populate({
+            path: 'staffId',
+            select: 'staffId designation userId',
+            populate: { path: 'userId', select: 'name image' },
+        })
+        .populate({
+            path: 'orderId',
+            select: 'orderName imageQuantity clientId',
+            populate: { path: 'clientId', select: 'clientId name' },
+        })
+        .lean();
+
+    const rows = sessions.map((s: any) => ({
+        sessionId: String(s._id),
+        date: s.startTime,
+        staffObjectId: String(s.staffId?._id),
+        editorName: s.staffId?.userId?.name || s.staffId?.staffId || 'Editor',
+        editorImage: s.staffId?.userId?.image || null,
+        employeeId: s.staffId?.staffId || '',
+        clientCode: s.orderId?.clientId?.clientId || '',
+        clientName: s.orderId?.clientId?.name || '',
+        orderName: s.orderId?.orderName || '',
+        orderImages: s.orderId?.imageQuantity || 0,
+        images: s.imageCount || 0,
+        workSeconds: s.durationSeconds || 0,
+        status: s.status,
+        steps: (s.completedSteps || []).join(', '),
+    }));
+
+    const byEditor = new Map<string, any>();
+    for (const r of rows) {
+        const e = byEditor.get(r.staffObjectId) || {
+            staffId: r.staffObjectId,
+            employeeId: r.employeeId,
+            name: r.editorName,
+            image: r.editorImage,
+            sessions: 0,
+            images: 0,
+            workSeconds: 0,
+            orders: new Set<string>(),
+            clients: new Set<string>(),
+            days: new Set<string>(),
+        };
+        e.sessions += 1;
+        e.images += r.images;
+        e.workSeconds += r.workSeconds;
+        if (r.orderName) e.orders.add(r.orderName);
+        if (r.clientCode) e.clients.add(r.clientCode);
+        e.days.add(new Date(r.date).toISOString().slice(0, 10));
+        byEditor.set(r.staffObjectId, e);
+    }
+
+    const editors = Array.from(byEditor.values())
+        .map((e) => ({
+            staffId: e.staffId,
+            employeeId: e.employeeId,
+            name: e.name,
+            image: e.image,
+            sessions: e.sessions,
+            images: e.images,
+            workSeconds: e.workSeconds,
+            workingDays: e.days.size,
+            ordersCount: e.orders.size,
+            clientsCount: e.clients.size,
+            avgSecondsPerImage: e.images ? Math.round(e.workSeconds / e.images) : 0,
+        }))
+        .sort((a, b) => b.images - a.images);
+
+    return {
+        month: filters.month,
+        year: filters.year,
+        totals: {
+            editors: editors.length,
+            sessions: rows.length,
+            images: editors.reduce((a, e) => a + e.images, 0),
+            workSeconds: editors.reduce((a, e) => a + e.workSeconds, 0),
+        },
+        editors,
+        rows,
+    };
+};
+
 const productionService = {
     getOrderActivity,
     createProductionLog,
@@ -2960,6 +3181,7 @@ const productionService = {
     qcApproveImages: productionMutation('approved', qcApproveImages),
     getStaffPerformanceAnalytics,
     getStaffEditedImages,
+    getMonthlyEditorReport,
 };
 
 export default productionService;

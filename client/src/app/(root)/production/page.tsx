@@ -2,6 +2,7 @@
 import { Suspense } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -14,6 +15,7 @@ import { ProductionWorkstation } from '@/components/production/production-workst
 import { ImageStatusGrid } from '@/components/production/image-status-grid';
 import { FloorMonitor } from '@/components/production/floor-monitor';
 import { StaffPerformanceAnalytics } from '@/components/production/staff-performance-analytics';
+import { MonthlyEditorReport } from '@/components/production/monthly-editor-report';
 import { ProductionStatsView } from '@/components/production/production-stats-view';
 import {
     Play,
@@ -24,6 +26,7 @@ import {
     Image,
     ClipboardCheck,
     RotateCcw,
+    FileSpreadsheet,
 } from 'lucide-react';
 import { StatCard } from '@/components/dashboard/admin-dashboard/stat-card';
 function ProductionContent() {
@@ -42,12 +45,13 @@ function ProductionContent() {
         ...(access.canDoQC
             ? [{ id: 'live_sessions', name: 'Team activity', icon: Users }]
             : []),
+        { id: 'monthly_report', name: 'Monthly report', icon: FileSpreadsheet },
         ...(access.isAdmin
             ? [
-                  { id: 'staff_analytics', name: 'People', icon: Award },
+                  { id: 'staff_analytics', name: 'Editor ranking', icon: Award },
                   {
                       id: 'analytics',
-                      name: 'Reports',
+                      name: 'Trends',
                       icon: ChartNoAxesCombined,
                   },
               ]
@@ -130,7 +134,7 @@ function ProductionContent() {
                     router.replace(`${pathname}?${next}`);
                 }}
             >
-                <div className="mb-6 overflow-x-auto pb-1">
+                <ScrollArea className="mb-6 w-full">
                     <TabsList className="h-auto w-max gap-1 p-1">
                         {tabs.map((tab) => (
                             <TabsTrigger
@@ -143,12 +147,16 @@ function ProductionContent() {
                             </TabsTrigger>
                         ))}
                     </TabsList>
-                </div>
+                    <ScrollBar orientation="horizontal" />
+                </ScrollArea>
                 <TabsContent value="workstation">
                     <ProductionWorkstation />
                 </TabsContent>
                 <TabsContent value="images">
                     <ImageStatusGrid isAdmin={access.isAdmin} />
+                </TabsContent>
+                <TabsContent value="monthly_report">
+                    <MonthlyEditorReport isSupervisor={access.canDoQC} />
                 </TabsContent>
                 {access.canDoQC && (
                     <TabsContent value="live_sessions">
