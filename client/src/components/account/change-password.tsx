@@ -60,12 +60,12 @@ export default function ChangePassword() {
     };
 
     return (
-        <form onSubmit={form.handleSubmit(onSubmit)} className="col-span-2">
-            <Card>
+        <form onSubmit={form.handleSubmit(onSubmit)}>
+            <Card className="border-border/60 shadow-md">
                 <CardHeader>
-                    <CardTitle className="text-2xl">Change Password</CardTitle>
+                    <CardTitle>Change password</CardTitle>
                     <CardDescription className="">
-                        Enter your current password and choose a new password.
+                        Enter your current password, then choose a new one. You will be signed out of your other devices.
                     </CardDescription>
                 </CardHeader>
 

@@ -240,7 +240,7 @@ export default function EditProfile() {
     };
 
     return (
-        <Card className="col-span-2">
+        <Card className="border-border/60 shadow-md">
             <CardHeader>
                 <CardTitle>Edit Profile</CardTitle>
                 <CardDescription>
@@ -251,7 +251,7 @@ export default function EditProfile() {
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                 <CardContent>
                     <div className="space-y-6">
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="grid gap-2">
                                 <Label>Name *</Label>
                                 <Input {...form.register("name")} />
@@ -269,7 +269,7 @@ export default function EditProfile() {
                             </div>
                         </div>
 
-                        <div className="grid gap-4 grid-cols-2">
+                        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
                             <div className="grid gap-2">
                                 <Label>Phone *</Label>
                                 <Input
@@ -299,7 +299,7 @@ export default function EditProfile() {
                             </div>
                         </div>
 
-                        <div className="grid gap-4 grid-cols-2">
+                        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
                             <div className="grid gap-2">
                                 <Label>National ID *</Label>
                                 <Input {...form.register("nationalId")} />
@@ -344,7 +344,7 @@ export default function EditProfile() {
 
                         <div className="grid gap-2">
                             <Label>Emergency Contact Person</Label>
-                            <div className="grid grid-cols-3 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                 <Input
                                     placeholder="Name"
                                     {...form.register("emergencyContact.name")}
@@ -391,7 +391,7 @@ export default function EditProfile() {
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                                 <Input
                                     placeholder="Father's Name"

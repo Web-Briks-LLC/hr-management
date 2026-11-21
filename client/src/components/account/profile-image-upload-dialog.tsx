@@ -11,7 +11,7 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
-import { UploadCloud, SquarePenIcon, X } from 'lucide-react';
+import { UploadCloud, CameraIcon, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
 import { Input } from '../ui/input';
@@ -71,9 +71,12 @@ export function ProfileImageUploadDialog() {
         // 3. Connect the state to the Dialog component
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
             <DialogTrigger asChild>
-                <Button className="absolute -top-16 right-0 group-hover/profile-image:top-0">
-                    <SquarePenIcon className=" h-4 w-4" />
-                    Update Image
+                <Button
+                    size="icon"
+                    className="absolute bottom-0 right-0 size-8 rounded-full border-2 border-card shadow"
+                    aria-label="Change profile photo"
+                >
+                    <CameraIcon className="size-4" />
                 </Button>
             </DialogTrigger>
 
