@@ -109,7 +109,7 @@ export function MonthlyEditorReport({ isSupervisor }: { isSupervisor: boolean })
           Date: format(new Date(r.date), "yyyy-MM-dd"),
           Editor: r.editorName,
           "Client ID": r.clientCode,
-          Client: r.clientName,
+          ...(r.clientName ? { Client: r.clientName } : {}),
           Order: r.orderName,
           "Order images": r.orderImages,
           "Images taken": r.images,
@@ -359,9 +359,11 @@ export function MonthlyEditorReport({ isSupervisor }: { isSupervisor: boolean })
                                   <div className="font-mono font-semibold">
                                     {r.clientCode || "—"}
                                   </div>
-                                  <div className="text-[11px] text-muted-foreground">
-                                    {r.clientName}
-                                  </div>
+                                  {r.clientName && (
+                                    <div className="text-[11px] text-muted-foreground">
+                                      {r.clientName}
+                                    </div>
+                                  )}
                                 </TableCell>
                                 <TableCell>
                                   <div className="font-mono font-semibold">

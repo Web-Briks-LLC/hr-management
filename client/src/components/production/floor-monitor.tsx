@@ -484,9 +484,11 @@ export function FloorMonitor() {
                                         <div className="font-mono font-semibold">
                                           {s.order.client.clientId}
                                         </div>
-                                        <div className="text-[11px] text-muted-foreground">
-                                          {s.order.client.name}
-                                        </div>
+                                        {s.order.client.name && (
+                                          <div className="text-[11px] text-muted-foreground">
+                                            {s.order.client.name}
+                                          </div>
+                                        )}
                                       </>
                                     ) : (
                                       "—"
@@ -692,6 +694,7 @@ export function FloorMonitor() {
                                         </div>
                                         <div className="text-[11px] text-muted-foreground">
                                           {first.order.client?.name ||
+                                            first.order.client?.clientId ||
                                             "No client"}
                                           {mine.length > 1 &&
                                             ` · +${mine.length - 1} more batch`}

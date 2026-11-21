@@ -718,7 +718,13 @@ const resolveReportScope = async (req: Request) => {
         const own = await StaffModel.findOne({ userId: req.user!.id }).select('_id').lean();
         staffId = own ? String(own._id) : '000000000000000000000000';
     }
-    return { month, year, staffId, branchId: req.query.branchId as string | undefined };
+    return {
+        month,
+        year,
+        staffId,
+        branchId: req.query.branchId as string | undefined,
+        userRole: req.user!.role as string,
+    };
 };
 
 export const getMonthlyEditorReport = async (req: Request, res: Response) => {

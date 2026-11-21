@@ -507,7 +507,7 @@ export interface ILiveWorkSession {
         imageQuantity?: number;
         requiredSteps?: { name: string; code?: string }[];
         status?: string;
-        client?: { _id: string; clientId: string; name: string } | null;
+        client?: { _id: string; clientId: string; name: string | null } | null;
         progress?: {
             registered: number;
             completed: number;

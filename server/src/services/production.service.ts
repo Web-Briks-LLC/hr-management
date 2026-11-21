@@ -2215,11 +2215,19 @@ const reassignWorkSession = async (
 };
 
 /**
+ * Client names are business-sensitive: only admin roles see them. Everyone
+ * else in production works with the client ID alone.
+ */
+const canViewClientName = (role?: string) =>
+    role === Role.SUPER_ADMIN || role === Role.ADMIN || role === Role.HR_MANAGER;
+
+/**
  * Live floor monitor feed for Admin / HR / Team Leader: every active + held
  * session with computed live timers, plus a per-editor rollup.
  */
 const getLiveWorkSessions = async (userId?: string, userRole?: string) => {
     await freezeInactiveWorkSessions();
+    const canSeeClientName = canViewClientName(userRole);
     // Branch scoping for the supervisor floor monitor: every supervisor except
     // super_admin only sees sessions from their own branch. Super admins — and
     // anyone whose staff profile has no branch — see every branch.
@@ -2318,7 +2326,7 @@ const getLiveWorkSessions = async (userId?: string, userRole?: string) => {
                     ? {
                           _id: s.orderId.clientId._id,
                           clientId: s.orderId.clientId.clientId,
-                          name: s.orderId.clientId.name,
+                          name: canSeeClientName ? s.orderId.clientId.name : null,
                       }
                     : null,
                 progress,
@@ -3055,7 +3063,9 @@ const getMonthlyEditorReport = async (filters: {
     year: number;
     staffId?: string | undefined;
     branchId?: string | undefined;
+    userRole?: string | undefined;
 }) => {
+    const canSeeClientName = canViewClientName(filters.userRole);
     const start = new Date(filters.year, filters.month - 1, 1);
     const end = new Date(filters.year, filters.month, 0, 23, 59, 59, 999);
 
@@ -3092,7 +3102,7 @@ const getMonthlyEditorReport = async (filters: {
         editorImage: s.staffId?.userId?.image || null,
         employeeId: s.staffId?.staffId || '',
         clientCode: s.orderId?.clientId?.clientId || '',
-        clientName: s.orderId?.clientId?.name || '',
+        clientName: canSeeClientName ? s.orderId?.clientId?.name || '' : '',
         orderName: s.orderId?.orderName || '',
         orderImages: s.orderId?.imageQuantity || 0,
         images: s.imageCount || 0,
