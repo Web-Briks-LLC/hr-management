@@ -23,6 +23,13 @@ const seed = async (
     await Order.collection.insertOne({
         _id,
         orderName: `order-${_id}`,
+        clientId: new Types.ObjectId(),
+        orderDate: new Date('2026-01-01'),
+        deadline: new Date('2026-12-31'),
+        imageQuantity: 10,
+        perImagePrice: 1,
+        totalPrice: 10,
+        returnFileFormat: new Types.ObjectId(),
         status,
         isPaid: false,
         createdBy: user,
@@ -150,7 +157,9 @@ test('paid orders auto-complete, with corner cases', async (t) => {
 
         await t.test('aggregation-pipeline update sets isPaid and completes', async () => {
             const id = await seed('pending');
-            await Order.updateOne({ _id: id }, [{ $set: { isPaid: true } }]);
+            await Order.updateOne({ _id: id }, [{ $set: { isPaid: true } }], {
+                updatePipeline: true,
+            });
             assert.equal((await load(id)).status, 'completed');
         });
 
