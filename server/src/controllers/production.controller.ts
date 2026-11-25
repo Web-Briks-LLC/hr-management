@@ -335,7 +335,7 @@ export const startWorkSession = async (req: Request, res: Response) => {
         console.error('startWorkSession error:', error);
         return res.status(error.name === 'ZodError' ? 400 : 400).json({
             success: false,
-            message: error.message || 'Failed to start work session',
+            message: error.message || 'We could not give you these images. Please refresh and try again.',
             errors: error.errors || undefined,
         });
     }
@@ -378,7 +378,7 @@ export const finishWorkSession = async (req: Request, res: Response) => {
         console.error('finishWorkSession error:', error);
         return res.status(error.name === 'ZodError' ? 400 : 400).json({
             success: false,
-            message: error.message || 'Failed to finish work session',
+            message: error.message || 'We could not save your submitted work. Please refresh and try again.',
             errors: error.errors || undefined,
         });
     }
@@ -404,7 +404,7 @@ export const cancelWorkSession = async (req: Request, res: Response) => {
         console.error('cancelWorkSession error:', error);
         return res.status(error.name === 'ZodError' ? 400 : 400).json({
             success: false,
-            message: error.message || 'Failed to cancel work session',
+            message: error.message || 'We could not release these images. Please refresh and try again.',
             errors: error.errors || undefined,
         });
     }
@@ -436,7 +436,7 @@ export const pauseWorkSession = async (req: Request, res: Response) => {
         console.error('pauseWorkSession error:', error);
         return res.status(error.name === 'ZodError' ? 400 : 400).json({
             success: false,
-            message: error.message || 'Failed to hold work session',
+            message: error.message || 'We could not put this work on hold. Please refresh and try again.',
             errors: error.errors || undefined,
         });
     }
@@ -455,7 +455,7 @@ export const resumeWorkSession = async (req: Request, res: Response) => {
         console.error('resumeWorkSession error:', error);
         return res.status(error.name === 'ZodError' ? 400 : 400).json({
             success: false,
-            message: error.message || 'Failed to resume work session',
+            message: error.message || 'We could not resume this work. Please refresh and try again.',
             errors: error.errors || undefined,
         });
     }
@@ -465,7 +465,8 @@ export const getLiveWorkSessions = async (req: Request, res: Response) => {
     try {
         const result = await productionService.getLiveWorkSessions(
             req.user!.id,
-            req.user!.role
+            req.user!.role,
+            typeof req.query.shiftId === 'string' ? req.query.shiftId : undefined
         );
         return res.status(200).json({ success: true, data: result });
     } catch (error: any) {
@@ -511,7 +512,7 @@ export const adminCancelWorkSession = async (req: Request, res: Response) => {
         console.error('adminCancelWorkSession error:', error);
         return res.status(error.name === 'ZodError' ? 400 : 400).json({
             success: false,
-            message: error.message || 'Failed to cancel work session',
+            message: error.message || 'We could not release these images. Please refresh and try again.',
             errors: error.errors || undefined,
         });
     }
@@ -533,7 +534,7 @@ export const adminFinishWorkSession = async (req: Request, res: Response) => {
         console.error('adminFinishWorkSession error:', error);
         return res.status(error.name === 'ZodError' ? 400 : 400).json({
             success: false,
-            message: error.message || 'Failed to finish work session',
+            message: error.message || 'We could not save your submitted work. Please refresh and try again.',
             errors: error.errors || undefined,
         });
     }
@@ -555,7 +556,7 @@ export const reassignWorkSession = async (req: Request, res: Response) => {
         console.error('reassignWorkSession error:', error);
         return res.status(error.name === 'ZodError' ? 400 : 400).json({
             success: false,
-            message: error.message || 'Failed to reassign work session',
+            message: error.message || 'We could not hand this work over. Please refresh and try again.',
             errors: error.errors || undefined,
         });
     }
@@ -580,7 +581,7 @@ export const flagImageRevision = async (req: Request, res: Response) => {
         console.error('flagImageRevision error:', error);
         return res.status(error.name === 'ZodError' ? 400 : 400).json({
             success: false,
-            message: error.message || 'Failed to flag image revision',
+            message: error.message || 'We could not send these images back for revision. Please refresh and try again.',
             errors: error.errors || undefined,
         });
     }
@@ -605,7 +606,7 @@ export const qcApproveImages = async (req: Request, res: Response) => {
         console.error('qcApproveImages error:', error);
         return res.status(error.name === 'ZodError' ? 400 : 400).json({
             success: false,
-            message: error.message || 'Failed to approve images',
+            message: error.message || 'We could not approve these images. Please refresh and try again.',
             errors: error.errors || undefined,
         });
     }
@@ -664,7 +665,7 @@ export const getStaffEditedImages = async (req: Request, res: Response) => {
             if (!staff) {
                 return res.status(404).json({
                     success: false,
-                    message: 'Staff profile not found for this user',
+                    message: 'Your account is not linked to a staff profile. Ask HR to link your profile.',
                 });
             }
             targetStaffId = staff._id.toString();

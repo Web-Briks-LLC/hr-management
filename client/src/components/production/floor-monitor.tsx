@@ -114,8 +114,10 @@ export function FloorMonitor() {
   const { socket } = useSocket();
   const nowTs = useLiveClock();
 
+  // null = follow the shift that is running right now (Bangladesh time).
+  const [shiftChoice, setShiftChoice] = useState<string | null>(null);
   const { data, isLoading, refetch, isFetching } = useGetLiveWorkSessionsQuery(
-    undefined,
+    shiftChoice ? { shiftId: shiftChoice } : undefined,
     { pollingInterval: 20000 },
   );
   const { data: editorsData } = useGetProductionEditorsQuery();
@@ -132,8 +134,9 @@ export function FloorMonitor() {
   const summary = data?.data?.summary || {
     totalEditors: 0,
     workingEditors: 0,
+    notWorkingEditors: 0,
     onHoldEditors: 0,
-    idleEditors: 0,
+    pendingImages: 0,
     editorsWorking: 0,
     activeSessions: 0,
     heldSessions: 0,
@@ -193,7 +196,7 @@ export function FloorMonitor() {
   const handleFinish = async () => {
     if (!target) return;
     if (finishSteps.length === 0) {
-      toast.error("Tick at least one completed step");
+      toast.error("Select at least one completed step before saving");
       return;
     }
     try {
@@ -205,13 +208,13 @@ export function FloorMonitor() {
       toast.success(res.message || "Session force-finished");
       closeDialog();
     } catch (e: any) {
-      toast.error(e?.data?.message || "Failed to finish session");
+      toast.error(e?.data?.message || "We could not submit this work. Refresh the page and try again.");
     }
   };
 
   const handleReassign = async () => {
     if (!target || !reassignTo) {
-      toast.error("Pick an editor to reassign to");
+      toast.error("Choose the editor who should take over this work");
       return;
     }
     try {
@@ -223,7 +226,7 @@ export function FloorMonitor() {
       toast.success(res.message || "Session reassigned");
       closeDialog();
     } catch (e: any) {
-      toast.error(e?.data?.message || "Failed to reassign session");
+      toast.error(e?.data?.message || "We could not hand this work over. Refresh the page and try again.");
     }
   };
 
@@ -237,11 +240,24 @@ export function FloorMonitor() {
       toast.success(res.message || "Session cancelled");
       closeDialog();
     } catch (e: any) {
-      toast.error(e?.data?.message || "Failed to cancel session");
+      toast.error(e?.data?.message || "We could not release these images. Refresh the page and try again.");
     }
   };
 
-  type ViewTab = "working" | "idle" | "all";
+  type ViewTab = "working" | "not_working" | "all";
+  const shifts = data?.data?.shifts || [];
+  const selectedShiftValue =
+    shiftChoice ?? data?.data?.selectedShiftId ?? "all";
+  const formatClock = (value: string | null) => {
+    const m = /^(\d{1,2}):(\d{2})/.exec(value || "");
+    if (!m) return "";
+    const h = Number(m[1]);
+    return `${h % 12 || 12}:${m[2]} ${h >= 12 ? "PM" : "AM"}`;
+  };
+  const shiftLabel = (sh: (typeof shifts)[number]) =>
+    sh.startTime && sh.endTime
+      ? `${sh.name} · ${formatClock(sh.startTime)} – ${formatClock(sh.endTime)}`
+      : sh.name;
   const [view, setView] = useState<ViewTab>("working");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -262,7 +278,7 @@ export function FloorMonitor() {
     ),
   );
   const idleRows = roster.filter(
-    (r) => r.state === "idle" && matches(r.name, r.employeeId),
+    (r) => r.state === "not_working" && matches(r.name, r.employeeId),
   );
   const allRows = roster.filter((r) => matches(r.name, r.employeeId));
   const sessionById = new Map(sessions.map((x) => [x._id, x]));
@@ -270,14 +286,14 @@ export function FloorMonitor() {
   const activeTotal =
     view === "working"
       ? workingRows.length
-      : view === "idle"
+      : view === "not_working"
         ? idleRows.length
         : allRows.length;
   const safePage = Math.min(page, Math.max(1, Math.ceil(activeTotal / limit)));
   const from = (safePage - 1) * limit;
   const to = safePage * limit;
 
-  const stateBadge = (state: "working" | "on_hold" | "idle") =>
+  const stateBadge = (state: "working" | "on_hold" | "not_working") =>
     state === "working" ? (
       <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 text-xs font-bold">
         Working
@@ -288,38 +304,41 @@ export function FloorMonitor() {
       </Badge>
     ) : (
       <Badge variant="outline" className="text-xs font-semibold text-muted-foreground">
-        Not started
+        Not working
       </Badge>
     );
 
   const stats = [
     {
-      label: "Total editors",
+      label: "Editors in this shift",
       value: summary.totalEditors,
-      hint: "Available for production",
+      hint: "Production editors and QA",
       icon: Users,
       tone: "slate" as const,
     },
     {
-      label: "Working now",
+      label: "Working",
       value: summary.workingEditors,
-      hint: "Have a batch in progress",
+      hint: "Took images in this shift",
       icon: Activity,
       tone: "green" as const,
     },
     {
-      label: "On hold",
-      value: summary.onHoldEditors,
-      hint: "Only paused batches",
-      icon: Pause,
-      tone: "orange" as const,
-    },
-    {
-      label: "Not started",
-      value: summary.idleEditors,
-      hint: "No batch taken yet",
+      label: "Not working",
+      value: summary.notWorkingEditors,
+      hint: "Have not taken any images",
       icon: UserX,
       tone: "blue" as const,
+    },
+    {
+      label: "Images still pending",
+      value: summary.pendingImages,
+      hint:
+        summary.onHoldEditors > 0
+          ? `Taken but not submitted · ${summary.onHoldEditors} on hold`
+          : "Taken but not submitted yet",
+      icon: Pause,
+      tone: "orange" as const,
     },
   ];
 
@@ -364,21 +383,50 @@ export function FloorMonitor() {
                 Team activity
               </CardTitle>
               <CardDescription className="mt-1">
-                Who is editing, for which client and order, and who has not
-                picked up work yet. Updates live.
+                Shows the production editing and QA team for the selected shift
+                (Bangladesh time): who took images, who has not, and how much
+                work is still pending. Updates live.
               </CardDescription>
             </div>
-            <Button
-              variant="outline"
-              className="border-primary text-primary shadow-sm hover:bg-primary/10"
-              onClick={() => refetch()}
-              disabled={isFetching}
-            >
-              <RefreshCw
-                className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`}
-              />
-              Refresh
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <Select
+                value={selectedShiftValue}
+                onValueChange={(v) => {
+                  setShiftChoice(v);
+                  setPage(1);
+                }}
+              >
+                <SelectTrigger
+                  className="h-9 w-full min-w-56 sm:w-auto"
+                  aria-label="Choose shift"
+                >
+                  <Clock className="mr-1 size-4 text-primary" />
+                  <SelectValue placeholder="Choose shift" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All shifts (today)</SelectItem>
+                  {shifts.map((sh) => (
+                    <SelectItem key={sh._id} value={sh._id}>
+                      {shiftLabel(sh)}
+                      {sh._id === data?.data?.currentShiftId
+                        ? "  ● Now"
+                        : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                variant="outline"
+                className="border-primary text-primary shadow-sm hover:bg-primary/10"
+                onClick={() => refetch()}
+                disabled={isFetching}
+              >
+                <RefreshCw
+                  className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`}
+                />
+                Refresh
+              </Button>
+            </div>
           </div>
         </CardHeader>
 
@@ -394,21 +442,21 @@ export function FloorMonitor() {
               <TabsList className="h-auto w-max gap-1 p-1">
                 <TabsTrigger value="working" className="gap-2 px-4 py-2">
                   <Activity className="size-4" />
-                  Working now
+                  Live batches
                   <Badge variant="secondary" className="ml-1">
                     {sessions.length}
                   </Badge>
                 </TabsTrigger>
-                <TabsTrigger value="idle" className="gap-2 px-4 py-2">
+                <TabsTrigger value="not_working" className="gap-2 px-4 py-2">
                   <UserX className="size-4" />
-                  Not started
+                  Not working
                   <Badge variant="secondary" className="ml-1">
-                    {summary.idleEditors}
+                    {summary.notWorkingEditors}
                   </Badge>
                 </TabsTrigger>
                 <TabsTrigger value="all" className="gap-2 px-4 py-2">
                   <Users className="size-4" />
-                  All editors
+                  Everyone in shift
                   <Badge variant="secondary" className="ml-1">
                     {summary.totalEditors}
                   </Badge>
@@ -437,7 +485,7 @@ export function FloorMonitor() {
             </div>
 
             <div className="overflow-hidden rounded-md border border-border/60">
-              {/* ---- Working now ---- */}
+              {/* ---- Live batches ---- */}
               <TabsContent value="working" className="m-0">
                 <Table>
                     <TableHeader className="bg-muted/40">
@@ -461,7 +509,7 @@ export function FloorMonitor() {
                               "Nobody is working right now",
                               needle
                                 ? "No batch matches your search."
-                                : "Batches show up here as soon as an editor takes work.",
+                                : "Batches show up here as soon as an editor in this shift takes work.",
                             )
                           : workingRows.slice(from, to).map((s) => {
                               const elapsed = computeElapsed(s, nowTs);
@@ -588,14 +636,14 @@ export function FloorMonitor() {
                   </Table>
               </TabsContent>
 
-              {/* ---- Not started ---- */}
-              <TabsContent value="idle" className="m-0">
+              {/* ---- Not working ---- */}
+              <TabsContent value="not_working" className="m-0">
                 <Table>
                     <TableHeader className="bg-muted/40">
                       <TableRow className="border-b-border/60 hover:bg-muted/40">
                         <TableHead>Editor</TableHead>
-                        <TableHead>Images done today</TableHead>
-                        <TableHead>Work time today</TableHead>
+                        <TableHead>Role</TableHead>
+                        <TableHead>Images this shift</TableHead>
                         <TableHead>Last finished</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -605,10 +653,10 @@ export function FloorMonitor() {
                         : idleRows.length === 0
                           ? emptyRow(
                               4,
-                              "Everyone has work in hand",
+                              "Everyone in this shift has taken work",
                               needle
                                 ? "No editor matches your search."
-                                : "Editors without a batch will be listed here.",
+                                : "Editors who have not taken any images will be listed here.",
                             )
                           : idleRows.slice(from, to).map((e) => (
                               <TableRow
@@ -622,13 +670,11 @@ export function FloorMonitor() {
                                     employeeId={e.employeeId}
                                   />
                                 </TableCell>
-                                <TableCell className="font-mono">
-                                  {e.todayImages}
+                                <TableCell className="text-muted-foreground">
+                                  {e.designation || "—"}
                                 </TableCell>
                                 <TableCell className="font-mono">
-                                  {e.todaySeconds
-                                    ? fmtDuration(e.todaySeconds)
-                                    : "—"}
+                                  {e.todayImages}
                                 </TableCell>
                                 <TableCell className="text-muted-foreground">
                                   {e.lastActiveAt
@@ -636,7 +682,7 @@ export function FloorMonitor() {
                                         new Date(e.lastActiveAt),
                                         { addSuffix: true },
                                       )
-                                    : "Nothing finished today"}
+                                    : "Nothing taken in this shift"}
                                 </TableCell>
                               </TableRow>
                             ))}
@@ -652,7 +698,7 @@ export function FloorMonitor() {
                         <TableHead>Editor</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Working on</TableHead>
-                        <TableHead className="text-right">Images held</TableHead>
+                        <TableHead className="text-right">Pending</TableHead>
                         <TableHead className="text-right">Done today</TableHead>
                         <TableHead className="text-right">Time today</TableHead>
                       </TableRow>
@@ -685,7 +731,9 @@ export function FloorMonitor() {
                                       employeeId={e.employeeId}
                                     />
                                   </TableCell>
-                                  <TableCell>{stateBadge(e.state)}</TableCell>
+                                  <TableCell>
+                                    {stateBadge(e.onHold ? "on_hold" : e.state)}
+                                  </TableCell>
                                   <TableCell>
                                     {first ? (
                                       <>
@@ -707,7 +755,7 @@ export function FloorMonitor() {
                                     )}
                                   </TableCell>
                                   <TableCell className="text-right font-mono">
-                                    {mine.reduce((a, m) => a + m.imageCount, 0)}
+                                    {e.pendingImages}
                                   </TableCell>
                                   <TableCell className="text-right font-mono">
                                     {e.todayImages}

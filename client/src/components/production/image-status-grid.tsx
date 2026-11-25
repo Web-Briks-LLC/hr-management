@@ -4,8 +4,7 @@ import Link from "next/link";
 import { useGetSanitizedOrdersQuery } from "@/redux/features/production/productionApi";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
+import { OrderProgressCell, OrderStatusBadge } from "@/components/production/order-progress-cell";
 import {
   Card,
   CardContent,
@@ -36,7 +35,6 @@ const STATUS_TABS: [string, string][] = [
   ["revision", "Sent back"],
   ["completed", "Completed"],
 ];
-const STATUS_LABEL = Object.fromEntries(STATUS_TABS);
 
 export function ImageStatusGrid(_props: { isAdmin?: boolean }) {
   const [search, setSearch] = useState("");
@@ -115,10 +113,7 @@ export function ImageStatusGrid(_props: { isAdmin?: boolean }) {
                 <TableHead>Order</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Total images</TableHead>
-                <TableHead className="text-right">Being edited</TableHead>
-                <TableHead className="text-right">Waiting for review</TableHead>
-                <TableHead className="text-right">Sent back</TableHead>
-                <TableHead>Approved</TableHead>
+                <TableHead>Progress</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -126,7 +121,7 @@ export function ImageStatusGrid(_props: { isAdmin?: boolean }) {
               {isLoading || (isFetching && !data) ? (
                 Array.from({ length: 5 }, (_, i) => (
                   <TableRow key={i}>
-                    {Array.from({ length: 9 }, (_, j) => (
+                    {Array.from({ length: 6 }, (_, j) => (
                       <TableCell key={j}>
                         <Skeleton className="h-4 w-20" />
                       </TableCell>
@@ -135,15 +130,15 @@ export function ImageStatusGrid(_props: { isAdmin?: boolean }) {
                 ))
               ) : isError ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="h-48 text-center">
+                  <TableCell colSpan={6} className="h-48 text-center">
                     <Button variant="outline" onClick={() => refetch()}>
-                      Could not load orders. Try again
+                      We could not load the orders. Check your connection and tap to try again
                     </Button>
                   </TableCell>
                 </TableRow>
               ) : !orders.length ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="h-48 text-center">
+                  <TableCell colSpan={6} className="h-48 text-center">
                     <div className="flex flex-col items-center justify-center gap-2 text-muted-foreground">
                       <div className="rounded-full bg-muted/50 p-3">
                         <Layers className="h-6 w-6 opacity-30" />
@@ -171,40 +166,16 @@ export function ImageStatusGrid(_props: { isAdmin?: boolean }) {
                         </Link>
                       </TableCell>
                       <TableCell>
-                        <Badge
-                          variant={order.status === "completed" ? "default" : "secondary"}
-                          className="text-xs"
-                        >
-                          {STATUS_LABEL[order.status] ||
-                            order.status.replaceAll("_", " ")}
-                        </Badge>
+                        <OrderStatusBadge status={order.status} />
                       </TableCell>
                       <TableCell className="text-right font-mono">
                         {order.imageQuantity.toLocaleString()}
                       </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {order.imageStats.inProgressCount}
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {order.imageStats.pendingQcCount}
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {order.imageStats.revisionCount}
-                      </TableCell>
-                      <TableCell>
-                        <div className="min-w-28 space-y-1">
-                          <span className="text-xs text-muted-foreground">
-                            {order.imageStats.completedCount} of {order.imageQuantity}
-                          </span>
-                          <Progress
-                            className="h-1.5"
-                            value={
-                              order.imageQuantity
-                                ? (100 * order.imageStats.completedCount) / order.imageQuantity
-                                : 0
-                            }
-                          />
-                        </div>
+                      <TableCell className="py-3">
+                        <OrderProgressCell
+                          stats={order.imageStats}
+                          total={order.imageQuantity}
+                        />
                       </TableCell>
                       <TableCell className="text-right">
                         <Button asChild variant="ghost" size="sm">

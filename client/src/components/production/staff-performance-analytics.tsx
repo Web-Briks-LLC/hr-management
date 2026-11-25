@@ -76,7 +76,7 @@ export function StaffPerformanceAnalytics() {
 
   const exportCsv = () => {
     if (!editors.length) {
-      toast.error("Nothing to export for this period");
+      toast.error("There is no data in this period to export. Pick a different date range and try again.");
       return;
     }
     const head = ["Employee ID", "Editor", "Sessions", "Images", "Hours", "Seconds per image"];

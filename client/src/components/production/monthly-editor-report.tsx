@@ -81,7 +81,7 @@ export function MonthlyEditorReport({ isSupervisor }: { isSupervisor: boolean })
 
   const exportExcel = () => {
     if (!rows.length) {
-      toast.error("No work recorded for this selection");
+      toast.error("There is no work recorded for this month and filter, so there is nothing to export. Try another month or clear the filters.");
       return;
     }
     const wb = XLSX.utils.book_new();

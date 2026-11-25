@@ -59,7 +59,7 @@ import {
 
 const errorMessage = (error: unknown) =>
     (error as { data?: { message?: string } })?.data?.message ||
-    'Could not save. Please refresh and try again.';
+    'Something went wrong while saving. Refresh the page and try again. If it keeps happening, tell your Team Leader.';
 const orderOf = (session: IProductionWorkSession) =>
     typeof session.orderId === 'object' ? session.orderId : null;
 function WorkClock({ session }: { session: IProductionWorkSession }) {
@@ -163,6 +163,46 @@ export function ProductionWorkstation() {
                     image.status,
                 ))
         );
+    });
+    const heldNames = new Set(held.flatMap((session) => session.imageNames));
+    const blockedImages = invalidNames.map((name) => {
+        const image = imageByName.get(name)!;
+        const owner =
+            image.currentAssignedStaffId?.userId?.name ||
+            image.currentAssignedStaffId?.staffId;
+        if (heldNames.has(name))
+            return {
+                name,
+                reason: 'is on your held work',
+                hint: 'Resume your held work to continue it.',
+            };
+        if (image.currentSessionId)
+            return {
+                name,
+                reason: owner
+                    ? `is being edited by ${owner}`
+                    : 'is being edited by another editor',
+                hint: owner
+                    ? `Ask ${owner} to release it, or request your Team Leader to reassign it.`
+                    : 'Ask that editor to release it, or request your Team Leader to reassign it.',
+            };
+        if (image.status === 'pending_qc')
+            return {
+                name,
+                reason: 'was already submitted and is waiting for review',
+                hint: 'Remove it from your selection.',
+            };
+        if (image.status === 'completed')
+            return {
+                name,
+                reason: 'was already approved',
+                hint: 'Remove it from your selection. A Team Leader can send it back for revision if needed.',
+            };
+        return {
+            name,
+            reason: 'cannot be taken right now',
+            hint: 'Remove it from your selection or refresh the list.',
+        };
     });
     const blocked = newCount > capacity || invalidNames.length > 0;
     useEffect(() => {
@@ -271,9 +311,10 @@ export function ProductionWorkstation() {
     if (activeQuery.isError)
         return (
             <Alert variant="destructive">
-                <AlertTitle>We could not check your current work</AlertTitle>
+                <AlertTitle>We could not load your current work</AlertTitle>
                 <AlertDescription>
-                    Check again before taking images.
+                    This is usually a connection problem. Check your internet,
+                    then try again before taking images.
                     <Button
                         className="mt-3"
                         variant="outline"
@@ -288,7 +329,7 @@ export function ProductionWorkstation() {
         <div className="space-y-6">
             {inlineError && !dialog && (
                 <Alert variant="destructive">
-                    <AlertTitle>Action could not be completed</AlertTitle>
+                    <AlertTitle>That did not work</AlertTitle>
                     <AlertDescription>{inlineError}</AlertDescription>
                 </Alert>
             )}
@@ -483,7 +524,7 @@ export function ProductionWorkstation() {
                                                 imagesQuery.refetch()
                                             }
                                         >
-                                            Could not load images. Retry
+                                            We could not load the images for this order. Tap to try again
                                         </Button>
                                     ) : imagesQuery.isLoading ? (
                                         <Skeleton className="h-40" />
@@ -726,22 +767,77 @@ export function ProductionWorkstation() {
                                             role="alert"
                                             className="text-sm text-destructive"
                                         >
-                                            This order has room for {capacity}{' '}
-                                            new images. Remove{' '}
-                                            {newCount - capacity} new filenames
-                                            to continue.
+                                            This order only has room for{' '}
+                                            {capacity} more new image
+                                            {capacity === 1 ? '' : 's'} (
+                                            {order.imageQuantity} ordered,{' '}
+                                            {summary?.totalRegistered ?? 0}{' '}
+                                            already registered). Remove{' '}
+                                            {newCount - capacity} new filename
+                                            {newCount - capacity === 1
+                                                ? ''
+                                                : 's'}{' '}
+                                            to continue, or ask your Team
+                                            Leader to increase the order
+                                            quantity.
                                         </p>
                                     )}
-                                    {!!invalidNames.length && (
-                                        <p
+                                    {!!blockedImages.length && (
+                                        <div
                                             role="alert"
-                                            className="text-sm text-destructive"
+                                            className="space-y-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm"
                                         >
-                                            {invalidNames.length} selected
-                                            images are no longer available.
-                                            Remove them or refresh your
-                                            selection.
-                                        </p>
+                                            <p className="font-medium text-destructive">
+                                                {blockedImages.length === 1
+                                                    ? '1 selected image cannot be taken'
+                                                    : `${blockedImages.length} selected images cannot be taken`}
+                                            </p>
+                                            <ul className="space-y-2">
+                                                {blockedImages
+                                                    .slice(0, 5)
+                                                    .map((item) => (
+                                                        <li key={item.name}>
+                                                            <span className="break-all font-medium">
+                                                                {item.name}
+                                                            </span>{' '}
+                                                            <span className="text-muted-foreground">
+                                                                {item.reason}.
+                                                            </span>
+                                                            <span className="block text-xs text-muted-foreground">
+                                                                {item.hint}
+                                                            </span>
+                                                        </li>
+                                                    ))}
+                                            </ul>
+                                            {blockedImages.length > 5 && (
+                                                <p className="text-xs text-muted-foreground">
+                                                    and{' '}
+                                                    {blockedImages.length - 5}{' '}
+                                                    more.
+                                                </p>
+                                            )}
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                disabled={busy}
+                                                onClick={() =>
+                                                    setStaged((previous) =>
+                                                        previous.filter(
+                                                            (name) =>
+                                                                !invalidNames.includes(
+                                                                    name,
+                                                                ),
+                                                        ),
+                                                    )
+                                                }
+                                            >
+                                                Remove{' '}
+                                                {blockedImages.length === 1
+                                                    ? 'this image'
+                                                    : 'these images'}{' '}
+                                                from my selection
+                                            </Button>
+                                        </div>
                                     )}
                                     <Button
                                         className="w-full"
@@ -794,7 +890,7 @@ export function ProductionWorkstation() {
             )}
             {heldQuery.isError && (
                 <Button variant="outline" onClick={() => heldQuery.refetch()}>
-                    Could not load held work. Retry
+                    We could not load your held work. Tap to try again
                 </Button>
             )}
             {!!held.length && (

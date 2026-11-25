@@ -73,7 +73,7 @@ export function OrderPicker({
                     <Skeleton className="h-9 w-full" />
                 ) : isError ? (
                     <Button variant="outline" onClick={() => refetch()}>
-                        Could not load orders. Retry
+                        We could not load the orders. Tap to try again
                     </Button>
                 ) : (
                     <Combobox

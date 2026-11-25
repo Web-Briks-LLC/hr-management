@@ -532,6 +532,10 @@ export interface ILiveWorkSessionsResponse {
     data: {
         sessions: ILiveWorkSession[];
         roster: ILiveRosterEntry[];
+        shifts: { _id: string; name: string; code?: string; startTime: string | null; endTime: string | null }[];
+        currentShiftId: string | null;
+        selectedShiftId: string | null;
+        shiftWindow: { start: string; end: string };
         byStaff: {
             staffId: string;
             name: string;
@@ -544,8 +548,9 @@ export interface ILiveWorkSessionsResponse {
         summary: {
             totalEditors: number;
             workingEditors: number;
+            notWorkingEditors: number;
             onHoldEditors: number;
-            idleEditors: number;
+            pendingImages: number;
             editorsWorking: number;
             activeSessions: number;
             heldSessions: number;
@@ -560,7 +565,9 @@ export interface ILiveRosterEntry {
     name: string;
     image?: string | null;
     designation?: string;
-    state: 'working' | 'on_hold' | 'idle';
+    state: 'working' | 'not_working';
+    onHold: boolean;
+    pendingImages: number;
     sessionIds: string[];
     todayImages: number;
     todaySeconds: number;

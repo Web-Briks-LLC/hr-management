@@ -70,7 +70,7 @@ export function ProductionActivity({
         <Skeleton className="h-32" />
       ) : isError ? (
         <Button variant="outline" onClick={() => refetch()}>
-          Could not load history. Retry
+          We could not load this order's history. Tap to try again
         </Button>
       ) : !result?.events.length ? (
         <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">

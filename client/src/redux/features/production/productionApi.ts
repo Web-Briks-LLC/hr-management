@@ -271,8 +271,14 @@ export const productionApi = apiSlice.injectEndpoints({
             invalidatesTags: [...SESSION_MUTATION_TAGS],
         }),
 
-        getLiveWorkSessions: builder.query<ILiveWorkSessionsResponse, void>({
-            query: () => '/production/sessions/live',
+        getLiveWorkSessions: builder.query<
+            ILiveWorkSessionsResponse,
+            { shiftId?: string } | void
+        >({
+            query: (arg) =>
+                arg?.shiftId
+                    ? `/production/sessions/live?shiftId=${encodeURIComponent(arg.shiftId)}`
+                    : '/production/sessions/live',
             providesTags: ['LiveWorkSessions'],
         }),
 

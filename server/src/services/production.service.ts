@@ -6,6 +6,8 @@ import { productionMutation, productionNotifications } from './production-transa
 import ShiftProductionModel from '../models/shift-production.model.js';
 import OrderModel from '../models/order.model.js';
 import ShiftModel from '../models/shift.model.js';
+import ShiftAssignmentModel from '../models/shift-assignment.model.js';
+import { getBDStartOfDay, getBDEndOfDay } from '../utils/date.util.js';
 import StaffModel from '../models/staff.model.js';
 import { assertEmployedOn, employmentExpr, employmentEnd } from '../utils/employment.util.js';
 import { freezeInactiveWorkSessions } from './employment-timers.service.js';
@@ -115,7 +117,7 @@ const createProductionLog = async (
     }
     const order = await OrderModel.findById(payload.orderId).lean();
     if (!order) {
-        throw new Error('Order not found');
+        throw new Error('This order could not be found. It may have been removed or closed. Refresh the page and try again.');
     }
 
     const shift = await ShiftModel.findById(payload.shiftId).lean();
@@ -609,7 +611,7 @@ const getOrderTimelineLogs = async (orderId: string) => {
         .lean();
 
     if (!order) {
-        throw new Error('Order not found');
+        throw new Error('This order could not be found. It may have been removed or closed. Refresh the page and try again.');
     }
 
     // Legacy per-shift team-leader logs. Left in place for branches that use
@@ -694,7 +696,7 @@ const updateProductionLog = async (
 ) => {
     const log = await ShiftProductionModel.findById(id);
     if (!log) {
-        throw new Error('Production log not found');
+        throw new Error('This production log could not be found. It may have been removed. Refresh the page and try again.');
     }
 
     // Verify permission: Admins have full access; Team Leader can edit if they created it
@@ -809,7 +811,7 @@ const submitQCReview = async (
     }
     const log = await ShiftProductionModel.findById(logId);
     if (!log) {
-        throw new Error('Production log not found');
+        throw new Error('This production log could not be found. It may have been removed. Refresh the page and try again.');
     }
 
     assertQCCounts(qcData.passedCount, qcData.rejectedCount, log.completedQuantity);
@@ -905,7 +907,7 @@ const submitQCReview = async (
 const deleteProductionLog = async (id: string) => {
     const log = await ShiftProductionModel.findByIdAndDelete(id);
     if (!log) {
-        throw new Error('Production log not found');
+        throw new Error('This production log could not be found. It may have been removed. Refresh the page and try again.');
     }
 
     notifyProductionUpdate('production:log_deleted', { id });
@@ -1198,7 +1200,7 @@ const getOrderImageStatus = async (
         .lean();
 
     if (!order) {
-        throw new Error('Order not found');
+        throw new Error('This order could not be found. It may have been removed or closed. Refresh the page and try again.');
     }
 
     const query: any = {
@@ -1310,18 +1312,18 @@ const startWorkSession = async (
         .populate('userId', 'name email')
         .lean();
     if (!staff) {
-        throw new Error('Staff profile not found for this user');
+        throw new Error('Your account is not linked to a staff profile, so you cannot take images. Ask HR to link your profile.');
     }
     assertEmployedOn(staff, new Date());
     const staffName = (staff.userId as any)?.name || 'Editor';
 
     const order = await OrderModel.findById(payload.orderId).lean();
     if (!order) {
-        throw new Error('Order not found');
+        throw new Error('This order could not be found. It may have been removed or closed. Refresh the page and try again.');
     }
 
     if (!['pending', 'in_progress', 'quality_check', 'revision'].includes(order.status)) {
-        throw new Error('This order is closed. Ask a supervisor to reopen it for revision.');
+        throw new Error('This order is closed, so no more images can be taken. Ask your Team Leader to reopen it if more work is needed.');
     }
 
     // Check if staff already has an active work session
@@ -1332,9 +1334,9 @@ const startWorkSession = async (
 
     if (existingActiveSession) {
         throw new Error(
-            `You already have an active work session on order "${
+            `You are already working on order "${
                 (existingActiveSession.orderId as any)?.orderName || 'Order'
-            }". Please finish or cancel it before starting a new one.`
+            }". Submit it, hold it, or release it before taking new images.`
         );
     }
 
@@ -1344,7 +1346,7 @@ const startWorkSession = async (
     );
 
     if (cleanImageNames.length === 0) {
-        throw new Error('No valid image names provided');
+        throw new Error('No image filenames were selected. Choose at least one image to take.');
     }
 
     // Concurrency Lock Check: Are any of these images currently locked by someone else?
@@ -1362,16 +1364,19 @@ const startWorkSession = async (
         .lean();
 
     if (lockedImages.length > 0) {
+        const owners = new Set<string>();
         const lockedDetails = lockedImages
             .map((img: any) => {
                 const lockOwner = img.currentAssignedStaffId;
                 const lockOwnerName =
                     lockOwner?.userId?.name || lockOwner?.staffId || 'another editor';
-                return `"${img.imageName}" (locked by ${lockOwnerName})`;
+                owners.add(lockOwnerName);
+                return `"${img.imageName}" (${lockOwnerName})`;
             })
             .join(', ');
+        const ownerList = Array.from(owners).join(' or ');
         throw new Error(
-            `Cannot start work. The following images are currently locked by another editor: ${lockedDetails}`
+            `You can't take these images because they are locked by another editor: ${lockedDetails}. To take them, ask ${ownerList} to release them, or request your Team Leader to reassign them.`
         );
     }
 
@@ -1397,7 +1402,7 @@ const startWorkSession = async (
             )
             .join(', ');
         throw new Error(
-            `Cannot start work. The following images are already submitted and cannot be reopened: ${details}`
+            `These images are already submitted and can't be taken again: ${details}. Remove them from your selection. If one needs more work, ask your Team Leader or QA to send it back for revision.`
         );
     }
 
@@ -1415,7 +1420,7 @@ const startWorkSession = async (
     if (ownHeldLocked.length > 0) {
         const names = ownHeldLocked.map((i) => `"${i.imageName}"`).join(', ');
         throw new Error(
-            `These image(s) are still locked to your held session: ${names}. Resume that session to continue them, or pick different images.`
+            `${names} ${ownHeldLocked.length === 1 ? 'is' : 'are'} still on your held session. Resume that held session to continue them, or release them first and then take them again.`
         );
     }
 
@@ -1430,7 +1435,7 @@ const startWorkSession = async (
     if (alreadyRegisteredCount + cleanImageNames.length > (order.imageQuantity || 0)) {
         const remaining = Math.max(0, (order.imageQuantity || 0) - alreadyRegisteredCount);
         throw new Error(
-            `This order is for ${order.imageQuantity} image(s). ${alreadyRegisteredCount} are already registered, so you can add at most ${remaining} more — you tried to add ${cleanImageNames.length}.`
+            `This order only covers ${order.imageQuantity} image(s) and ${alreadyRegisteredCount} are already registered, so you can add at most ${remaining} more new image(s). You tried to add ${cleanImageNames.length}. Remove the extra filenames, or ask your Team Leader to increase the order quantity.`
         );
     }
 
@@ -1595,7 +1600,7 @@ const assertSessionOwnership = async (session: any) => {
     const count = await OrderImageModel.countDocuments({ orderId: session.orderId,
         imageName: { $in: session.imageNames }, currentSessionId: session._id,
         currentAssignedStaffId: session.staffId });
-    if (count !== session.imageNames.length) throw new Error('Image ownership has changed. Ask a supervisor to review this session.');
+    if (count !== session.imageNames.length) throw new Error('Some of these images are no longer assigned to you (they may have been reassigned or released). Refresh the page, or ask your Team Leader to check the order history.');
 };
 
 /**
@@ -1606,18 +1611,18 @@ const assertSessionOwnership = async (session: any) => {
 const pauseWorkSession = async (sessionId: string, userId: string) => {
     const staff = await StaffModel.findOne({ userId }).lean();
     if (!staff) {
-        throw new Error('Staff profile not found');
+        throw new Error('Your account is not linked to a staff profile. Ask HR to link your profile.');
     }
 
     const session = await ProductionWorkSessionModel.findById(sessionId);
     if (!session) {
-        throw new Error('Work session not found');
+        throw new Error('This work could not be found. It may have been removed. Refresh the page and try again.');
     }
     if (session.staffId.toString() !== staff._id.toString()) {
-        throw new Error('You can only hold your own work session');
+        throw new Error('You can only hold your own work. This batch belongs to another editor.');
     }
     if (session.status !== 'active') {
-        throw new Error('Only an active session can be put on hold');
+        throw new Error('This work is not running right now, so it cannot be put on hold. Refresh the page to see its latest status.');
     }
 
     const now = employmentEnd(staff, session.startTime, new Date());
@@ -1646,19 +1651,19 @@ const pauseWorkSession = async (sessionId: string, userId: string) => {
 const resumeWorkSession = async (sessionId: string, userId: string) => {
     const staff = await StaffModel.findOne({ userId }).lean();
     if (!staff) {
-        throw new Error('Staff profile not found');
+        throw new Error('Your account is not linked to a staff profile. Ask HR to link your profile.');
     }
 
     assertEmployedOn(staff, new Date());
     const session = await ProductionWorkSessionModel.findById(sessionId);
     if (!session) {
-        throw new Error('Work session not found');
+        throw new Error('This work could not be found. It may have been removed. Refresh the page and try again.');
     }
     if (session.staffId.toString() !== staff._id.toString()) {
-        throw new Error('You can only resume your own work session');
+        throw new Error('You can only resume your own work. This batch belongs to another editor.');
     }
     if (session.status !== 'paused') {
-        throw new Error('This session is not on hold');
+        throw new Error('This work is not on hold, so there is nothing to resume. Refresh the page to see its latest status.');
     }
 
     await assertSessionOwnership(session);
@@ -1672,9 +1677,9 @@ const resumeWorkSession = async (sessionId: string, userId: string) => {
 
     if (otherActive) {
         throw new Error(
-            `You have an active session on "${
+            `You are already working on "${
                 (otherActive.orderId as any)?.orderName || 'another order'
-            }". Hold or finish it before resuming this one.`
+            }". Hold or submit that work before resuming this one.`
         );
     }
 
@@ -1717,20 +1722,20 @@ const finishWorkSession = async (
 ) => {
     const staff = await StaffModel.findOne({ userId }).lean();
     if (!staff) {
-        throw new Error('Staff profile not found');
+        throw new Error('Your account is not linked to a staff profile. Ask HR to link your profile.');
     }
 
     const session = await ProductionWorkSessionModel.findById(payload.sessionId);
     if (!session) {
-        throw new Error('Work session not found');
+        throw new Error('This work could not be found. It may have been removed. Refresh the page and try again.');
     }
 
     if (session.staffId.toString() !== staff._id.toString()) {
-        throw new Error('You are not authorized to finish this work session');
+        throw new Error('You are not authorized to submit this work because it belongs to another editor. Ask your Team Leader to submit it for them.');
     }
 
     if (session.status !== 'active' && session.status !== 'paused') {
-        throw new Error('This work session is already closed or cancelled');
+        throw new Error('This work was already submitted or released, so it cannot be submitted again. Refresh the page to see the latest status.');
     }
 
     return finalizeSessionCompletion(session, {
@@ -1755,7 +1760,7 @@ const finalizeSessionCompletion = async (
 ) => {
     const staff = await StaffModel.findById(session.staffId).lean();
     if (!staff) {
-        throw new Error('Editor profile for this session was not found');
+        throw new Error('The editor who owns this work has no staff profile. Ask HR to check their profile.');
     }
     assertEmployedOn(staff, new Date());
 
@@ -1789,10 +1794,10 @@ const finalizeSessionCompletion = async (
         currentSessionId: session._id, currentAssignedStaffId: session.staffId,
     });
     if (images.length !== session.imageNames.length) {
-        throw new Error('Some images no longer belong to this session. Refresh and ask your supervisor to review the history.');
+        throw new Error('Some images in this batch are no longer assigned to you (they may have been reassigned or released). Refresh the page, or ask your Team Leader to check the order history.');
     }
     if (!opts.completedSteps.length || opts.completedSteps.some(step => !orderRequiredSteps.includes(step))) {
-        throw new Error('Choose valid work steps from this order.');
+        throw new Error('Select at least one step that belongs to this order before saving.');
     }
 
     // Dedupe defensively against the same step name being submitted twice in
@@ -1992,7 +1997,7 @@ const cancelWorkSession = async (
 ) => {
     const session = await ProductionWorkSessionModel.findById(sessionId);
     if (!session) {
-        throw new Error('Work session not found');
+        throw new Error('This work could not be found. It may have been removed. Refresh the page and try again.');
     }
 
     const isSupervisor = options?.isSupervisor === true;
@@ -2000,15 +2005,15 @@ const cancelWorkSession = async (
     if (!isSupervisor) {
         const staff = await StaffModel.findOne({ userId }).lean();
         if (!staff) {
-            throw new Error('Staff profile not found');
+            throw new Error('Your account is not linked to a staff profile. Ask HR to link your profile.');
         }
         if (session.staffId.toString() !== staff._id.toString()) {
-            throw new Error('You are not authorized to cancel this session');
+            throw new Error('You are not authorized to release this work because it belongs to another editor. Ask your Team Leader to release it.');
         }
     }
 
     if (session.status !== 'active' && session.status !== 'paused') {
-        throw new Error('Session is not currently active or on hold');
+        throw new Error('This work was already submitted or released, so there is nothing left to release. Refresh the page to see the latest status.');
     }
 
     await unlockSessionImages(session as any);
@@ -2047,10 +2052,10 @@ const adminFinishWorkSession = async (
 ) => {
     const session = await ProductionWorkSessionModel.findById(payload.sessionId);
     if (!session) {
-        throw new Error('Work session not found');
+        throw new Error('This work could not be found. It may have been removed. Refresh the page and try again.');
     }
     if (session.status !== 'active' && session.status !== 'paused') {
-        throw new Error('This work session is already closed');
+        throw new Error('This work was already submitted or released, so it cannot be changed. Refresh the page to see the latest status.');
     }
 
     return finalizeSessionCompletion(session, {
@@ -2077,22 +2082,22 @@ const reassignWorkSession = async (
     await freezeInactiveWorkSessions();
     const oldSession = await ProductionWorkSessionModel.findById(payload.sessionId);
     if (!oldSession) {
-        throw new Error('Work session not found');
+        throw new Error('This work could not be found. It may have been removed. Refresh the page and try again.');
     }
     if (oldSession.status !== 'active' && oldSession.status !== 'paused') {
-        throw new Error('Only an active or held session can be reassigned');
+        throw new Error('This batch is already submitted or released, so it cannot be reassigned. Refresh the page to see the latest status.');
     }
 
     const newStaff = await StaffModel.findById(payload.newStaffId)
         .populate('userId', 'name email')
         .lean();
     if (!newStaff) {
-        throw new Error('Target editor not found');
+        throw new Error('The editor you chose could not be found. Pick an editor from the list and try again.');
     }
     assertEmployedOn(newStaff, new Date());
     if (newStaff.designation?.toLowerCase() === 'telemarketer') throw new Error('Choose a production editor.');
     if (newStaff._id.toString() === oldSession.staffId.toString()) {
-        throw new Error('Session is already assigned to this editor');
+        throw new Error('This batch is already assigned to that editor. Choose a different editor.');
     }
 
     const newStaffActive = await ProductionWorkSessionModel.findOne({
@@ -2218,6 +2223,59 @@ const reassignWorkSession = async (
  * Client names are business-sensitive: only admin roles see them. Everyone
  * else in production works with the client ID alone.
  */
+/* ── Shift / roster helpers (all times Asia/Dhaka) ─────────────────────── */
+const parseClock = (value?: string | null) => {
+    const m = /^(\d{1,2}):(\d{2})/.exec(value || '');
+    return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+};
+const bdClockFormatter = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Dhaka',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+});
+const bdMinutesOfDay = (date: Date) => {
+    const parts = bdClockFormatter.formatToParts(date);
+    const hour = Number(parts.find((p) => p.type === 'hour')?.value);
+    const minute = Number(parts.find((p) => p.type === 'minute')?.value);
+    return (hour % 24) * 60 + minute;
+};
+/** True when the minute-of-day falls inside the shift, including overnight shifts. */
+const shiftContainsMinute = (
+    shift: { startTime?: string | null; endTime?: string | null },
+    minute: number
+) => {
+    const start = parseClock(shift.startTime);
+    const end = parseClock(shift.endTime);
+    if (start === null || end === null || start === end) return false;
+    return start < end ? minute >= start && minute < end : minute >= start || minute < end;
+};
+/** Latest occurrence of the shift that has already started, as an absolute range. */
+const shiftWindow = (
+    shift: { startTime?: string | null; endTime?: string | null },
+    now: Date
+) => {
+    const start = parseClock(shift.startTime);
+    const end = parseClock(shift.endTime);
+    if (start === null || end === null || start === end) {
+        return { start: getBDStartOfDay(now), end: getBDEndOfDay(now) };
+    }
+    let from = new Date(getBDStartOfDay(now).getTime() + start * 60000);
+    if (from > now) from = new Date(from.getTime() - 86400000);
+    const minutes = (end - start + 1440) % 1440;
+    return { start: from, end: new Date(from.getTime() + minutes * 60000) };
+};
+const normalizeLabel = (value?: string | null) =>
+    String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+const ROSTER_ROLES = new Set(['staff', 'teamleader']);
+const ROSTER_DESIGNATIONS = new Set(['teamleader', 'photoeditor', 'qualityassurance']);
+/** Production editing/QA people: staff or team leader, in Production, with an editing or QA designation. */
+const isProductionRosterStaff = (staff: any) =>
+    !!staff.userId &&
+    ROSTER_ROLES.has(normalizeLabel(staff.userId.role)) &&
+    normalizeLabel(staff.department) === 'production' &&
+    ROSTER_DESIGNATIONS.has(normalizeLabel(staff.designation));
+
 const canViewClientName = (role?: string) =>
     role === Role.SUPER_ADMIN || role === Role.ADMIN || role === Role.HR_MANAGER;
 
@@ -2225,7 +2283,7 @@ const canViewClientName = (role?: string) =>
  * Live floor monitor feed for Admin / HR / Team Leader: every active + held
  * session with computed live timers, plus a per-editor rollup.
  */
-const getLiveWorkSessions = async (userId?: string, userRole?: string) => {
+const getLiveWorkSessions = async (userId?: string, userRole?: string, shiftParam?: string) => {
     await freezeInactiveWorkSessions();
     const canSeeClientName = canViewClientName(userRole);
     // Branch scoping for the supervisor floor monitor: every supervisor except
@@ -2344,8 +2402,53 @@ const getLiveWorkSessions = async (userId?: string, userRole?: string) => {
         };
     });
 
+    // ── Shift scoping (Asia/Dhaka) ─────────────────────────────────────────
+    const shiftQuery: Record<string, unknown> = { isActive: true };
+    if (viewerBranchId) shiftQuery.branchId = viewerBranchId;
+    const shiftDocs = await ShiftModel.find(shiftQuery)
+        .select('name code startTime endTime isFlexible')
+        .sort({ startTime: 1, name: 1 })
+        .lean();
+    const nowMinutes = bdMinutesOfDay(now);
+    const currentShift = shiftDocs.find((sh: any) => shiftContainsMinute(sh, nowMinutes));
+    const currentShiftId = currentShift ? String(currentShift._id) : null;
+    const selectedShiftId =
+        shiftParam === 'all'
+            ? null
+            : shiftParam && shiftDocs.some((sh: any) => String(sh._id) === shiftParam)
+              ? shiftParam
+              : currentShiftId;
+    const selectedShift = selectedShiftId
+        ? shiftDocs.find((sh: any) => String(sh._id) === selectedShiftId)
+        : null;
+    const window = selectedShift
+        ? shiftWindow(selectedShift, now)
+        : { start: getBDStartOfDay(now), end: getBDEndOfDay(now) };
+
+    // ── Roster: Production staff / team leaders who edit or QA ─────────────
+    const rosterQuery: Record<string, unknown> = { $expr: employmentExpr() };
+    if (viewerBranchId) rosterQuery.branchId = viewerBranchId;
+    if (selectedShiftId) {
+        const assigned = await ShiftAssignmentModel.find({
+            shiftId: new Types.ObjectId(selectedShiftId),
+            isActive: true,
+        })
+            .select('staffId')
+            .lean();
+        rosterQuery._id = { $in: assigned.map((a: any) => a.staffId) };
+    }
+    const staffDocs = await StaffModel.find(rosterQuery)
+        .select('staffId designation department userId')
+        .populate('userId', 'name image role')
+        .lean();
+    const eligible = staffDocs.filter((st: any) => isProductionRosterStaff(st));
+    const eligibleIds = new Set(eligible.map((st: any) => String(st._id)));
+
+    // Only sessions owned by roster staff are shown on this screen.
+    const visible = mapped.filter((s) => eligibleIds.has(String(s.staff._id)));
+
     const byStaffMap = new Map<string, any>();
-    for (const s of mapped) {
+    for (const s of visible) {
         const key = String(s.staff._id);
         if (!byStaffMap.has(key)) {
             byStaffMap.set(key, {
@@ -2367,24 +2470,14 @@ const getLiveWorkSessions = async (userId?: string, userRole?: string) => {
         }
     }
 
-    // Full roster: every production-eligible editor in scope, marked as
-    // working / on_hold / idle, with today's finished output alongside.
-    const rosterQuery: Record<string, unknown> = { $expr: employmentExpr() };
-    if (viewerBranchId) rosterQuery.branchId = viewerBranchId;
-    const staffDocs = await StaffModel.find(rosterQuery)
-        .select('staffId designation userId')
-        .populate('userId', 'name image')
-        .lean();
-    const eligible = staffDocs.filter(
-        (st: any) => (st.designation || '').toLowerCase() !== 'telemarketer' && st.userId
-    );
-    const todayRows = eligible.length
+    // Everyone who took images inside this shift window (finished or not).
+    const windowRows = eligible.length
         ? await ProductionWorkSessionModel.aggregate([
               {
                   $match: {
                       staffId: { $in: eligible.map((st: any) => st._id) },
-                      status: { $in: ['completed', 'reassigned'] },
-                      startTime: { $gte: startOfDay(now), $lte: endOfDay(now) },
+                      status: { $in: ['active', 'paused', 'completed', 'reassigned'] },
+                      startTime: { $gte: window.start, $lte: window.end },
                   },
               },
               {
@@ -2397,16 +2490,13 @@ const getLiveWorkSessions = async (userId?: string, userRole?: string) => {
               },
           ])
         : [];
-    const todayByStaff = new Map(todayRows.map((r: any) => [String(r._id), r]));
+    const windowByStaff = new Map(windowRows.map((r: any) => [String(r._id), r]));
     const roster = eligible
         .map((st: any) => {
-            const mine = mapped.filter((m) => String(m.staff._id) === String(st._id));
-            const today = todayByStaff.get(String(st._id));
-            const state: 'working' | 'on_hold' | 'idle' = mine.some((m) => !m.isOnHold)
-                ? 'working'
-                : mine.length
-                  ? 'on_hold'
-                  : 'idle';
+            const mine = visible.filter((m) => String(m.staff._id) === String(st._id));
+            const stats = windowByStaff.get(String(st._id));
+            const tookWork = mine.length > 0 || !!stats;
+            const state: 'working' | 'not_working' = tookWork ? 'working' : 'not_working';
             return {
                 staffId: st._id,
                 employeeId: st.staffId,
@@ -2414,29 +2504,42 @@ const getLiveWorkSessions = async (userId?: string, userRole?: string) => {
                 image: st.userId?.image || null,
                 designation: st.designation,
                 state,
+                onHold: mine.length > 0 && mine.every((m) => m.isOnHold),
                 sessionIds: mine.map((m) => m._id),
-                todayImages: today?.images || 0,
-                todaySeconds: today?.seconds || 0,
-                lastActiveAt: today?.lastEndTime || null,
+                pendingImages: mine.reduce((acc, m) => acc + m.imageCount, 0),
+                todayImages: stats?.images || 0,
+                todaySeconds: stats?.seconds || 0,
+                lastActiveAt: stats?.lastEndTime || null,
             };
         })
         .sort((a, b) => a.name.localeCompare(b.name));
 
     return {
-        sessions: mapped,
+        sessions: visible,
         roster,
+        shifts: shiftDocs.map((sh: any) => ({
+            _id: String(sh._id),
+            name: sh.name,
+            code: sh.code,
+            startTime: sh.startTime || null,
+            endTime: sh.endTime || null,
+        })),
+        currentShiftId,
+        selectedShiftId,
+        shiftWindow: { start: window.start, end: window.end },
         byStaff: Array.from(byStaffMap.values()).sort(
             (a, b) => b.totalImages - a.totalImages
         ),
         summary: {
             totalEditors: roster.length,
             workingEditors: roster.filter((r) => r.state === 'working').length,
-            onHoldEditors: roster.filter((r) => r.state === 'on_hold').length,
-            idleEditors: roster.filter((r) => r.state === 'idle').length,
+            notWorkingEditors: roster.filter((r) => r.state === 'not_working').length,
+            onHoldEditors: roster.filter((r) => r.onHold).length,
+            pendingImages: roster.reduce((acc, r) => acc + r.pendingImages, 0),
             editorsWorking: byStaffMap.size,
-            activeSessions: mapped.filter((s) => !s.isOnHold).length,
-            heldSessions: mapped.filter((s) => s.isOnHold).length,
-            imagesInProgress: mapped
+            activeSessions: visible.filter((s) => !s.isOnHold).length,
+            heldSessions: visible.filter((s) => s.isOnHold).length,
+            imagesInProgress: visible
                 .filter((s) => !s.isOnHold)
                 .reduce((acc, s) => acc + s.imageCount, 0),
         },
@@ -2494,7 +2597,7 @@ const flagImageRevision = async (
 ) => {
     const order = await OrderModel.findById(payload.orderId);
     if (!order) {
-        throw new Error('Order not found');
+        throw new Error('This order could not be found. It may have been removed or closed. Refresh the page and try again.');
     }
 
     const now = new Date();
@@ -2502,7 +2605,7 @@ const flagImageRevision = async (
     const images = await OrderImageModel.find({ orderId: order._id, imageName: { $in: names } });
     if (!names.length || images.length !== names.length || images.some(img =>
         img.currentSessionId || !['pending_qc', 'completed'].includes(img.status))) {
-        throw new Error('Only submitted or approved images can be returned for revision. Release active work first.');
+        throw new Error('Only submitted or approved images can be sent back for revision. If an editor is still working on an image, release it first.');
     }
     for (const orderImage of images) {
         orderImage.status = 'in_revision';
@@ -2550,7 +2653,7 @@ const qcApproveImages = async (
 ) => {
     const order = await OrderModel.findById(payload.orderId);
     if (!order) {
-        throw new Error('Order not found');
+        throw new Error('This order could not be found. It may have been removed or closed. Refresh the page and try again.');
     }
 
     const now = new Date();
@@ -2558,7 +2661,7 @@ const qcApproveImages = async (
     const names = [...new Set(payload.imageNames.map(n => n.trim()).filter(Boolean))];
     const eligible = await OrderImageModel.countDocuments({ orderId: order._id,
         imageName: { $in: names }, status: 'pending_qc', currentSessionId: null });
-    if (!names.length || eligible !== names.length) throw new Error('Only images awaiting review can be approved. Refresh the image list.');
+    if (!names.length || eligible !== names.length) throw new Error('Only images that are waiting for review can be approved. Some of the selected images were already reviewed or are still being edited. Refresh the list and try again.');
 
     const updateResult = await OrderImageModel.updateMany(
         {
