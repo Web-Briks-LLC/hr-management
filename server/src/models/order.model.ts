@@ -222,5 +222,71 @@ orderSchema.index({ status: 1, deadline: 1 });
 // Text search index
 orderSchema.index({ orderName: 'text' });
 
+/**
+ * Auto-complete: once an order is paid (isPaid becomes true) it moves to
+ * "completed", unless it is already completed, delivered or cancelled.
+ * Covers save() and updateOne/updateMany/findOneAndUpdate, so every payment
+ * path (earnings, invoices, withdrawals) triggers it.
+ */
+const AUTO_COMPLETE_SKIP = ['completed', 'delivered', 'cancelled'];
+const AUTO_COMPLETE_NOTE = 'Order marked completed automatically because payment was received';
+
+orderSchema.pre('save', function () {
+    if (this.isModified('isPaid') && this.isPaid && !AUTO_COMPLETE_SKIP.includes(this.status)) {
+        this.status = 'completed';
+        this.completedAt = this.completedAt || new Date();
+        this.timeline.push({
+            status: 'completed',
+            timestamp: new Date(),
+            changedBy: this.createdBy,
+            note: AUTO_COMPLETE_NOTE,
+        } as any);
+    }
+});
+
+const setsPaid = (update: any): boolean => {
+    if (!update) return false;
+    if (Array.isArray(update)) return update.some(setsPaid);
+    return update.isPaid === true || update.$set?.isPaid === true;
+};
+
+for (const op of ['updateOne', 'updateMany', 'findOneAndUpdate'] as const) {
+    orderSchema.pre(op, function (this: any) {
+        // Remember the filter so the post hook can find the orders that were just paid.
+        this._autoCompleteFilter = setsPaid(this.getUpdate()) ? { ...this.getFilter() } : null;
+    });
+    orderSchema.post(op, async function (this: any) {
+        const filter = this._autoCompleteFilter;
+        if (!filter) return;
+        const session = this.getOptions?.().session || null;
+        const paid = await this.model
+            .find({ ...filter, isPaid: true, status: { $nin: AUTO_COMPLETE_SKIP } })
+            .select('_id createdBy')
+            .session(session)
+            .lean();
+        if (!paid.length) return;
+        const now = new Date();
+        await this.model.bulkWrite(
+            paid.map((order: any) => ({
+                updateOne: {
+                    filter: { _id: order._id },
+                    update: {
+                        $set: { status: 'completed', completedAt: now },
+                        $push: {
+                            timeline: {
+                                status: 'completed',
+                                timestamp: now,
+                                changedBy: order.createdBy,
+                                note: AUTO_COMPLETE_NOTE,
+                            },
+                        },
+                    },
+                },
+            })),
+            { session }
+        );
+    });
+}
+
 const OrderModel = model<IOrder>('Order', orderSchema);
 export default OrderModel;
