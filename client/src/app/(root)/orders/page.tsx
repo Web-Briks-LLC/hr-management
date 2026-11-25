@@ -131,27 +131,11 @@ const priorityColors: Record<OrderPriority, string> = {
     urgent: "bg-red-500/20 text-red-700 dark:text-red-400",
 };
 
-// Status workflow: defines which statuses can transition to which
-// Key = current status, Value = array of allowed next statuses
-const statusWorkflow: Record<OrderStatus, OrderStatus[]> = {
-    pending: ["in_progress", "cancelled"],
-    in_progress: ["quality_check", "revision", "cancelled"],
-    quality_check: ["ready_to_deliver", "revision", "in_progress"],
-    revision: ["in_progress", "cancelled"],
-    ready_to_deliver: ["completed", "revision"],
-    completed: ["delivered", "revision"],
-    delivered: [], // Final state - no transitions allowed
-    cancelled: [], // Final state - no transitions allowed
-};
-
-// Helper function to check if a status transition is allowed
+// Any status can be changed to any other status; only the current one is skipped.
 const canTransitionTo = (
     currentStatus: OrderStatus,
     targetStatus: OrderStatus,
-): boolean => {
-    if (currentStatus === targetStatus) return false; // Can't transition to same status
-    return statusWorkflow[currentStatus]?.includes(targetStatus) || false;
-};
+): boolean => currentStatus !== targetStatus;
 
 interface ApiErrorResponse {
     data?: {
@@ -1445,12 +1429,7 @@ function OrdersContent() {
                                                                 value as OrderStatus,
                                                             )
                                                         }
-                                                        disabled={
-                                                            isUpdatingStatus ||
-                                                            statusWorkflow[
-                                                                order.status
-                                                            ].length === 0
-                                                        }
+                                                        disabled={isUpdatingStatus}
                                                     >
                                                         <SelectTrigger
                                                             className={cn(
