@@ -6,6 +6,7 @@ import { productionMutation, productionNotifications } from './production-transa
 import ShiftProductionModel from '../models/shift-production.model.js';
 import OrderModel from '../models/order.model.js';
 import ShiftModel from '../models/shift.model.js';
+import { normalizeLabel, canonicalLabel } from '../utils/label-match.util.js';
 import ShiftAssignmentModel from '../models/shift-assignment.model.js';
 import { getBDStartOfDay, getBDEndOfDay } from '../utils/date.util.js';
 import StaffModel from '../models/staff.model.js';
@@ -2265,16 +2266,14 @@ const shiftWindow = (
     const minutes = (end - start + 1440) % 1440;
     return { start: from, end: new Date(from.getTime() + minutes * 60000) };
 };
-const normalizeLabel = (value?: string | null) =>
-    String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 const ROSTER_ROLES = new Set(['staff', 'teamleader']);
 const ROSTER_DESIGNATIONS = new Set(['teamleader', 'photoeditor', 'qualityassurance']);
 /** Production editing/QA people: staff or team leader, in Production, with an editing or QA designation. */
 const isProductionRosterStaff = (staff: any) =>
     !!staff.userId &&
     ROSTER_ROLES.has(normalizeLabel(staff.userId.role)) &&
-    normalizeLabel(staff.department) === 'production' &&
-    ROSTER_DESIGNATIONS.has(normalizeLabel(staff.designation));
+    canonicalLabel(staff.department) === 'production' &&
+    ROSTER_DESIGNATIONS.has(canonicalLabel(staff.designation));
 
 const canViewClientName = (role?: string) =>
     role === Role.SUPER_ADMIN || role === Role.ADMIN || role === Role.HR_MANAGER;
@@ -2435,7 +2434,14 @@ const getLiveWorkSessions = async (userId?: string, userRole?: string, shiftPara
         })
             .select('staffId')
             .lean();
-        rosterQuery._id = { $in: assigned.map((a: any) => a.staffId) };
+        // Assigned to this shift, or took images during it (assignments can lag behind real work).
+        const workedInWindow = await ProductionWorkSessionModel.distinct('staffId', {
+            startTime: { $gte: window.start, $lte: window.end },
+            status: { $in: ['active', 'paused', 'completed', 'reassigned'] },
+        });
+        rosterQuery._id = {
+            $in: [...assigned.map((a: any) => a.staffId), ...workedInWindow],
+        };
     }
     const staffDocs = await StaffModel.find(rosterQuery)
         .select('staffId designation department userId')

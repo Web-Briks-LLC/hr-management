@@ -3,6 +3,7 @@ import StaffModel from "../models/staff.model.js";
 import type IStaff from "../types/staff.type.js";
 import { startOfDay, endOfDay } from "date-fns";
 import { escapeRegex } from "../lib/sanitize.js";
+import { staffLabelFilter } from "../utils/label-match.util.js";
 import auditService from "./audit.service.js";
 import { prepareEmploymentUpdate } from './employment.service.js';
 import { employmentStatusStage } from '../utils/employment.util.js';
@@ -50,8 +51,8 @@ async function getAllStaffsFromDB(query: IStaffQueryParams) {
         // OR better: do lookups first then match.
     }
 
-    if (department) matchStage.department = department;
-    if (designation) matchStage.designation = designation;
+    if (department) matchStage.department = await staffLabelFilter('department', department);
+    if (designation) matchStage.designation = await staffLabelFilter('designation', designation);
 
     if (hasBalance) matchStage.balance = { $gt: 0 };
     if (branchId) matchStage.branchId = new Types.ObjectId(branchId);
