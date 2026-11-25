@@ -533,8 +533,8 @@ export interface ILiveWorkSessionsResponse {
         sessions: ILiveWorkSession[];
         roster: ILiveRosterEntry[];
         shifts: { _id: string; name: string; code?: string; startTime: string | null; endTime: string | null }[];
-        currentShiftId: string | null;
-        selectedShiftId: string | null;
+        runningShiftIds: string[];
+        selectedShiftId: string; // 'now' | 'all' | a shift id
         shiftWindow: { start: string; end: string };
         byStaff: {
             staffId: string;

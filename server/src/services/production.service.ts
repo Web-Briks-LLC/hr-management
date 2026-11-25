@@ -2267,13 +2267,22 @@ const shiftWindow = (
     return { start: from, end: new Date(from.getTime() + minutes * 60000) };
 };
 const ROSTER_ROLES = new Set(['staff', 'teamleader']);
-const ROSTER_DESIGNATIONS = new Set(['teamleader', 'photoeditor', 'qualityassurance']);
-/** Production editing/QA people: staff or team leader, in Production, with an editing or QA designation. */
+const ROSTER_DEPARTMENTS = new Set(['production', 'postproduction']);
+/** Team leader, any photo editor level (junior/senior/executive…), or quality assurance. */
+const isRosterDesignation = (value?: string | null) => {
+    const label = canonicalLabel(value);
+    return (
+        label === 'teamleader' ||
+        label.includes('photoeditor') ||
+        label.includes('qualityassurance')
+    );
+};
+/** Production / post-production editing and QA people: staff or team leader roles only. */
 const isProductionRosterStaff = (staff: any) =>
     !!staff.userId &&
     ROSTER_ROLES.has(normalizeLabel(staff.userId.role)) &&
-    canonicalLabel(staff.department) === 'production' &&
-    ROSTER_DESIGNATIONS.has(canonicalLabel(staff.designation));
+    ROSTER_DEPARTMENTS.has(canonicalLabel(staff.department)) &&
+    isRosterDesignation(staff.designation);
 
 const canViewClientName = (role?: string) =>
     role === Role.SUPER_ADMIN || role === Role.ADMIN || role === Role.HR_MANAGER;
@@ -2409,27 +2418,32 @@ const getLiveWorkSessions = async (userId?: string, userRole?: string, shiftPara
         .sort({ startTime: 1, name: 1 })
         .lean();
     const nowMinutes = bdMinutesOfDay(now);
-    const currentShift = shiftDocs.find((sh: any) => shiftContainsMinute(sh, nowMinutes));
-    const currentShiftId = currentShift ? String(currentShift._id) : null;
-    const selectedShiftId =
-        shiftParam === 'all'
-            ? null
-            : shiftParam && shiftDocs.some((sh: any) => String(sh._id) === shiftParam)
-              ? shiftParam
-              : currentShiftId;
-    const selectedShift = selectedShiftId
-        ? shiftDocs.find((sh: any) => String(sh._id) === selectedShiftId)
-        : null;
-    const window = selectedShift
-        ? shiftWindow(selectedShift, now)
+    // Several shifts can overlap, so "now" means every shift running right now.
+    const runningShifts = shiftDocs.filter((sh: any) => shiftContainsMinute(sh, nowMinutes));
+    const runningShiftIds = runningShifts.map((sh: any) => String(sh._id));
+    const chosenShift =
+        shiftParam && shiftParam !== 'all' && shiftParam !== 'now'
+            ? shiftDocs.find((sh: any) => String(sh._id) === shiftParam)
+            : undefined;
+    const mode: 'all' | 'now' | 'shift' =
+        shiftParam === 'all' ? 'all' : chosenShift ? 'shift' : 'now';
+    const scopeShifts: any[] =
+        mode === 'shift' ? [chosenShift] : mode === 'now' ? runningShifts : [];
+    const selectedShiftId = mode === 'shift' ? String(chosenShift!._id) : mode;
+    const windows = scopeShifts.map((sh) => shiftWindow(sh, now));
+    const window = windows.length
+        ? {
+              start: new Date(Math.min(...windows.map((w) => w.start.getTime()))),
+              end: new Date(Math.max(...windows.map((w) => w.end.getTime()))),
+          }
         : { start: getBDStartOfDay(now), end: getBDEndOfDay(now) };
 
     // ── Roster: Production staff / team leaders who edit or QA ─────────────
     const rosterQuery: Record<string, unknown> = { $expr: employmentExpr() };
     if (viewerBranchId) rosterQuery.branchId = viewerBranchId;
-    if (selectedShiftId) {
+    if (scopeShifts.length) {
         const assigned = await ShiftAssignmentModel.find({
-            shiftId: new Types.ObjectId(selectedShiftId),
+            shiftId: { $in: scopeShifts.map((sh) => sh._id) },
             isActive: true,
         })
             .select('staffId')
@@ -2530,7 +2544,7 @@ const getLiveWorkSessions = async (userId?: string, userRole?: string, shiftPara
             startTime: sh.startTime || null,
             endTime: sh.endTime || null,
         })),
-        currentShiftId,
+        runningShiftIds,
         selectedShiftId,
         shiftWindow: { start: window.start, end: window.end },
         byStaff: Array.from(byStaffMap.values()).sort(

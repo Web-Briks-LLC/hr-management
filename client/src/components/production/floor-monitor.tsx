@@ -247,7 +247,11 @@ export function FloorMonitor() {
   type ViewTab = "working" | "not_working" | "all";
   const shifts = data?.data?.shifts || [];
   const selectedShiftValue =
-    shiftChoice ?? data?.data?.selectedShiftId ?? "all";
+    shiftChoice ?? data?.data?.selectedShiftId ?? "now";
+  const runningShiftIds = data?.data?.runningShiftIds || [];
+  const runningNames = shifts
+    .filter((sh) => runningShiftIds.includes(sh._id))
+    .map((sh) => sh.name);
   const formatClock = (value: string | null) => {
     const m = /^(\d{1,2}):(\d{2})/.exec(value || "");
     if (!m) return "";
@@ -392,7 +396,7 @@ export function FloorMonitor() {
               <Select
                 value={selectedShiftValue}
                 onValueChange={(v) => {
-                  setShiftChoice(v);
+                  setShiftChoice(v === "now" ? null : v);
                   setPage(1);
                 }}
               >
@@ -404,13 +408,16 @@ export function FloorMonitor() {
                   <SelectValue placeholder="Choose shift" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="now">
+                    {runningNames.length
+                      ? `Running now: ${runningNames.join(", ")}`
+                      : "Running now"}
+                  </SelectItem>
                   <SelectItem value="all">All shifts (today)</SelectItem>
                   {shifts.map((sh) => (
                     <SelectItem key={sh._id} value={sh._id}>
                       {shiftLabel(sh)}
-                      {sh._id === data?.data?.currentShiftId
-                        ? "  ● Now"
-                        : ""}
+                      {runningShiftIds.includes(sh._id) ? "  ● Now" : ""}
                     </SelectItem>
                   ))}
                 </SelectContent>

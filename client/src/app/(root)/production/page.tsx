@@ -73,59 +73,6 @@ function ProductionContent() {
         );
     return (
         <div className="mx-auto w-full min-w-0 max-w-7xl space-y-6 pb-10">
-            <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
-                <div>
-                    <div className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                        <span className="size-2 rounded-full bg-emerald-500" />{' '}
-                        Production
-                    </div>
-                    <h1 className="text-3xl font-semibold tracking-tight">
-                        Good work, one image at a time.
-                    </h1>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                        Take work, keep progress clear, and hand over with
-                        confidence.
-                    </p>
-                </div>
-                <Badge variant="outline" className="w-fit">
-                    {orders.length} active orders
-                </Badge>
-            </header>
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                <StatCard
-                    title="Being edited"
-                    value={orders.reduce(
-                        (total, order) =>
-                            total + order.imageStats.inProgressCount,
-                        0,
-                    )}
-                    icon={Image}
-                    description="Images currently reserved by editors"
-                    variant="primary"
-                />
-                <StatCard
-                    title="Awaiting review"
-                    value={orders.reduce(
-                        (total, order) =>
-                            total + order.imageStats.pendingQcCount,
-                        0,
-                    )}
-                    icon={ClipboardCheck}
-                    description="Submitted images ready for quality check"
-                    variant="indigo"
-                />
-                <StatCard
-                    title="Need revision"
-                    value={orders.reduce(
-                        (total, order) =>
-                            total + order.imageStats.revisionCount,
-                        0,
-                    )}
-                    icon={RotateCcw}
-                    description="Images returned for corrections"
-                    variant="warning"
-                />
-            </div>
             <Tabs
                 value={selected}
                 onValueChange={(value) => {
@@ -149,8 +96,61 @@ function ProductionContent() {
                     </TabsList>
                     <ScrollBar orientation="horizontal" />
                 </ScrollArea>
-                <TabsContent value="workstation">
-                    <ProductionWorkstation />
+                <TabsContent value="workstation" className="space-y-6">
+                    <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+                        <div>
+                            <div className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                                <span className="size-2 rounded-full bg-emerald-500" />{' '}
+                                Production
+                            </div>
+                            <h1 className="text-3xl font-semibold tracking-tight">
+                                Good work, one image at a time.
+                            </h1>
+                            <p className="mt-2 text-sm text-muted-foreground">
+                                Take work, keep progress clear, and hand over with
+                                confidence.
+                            </p>
+                        </div>
+                        <Badge variant="outline" className="w-fit">
+                            {orders.length} active orders
+                        </Badge>
+                    </header>
+                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                        <StatCard
+                            title="Being edited"
+                            value={orders.reduce(
+                                (total, order) =>
+                                    total + order.imageStats.inProgressCount,
+                                0,
+                            )}
+                            icon={Image}
+                            description="Images currently reserved by editors"
+                            variant="primary"
+                        />
+                        <StatCard
+                            title="Awaiting review"
+                            value={orders.reduce(
+                                (total, order) =>
+                                    total + order.imageStats.pendingQcCount,
+                                0,
+                            )}
+                            icon={ClipboardCheck}
+                            description="Submitted images ready for quality check"
+                            variant="indigo"
+                        />
+                        <StatCard
+                            title="Need revision"
+                            value={orders.reduce(
+                                (total, order) =>
+                                    total + order.imageStats.revisionCount,
+                                0,
+                            )}
+                            icon={RotateCcw}
+                            description="Images returned for corrections"
+                            variant="warning"
+                        />
+                    </div>
+                        <ProductionWorkstation />
                 </TabsContent>
                 <TabsContent value="images">
                     <ImageStatusGrid isAdmin={access.isAdmin} />
