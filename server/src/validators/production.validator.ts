@@ -95,6 +95,7 @@ export const finishWorkSessionSchema = z.object({
 export const cancelWorkSessionSchema = z.object({
     sessionId: z.string({ message: 'Session ID is required' }),
     reason: z.string().max(500).optional(),
+    imageNames: z.array(z.string().min(1)).min(1).optional(),
 });
 
 export const sessionIdOnlySchema = z.object({

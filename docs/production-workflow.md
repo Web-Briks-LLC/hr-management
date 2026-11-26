@@ -11,9 +11,13 @@ quantity while their sessions and audit history remain separate. Files are not u
 
 - **Hold for me** pauses time and keeps ownership. Another batch may be started.
 - **Release for others** frees images and keeps previously submitted steps.
+  Editors can release the whole batch or drop specific filenames to release only
+  those images. The remaining images stay assigned in the same session.
   Unsaved local editing is not automatically marked as a completed step.
 - **Submit work** records the selected steps for every image in the batch.
-  Partly completed images become available; fully edited images await QC.
+  To submit only part of a batch, release the unfinished images first, then
+  submit the remaining batch. Partly completed images become available; fully
+  edited images await QC.
 - Supervisors can hand over a live/held batch, submit its steps, or release it.
 - QC approves submitted images or returns submitted/approved images for revision.
   Revision starts a new step cycle; prior steps remain in the audit snapshot and

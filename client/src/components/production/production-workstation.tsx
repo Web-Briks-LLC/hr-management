@@ -62,6 +62,12 @@ const errorMessage = (error: unknown) =>
     'Something went wrong while saving. Refresh the page and try again. If it keeps happening, tell your Team Leader.';
 const orderOf = (session: IProductionWorkSession) =>
     typeof session.orderId === 'object' ? session.orderId : null;
+type WorkDialog = {
+    stage: 'confirm' | 'details';
+    type: 'release' | 'submit';
+    origin: 'release' | 'submit';
+    session: IProductionWorkSession;
+};
 function WorkClock({ session }: { session: IProductionWorkSession }) {
     const [now, setNow] = useState(Date.now());
     useEffect(() => {
@@ -109,12 +115,13 @@ export function ProductionWorkstation() {
     const [visibleCount, setVisibleCount] = useState(100);
     const [stagedSearch, setStagedSearch] = useState('');
     const [history, setHistory] = useState<string | null>(null);
-    const [dialog, setDialog] = useState<{
-        type: 'release' | 'submit';
-        session: IProductionWorkSession;
-    } | null>(null);
+    const [dialog, setDialog] = useState<WorkDialog | null>(null);
     const [steps, setSteps] = useState<string[]>([]);
     const [note, setNote] = useState('');
+    const [releaseAll, setReleaseAll] = useState(true);
+    const [releaseNames, setReleaseNames] = useState<string[]>([]);
+    const [releaseError, setReleaseError] = useState('');
+    const [skippedNames, setSkippedNames] = useState<string[]>([]);
     const [inlineError, setInlineError] = useState('');
     const [start, startState] = useStartWorkSessionMutation();
     const [pause, pauseState] = usePauseWorkSessionMutation();
@@ -163,7 +170,11 @@ export function ProductionWorkstation() {
         (name) => !registered.has(name) &&
             (byStem.get(name.replace(/\.[^.]+$/, ''))?.length || 0) > 1,
     );
-    const newCount = staged.filter((name) => !registered.has(name) && !ambiguousNames.includes(name)).length;
+    const duplicateNames = staged.filter((name, index) =>
+        staged.findIndex((other) => other.replace(/\.[^.]+$/, '') === name.replace(/\.[^.]+$/, '')) !== index,
+    );
+    const newCount = new Set(staged.filter((name) => !registered.has(name) && !ambiguousNames.includes(name))
+        .map((name) => name.replace(/\.[^.]+$/, ''))).size;
     const capacity = Math.max(
         0,
         (order?.imageQuantity || 0) - (summary?.totalRegistered || 0),
@@ -177,10 +188,15 @@ export function ProductionWorkstation() {
                     image.status,
                 ))
         );
-    }).concat(ambiguousNames);
+    }).concat(ambiguousNames, duplicateNames).filter((name, index, all) => all.indexOf(name) === index);
     const heldNames = new Set(held.flatMap((session) => session.imageNames));
     const blockedImages = invalidNames.map((name) => {
         const image = imageByName.get(name);
+        if (duplicateNames.includes(name)) return {
+            name,
+            reason: 'duplicates another selected image with a different extension',
+            hint: 'Keep just one filename for this image.',
+        };
         if (!image) return {
             name,
             reason: 'matches multiple registered filenames',
@@ -271,21 +287,49 @@ export function ProductionWorkstation() {
             }
             return name;
         });
+        const rejected = resolved.filter((name) => {
+            const image = imageByName.get(name);
+            return image && (image.currentSessionId ||
+                blockedStems.has(name.replace(/\.[^.]+$/, '')) ||
+                !['unassigned', 'partially_completed', 'in_revision'].includes(image.status));
+        });
+        setSkippedNames(rejected);
         setStaged((previous) => [
             ...new Set([
-                ...previous,
-                ...resolved.filter(Boolean),
+                ...previous.filter((name) => !invalidNames.includes(name)),
+                ...resolved.filter((name) => name && !rejected.includes(name)),
             ]),
         ]);
-        if (matched) toast.info(`${matched} filename${matched === 1 ? '' : 's'} matched registered images; their existing records will be used.`);
+        if (rejected.length) toast.error(`${rejected.length} image${rejected.length === 1 ? ' is' : 's are'} already locked or submitted. Ask your Team Leader for revision if needed.`);
+        if (matched && !rejected.length) toast.info(`${matched} filename${matched === 1 ? '' : 's'} matched registered images; their existing records will be used.`);
     };
     const dropzone = useDropzone({
-        disabled: !order || !!running || busy || imagesQuery.isFetching,
+        disabled: !order || !!running || busy || !summary || imagesQuery.isError,
         onDrop: (files) => addNames(files.map((f) => f.name)),
+    });
+    const releaseDropzone = useDropzone({
+        disabled: dialog?.stage !== 'details' || dialog.type !== 'release' || releaseAll || busy,
+        onDrop: (files) => {
+            if (!dialog) return;
+            const names = dialog.session.imageNames;
+            const selected: string[] = [];
+            const invalid: string[] = [];
+            for (const file of files) {
+                const name = file.name.trim();
+                const matches = names.includes(name) ? [name] : names.filter(
+                    (candidate) => candidate.replace(/\.[^.]+$/, '') === name.replace(/\.[^.]+$/, ''),
+                );
+                if (matches.length === 1) selected.push(matches[0]);
+                else invalid.push(name);
+            }
+            setReleaseNames((previous) => [...new Set([...previous, ...selected])]);
+            setReleaseError(invalid.length ? `${invalid.length} filename(s) did not match one exact image in this batch. Check the names and try again.` : '');
+        },
     });
     const changeOrder = (next: ISanitizedProductionOrder | null) => {
         setOrder(next);
         setStaged([]);
+        setSkippedNames([]);
         setSearch('');
         setVisibleCount(100);
         setStagedSearch('');
@@ -308,19 +352,33 @@ export function ProductionWorkstation() {
         type: 'release' | 'submit',
         session: IProductionWorkSession,
     ) => {
-        setDialog({ type, session });
+        setDialog({ stage: 'confirm', type, origin: type, session });
         setSteps([]);
         setNote('');
         setInlineError('');
+        setReleaseAll(true);
+        setReleaseNames([]);
+        setReleaseError('');
+    };
+    const chooseDialog = (all: boolean) => {
+        if (!dialog || dialog.stage !== 'confirm') return;
+        setReleaseAll(all);
+        setReleaseNames([]);
+        setReleaseError('');
+        setSteps([]);
+        setNote('');
+        setInlineError('');
+        setDialog({ ...dialog, stage: 'details', type: all ? dialog.type : 'release' });
     };
     const submitDialog = async () => {
-        if (!dialog) return;
+        if (!dialog || dialog.stage !== 'details') return;
         const ok = await run(
             () =>
                 dialog.type === 'release'
                     ? release({
                           sessionId: dialog.session._id,
                           reason: note || undefined,
+                          imageNames: releaseAll ? undefined : releaseNames,
                       }).unwrap()
                     : finish({
                           sessionId: dialog.session._id,
@@ -328,7 +386,9 @@ export function ProductionWorkstation() {
                           notes: note || undefined,
                       }).unwrap(),
             dialog.type === 'release'
-                ? 'Images released. Anyone can take them now.'
+                ? releaseAll
+                    ? 'All images released. Anyone can take them now.'
+                    : `${releaseNames.length} image(s) released. ${dialog.session.imageCount - releaseNames.length} remain assigned to you.`
                 : 'Work saved. Completed images go to quality check; remaining work is available.',
         );
         if (ok) setDialog(null);
@@ -701,6 +761,13 @@ export function ProductionWorkstation() {
                                                     your computer.
                                                 </p>
                                             </div>
+                                            {!!skippedNames.length && (
+                                                <div role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm">
+                                                    <p className="font-medium text-destructive">{skippedNames.length} file(s) were not added because they are locked or already submitted.</p>
+                                                    <p className="mt-1 break-all text-xs text-muted-foreground">{skippedNames.slice(0, 5).join(', ')}{skippedNames.length > 5 ? `, and ${skippedNames.length - 5} more` : ''}</p>
+                                                    <p className="mt-1 text-xs text-muted-foreground">Submitted images need a QC revision before anyone can take them again.</p>
+                                                </div>
+                                            )}
                                             <p className="flex items-center gap-2 text-xs text-muted-foreground">
                                                 <LockKeyhole className="size-3" />{' '}
                                                 Images held by another editor
@@ -723,7 +790,7 @@ export function ProductionWorkstation() {
                                     </CardTitle>
                                     <CardDescription>
                                         {newCount} new ·{' '}
-                                        {staged.length - newCount} already
+                                        {staged.filter((name) => registered.has(name)).length} already
                                         registered
                                     </CardDescription>
                                 </CardHeader>
@@ -885,7 +952,6 @@ export function ProductionWorkstation() {
                                             busy ||
                                             !staged.length ||
                                             blocked ||
-                                            imagesQuery.isFetching ||
                                             imagesQuery.isError ||
                                             !summary
                                         }
@@ -898,7 +964,10 @@ export function ProductionWorkstation() {
                                                     }).unwrap(),
                                                 'Images are yours. Your work timer has started.',
                                             );
-                                            if (ok) setStaged([]);
+                                            if (ok) {
+                                                setStaged([]);
+                                                setSkippedNames([]);
+                                            }
                                         }}
                                     >
                                         <Play className="size-4" />
@@ -1014,24 +1083,72 @@ export function ProductionWorkstation() {
                 </section>
             )}
             <Dialog
-                open={!!dialog}
+                open={dialog?.stage === 'confirm'}
                 onOpenChange={(open) => {
-                    if (!open && !busy) setDialog(null);
+                    if (!open && dialog?.stage === 'confirm') setDialog(null);
                 }}
             >
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>
                             {dialog?.type === 'release'
-                                ? 'Release these images?'
+                                ? `Release all ${dialog.session.imageCount} images?`
+                                : `Submit all ${dialog?.session.imageCount || 0} images?`}
+                        </DialogTitle>
+                        <DialogDescription>
+                            {dialog?.type === 'release'
+                                ? 'You can release the whole batch or choose specific images. Saved steps stay recorded.'
+                                : 'If some images are unfinished, release those images before submitting the rest.'}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => chooseDialog(false)}>
+                            {dialog?.type === 'release' ? 'No, choose images' : 'No, release some images'}
+                        </Button>
+                        <Button onClick={() => chooseDialog(true)}>
+                            {dialog?.type === 'release' ? 'Yes, release all' : 'Yes, submit all'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+            <Dialog
+                open={dialog?.stage === 'details'}
+                onOpenChange={(open) => {
+                    if (!open && dialog?.stage === 'details' && !busy) setDialog(null);
+                }}
+            >
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>
+                            {dialog?.type === 'release'
+                                ? releaseAll ? 'Release all images' : 'Choose images to release'
                                 : 'Which steps did you finish?'}
                         </DialogTitle>
                         <DialogDescription>
                             {dialog?.type === 'release'
-                                ? `${dialog.session.imageCount} images will become available to other editors. Previously saved steps stay recorded. Work not submitted here is not marked complete.`
-                                : 'Check only the steps completed on every image in this batch. Unfinished steps become available for another editor.'}
+                                ? releaseAll
+                                    ? `All ${dialog.session.imageCount} images will be available to other editors. Saved steps stay recorded.`
+                                    : 'Drop or choose the files to release. The rest stay assigned to you.'
+                                : `Select the steps completed on all ${dialog?.session.imageCount || 0} images in this batch.`}
                         </DialogDescription>
                     </DialogHeader>
+                    {dialog?.type === 'release' && !releaseAll && (
+                        <div className="space-y-3">
+                            <div {...releaseDropzone.getRootProps()} className="cursor-pointer rounded-lg border-2 border-dashed p-5 text-center text-sm hover:bg-muted/40">
+                                <input {...releaseDropzone.getInputProps()} />
+                                <UploadCloud className="mx-auto mb-2 size-5" />
+                                Drop files to release, or click to choose
+                            </div>
+                            <p className="text-xs text-muted-foreground">{releaseNames.length} of {dialog.session.imageCount} selected for release. The rest remain assigned to you.</p>
+                            {!!releaseNames.length && <ScrollBox maxHeight="10rem" className="rounded-md border p-2"><div className="space-y-1">
+                                {releaseNames.map((name) => <div key={name} className="flex items-center gap-2 text-xs">
+                                    <span className="min-w-0 flex-1 truncate" title={name}>{name}</span>
+                                    <Button variant="ghost" size="icon" className="size-6" aria-label={`Keep ${name}`} onClick={() => setReleaseNames((previous) => previous.filter((item) => item !== name))}><X className="size-3" /></Button>
+                                </div>)}
+                            </div></ScrollBox>}
+                            {releaseError && <p role="alert" className="text-sm text-destructive">{releaseError}</p>}
+                        </div>
+                    )}
                     {dialog?.type === 'submit' && (
                         <div className="space-y-3">
                             {resolveOrderSteps(
@@ -1082,14 +1199,17 @@ export function ProductionWorkstation() {
                         <Button
                             variant="outline"
                             disabled={busy}
-                            onClick={() => setDialog(null)}
+                            onClick={() => {
+                                if (dialog) setDialog({ ...dialog, stage: 'confirm', type: dialog.origin });
+                            }}
                         >
                             Go back
                         </Button>
                         <Button
                             disabled={
                                 busy ||
-                                (dialog?.type === 'submit' && !steps.length)
+                                (dialog?.type === 'submit' && !steps.length) ||
+                                (dialog?.type === 'release' && !releaseAll && !releaseNames.length)
                             }
                             onClick={submitDialog}
                         >

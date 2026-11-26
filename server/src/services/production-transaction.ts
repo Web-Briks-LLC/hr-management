@@ -23,8 +23,8 @@ export function resolveImageNames(requested: string[], existing: string[]): stri
         if (!byStem.has(stem)) byStem.set(stem, []);
         byStem.get(stem)!.push(name);
     }
-    const resolved = requested.map((raw) => {
-        const name = raw.trim();
+    const selected = [...new Set(requested.map((raw) => raw.trim()).filter(Boolean))];
+    const resolved = selected.map((name) => {
         if (names.has(name)) return name;
         const matches = byStem.get(name.replace(/\.[^.]+$/, '')) || [];
         if (matches.length > 1)
@@ -96,7 +96,9 @@ export function productionMutation<T extends (...args: any[]) => Promise<any>>(
                 }
                 const imageNames = [
                     ...new Set<string>(
-                        (current?.imageNames || args[0].imageNames || [])
+                        (action === 'released' && args[3]?.imageNames
+                            ? args[3].imageNames
+                            : current?.imageNames || args[0].imageNames || [])
                             .map((n: string) => n.trim())
                             .filter(Boolean),
                     ),

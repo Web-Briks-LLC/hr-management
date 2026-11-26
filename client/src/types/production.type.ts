@@ -679,6 +679,7 @@ export interface IFinishWorkSessionInput {
 export interface ICancelWorkSessionInput {
     sessionId: string;
     reason?: string;
+    imageNames?: string[];
 }
 
 export interface IFlagImageRevisionInput {

@@ -1973,7 +1973,7 @@ const cancelWorkSession = async (
     sessionId: string,
     userId: string,
     reason?: string,
-    options?: { isSupervisor?: boolean }
+    options?: { isSupervisor?: boolean; imageNames?: string[] | undefined }
 ) => {
     const session = await ProductionWorkSessionModel.findById(sessionId);
     if (!session) {
@@ -1996,7 +1996,42 @@ const cancelWorkSession = async (
         throw new Error('This work was already submitted or released, so there is nothing left to release. Refresh the page to see the latest status.');
     }
 
-    await unlockSessionImages(session as any);
+    const requested = options?.imageNames;
+    const releasing = requested
+        ? [...new Set(requested.map((name) => name.trim()).filter(Boolean))]
+        : [...session.imageNames];
+    const ownedNames = new Set(session.imageNames);
+    if (!releasing.length || releasing.some((name) => !ownedNames.has(name))) {
+        throw new Error('Select images from this work session to release. Refresh your work and try again.');
+    }
+    if (requested) {
+        const locked = await OrderImageModel.countDocuments({
+            orderId: session.orderId,
+            imageName: { $in: releasing },
+            currentSessionId: session._id,
+            currentAssignedStaffId: session.staffId,
+        });
+        if (locked !== releasing.length) {
+            throw new Error('Some selected images are no longer assigned to you. Refresh your work and try again.');
+        }
+    }
+    await unlockSessionImages({
+        _id: session._id,
+        staffId: session.staffId,
+        orderId: session.orderId,
+        imageNames: releasing,
+    });
+
+    const releasedNames = new Set(releasing);
+    const remaining = session.imageNames.filter((name) => !releasedNames.has(name));
+    if (remaining.length) {
+        session.imageNames = remaining;
+        session.imageCount = remaining.length;
+        if (reason) session.notes = reason;
+        await session.save();
+        notifyProductionUpdate('production:images_updated', { orderId: session.orderId });
+        return { success: true, message: `${releasing.length} image(s) released; ${remaining.length} remain in your work` };
+    }
 
     const now = new Date();
     session.durationSeconds = computeEffectiveSeconds(session as any, now);

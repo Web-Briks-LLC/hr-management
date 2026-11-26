@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readdir } from 'node:fs/promises';
+import { join } from 'node:path';
 import mongoose, { Types } from 'mongoose';
 import production from '../services/production.service.js';
 import Staff from '../models/staff.model.js';
@@ -58,14 +60,14 @@ test('production lifecycle and competing requests on a real replica set', async 
         await Client.collection.insertOne({
             _id: clientId,
             clientId: 'CLIENT+[1]',
-            name: 'Test client',
+            name: 'Completed Fixture Client',
         });
-        const makeOrder = async (quantity: number) => {
+        const makeOrder = async (quantity: number, name?: string) => {
             const id = new Types.ObjectId();
             await Order.collection.insertOne({
                 _id: id,
                 clientId,
-                orderName: `ORDER-${id}`,
+                orderName: name || `ORDER-${id}`,
                 status: 'pending',
                 orderDate: new Date(),
                 deadline: new Date(),
@@ -153,6 +155,30 @@ test('production lifecycle and competing requests on a real replica set', async 
             assert.equal(await Image.countDocuments({ orderId }), 3);
             assert.equal((await production.getOrderImageStatus(orderId)).summary.totalRegistered, 2);
             await cancel(second.session._id, userB);
+        });
+        await t.test('partial release keeps remaining images for submission and audits only released names', async () => {
+            const orderId = await makeOrder(3);
+            const work = await take(orderId, ['a.jpg', 'b.jpg', 'c.jpg']);
+            const sessionId = String(work.session._id);
+            await assert.rejects(
+                production.cancelWorkSession(sessionId, String(userA), undefined, { imageNames: ['other.jpg'] }),
+                /Select images from this work session/,
+            );
+            await production.cancelWorkSession(sessionId, String(userA), undefined, { imageNames: ['b.jpg'] });
+            const remaining = await Session.findById(sessionId);
+            assert.equal(remaining?.status, 'active');
+            assert.deepEqual(remaining?.imageNames, ['a.jpg', 'c.jpg']);
+            assert.equal(remaining?.imageCount, 2);
+            assert.equal((await Image.findOne({ orderId, imageName: 'b.jpg' }))?.status, 'unassigned');
+            const released = await Event.findOne({ orderId, action: 'released' }).lean();
+            assert.deepEqual(released?.imageNames, ['b.jpg']);
+            assert.deepEqual(released?.previousImages?.map((image) => image.imageName), ['b.jpg']);
+            await production.finishWorkSession({ sessionId, completedSteps: ['Edit', 'Retouch'] }, String(userA));
+            assert.equal((await Image.findOne({ orderId, imageName: 'a.jpg' }))?.status, 'pending_qc');
+            assert.equal((await Image.findOne({ orderId, imageName: 'c.jpg' }))?.status, 'pending_qc');
+            assert.equal((await Image.findOne({ orderId, imageName: 'b.jpg' }))?.status, 'unassigned');
+            const retake = await take(orderId, ['b.jpg'], userB);
+            await cancel(retake.session._id, userB);
         });
         await t.test(
             'simultaneous claim has exactly one winner and no orphan session',
@@ -269,7 +295,7 @@ test('production lifecycle and competing requests on a real replica set', async 
                         },
                         String(userB),
                     ),
-                    /closed/,
+                    /already submitted or released/,
                 );
                 const next = await Session.findOne({
                     orderId,
@@ -395,7 +421,7 @@ test('production lifecycle and competing requests on a real replica set', async 
                         },
                         String(userA),
                     ),
-                    /no longer belong/,
+                    /no longer assigned/,
                 );
                 assert.equal(
                     (await Image.findOne({ orderId }))?.completedSteps.length,
@@ -424,7 +450,7 @@ test('production lifecycle and competing requests on a real replica set', async 
                         },
                         String(userA),
                     ),
-                    /valid work steps/,
+                    /belongs to this order/,
                 );
                 assert.equal(
                     (await Session.findById(a.session._id))?.status,
@@ -561,6 +587,49 @@ test('production lifecycle and competing requests on a real replica set', async 
                 assert.equal(await Image.countDocuments({ orderId }), 0);
             },
         );
+        if (process.env.PRODUCTION_TEST_FIXTURES) {
+            const fixtureRoot = process.env.PRODUCTION_TEST_FIXTURES;
+            const folders = (await readdir(fixtureRoot, { withFileTypes: true }))
+                .filter((entry) => entry.isDirectory())
+                .map((entry) => entry.name);
+            for (const [folderIndex, folder] of folders.entries()) {
+                await t.test(`Completed fixture: ${folder}`, async () => {
+                    const jpeg = (await readdir(join(fixtureRoot, folder, 'JPEG')))
+                        .filter((name) => /\.jpe?g$/i.test(name)).sort();
+                    const png = (await readdir(join(fixtureRoot, folder, 'PNG')))
+                        .filter((name) => /\.png$/i.test(name)).sort();
+                    assert.deepEqual(jpeg.map((name) => name.replace(/\.[^.]+$/, '')),
+                        png.map((name) => name.replace(/\.[^.]+$/, '')));
+                    const firstJpeg = jpeg[0];
+                    const firstPng = png[0];
+                    assert.ok(firstJpeg && firstPng);
+                    const orderId = await makeOrder(jpeg.length, folder);
+                    await assert.rejects(take(orderId, [firstJpeg, firstPng]), /multiple filenames/);
+                    const first = await take(orderId, jpeg);
+                    const released = jpeg.filter((_, index) => index % 5 === 0);
+                    await production.cancelWorkSession(String(first.session._id), String(userA), undefined,
+                        { imageNames: released });
+                    assert.equal((await Session.findById(first.session._id))?.imageCount, jpeg.length - released.length);
+                    await production.finishWorkSession({ sessionId: String(first.session._id),
+                        completedSteps: ['Edit', 'Retouch'] }, String(userA));
+                    const second = await take(orderId, released.map((name) => name.replace(/\.[^.]+$/, '.png')), userB);
+                    assert.deepEqual(second.session.imageNames, released);
+                    if (folderIndex % 2 === 0) {
+                        await cancel(second.session._id, userB);
+                    } else {
+                        await production.finishWorkSession({ sessionId: String(second.session._id),
+                            completedSteps: ['Edit'] }, String(userB));
+                        assert.equal(await Image.countDocuments({ orderId, status: 'partially_completed' }), released.length);
+                    }
+                    const third = await take(orderId, released, userA);
+                    await production.finishWorkSession({ sessionId: String(third.session._id),
+                        completedSteps: folderIndex % 2 === 0 ? ['Edit', 'Retouch'] : ['Retouch'] }, String(userA));
+                    assert.equal(await Image.countDocuments({ orderId, status: 'pending_qc' }), jpeg.length);
+                    assert.equal((await production.getOrderImageStatus(orderId)).summary.totalRegistered, jpeg.length);
+                    await assert.rejects(take(orderId, [firstPng], userB), /already submitted/);
+                });
+            }
+        }
     } finally {
         await mongoose.connection.dropDatabase();
         await mongoose.disconnect();

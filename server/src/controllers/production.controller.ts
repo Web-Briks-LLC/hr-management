@@ -392,7 +392,8 @@ export const cancelWorkSession = async (req: Request, res: Response) => {
         const result = await productionService.cancelWorkSession(
             validatedData.sessionId,
             userId,
-            validatedData.reason
+            validatedData.reason,
+            { imageNames: validatedData.imageNames }
         );
 
         return res.status(200).json({
@@ -501,7 +502,7 @@ export const adminCancelWorkSession = async (req: Request, res: Response) => {
             validatedData.sessionId,
             req.user!.id,
             validatedData.reason,
-            { isSupervisor: true }
+            { isSupervisor: true, imageNames: validatedData.imageNames }
         );
         return res.status(200).json({
             success: true,
