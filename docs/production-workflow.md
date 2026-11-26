@@ -3,7 +3,11 @@
 Editors use **My work**: choose an order, select released images or drop filenames,
 then take the batch. There is no 300-image batch cap. Only distinct registered
 filenames count against the order quantity; retaking a registered file does not.
-Filenames are case-sensitive and unique within an order. Files are not uploaded.
+Filenames are case-sensitive and unique within an order. A dropped file with the
+same basename and a different extension takes the existing image record. If
+multiple registered files share that basename, the editor must select the exact
+image from the available list. Historical copies count once toward order
+quantity while their sessions and audit history remain separate. Files are not uploaded.
 
 - **Hold for me** pauses time and keeps ownership. Another batch may be started.
 - **Release for others** frees images and keeps previously submitted steps.

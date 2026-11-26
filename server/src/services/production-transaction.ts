@@ -15,6 +15,29 @@ export const productionNotifications = new AsyncLocalStorage<
     Array<() => void>
 >();
 
+export function resolveImageNames(requested: string[], existing: string[]): string[] {
+    const names = new Set(existing);
+    const byStem = new Map<string, string[]>();
+    for (const name of names) {
+        const stem = name.replace(/\.[^.]+$/, '');
+        if (!byStem.has(stem)) byStem.set(stem, []);
+        byStem.get(stem)!.push(name);
+    }
+    const resolved = requested.map((raw) => {
+        const name = raw.trim();
+        if (names.has(name)) return name;
+        const matches = byStem.get(name.replace(/\.[^.]+$/, '')) || [];
+        if (matches.length > 1)
+            throw new Error(`"${name}" matches multiple registered filenames. Select the exact image from the available list.`);
+        return matches[0] || name;
+    });
+    if (new Set(resolved).size !== resolved.length)
+        throw new Error('This batch contains the same image more than once under different filenames. Remove the duplicate and try again.');
+    if (new Set(resolved.map((name) => name.replace(/\.[^.]+$/, ''))).size !== resolved.length)
+        throw new Error('This batch contains multiple filenames for the same image. Take each image only once.');
+    return resolved;
+}
+
 /** Serializes conflicting order/editor operations across server instances. Unrelated
  * orders remain concurrent. Requires a replica set; never falls back to unsafe writes. */
 export function productionMutation<T extends (...args: any[]) => Promise<any>>(
@@ -65,9 +88,15 @@ export function productionMutation<T extends (...args: any[]) => Promise<any>>(
                 const current = sessionId
                     ? await WorkSession.findById(sessionId).lean()
                     : null;
+                if (action === 'taken') {
+                    const existing = await Image.find({ orderId })
+                        .select('imageName')
+                        .lean();
+                    args[0] = { ...payload, imageNames: resolveImageNames(payload.imageNames, existing.map((image) => image.imageName)) };
+                }
                 const imageNames = [
                     ...new Set<string>(
-                        (current?.imageNames || payload.imageNames || [])
+                        (current?.imageNames || args[0].imageNames || [])
                             .map((n: string) => n.trim())
                             .filter(Boolean),
                     ),

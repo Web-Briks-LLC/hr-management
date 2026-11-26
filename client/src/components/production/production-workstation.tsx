@@ -135,9 +135,13 @@ export function ProductionWorkstation() {
     );
     const images = imagesQuery.currentData?.data?.images || [];
     const summary = imagesQuery.currentData?.data?.summary;
+    const blockedStems = new Set(images
+        .filter((image) => image.currentSessionId || ['pending_qc', 'completed'].includes(image.status))
+        .map((image) => image.imageName.replace(/\.[^.]+$/, '')));
     const available = images.filter(
         (image) =>
             !image.currentSessionId &&
+            !blockedStems.has(image.imageName.replace(/\.[^.]+$/, '')) &&
             ['unassigned', 'partially_completed', 'in_revision'].includes(
                 image.status,
             ),
@@ -146,10 +150,20 @@ export function ProductionWorkstation() {
         image.imageName.toLowerCase().includes(search.toLowerCase()),
     );
     const registered = new Set(images.map((image) => image.imageName));
+    const byStem = new Map<string, string[]>();
+    for (const image of images) {
+        const stem = image.imageName.replace(/\.[^.]+$/, '');
+        if (!byStem.has(stem)) byStem.set(stem, []);
+        byStem.get(stem)!.push(image.imageName);
+    }
     const imageByName = new Map(
         images.map((image) => [image.imageName, image]),
     );
-    const newCount = staged.filter((name) => !registered.has(name)).length;
+    const ambiguousNames = staged.filter(
+        (name) => !registered.has(name) &&
+            (byStem.get(name.replace(/\.[^.]+$/, ''))?.length || 0) > 1,
+    );
+    const newCount = staged.filter((name) => !registered.has(name) && !ambiguousNames.includes(name)).length;
     const capacity = Math.max(
         0,
         (order?.imageQuantity || 0) - (summary?.totalRegistered || 0),
@@ -158,15 +172,27 @@ export function ProductionWorkstation() {
         const image = imageByName.get(name);
         return (
             image &&
-            (image.currentSessionId ||
+            (image.currentSessionId || blockedStems.has(name.replace(/\.[^.]+$/, '')) ||
                 !['unassigned', 'partially_completed', 'in_revision'].includes(
                     image.status,
                 ))
         );
-    });
+    }).concat(ambiguousNames);
     const heldNames = new Set(held.flatMap((session) => session.imageNames));
     const blockedImages = invalidNames.map((name) => {
-        const image = imageByName.get(name)!;
+        const image = imageByName.get(name);
+        if (!image) return {
+            name,
+            reason: 'matches multiple registered filenames',
+            hint: 'Select the exact image from the available list.',
+        };
+        if (['unassigned', 'partially_completed', 'in_revision'].includes(image.status) &&
+            blockedStems.has(name.replace(/\.[^.]+$/, '')))
+            return {
+                name,
+                reason: 'has another copy already locked or submitted',
+                hint: 'Ask your Team Leader to review its work history.',
+            };
         const owner =
             image.currentAssignedStaffId?.userId?.name ||
             image.currentAssignedStaffId?.staffId;
@@ -233,13 +259,26 @@ export function ProductionWorkstation() {
         heldQuery.refetch,
         imagesQuery.refetch,
     ]);
-    const addNames = (names: string[]) =>
+    const addNames = (names: string[]) => {
+        let matched = 0;
+        const resolved = names.map((raw) => {
+            const name = raw.trim();
+            if (registered.has(name)) return name;
+            const matches = byStem.get(name.replace(/\.[^.]+$/, '')) || [];
+            if (matches.length === 1) {
+                matched++;
+                return matches[0];
+            }
+            return name;
+        });
         setStaged((previous) => [
             ...new Set([
                 ...previous,
-                ...names.map((n) => n.trim()).filter(Boolean),
+                ...resolved.filter(Boolean),
             ]),
         ]);
+        if (matched) toast.info(`${matched} filename${matched === 1 ? '' : 's'} matched registered images; their existing records will be used.`);
+    };
     const dropzone = useDropzone({
         disabled: !order || !!running || busy || imagesQuery.isFetching,
         onDrop: (files) => addNames(files.map((f) => f.name)),

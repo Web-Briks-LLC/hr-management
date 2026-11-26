@@ -111,6 +111,49 @@ test('production lifecycle and competing requests on a real replica set', async 
                 assert.equal(await Event.countDocuments({ orderId }), 6);
             },
         );
+        await t.test('released JPG can be taken as PSD without using another slot', async () => {
+            const orderId = await makeOrder(1);
+            const first = await take(orderId, ['photo.jpg']);
+            await cancel(first.session._id);
+            const second = await take(orderId, ['photo.psd'], userB);
+            assert.deepEqual(second.session.imageNames, ['photo.jpg']);
+            assert.equal(await Image.countDocuments({ orderId }), 1);
+            const latest = await Event.findOne({ orderId, action: 'taken' }).sort({ createdAt: -1 }).lean();
+            assert.deepEqual(latest?.imageNames, ['photo.jpg']);
+            assert.equal(latest?.previousImages?.[0]?.imageName, 'photo.jpg');
+            await cancel(second.session._id, userB);
+            await assert.rejects(take(orderId, ['photo.jpg', 'photo.psd']), /same image more than once/);
+            await assert.rejects(take(orderId, ['new.jpg', 'new.psd']), /multiple filenames for the same image/);
+        });
+        await t.test('submitted JPG cannot be reopened through a PSD alias', async () => {
+            const orderId = await makeOrder(1);
+            const first = await take(orderId, ['photo.jpg']);
+            await production.finishWorkSession(
+                { sessionId: String(first.session._id), completedSteps: ['Edit', 'Retouch'] },
+                String(userA),
+            );
+            await assert.rejects(take(orderId, ['photo.psd'], userB), /already submitted/);
+            assert.equal(await Image.countDocuments({ orderId }), 1);
+        });
+        await t.test('historical JPG/PSD copies count once and preserve both records', async () => {
+            const orderId = await makeOrder(2);
+            const first = await take(orderId, ['photo.jpg']);
+            await cancel(first.session._id);
+            await Image.collection.insertOne({
+                orderId: new Types.ObjectId(orderId), imageName: 'photo.psd',
+                status: 'unassigned', requiredSteps: [], completedSteps: [],
+            });
+            const before = await production.getOrderImageStatus(orderId);
+            assert.equal(before.summary.totalRegistered, 1);
+            assert.equal(before.summary.unassignedCount, 2);
+            await assert.rejects(take(orderId, ['photo.tif']), /multiple registered filenames/);
+            await Image.updateOne({ orderId, imageName: 'photo.psd' }, { $set: { status: 'pending_qc' } });
+            await assert.rejects(take(orderId, ['photo.jpg']), /another registered copy/);
+            const second = await take(orderId, ['new.jpg'], userB);
+            assert.equal(await Image.countDocuments({ orderId }), 3);
+            assert.equal((await production.getOrderImageStatus(orderId)).summary.totalRegistered, 2);
+            await cancel(second.session._id, userB);
+        });
         await t.test(
             'simultaneous claim has exactly one winner and no orphan session',
             async () => {

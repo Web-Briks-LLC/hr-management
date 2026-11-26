@@ -104,6 +104,36 @@ const assertQCCounts = (passed: number, rejected: number, completed: number) => 
     }
 };
 
+const imageStem = (name: string) => name.replace(/\.[^.]+$/, '');
+const statusPriority = ['completed', 'pending_qc', 'unassigned', 'partially_completed', 'in_revision', 'in_progress'];
+const logicalImageStats = async (orderIds: Types.ObjectId[]) => {
+    const images = await OrderImageModel.find({ orderId: { $in: orderIds } })
+        .select('orderId imageName status').lean();
+    const groups = new Map<string, Map<string, string>>();
+    for (const image of images) {
+        const id = String(image.orderId);
+        if (!groups.has(id)) groups.set(id, new Map());
+        const statuses = groups.get(id)!;
+        const stem = imageStem(image.imageName);
+        const previous = statuses.get(stem);
+        if (!previous || statusPriority.indexOf(image.status) > statusPriority.indexOf(previous))
+            statuses.set(stem, image.status);
+    }
+    const result = new Map<string, { totalRegistered: number; completedCount: number; inProgressCount: number; partiallyCompletedCount: number; pendingQcCount: number; revisionCount: number }>();
+    for (const [id, statuses] of groups) {
+        const values = [...statuses.values()];
+        result.set(id, {
+            totalRegistered: statuses.size,
+            completedCount: values.filter((status) => status === 'completed').length,
+            inProgressCount: values.filter((status) => status === 'in_progress').length,
+            partiallyCompletedCount: values.filter((status) => status === 'partially_completed').length,
+            pendingQcCount: values.filter((status) => status === 'pending_qc').length,
+            revisionCount: values.filter((status) => status === 'in_revision').length,
+        });
+    }
+    return result;
+};
+
 /**
  * Create a new shift production log
  */
@@ -1109,37 +1139,7 @@ const getSanitizedActiveOrders = async (search?: string, includeCompleted?: bool
 
     // Attach real-time image status summary for each order
     const orderIds = orders.map((o) => o._id);
-    const imageStats = await OrderImageModel.aggregate([
-        { $match: { orderId: { $in: orderIds } } },
-        {
-            $group: {
-                _id: '$orderId',
-                totalRegistered: { $sum: 1 },
-                completedCount: {
-                    $sum: { $cond: [{ $eq: ['$status', 'completed'] }, 1, 0] },
-                },
-                inProgressCount: {
-                    $sum: { $cond: [{ $eq: ['$status', 'in_progress'] }, 1, 0] },
-                },
-                partiallyCompletedCount: {
-                    $sum: {
-                        $cond: [{ $eq: ['$status', 'partially_completed'] }, 1, 0],
-                    },
-                },
-                pendingQcCount: {
-                    $sum: { $cond: [{ $eq: ['$status', 'pending_qc'] }, 1, 0] },
-                },
-                revisionCount: {
-                    $sum: { $cond: [{ $eq: ['$status', 'in_revision'] }, 1, 0] },
-                },
-            },
-        },
-    ]);
-
-    const statsMap = new Map<string, any>();
-    imageStats.forEach((stat) => {
-        statsMap.set(stat._id.toString(), stat);
-    });
+    const statsMap = await logicalImageStats(orderIds);
 
     return orders.map((order) => {
         const stats = statsMap.get(order._id.toString()) || {
@@ -1234,34 +1234,7 @@ const getOrderImageStatus = async (
         .sort({ updatedAt: -1, imageName: 1 })
         .lean();
 
-    const summaryStats = await OrderImageModel.aggregate([
-        { $match: { orderId: new Types.ObjectId(orderId) } },
-        {
-            $group: {
-                _id: null,
-                totalRegistered: { $sum: 1 },
-                completedCount: {
-                    $sum: { $cond: [{ $eq: ['$status', 'completed'] }, 1, 0] },
-                },
-                inProgressCount: {
-                    $sum: { $cond: [{ $eq: ['$status', 'in_progress'] }, 1, 0] },
-                },
-                partiallyCompletedCount: {
-                    $sum: {
-                        $cond: [{ $eq: ['$status', 'partially_completed'] }, 1, 0],
-                    },
-                },
-                pendingQcCount: {
-                    $sum: { $cond: [{ $eq: ['$status', 'pending_qc'] }, 1, 0] },
-                },
-                revisionCount: {
-                    $sum: { $cond: [{ $eq: ['$status', 'in_revision'] }, 1, 0] },
-                },
-            },
-        },
-    ]);
-
-    const stats = summaryStats[0] || {
+    const stats = (await logicalImageStats([new Types.ObjectId(orderId)])).get(orderId) || {
         totalRegistered: 0,
         completedCount: 0,
         inProgressCount: 0,
@@ -1350,6 +1323,19 @@ const startWorkSession = async (
         throw new Error('No image filenames were selected. Choose at least one image to take.');
     }
 
+    const registeredImages = await OrderImageModel.find({ orderId: order._id })
+        .select('imageName status currentSessionId')
+        .lean();
+    const selectedStems = new Set(cleanImageNames.map(imageStem));
+    const siblingConflict = registeredImages.find((image) =>
+        selectedStems.has(imageStem(image.imageName)) &&
+        !cleanImageNames.includes(image.imageName) &&
+        (image.currentSessionId || ['completed', 'pending_qc'].includes(image.status))
+    );
+    if (siblingConflict) {
+        throw new Error(`"${siblingConflict.imageName}" is another registered copy of a selected image and is already locked or submitted. Ask your Team Leader to review its work history.`);
+    }
+
     // Concurrency Lock Check: Are any of these images currently locked by someone else?
     const lockedImages = await OrderImageModel.find({
         orderId: new Types.ObjectId(payload.orderId),
@@ -1425,18 +1411,13 @@ const startWorkSession = async (
         );
     }
 
-    // Quantity validation: the number of distinct images registered against an
-    // order can never exceed the order's ordered image quantity. Counts images
-    // already registered (any non-cancelled state) plus the new batch.
-    const alreadyRegisteredCount = await OrderImageModel.countDocuments({
-        orderId: new Types.ObjectId(payload.orderId),
-        imageName: { $nin: cleanImageNames },
-    });
-
-    if (alreadyRegisteredCount + cleanImageNames.length > (order.imageQuantity || 0)) {
+    const registeredStems = new Set(registeredImages.map((image) => imageStem(image.imageName)));
+    const alreadyRegisteredCount = registeredStems.size;
+    const newCount = [...selectedStems].filter((stem) => !registeredStems.has(stem)).length;
+    if (alreadyRegisteredCount + newCount > (order.imageQuantity || 0)) {
         const remaining = Math.max(0, (order.imageQuantity || 0) - alreadyRegisteredCount);
         throw new Error(
-            `This order only covers ${order.imageQuantity} image(s) and ${alreadyRegisteredCount} are already registered, so you can add at most ${remaining} more new image(s). You tried to add ${cleanImageNames.length}. Remove the extra filenames, or ask your Team Leader to increase the order quantity.`
+            `This order only covers ${order.imageQuantity} image(s) and ${alreadyRegisteredCount} are already registered, so you can add at most ${remaining} more new image(s). You tried to add ${newCount}. Remove the extra filenames, or ask your Team Leader to increase the order quantity.`
         );
     }
 
@@ -1950,9 +1931,7 @@ const finalizeSessionCompletion = async (
         status: { $nin: ['completed', 'pending_qc'] },
     });
 
-    const totalOrderImages = await OrderImageModel.countDocuments({
-        orderId: session.orderId,
-    });
+    const totalOrderImages = (await logicalImageStats([session.orderId])).get(String(session.orderId))?.totalRegistered || 0;
 
     if (
         totalOrderImages >= (order?.imageQuantity || 1) &&
@@ -2705,9 +2684,7 @@ const qcApproveImages = async (
         status: { $ne: 'completed' },
     });
 
-    const totalOrderImages = await OrderImageModel.countDocuments({
-        orderId: order._id,
-    });
+    const totalOrderImages = (await logicalImageStats([order._id])).get(String(order._id))?.totalRegistered || 0;
 
     const orderJustCompleted =
         totalOrderImages >= order.imageQuantity &&
