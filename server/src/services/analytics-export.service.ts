@@ -130,17 +130,17 @@ async function getExportData(params: AnalyticsQueryParams) {
         }
     }
 
-    const monthsInInterval = getMonthsInInterval(startDate, endDate);
-
-    // Earnings query
+    // Earnings query (same rule as getFinanceAnalytics)
     const earningMatch: any = {
         status: 'paid',
     };
     if (hasDateRange) {
-        earningMatch.$or = monthsInInterval.map(m => ({
-            year: m.year,
-            month: m.month
-        }));
+        const range = { $gte: startDate, $lte: endDate };
+        earningMatch.$or = [
+            { paidAt: range },
+            // `paidAt: null` also matches documents without the field
+            { paidAt: null, createdAt: range },
+        ];
     } else {
         earningMatch.year = params.year || now.getFullYear();
         if (params.month) {
@@ -153,25 +153,10 @@ async function getExportData(params: AnalyticsQueryParams) {
         .sort({ createdAt: 1 })
         .lean();
 
-    // Expenses query
+    // Expenses query (same rule as getFinanceAnalytics: by expense date, not billing month)
     const expenseFilter: any = {
         status: { $in: ['paid', 'partial_paid'] },
-        $or: [
-            {
-                $or: monthsInInterval.map(m => ({
-                    billingYear: m.year,
-                    billingMonth: m.month
-                }))
-            },
-            {
-                billingMonth: { $exists: false },
-                date: { $gte: startDate, $lte: endDate }
-            },
-            {
-                billingMonth: null,
-                date: { $gte: startDate, $lte: endDate }
-            }
-        ]
+        date: { $gte: startDate, $lte: endDate },
     };
 
     // Expenses query with $lookup join for user (better-auth collection), branch and category
@@ -236,18 +221,17 @@ async function getExportData(params: AnalyticsQueryParams) {
             currency: e.currency || 'USD',
             convertedPrice: e.conversionRate || 0,
             totalBDT: totalBDT,
-            date: new Date(`${e.year}-${e.month.toString().padStart(2, '0')}-01T12:00:00+06:00`),
+            date: hasDateRange
+                ? new Date(e.paidAt || e.createdAt)
+                : new Date(`${e.year}-${e.month.toString().padStart(2, '0')}-01T12:00:00+06:00`),
         };
     });
 
     const formattedExpenses = expenses.map((e: any) => {
         totalExpensesBDT += e.amount || 0;
         const createdByName = e.creatorDetails?.name || 'Unknown User';
-        const representedDate = e.billingMonth && e.billingYear
-            ? new Date(`${e.billingYear}-${e.billingMonth.toString().padStart(2, '0')}-01T12:00:00+06:00`)
-            : e.date;
         return {
-            date: representedDate,
+            date: e.date,
             title: e.title,
             branchName: e.branchDetails?.name || 'Unknown Branch',
             categoryName: e.categoryDetails?.name || 'Uncategorized',
